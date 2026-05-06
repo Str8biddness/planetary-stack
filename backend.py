@@ -7,11 +7,10 @@ import sys
 import asyncio
 
 # Ensure synthesus is in the path
-# Assuming backend.py is in /projects/ghostkey_quadbrain/
-# and synthesus is in /
-SYNTH_BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../synthesus"))
+# In the monorepo structure, synthesus_framework is in the same directory as backend.py
+SYNTH_BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), "synthesus_framework"))
 if SYNTH_BASE not in sys.path:
-    sys.path.append(SYNTH_BASE)
+    sys.path.insert(0, SYNTH_BASE)
 
 try:
     from core.quadbrain_master import QuadbrainMaster
@@ -154,7 +153,7 @@ async def security_pulse(master):
 async def main_loop():
     # Find the synthesus directory relative to this script
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    SYNTH_DIR = os.path.abspath(os.path.join(current_dir, "../../synthesus"))
+    SYNTH_DIR = os.path.join(current_dir, "synthesus_framework")
     
     if os.path.exists(SYNTH_DIR):
         os.chdir(SYNTH_DIR)
