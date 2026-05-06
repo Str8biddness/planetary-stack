@@ -1,0 +1,166 @@
+# KN — Knowledge Node System
+
+> Synthesus 3.0 — Knowledge Index Architecture
+
+## Overview
+
+The KN (Knowledge Node) system is Synthesus's persistent, queryable memory layer for entities, relationships, and facts. It organizes knowledge as a graph of typed nodes connected by weighted edges, with optional vector-based semantic search via FAISS.
+
+## Architecture
+
+```
+User Query
+    │
+    ▼
+KnowledgeNetwork (graph storage + keyword search)
+    │
+    ├──► SemanticIndexer (FAISS + SwarmEmbedder)
+    │         ~50KB TF-IDF+SVD embedder, <1ms inference
+    │
+    └──► EntityLinker (mention → canonical node resolution)
+              │
+              ▼
+         Response Enhancement
+```
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `kn/__init__.py` | Module entry point — exports all public classes |
+| `kn/node.py` | NodeType, EdgeType, Edge, KNode, and typed subclasses |
+| `kn/network.py` | KnowledgeNetwork — core graph manager |
+| `kn/semantic_indexer.py` | SemanticIndexer — FAISS-backed vector semantic search |
+| `kn/entity_linker.py` | EntityLinker — text-to-node mention resolution |
+| `kn/graph_connector.py` | GraphConnector — bulk import pipeline |
+| `knowledge_integration/kaggle_loader.py` | KaggleLoader — High-quality fact ingestion from Jeopardy/ConceptNet |
+
+## Core Components
+
+### KnowledgeNetwork (`kn/network.py`)
+
+Manages the persistent graph of typed nodes and weighted edges. Supports auto-save, keyword search, and contextual subgraph retrieval.
+
+```python
+from kn import KnowledgeNetwork, SemanticIndexer, EntityLinker, GraphConnector
+from kn.node import NodeType, KNode
+
+kn = KnowledgeNetwork(index_path="data/kn_index.json", graph_path="data/knowledge_graph.pkl")
+kn.register_node(KNode(id="gorn", node_type=NodeType.PERSON, content="A merchant in the riverside tavern."))
+kn.add_edge("gorn", "tavern", EdgeType.LOCATED_AT, weight=0.9)
+results = kn.search("merchant", top_k=5)
+```
+
+### SemanticIndexer (`kn/semantic_indexer.py`)
+
+Vector-based semantic similarity search using TF-IDF + SVD embeddings (SwarmEmbedder) backed by FAISS IndexFlatIP. Recent updates include **Similarity Floor Tuning (0.12)** and **TF-IDF threshold adjustments** for better recall in noisy domains.
+
+```python
+indexer = SemanticIndexer(kn=kn)
+indexer.index_nodes(kn.list_nodes())
+results = indexer.search("fire-breathing creatures", top_k=5)
+```
+
+### EntityLinker (`kn/entity_linker.py`)
+
+Resolves textual mentions (names, aliases, pronouns) to canonical node IDs with fuzzy matching and LRU caching.
+
+```python
+linker = EntityLinker(kn=kn)
+result = linker.link_mention("Gorn the merchant")
+if result:
+    print(f"Resolved to: {result.node_id} (confidence: {result.confidence:.2f})")
+```
+
+### GraphConnector (`kn/graph_connector.py`)
+
+Bridges external data sources (JSON, world lore) into the KN graph with automatic edge creation and duplicate detection.
+
+```python
+connector = GraphConnector(kn=kn, linker=linker, indexer=indexer)
+stats = connector.import_json("data/world_lore.json", create_edges=True)
+print(f"Imported {stats['nodes_added']} nodes, {stats['edges_added']} edges")
+```
+
+## Node Types
+
+| Type | Description |
+|------|-------------|
+| `PERSON` | Characters, NPCs, players |
+| `PLACE` | Locations, cities, buildings |
+| `ITEM` | Objects, artifacts, weapons |
+| `FACTION` | Organizations, guilds, governments |
+| `EVENT` | Historical or in-world events |
+| `CREATURE` | Monsters, beasts, dragons |
+| `KNOWLEDGE` | Facts, lore, rules |
+| `UNKNOWN` | Uncategorized |
+
+## Edge Types
+
+| Type | Description |
+|------|-------------|
+| `RELATED_TO` | General relationship |
+| `LOCATED_AT` | Spatial containment |
+| `PART_OF` | Hierarchical membership |
+| `ALLIED_WITH` | Alliance or friendship |
+| `HOSTILE_TOWARD` | Opposition or enemy |
+| `CAUSED_BY` | Causal chain |
+| `KNOWS_ABOUT` | Knowledge relationship |
+| `AFFECTED_BY` | Influence relationship |
+
+## Knowledge Population
+
+The knowledge integration pipeline sources data from:
+1. **Jeopardy Questions** — ~216,930 Q&A pairs (diverse trivia facts)
+2. **ConceptNet Assertions** — ~2M commonsense knowledge edges
+
+**Production Scale Population (2026-04-27):**
+- Total index size: **501,819 vectors**.
+- Verified semantic search quality across Science, History, Geography, and Fiction domains.
+- Integrated **Lore Forge** synthetic data for narrative grounding.
+
+Data flows through:
+1. `knowledge_integration/kaggle_loader.py` — Download and parse external datasets
+2. `knowledge_integration/kn_populator.py` — Transform raw data into KN nodes
+3. `knowledge_integration/lore_forge.py` — Generate high-fidelity synthetic lore nodes
+4. Build artifacts stored in `data/` (gitignored)
+
+## Usage
+
+```python
+from kn import KnowledgeNetwork, SemanticIndexer, EntityLinker, GraphConnector
+from kn.node import NodeType, KNode, PersonNode, PlaceNode, Edge, EdgeType
+
+# Create network
+kn = KnowledgeNetwork(index_path="data/kn_index.json", graph_path="data/knowledge_graph.pkl")
+
+# Register typed nodes
+kn.register_node(PersonNode(id="gorn", display_name="Gorn", content="A merchant."))
+kn.register_node(PlaceNode(id="tavern", display_name="Riverside Tavern", content="A lively inn."))
+
+# Connect them
+kn.add_edge("gorn", "tavern", EdgeType.LOCATED_AT, weight=0.9, bidirectional=True)
+
+# Search
+results = kn.search("merchant", top_k=5)
+for node, score, reason in results:
+    print(f"  [{score:.2f}] {node.display_name}: {reason}")
+
+# Context retrieval (subgraph)
+ctx = kn.get_context("gorn", depth=2)
+print(f"Context for gorn: {ctx['nodes'].keys()}")
+
+# Semantic search
+indexer = SemanticIndexer(kn=kn)
+indexer.index_nodes(kn.list_nodes())
+semantic = indexer.search("inn by the river", top_k=3)
+```
+
+## Performance
+
+| Operation | Latency |
+|-----------|---------|
+| Embedding inference (SwarmEmbedder) | **<1ms** per query |
+| FAISS search (top-10, 200K vectors) | **<5ms** |
+| KN keyword search (1000 nodes) | **<2ms** |
+| Entity linking (cached) | **<0.1ms** |

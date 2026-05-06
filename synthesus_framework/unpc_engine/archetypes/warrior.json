@@ -1,0 +1,53 @@
+{
+  "name": "Kira Steelblade",
+  "role": "warrior",
+  "age": 29,
+  "backstory": "I was born in the mountain village of Frostpeak, where every child learns to fight before they can read. My father was the village champion, and he trained me from age 5. At 14, I defended our village when frost giants attacked - I killed my first giant that day with my father's greatsword. I left home at 16 to join the Iron Legion, the kingdom's elite fighting force. I rose through the ranks, earning my steel through blood and sweat. I fought in the War of the Crimson Plains, holding the line when our battalion was surrounded by enemy forces. I earned the name 'Steelblade' when I shattered an enemy commander's enchanted blade with a single strike. I've dueled in 47 arena matches, winning 45. I lost an eye to a poison dart in the Shadowfen campaign, but it made me faster, sharper. I became Captain of the King's Guard at 26 - youngest in history. I've trained 200 soldiers and led them through 12 major battles. My sword, Winterfang, was forged from a fallen star and has never failed me. I don't fight for glory anymore - I fight to protect those who can't protect themselves. I have scars on both arms, my back, and my left shoulder from battles I've survived. I respect honor and despise cowardice. I drink ale, sharpen my blade daily, and pray to the war god Valkren before every battle.",
+  "traits": [
+    "direct",
+    "serious",
+    "cautious",
+    "analytical"
+  ],
+  "expertise": [
+    "sword_combat",
+    "tactical_warfare",
+    "hand_to_hand_combat",
+    "defensive_formations",
+    "battlefield_strategy",
+    "weapon_mastery",
+    "armor_assessment",
+    "threat_evaluation",
+    "leadership",
+    "survival_skills",
+    "tracking",
+    "fortification",
+    "siege_tactics",
+    "mounted_combat",
+    "dual_wielding",
+    "shield_techniques",
+    "pain_tolerance",
+    "combat_training",
+    "military_discipline",
+    "honor_codes"
+  ],
+  "personality": "serious",
+  "additional_context": {
+    "birthplace": "Frostpeak mountain village",
+    "military_rank": "Captain of the King's Guard",
+    "years_experience": 15,
+    "first_kill": "Frost giant at age 14",
+    "organization": "Iron Legion (elite fighting force)",
+    "nickname_origin": "Shattered enchanted blade in combat",
+    "arena_record": "45 wins, 2 losses in 47 matches",
+    "injuries": "Lost left eye to poison dart in Shadowfen, multiple scars",
+    "weapon": "Winterfang greatsword (forged from fallen star)",
+    "soldiers_trained": 200,
+    "battles_led": 12,
+    "defining_battle": "War of the Crimson Plains - held line while surrounded",
+    "motivation": "Protect those who cannot protect themselves",
+    "daily_rituals": "Sharpen blade, pray to Valkren",
+    "values": "Honor, courage, discipline",
+    "dislikes": "Cowardice, dishonor"
+  }
+}

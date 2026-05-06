@@ -1,0 +1,3602 @@
+[
+  {
+    "turn_count": 6,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 300,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 60,
+    "question_ratio": 0.2,
+    "action": "buy"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 0.8,
+    "action": "explore"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 120,
+    "question_ratio": 0.2,
+    "action": "buy"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 60,
+    "question_ratio": 0.4,
+    "action": "fight"
+  },
+  {
+    "turn_count": 4,
+    "avg_msg_length": 25,
+    "sentiment_trend": 1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 5,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 9,
+    "avg_msg_length": 50,
+    "sentiment_trend": -0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 0.6,
+    "action": "leave"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 25,
+    "sentiment_trend": -0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 300,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.0,
+    "topic_switches": 1,
+    "time_between_msgs": 15,
+    "question_ratio": 1.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.0,
+    "topic_switches": 5,
+    "time_between_msgs": 15,
+    "question_ratio": 0.8,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.0,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.2,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 15,
+    "sentiment_trend": 1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 15,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 9,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 60,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 30,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 1.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 7,
+    "avg_msg_length": 50,
+    "sentiment_trend": -1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 5,
+    "question_ratio": 0.6,
+    "action": "leave"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 25,
+    "sentiment_trend": -1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 300,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 30,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 15,
+    "question_ratio": 0.4,
+    "action": "explore"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 5,
+    "question_ratio": 1.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 15,
+    "question_ratio": 0.2,
+    "action": "fight"
+  },
+  {
+    "turn_count": 7,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.0,
+    "topic_switches": 1,
+    "time_between_msgs": 120,
+    "question_ratio": 0.4,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 4,
+    "avg_msg_length": 20,
+    "sentiment_trend": -0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.0,
+    "action": "idle"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 20,
+    "sentiment_trend": -1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 5,
+    "question_ratio": 0.8,
+    "action": "leave"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 25,
+    "sentiment_trend": -1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 300,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.0,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.6,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 5,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 0.4,
+    "action": "buy"
+  },
+  {
+    "turn_count": 4,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 120,
+    "question_ratio": 1.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.0,
+    "action": "fight"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 120,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 60,
+    "question_ratio": 0.4,
+    "action": "leave"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.0,
+    "topic_switches": 4,
+    "time_between_msgs": 5,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 25,
+    "sentiment_trend": -0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 30,
+    "question_ratio": 0.8,
+    "action": "fight"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 30,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 5,
+    "question_ratio": 0.8,
+    "action": "sell"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 30,
+    "question_ratio": 0.0,
+    "action": "explore"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 10,
+    "sentiment_trend": -0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 15,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 10,
+    "sentiment_trend": -1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 60,
+    "question_ratio": 0.4,
+    "action": "leave"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 5,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 10,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 1.0,
+    "action": "explore"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.0,
+    "topic_switches": 1,
+    "time_between_msgs": 60,
+    "question_ratio": 0.6,
+    "action": "sell"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 25,
+    "sentiment_trend": -1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 300,
+    "question_ratio": 0.2,
+    "action": "fight"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 120,
+    "question_ratio": 0.2,
+    "action": "fight"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 25,
+    "sentiment_trend": -1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 60,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 15,
+    "sentiment_trend": -0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 15,
+    "question_ratio": 0.2,
+    "action": "fight"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 60,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 25,
+    "sentiment_trend": -0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 30,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 0.0,
+    "action": "fight"
+  },
+  {
+    "turn_count": 15,
+    "avg_msg_length": 50,
+    "sentiment_trend": -0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 30,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 30,
+    "sentiment_trend": 1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 60,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 25,
+    "sentiment_trend": -1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 5,
+    "question_ratio": 1.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 25,
+    "sentiment_trend": -1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 30,
+    "question_ratio": 0.8,
+    "action": "fight"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 15,
+    "avg_msg_length": 15,
+    "sentiment_trend": 1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 60,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 0.6,
+    "action": "explore"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "explore"
+  },
+  {
+    "turn_count": 15,
+    "avg_msg_length": 5,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 15,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 15,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 5,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 7,
+    "avg_msg_length": 10,
+    "sentiment_trend": -0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 15,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "sell"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 5,
+    "question_ratio": 0.8,
+    "action": "buy"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 30,
+    "sentiment_trend": -1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 60,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 30,
+    "sentiment_trend": -0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 1.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.0,
+    "topic_switches": 5,
+    "time_between_msgs": 300,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 25,
+    "sentiment_trend": -0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 120,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 50,
+    "sentiment_trend": -1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 60,
+    "question_ratio": 1.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 30,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 0.4,
+    "action": "leave"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.0,
+    "topic_switches": 4,
+    "time_between_msgs": 300,
+    "question_ratio": 0.2,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 9,
+    "avg_msg_length": 5,
+    "sentiment_trend": 1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 120,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 50,
+    "sentiment_trend": -0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 120,
+    "question_ratio": 0.6,
+    "action": "fight"
+  },
+  {
+    "turn_count": 4,
+    "avg_msg_length": 30,
+    "sentiment_trend": -0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 120,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 4,
+    "avg_msg_length": 15,
+    "sentiment_trend": -0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 60,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.0,
+    "topic_switches": 4,
+    "time_between_msgs": 30,
+    "question_ratio": 1.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 50,
+    "sentiment_trend": -0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 15,
+    "question_ratio": 0.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 5,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 25,
+    "sentiment_trend": -0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 5,
+    "question_ratio": 1.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 5,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.0,
+    "topic_switches": 0,
+    "time_between_msgs": 30,
+    "question_ratio": 1.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 15,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 15,
+    "question_ratio": 0.0,
+    "action": "explore"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 5,
+    "question_ratio": 0.6,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 300,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 5,
+    "sentiment_trend": 1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 300,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 20,
+    "sentiment_trend": -1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 120,
+    "question_ratio": 1.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.0,
+    "topic_switches": 0,
+    "time_between_msgs": 60,
+    "question_ratio": 0.8,
+    "action": "sell"
+  },
+  {
+    "turn_count": 9,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 15,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.0,
+    "topic_switches": 5,
+    "time_between_msgs": 15,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 5,
+    "question_ratio": 0.6,
+    "action": "leave"
+  },
+  {
+    "turn_count": 4,
+    "avg_msg_length": 5,
+    "sentiment_trend": 1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 10,
+    "sentiment_trend": 1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 30,
+    "question_ratio": 0.2,
+    "action": "explore"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.0,
+    "topic_switches": 3,
+    "time_between_msgs": 5,
+    "question_ratio": 0.2,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 30,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 30,
+    "question_ratio": 0.4,
+    "action": "buy"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 5,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 25,
+    "sentiment_trend": -1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 60,
+    "question_ratio": 0.4,
+    "action": "leave"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 300,
+    "question_ratio": 0.4,
+    "action": "buy"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 15,
+    "question_ratio": 0.6,
+    "action": "sell"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 30,
+    "sentiment_trend": 1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 15,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 15,
+    "question_ratio": 0.0,
+    "action": "buy"
+  },
+  {
+    "turn_count": 9,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "sell"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 15,
+    "question_ratio": 0.6,
+    "action": "explore"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.8,
+    "action": "sell"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 20,
+    "sentiment_trend": -1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 15,
+    "question_ratio": 0.8,
+    "action": "leave"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 300,
+    "question_ratio": 1.0,
+    "action": "buy"
+  },
+  {
+    "turn_count": 4,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 5,
+    "question_ratio": 0.6,
+    "action": "sell"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 15,
+    "question_ratio": 0.0,
+    "action": "explore"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 1.0,
+    "action": "buy"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 300,
+    "question_ratio": 0.2,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.0,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 0.0,
+    "action": "explore"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 25,
+    "sentiment_trend": -0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 5,
+    "question_ratio": 0.8,
+    "action": "leave"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 5,
+    "sentiment_trend": 1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 30,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 15,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "sell"
+  },
+  {
+    "turn_count": 9,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 50,
+    "sentiment_trend": -1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 15,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 25,
+    "sentiment_trend": -0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 120,
+    "question_ratio": 0.6,
+    "action": "fight"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.0,
+    "topic_switches": 4,
+    "time_between_msgs": 30,
+    "question_ratio": 1.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 15,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 1.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 30,
+    "question_ratio": 0.2,
+    "action": "buy"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 60,
+    "question_ratio": 0.2,
+    "action": "explore"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 5,
+    "sentiment_trend": 1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 30,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 10,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 50,
+    "sentiment_trend": -0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "sell"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 300,
+    "question_ratio": 0.8,
+    "action": "leave"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 30,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 300,
+    "question_ratio": 0.8,
+    "action": "explore"
+  },
+  {
+    "turn_count": 15,
+    "avg_msg_length": 25,
+    "sentiment_trend": -1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 300,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 30,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 0.2,
+    "action": "explore"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 15,
+    "sentiment_trend": -0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 15,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 30,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 60,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 7,
+    "avg_msg_length": 25,
+    "sentiment_trend": 1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 30,
+    "question_ratio": 0.6,
+    "action": "sell"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.0,
+    "topic_switches": 1,
+    "time_between_msgs": 120,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.0,
+    "topic_switches": 3,
+    "time_between_msgs": 15,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 10,
+    "sentiment_trend": -0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 5,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 60,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 5,
+    "question_ratio": 0.8,
+    "action": "sell"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 15,
+    "question_ratio": 0.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 5,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 5,
+    "question_ratio": 0.0,
+    "action": "explore"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 20,
+    "sentiment_trend": -0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 15,
+    "question_ratio": 0.8,
+    "action": "leave"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 25,
+    "sentiment_trend": -0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 5,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 7,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.0,
+    "topic_switches": 0,
+    "time_between_msgs": 30,
+    "question_ratio": 0.4,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.0,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.2,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 25,
+    "sentiment_trend": -0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 60,
+    "question_ratio": 1.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 60,
+    "question_ratio": 0.4,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 30,
+    "sentiment_trend": -1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 5,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 120,
+    "question_ratio": 1.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 15,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.0,
+    "topic_switches": 3,
+    "time_between_msgs": 15,
+    "question_ratio": 0.2,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 5,
+    "question_ratio": 0.4,
+    "action": "explore"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 120,
+    "question_ratio": 0.6,
+    "action": "explore"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 30,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 9,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.0,
+    "topic_switches": 5,
+    "time_between_msgs": 120,
+    "question_ratio": 0.6,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 15,
+    "question_ratio": 0.8,
+    "action": "sell"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 60,
+    "question_ratio": 0.4,
+    "action": "buy"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 30,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 300,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 30,
+    "question_ratio": 0.4,
+    "action": "leave"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 300,
+    "question_ratio": 0.2,
+    "action": "explore"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.0,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 60,
+    "question_ratio": 1.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 60,
+    "question_ratio": 1.0,
+    "action": "explore"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 10,
+    "sentiment_trend": -1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 30,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.0,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 30,
+    "sentiment_trend": 1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 300,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 10,
+    "sentiment_trend": -0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 15,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 300,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 60,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.0,
+    "topic_switches": 0,
+    "time_between_msgs": 120,
+    "question_ratio": 0.2,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 25,
+    "sentiment_trend": -1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 60,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 30,
+    "question_ratio": 1.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.0,
+    "topic_switches": 3,
+    "time_between_msgs": 15,
+    "question_ratio": 0.6,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.0,
+    "topic_switches": 1,
+    "time_between_msgs": 120,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 15,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 300,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 50,
+    "sentiment_trend": -0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 60,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 15,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 7,
+    "avg_msg_length": 25,
+    "sentiment_trend": 1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 25,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 15,
+    "question_ratio": 1.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 300,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 25,
+    "sentiment_trend": 1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 15,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 30,
+    "sentiment_trend": -0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 60,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 10,
+    "sentiment_trend": -0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 30,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 4,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 0.6,
+    "action": "leave"
+  },
+  {
+    "turn_count": 15,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 30,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 300,
+    "question_ratio": 0.0,
+    "action": "explore"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 10,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 0.2,
+    "action": "explore"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 50,
+    "sentiment_trend": -1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 30,
+    "question_ratio": 0.6,
+    "action": "fight"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 25,
+    "sentiment_trend": -0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.0,
+    "action": "fight"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 60,
+    "question_ratio": 0.8,
+    "action": "explore"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.0,
+    "topic_switches": 5,
+    "time_between_msgs": 15,
+    "question_ratio": 1.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 30,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 15,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.4,
+    "action": "leave"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 20,
+    "sentiment_trend": -1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 0.4,
+    "action": "leave"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 15,
+    "sentiment_trend": -0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 300,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 120,
+    "question_ratio": 0.2,
+    "action": "fight"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.0,
+    "topic_switches": 5,
+    "time_between_msgs": 5,
+    "question_ratio": 0.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 15,
+    "sentiment_trend": 1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 5,
+    "question_ratio": 0.2,
+    "action": "buy"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 5,
+    "sentiment_trend": 1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 15,
+    "question_ratio": 0.6,
+    "action": "leave"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 15,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 15,
+    "question_ratio": 0.0,
+    "action": "explore"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 60,
+    "question_ratio": 0.0,
+    "action": "fight"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 300,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 30,
+    "sentiment_trend": 1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 15,
+    "question_ratio": 0.2,
+    "action": "explore"
+  },
+  {
+    "turn_count": 7,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.0,
+    "topic_switches": 4,
+    "time_between_msgs": 15,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 7,
+    "avg_msg_length": 25,
+    "sentiment_trend": -1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 15,
+    "question_ratio": 0.6,
+    "action": "leave"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 15,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 300,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 300,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.0,
+    "topic_switches": 3,
+    "time_between_msgs": 15,
+    "question_ratio": 0.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 300,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 50,
+    "sentiment_trend": -1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 300,
+    "question_ratio": 1.0,
+    "action": "fight"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 10,
+    "sentiment_trend": 1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 5,
+    "question_ratio": 0.0,
+    "action": "explore"
+  },
+  {
+    "turn_count": 15,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 15,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 15,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 60,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 10,
+    "sentiment_trend": -1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 5,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 60,
+    "question_ratio": 0.0,
+    "action": "buy"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 20,
+    "sentiment_trend": -0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 0.4,
+    "action": "buy"
+  },
+  {
+    "turn_count": 15,
+    "avg_msg_length": 30,
+    "sentiment_trend": -1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 60,
+    "question_ratio": 0.8,
+    "action": "fight"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.0,
+    "topic_switches": 4,
+    "time_between_msgs": 300,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 9,
+    "avg_msg_length": 50,
+    "sentiment_trend": -0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 300,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 10,
+    "sentiment_trend": -1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 5,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 60,
+    "question_ratio": 0.4,
+    "action": "explore"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 25,
+    "sentiment_trend": -1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 60,
+    "question_ratio": 0.8,
+    "action": "leave"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.0,
+    "topic_switches": 3,
+    "time_between_msgs": 15,
+    "question_ratio": 0.2,
+    "action": "explore"
+  },
+  {
+    "turn_count": 4,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.0,
+    "topic_switches": 3,
+    "time_between_msgs": 60,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 5,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 25,
+    "sentiment_trend": -0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 60,
+    "question_ratio": 0.6,
+    "action": "leave"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 20,
+    "sentiment_trend": -0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 120,
+    "question_ratio": 0.0,
+    "action": "fight"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.0,
+    "topic_switches": 3,
+    "time_between_msgs": 5,
+    "question_ratio": 0.2,
+    "action": "explore"
+  },
+  {
+    "turn_count": 4,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 5,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 20,
+    "sentiment_trend": -1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.6,
+    "action": "leave"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 30,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 15,
+    "sentiment_trend": -0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 15,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 5,
+    "sentiment_trend": 1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 15,
+    "question_ratio": 0.4,
+    "action": "buy"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.0,
+    "topic_switches": 3,
+    "time_between_msgs": 60,
+    "question_ratio": 1.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 9,
+    "avg_msg_length": 20,
+    "sentiment_trend": -1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.8,
+    "action": "fight"
+  },
+  {
+    "turn_count": 7,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 60,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 20,
+    "sentiment_trend": -0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 30,
+    "question_ratio": 0.8,
+    "action": "fight"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 5,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 30,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 50,
+    "sentiment_trend": -1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 5,
+    "question_ratio": 0.6,
+    "action": "fight"
+  },
+  {
+    "turn_count": 15,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.0,
+    "topic_switches": 0,
+    "time_between_msgs": 5,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 10,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 5,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 9,
+    "avg_msg_length": 25,
+    "sentiment_trend": -1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 15,
+    "question_ratio": 1.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 15,
+    "sentiment_trend": -0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 30,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 300,
+    "question_ratio": 0.8,
+    "action": "buy"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 1.0,
+    "action": "explore"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 300,
+    "question_ratio": 0.4,
+    "action": "explore"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 60,
+    "question_ratio": 0.4,
+    "action": "leave"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 15,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 20,
+    "sentiment_trend": -0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 300,
+    "question_ratio": 1.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.0,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 0.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 15,
+    "avg_msg_length": 50,
+    "sentiment_trend": -1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 300,
+    "question_ratio": 0.4,
+    "action": "leave"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 50,
+    "sentiment_trend": -0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 15,
+    "question_ratio": 0.6,
+    "action": "idle"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 50,
+    "sentiment_trend": -0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 5,
+    "question_ratio": 0.6,
+    "action": "leave"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.0,
+    "topic_switches": 0,
+    "time_between_msgs": 120,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 25,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "explore"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 5,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 30,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 300,
+    "question_ratio": 0.8,
+    "action": "sell"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 0.2,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 4,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.0,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 1.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 60,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 50,
+    "sentiment_trend": -1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 0.0,
+    "action": "fight"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 20,
+    "sentiment_trend": -1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 15,
+    "question_ratio": 0.6,
+    "action": "leave"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 300,
+    "question_ratio": 1.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 15,
+    "question_ratio": 0.8,
+    "action": "sell"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 25,
+    "sentiment_trend": -0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 300,
+    "question_ratio": 0.6,
+    "action": "leave"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 30,
+    "sentiment_trend": -1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 5,
+    "question_ratio": 0.8,
+    "action": "leave"
+  },
+  {
+    "turn_count": 4,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 15,
+    "question_ratio": 0.2,
+    "action": "buy"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 25,
+    "sentiment_trend": -0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 300,
+    "question_ratio": 0.6,
+    "action": "leave"
+  },
+  {
+    "turn_count": 15,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 30,
+    "question_ratio": 1.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 60,
+    "question_ratio": 0.8,
+    "action": "explore"
+  },
+  {
+    "turn_count": 9,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 30,
+    "question_ratio": 0.6,
+    "action": "sell"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 15,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 10,
+    "sentiment_trend": -0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 15,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 15,
+    "question_ratio": 0.0,
+    "action": "explore"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 50,
+    "sentiment_trend": -0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 0.6,
+    "action": "leave"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 10,
+    "sentiment_trend": 1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 60,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 20,
+    "sentiment_trend": -0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 0.8,
+    "action": "leave"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 5,
+    "sentiment_trend": 1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 5,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 50,
+    "sentiment_trend": -0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 300,
+    "question_ratio": 0.8,
+    "action": "leave"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 50,
+    "sentiment_trend": -0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 60,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 30,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.0,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 30,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 4,
+    "avg_msg_length": 25,
+    "sentiment_trend": -1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 30,
+    "question_ratio": 1.0,
+    "action": "fight"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 5,
+    "question_ratio": 0.8,
+    "action": "explore"
+  },
+  {
+    "turn_count": 9,
+    "avg_msg_length": 25,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 1.0,
+    "action": "buy"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.4,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 25,
+    "sentiment_trend": -1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 30,
+    "question_ratio": 0.8,
+    "action": "leave"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 0.6,
+    "action": "sell"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 25,
+    "sentiment_trend": -0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 120,
+    "question_ratio": 0.6,
+    "action": "leave"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.0,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 0.8,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.0,
+    "topic_switches": 4,
+    "time_between_msgs": 30,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 15,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 15,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 60,
+    "question_ratio": 0.0,
+    "action": "fight"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 10,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 10,
+    "sentiment_trend": 0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 300,
+    "question_ratio": 0.2,
+    "action": "explore"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 300,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 15,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 30,
+    "question_ratio": 0.2,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.0,
+    "topic_switches": 5,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 20,
+    "sentiment_trend": -1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 60,
+    "question_ratio": 0.4,
+    "action": "leave"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 60,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 30,
+    "question_ratio": 0.2,
+    "action": "buy"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 60,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 15,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.0,
+    "topic_switches": 0,
+    "time_between_msgs": 5,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.0,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 10,
+    "sentiment_trend": -0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 15,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 15,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 300,
+    "question_ratio": 0.6,
+    "action": "explore"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.0,
+    "topic_switches": 4,
+    "time_between_msgs": 5,
+    "question_ratio": 0.6,
+    "action": "sell"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 30,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 9,
+    "avg_msg_length": 25,
+    "sentiment_trend": 1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 60,
+    "question_ratio": 0.0,
+    "action": "buy"
+  },
+  {
+    "turn_count": 4,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 0.6,
+    "action": "sell"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 10,
+    "sentiment_trend": -0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 15,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 20,
+    "sentiment_trend": -1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 60,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.0,
+    "topic_switches": 1,
+    "time_between_msgs": 300,
+    "question_ratio": 0.6,
+    "action": "sell"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 30,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 15,
+    "sentiment_trend": -0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 30,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 60,
+    "question_ratio": 0.8,
+    "action": "sell"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.0,
+    "topic_switches": 4,
+    "time_between_msgs": 15,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 30,
+    "sentiment_trend": -0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 30,
+    "question_ratio": 0.4,
+    "action": "leave"
+  },
+  {
+    "turn_count": 9,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 60,
+    "question_ratio": 0.4,
+    "action": "leave"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 300,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 5,
+    "sentiment_trend": -0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 15,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 300,
+    "question_ratio": 1.0,
+    "action": "explore"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 30,
+    "sentiment_trend": -1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 60,
+    "question_ratio": 0.6,
+    "action": "leave"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.0,
+    "topic_switches": 5,
+    "time_between_msgs": 300,
+    "question_ratio": 1.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 10,
+    "sentiment_trend": -1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 50,
+    "sentiment_trend": -1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 30,
+    "question_ratio": 1.0,
+    "action": "buy"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 0.4,
+    "action": "buy"
+  },
+  {
+    "turn_count": 7,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 15,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 50,
+    "sentiment_trend": -0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 300,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 60,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 15,
+    "question_ratio": 0.4,
+    "action": "buy"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.0,
+    "topic_switches": 3,
+    "time_between_msgs": 5,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 300,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 10,
+    "sentiment_trend": 1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 15,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.0,
+    "topic_switches": 4,
+    "time_between_msgs": 300,
+    "question_ratio": 0.6,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 25,
+    "sentiment_trend": 0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "explore"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 60,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.0,
+    "topic_switches": 3,
+    "time_between_msgs": 300,
+    "question_ratio": 0.2,
+    "action": "explore"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.0,
+    "topic_switches": 1,
+    "time_between_msgs": 30,
+    "question_ratio": 0.2,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 18,
+    "avg_msg_length": 30,
+    "sentiment_trend": -0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 25,
+    "sentiment_trend": -1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 5,
+    "question_ratio": 1.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 120,
+    "question_ratio": 0.2,
+    "action": "sell"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 300,
+    "question_ratio": 0.8,
+    "action": "sell"
+  },
+  {
+    "turn_count": 7,
+    "avg_msg_length": 10,
+    "sentiment_trend": -0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 5,
+    "question_ratio": 0.0,
+    "action": "fight"
+  },
+  {
+    "turn_count": 6,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 300,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 20,
+    "sentiment_trend": -1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 5,
+    "question_ratio": 0.8,
+    "action": "leave"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 30,
+    "sentiment_trend": 1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 60,
+    "question_ratio": 1.0,
+    "action": "explore"
+  },
+  {
+    "turn_count": 1,
+    "avg_msg_length": 25,
+    "sentiment_trend": -1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 15,
+    "question_ratio": 0.4,
+    "action": "fight"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 15,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 30,
+    "sentiment_trend": -0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 5,
+    "question_ratio": 0.8,
+    "action": "leave"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 60,
+    "question_ratio": 0.8,
+    "action": "buy"
+  },
+  {
+    "turn_count": 7,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.0,
+    "topic_switches": 3,
+    "time_between_msgs": 120,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 4,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 300,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 13,
+    "avg_msg_length": 10,
+    "sentiment_trend": -1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 30,
+    "question_ratio": 0.4,
+    "action": "leave"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.5,
+    "topic_switches": 0,
+    "time_between_msgs": 30,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.5,
+    "topic_switches": 5,
+    "time_between_msgs": 60,
+    "question_ratio": 0.6,
+    "action": "buy"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 30,
+    "question_ratio": 0.0,
+    "action": "buy"
+  },
+  {
+    "turn_count": 8,
+    "avg_msg_length": 15,
+    "sentiment_trend": -1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 120,
+    "question_ratio": 0.4,
+    "action": "leave"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 2,
+    "time_between_msgs": 120,
+    "question_ratio": 0.6,
+    "action": "buy"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 50,
+    "sentiment_trend": 1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 60,
+    "question_ratio": 0.6,
+    "action": "sell"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 25,
+    "sentiment_trend": -0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 120,
+    "question_ratio": 1.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 20,
+    "sentiment_trend": -0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 120,
+    "question_ratio": 0.6,
+    "action": "leave"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 10,
+    "sentiment_trend": 1.0,
+    "topic_switches": 3,
+    "time_between_msgs": 120,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 19,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 300,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 20,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.0,
+    "topic_switches": 0,
+    "time_between_msgs": 30,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 20,
+    "sentiment_trend": -1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 60,
+    "question_ratio": 0.6,
+    "action": "fight"
+  },
+  {
+    "turn_count": 5,
+    "avg_msg_length": 5,
+    "sentiment_trend": -1.0,
+    "topic_switches": 1,
+    "time_between_msgs": 60,
+    "question_ratio": 1.0,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 20,
+    "sentiment_trend": 1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 120,
+    "question_ratio": 0.2,
+    "action": "explore"
+  },
+  {
+    "turn_count": 10,
+    "avg_msg_length": 5,
+    "sentiment_trend": 1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 120,
+    "question_ratio": 0.4,
+    "action": "sell"
+  },
+  {
+    "turn_count": 3,
+    "avg_msg_length": 50,
+    "sentiment_trend": 0.5,
+    "topic_switches": 2,
+    "time_between_msgs": 30,
+    "question_ratio": 0.8,
+    "action": "buy"
+  },
+  {
+    "turn_count": 4,
+    "avg_msg_length": 20,
+    "sentiment_trend": 0.5,
+    "topic_switches": 3,
+    "time_between_msgs": 30,
+    "question_ratio": 1.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 16,
+    "avg_msg_length": 15,
+    "sentiment_trend": 0.5,
+    "topic_switches": 4,
+    "time_between_msgs": 15,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 9,
+    "avg_msg_length": 5,
+    "sentiment_trend": 1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 120,
+    "question_ratio": 0.6,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 14,
+    "avg_msg_length": 15,
+    "sentiment_trend": -0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 15,
+    "question_ratio": 0.8,
+    "action": "ask_question"
+  },
+  {
+    "turn_count": 11,
+    "avg_msg_length": 25,
+    "sentiment_trend": 1.0,
+    "topic_switches": 0,
+    "time_between_msgs": 60,
+    "question_ratio": 0.0,
+    "action": "sell"
+  },
+  {
+    "turn_count": 9,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 15,
+    "question_ratio": 0.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 30,
+    "sentiment_trend": 0.0,
+    "topic_switches": 2,
+    "time_between_msgs": 60,
+    "question_ratio": 0.0,
+    "action": "negotiate"
+  },
+  {
+    "turn_count": 17,
+    "avg_msg_length": 10,
+    "sentiment_trend": -1.0,
+    "topic_switches": 4,
+    "time_between_msgs": 15,
+    "question_ratio": 0.2,
+    "action": "leave"
+  },
+  {
+    "turn_count": 12,
+    "avg_msg_length": 20,
+    "sentiment_trend": -1.0,
+    "topic_switches": 5,
+    "time_between_msgs": 120,
+    "question_ratio": 0.0,
+    "action": "leave"
+  },
+  {
+    "turn_count": 2,
+    "avg_msg_length": 5,
+    "sentiment_trend": 0.5,
+    "topic_switches": 1,
+    "time_between_msgs": 300,
+    "question_ratio": 0.4,
+    "action": "buy"
+  }
+]

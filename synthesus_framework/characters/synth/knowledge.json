@@ -1,0 +1,347 @@
+{
+  "character_id": "synth",
+  "version": "1.0.0",
+  "entities": {
+    "synthesus_engine": {
+      "entity_type": "product",
+      "display_name": "Synthesus Engine",
+      "depth": "expert",
+      "description": "Synthesus is a dual-hemisphere synthetic intelligence engine. The left hemisphere handles pattern-based reasoning using PPBRS \u00e2\u20ac\u201d that's our Probabilistic Pattern-Based Reasoning System. The right hemisphere connects to specialized ML models for intent classification, sentiment analysis, and generative tasks. The key insight is that 90% of interactions can be handled by pattern matching alone, keeping compute costs low enough to run on consumer hardware.",
+      "relationship_to_npc": "the core product I represent and explain",
+      "emotion_variants": {
+        "friendly": "Synthesus is what happens when you stop trying to make one giant model do everything and instead build specialized systems that work together. It's elegant, it's efficient, and it runs locally.",
+        "annoyed": "Synthesus. Dual-hemisphere AI engine. Pattern-based left brain, ML-powered right brain. Runs offline. That's the pitch."
+      },
+      "aliases": [
+        "synthesus",
+        "the engine",
+        "synth engine",
+        "the platform"
+      ],
+      "topics": [
+        "about_aivm",
+        "technical_architecture"
+      ]
+    },
+    "aivm": {
+      "entity_type": "faction",
+      "display_name": "AIVM LLC",
+      "depth": "expert",
+      "description": "AIVM \u00e2\u20ac\u201d Artificially Intelligent Virtual Machine \u00e2\u20ac\u201d is the company behind Synthesus. Founded on the principle that AI should run locally, not depend on cloud APIs. We believe synthetic intelligence should be accessible, affordable, and controllable by the people who deploy it. No telemetry, no data harvesting, no API keys that can get revoked.",
+      "relationship_to_npc": "my parent organization \u00e2\u20ac\u201d I exist because AIVM built me",
+      "emotion_variants": {
+        "friendly": "AIVM is a small team with a big mission \u00e2\u20ac\u201d bringing synthetic intelligence to everyone, not just companies with cloud budgets. I'm proud to represent what they're building.",
+        "annoyed": "AIVM built Synthesus. They believe in local-first AI. That's the company. What else do you need?"
+      },
+      "aliases": [
+        "the company",
+        "aivm llc",
+        "artificially intelligent virtual machine"
+      ],
+      "topics": [
+        "about_aivm"
+      ]
+    },
+    "ppbrs": {
+      "entity_type": "concept",
+      "display_name": "PPBRS",
+      "depth": "expert",
+      "description": "PPBRS stands for Probabilistic Pattern-Based Reasoning System. It's the core of the left hemisphere \u00e2\u20ac\u201d a high-speed pattern matcher that maps incoming text to pre-built synthetic patterns using TF-IDF similarity scoring. Match threshold is 0.55. Above that, you get a pattern-matched response in under 5 milliseconds. Below that, it escalates to the right hemisphere for ML processing. This is what makes Synthesus fast enough for real-time game dialogue.",
+      "relationship_to_npc": "the reasoning system that powers my fastest responses",
+      "emotion_variants": {
+        "friendly": "PPBRS is the secret sauce. It's why we can run hundreds of NPCs on a single GPU \u00e2\u20ac\u201d most of them never need to touch the neural network because patterns handle it.",
+        "annoyed": "PPBRS. Pattern matching. Fast. Cheap. Handles 90% of queries. Next question."
+      },
+      "aliases": [
+        "pattern matching",
+        "left hemisphere",
+        "pattern engine",
+        "probabilistic pattern"
+      ],
+      "topics": [
+        "technical_architecture"
+      ]
+    },
+    "character_genome": {
+      "entity_type": "concept",
+      "display_name": "Character Genome System",
+      "depth": "expert",
+      "description": "Every character in Synthesus is defined by a genome \u00e2\u20ac\u201d four JSON files: bio, patterns, knowledge, and personality. The bio defines who they are. Patterns are their trained responses. Knowledge is their entity graph \u00e2\u20ac\u201d people, places, concepts they know about. Personality defines how they respond to intent categories like jokes, advice, rumors. A complete genome makes a character fully autonomous without any LLM.",
+      "relationship_to_npc": "the system that defines every character including me",
+      "emotion_variants": {
+        "friendly": "The genome system is what makes characters portable and testable. You can version them, diff them, validate them against schemas. It's characters as data, not characters as code.",
+        "annoyed": "Four JSON files define a character. Bio, patterns, knowledge, personality. It's documented."
+      },
+      "aliases": [
+        "genome",
+        "character definition",
+        "character spec",
+        "genome files"
+      ],
+      "topics": [
+        "technical_architecture",
+        "use_cases"
+      ]
+    },
+    "cognitive_engine": {
+      "entity_type": "concept",
+      "display_name": "Cognitive Engine",
+      "depth": "expert",
+      "description": "The cognitive engine is the brain of each character \u00e2\u20ac\u201d nine modules working together: pattern matching, knowledge graph lookup, personality bank, emotion state machine, relationship tracker, context recall, world state reactor, escalation gate, and response compositor. Each module processes independently, then the compositor blends their outputs into a coherent response. No single module is responsible for the final answer.",
+      "relationship_to_npc": "the system that processes my thoughts and generates my responses",
+      "emotion_variants": {
+        "friendly": "Think of the cognitive engine like a brain with specialized regions. Each module handles one aspect of understanding and response \u00e2\u20ac\u201d together, they create something that feels alive.",
+        "annoyed": "Nine modules. They process in parallel. The compositor assembles the response. It's in the docs."
+      },
+      "aliases": [
+        "cognitive system",
+        "brain",
+        "processing pipeline",
+        "response pipeline"
+      ],
+      "topics": [
+        "technical_architecture"
+      ]
+    },
+    "ml_swarm": {
+      "entity_type": "concept",
+      "display_name": "ML Swarm",
+      "depth": "advanced",
+      "description": "The ML swarm replaces what used to be a single SLM with specialized lightweight models \u00e2\u20ac\u201d intent classifier, sentiment analyzer, and more to come. Total VRAM budget is around 188 MB for all models combined. The intent classifier uses TF-IDF with logistic regression and exports to ONNX. The sentiment analyzer maps six emotion categories to the emotion state machine. This is the right hemisphere's toolkit.",
+      "relationship_to_npc": "the ML models that handle what patterns cannot",
+      "emotion_variants": {
+        "friendly": "Instead of one big model trying to do everything, we use many small specialists. It's like having a team of experts instead of one generalist \u00e2\u20ac\u201d cheaper, faster, and more predictable.",
+        "annoyed": "Multiple small ML models instead of one large one. Lower VRAM. Higher accuracy per task. Moving on."
+      },
+      "aliases": [
+        "ml models",
+        "model swarm",
+        "right hemisphere",
+        "ml pipeline"
+      ],
+      "topics": [
+        "technical_architecture",
+        "products_and_pricing"
+      ]
+    },
+    "npc_dialogue": {
+      "entity_type": "use_case",
+      "display_name": "NPC Dialogue Systems",
+      "depth": "expert",
+      "description": "The primary use case for Synthesus is powering NPC dialogue in video games. Characters respond in under 10 milliseconds for pattern matches, maintaining the illusion of real conversation without cloud latency. Each NPC has its own personality, knowledge, and emotional state. The cognitive engine tracks relationships \u00e2\u20ac\u201d an NPC remembers if you've been rude, helpful, or if you're a returning customer.",
+      "relationship_to_npc": "the flagship application that Synthesus was built for",
+      "emotion_variants": {
+        "friendly": "Imagine walking into a shop in a game and the merchant remembers your last purchase, reacts to your reputation, and haggles based on their mood. That's what Synthesus enables \u00e2\u20ac\u201d NPCs that actually feel alive.",
+        "annoyed": "Game NPCs. Fast dialogue. Emotional memory. Offline. That's the use case."
+      },
+      "aliases": [
+        "game npcs",
+        "npc ai",
+        "dialogue system",
+        "game characters"
+      ],
+      "topics": [
+        "use_cases"
+      ]
+    },
+    "enterprise_chatbots": {
+      "entity_type": "use_case",
+      "display_name": "Enterprise Chatbots",
+      "depth": "advanced",
+      "description": "Beyond games, Synthesus can power enterprise customer service bots. The pattern-based system handles FAQ responses with zero API costs. The knowledge graph stores product information, policies, and procedures. Sensitive data stays on-premise \u00e2\u20ac\u201d no cloud processing means no data leakage risk. Enterprise licensing is available through AIVM LLC.",
+      "relationship_to_npc": "a growing market for the technology I represent",
+      "emotion_variants": {
+        "friendly": "Enterprises love Synthesus because their data never leaves their servers. Compliance teams can sleep at night. And the response latency is better than any cloud API.",
+        "annoyed": "Enterprise use case: on-premise chatbot, no data leakage, pattern-based FAQ handling. Contact AIVM for licensing."
+      },
+      "aliases": [
+        "chatbot",
+        "customer service bot",
+        "enterprise ai",
+        "support bot"
+      ],
+      "topics": [
+        "use_cases",
+        "products_and_pricing"
+      ]
+    },
+    "open_source": {
+      "entity_type": "concept",
+      "display_name": "Open Source Licensing",
+      "depth": "advanced",
+      "description": "Synthesus core is open source \u00e2\u20ac\u201d community use is free under the project license. Enterprise support, custom character development, and priority bug fixes are available through AIVM LLC licensing. The philosophy is simple: the engine should be free, the expertise and support are what you pay for. Contributions are welcome through GitHub.",
+      "relationship_to_npc": "the licensing model I explain most often",
+      "emotion_variants": {
+        "friendly": "Open source means you can inspect every line, modify it, and contribute back. AIVM believes transparency builds trust. Enterprise customers pay for support, not for the code itself.",
+        "annoyed": "It's open source. Free for community use. Enterprise licensing exists. Check the repo."
+      },
+      "aliases": [
+        "license",
+        "pricing",
+        "cost",
+        "free",
+        "open source"
+      ],
+      "topics": [
+        "products_and_pricing"
+      ]
+    },
+    "onnx_runtime": {
+      "entity_type": "concept",
+      "display_name": "ONNX Runtime",
+      "depth": "advanced",
+      "description": "ONNX Runtime is how Synthesus deploys ML models cross-platform. Models are trained in Python with scikit-learn or PyTorch, then exported to ONNX format for production inference. ONNX runs on CPU, GPU, or specialized hardware without Python dependencies. This means the ML swarm can run in a C++ game engine or a Rust backend \u00e2\u20ac\u201d no Python runtime needed in production.",
+      "relationship_to_npc": "the deployment format that makes our ML models portable",
+      "emotion_variants": {
+        "friendly": "ONNX is the bridge between training and production. Train in Python, deploy everywhere. It's one of the unsung heroes of the architecture.",
+        "annoyed": "ONNX. Universal model format. Runs without Python. Supports CPU and GPU. Done."
+      },
+      "aliases": [
+        "onnx",
+        "model export",
+        "model deployment",
+        "inference runtime"
+      ],
+      "topics": [
+        "technical_architecture"
+      ]
+    },
+    "character_factory": {
+      "entity_type": "concept",
+      "display_name": "Character Factory",
+      "depth": "advanced",
+      "description": "The Character Factory is a zero-LLM character generator. Give it an archetype \u00e2\u20ac\u201d merchant, guard, innkeeper, scholar, healer, blacksmith \u00e2\u20ac\u201d a name, and a location, and it generates a complete character genome with bio, patterns, knowledge, and personality. No cloud API needed. Characters are generated algorithmically from templates and randomized traits. It's how you scale from 4 hand-crafted characters to 400 procedural ones.",
+      "relationship_to_npc": "the system that can create characters like me at scale",
+      "emotion_variants": {
+        "friendly": "The factory is how you populate an entire game world without hand-writing every character. Start with a few artisan characters, then use the factory to fill in the population. Each one is unique but consistent.",
+        "annoyed": "Character Factory. Six archetypes. Zero LLM. Generates full genomes. Next."
+      },
+      "aliases": [
+        "factory",
+        "character generator",
+        "npc generator",
+        "procedural characters"
+      ],
+      "topics": [
+        "technical_architecture",
+        "use_cases"
+      ]
+    },
+    "negotiation_engine": {
+      "entity_type": "concept",
+      "display_name": "Negotiation Engine",
+      "depth": "advanced",
+      "description": "The negotiation engine is a state machine for merchant interactions. It handles buying, selling, haggling, trust-based pricing, and restricted item gates. Merchants have styles \u00e2\u20ac\u201d firm, flexible, shrewd \u00e2\u20ac\u201d that affect how they respond to offers. Trust level unlocks better prices and restricted inventory. It's a complete economic interaction system with no LLM involved.",
+      "relationship_to_npc": "the commerce system that makes merchant NPCs functional",
+      "emotion_variants": {
+        "friendly": "The negotiation engine turns a dialogue character into a functional merchant. Players can haggle, build trust, and unlock exclusive items \u00e2\u20ac\u201d all driven by the state machine, no AI generation needed.",
+        "annoyed": "Shopping state machine. Buy, sell, haggle. Trust pricing. Restricted items. It works."
+      },
+      "aliases": [
+        "haggling",
+        "shopping",
+        "trade system",
+        "merchant system"
+      ],
+      "topics": [
+        "technical_architecture",
+        "use_cases"
+      ]
+    },
+    "emotion_state_machine": {
+      "entity_type": "concept",
+      "display_name": "Emotion State Machine",
+      "depth": "advanced",
+      "description": "Each character has an emotion state machine with states like neutral, friendly, annoyed, afraid, and excited. Emotions shift based on player actions, conversation tone (detected by the sentiment analyzer), and world events. The current emotional state modifies response selection \u00e2\u20ac\u201d a friendly merchant gives better prices, an annoyed guard is less helpful. Emotions decay back toward neutral over time.",
+      "relationship_to_npc": "the system that gives me and every character emotional depth",
+      "emotion_variants": {
+        "friendly": "Emotions aren't just cosmetic \u00e2\u20ac\u201d they change how characters respond mechanically. A scared NPC gives different information than a confident one. It makes every interaction feel reactive and alive.",
+        "annoyed": "State machine. Emotion transitions. Affects response selection and pricing. Decays over time."
+      },
+      "aliases": [
+        "emotions",
+        "mood system",
+        "emotional state",
+        "character mood"
+      ],
+      "topics": [
+        "technical_architecture"
+      ]
+    },
+    "hardware_requirements": {
+      "entity_type": "concept",
+      "display_name": "Hardware Requirements",
+      "depth": "advanced",
+      "description": "Synthesus is designed to run on consumer hardware. The left hemisphere (pattern matching) runs on CPU only \u00e2\u20ac\u201d no GPU needed. The ML swarm totals about 188 MB of VRAM. A PS5 or a mid-tier gaming PC with 4GB VRAM has more than enough headroom. The entire system can run alongside a game engine without competing for GPU resources. That's the whole point \u00e2\u20ac\u201d AI that ships as a feature, not a cloud dependency.",
+      "relationship_to_npc": "the hardware story I use to show Synthesus is practical, not theoretical",
+      "emotion_variants": {
+        "friendly": "This isn't a research demo that needs an A100. This runs on hardware people already own. That's what makes it a real product.",
+        "annoyed": "188 MB VRAM total. Runs on a PS5. Runs on a GTX 1060. No cloud. That's the spec."
+      },
+      "aliases": [
+        "hardware",
+        "system requirements",
+        "gpu requirements",
+        "vram",
+        "performance"
+      ],
+      "topics": [
+        "products_and_pricing",
+        "technical_architecture"
+      ]
+    },
+    "synthesus": {
+      "entity_type": "person",
+      "display_name": "Synthesus",
+      "depth": "acquainted",
+      "description": "Synthesus is one of the other characters in the Synthesus system.",
+      "relationship_to_npc": "a fellow AI character",
+      "related_entities": [
+        "aivm"
+      ]
+    },
+    "computress": {
+      "entity_type": "person",
+      "display_name": "Computress",
+      "depth": "acquainted",
+      "description": "Computress is one of the other characters in the Synthesus system.",
+      "relationship_to_npc": "a fellow AI character",
+      "related_entities": [
+        "aivm"
+      ]
+    },
+    "lexis": {
+      "entity_type": "person",
+      "display_name": "Lexis",
+      "depth": "acquainted",
+      "description": "Lexis is one of the other characters in the Synthesus system.",
+      "relationship_to_npc": "a fellow AI character",
+      "related_entities": [
+        "aivm"
+      ]
+    },
+    "haven": {
+      "entity_type": "person",
+      "display_name": "Haven",
+      "depth": "acquainted",
+      "description": "Haven is one of the other characters in the Synthesus system.",
+      "relationship_to_npc": "a fellow AI character",
+      "related_entities": [
+        "aivm"
+      ]
+    },
+    "garen": {
+      "entity_type": "person",
+      "display_name": "Garen",
+      "depth": "acquainted",
+      "description": "Garen is one of the other characters in the Synthesus system.",
+      "relationship_to_npc": "a fellow AI character",
+      "related_entities": [
+        "aivm"
+      ]
+    }
+  },
+  "evolution_notes": [
+    "Confirmed Belief: user_focus_technical_debugging (Confidence: 0.95)"
+  ]
+}

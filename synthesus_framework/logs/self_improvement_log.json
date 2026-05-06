@@ -1,0 +1,59 @@
+[
+  {
+    "timestamp": "2026-05-05T04:46:42.544199+00:00",
+    "duration_s": 1.88,
+    "real_traces": 9,
+    "synthetic_traces": 450,
+    "total_traces": 459,
+    "training_results": {
+      "chat_policy_prior": {
+        "status": "success",
+        "model_size_bytes": 139329,
+        "duration_s": 0.12
+      },
+      "chat_risk_outcome": {
+        "status": "success",
+        "model_size_bytes": 154417,
+        "duration_s": 0.08
+      },
+      "chat_attention": {
+        "status": "success",
+        "model_size_bytes": 226137,
+        "duration_s": 0.09
+      },
+      "sysops_policy_prior": {
+        "status": "success",
+        "model_size_bytes": 128929,
+        "duration_s": 0.1
+      },
+      "sysops_risk_outcome": {
+        "status": "success",
+        "model_size_bytes": 166513,
+        "duration_s": 0.09
+      },
+      "sysops_attention": {
+        "status": "success",
+        "model_size_bytes": 245721,
+        "duration_s": 0.09
+      },
+      "gm_policy_prior": {
+        "status": "success",
+        "model_size_bytes": 131425,
+        "duration_s": 0.1
+      },
+      "gm_risk_outcome": {
+        "status": "success",
+        "model_size_bytes": 173569,
+        "duration_s": 0.09
+      },
+      "gm_attention": {
+        "status": "success",
+        "model_size_bytes": 263577,
+        "duration_s": 0.11
+      }
+    },
+    "evaluation_summary": [],
+    "models_trained": 9,
+    "models_failed": 0
+  }
+]

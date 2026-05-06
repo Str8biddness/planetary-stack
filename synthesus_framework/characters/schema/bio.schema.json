@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "synthesus://character/bio.schema.json",
+  "title": "Synthesus Character Bio",
+  "description": "Required identity file for every Synthesus character genome. Defines who the character IS.",
+  "type": "object",
+  "required": [
+    "character_id",
+    "name",
+    "version",
+    "type",
+    "status",
+    "description",
+    "persona"
+  ],
+  "properties": {
+    "character_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,31}$",
+      "description": "Unique snake_case identifier. Must match the directory name under characters/."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Display name shown to players (e.g., 'Garen Ironfoot', 'Haven')."
+    },
+    "display_name": {
+      "type": "string",
+      "maxLength": 64,
+      "description": "Optional alternate display name. Defaults to 'name' if omitted."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of this character genome (e.g., '1.0.0')."
+    },
+    "hemisphere_id": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 255,
+      "description": "Unique numeric ID for kernel routing. Ranges: 1-99 core, 100-199 marketplace, 200-255 enterprise."
+    },
+    "type": {
+      "type": "string",
+      "description": "Character archetype/role category.",
+      "examples": [
+        "merchant_npc",
+        "guard_npc",
+        "innkeeper_npc",
+        "quest_giver",
+        "wellness_companion",
+        "technical_assistant",
+        "brand_ambassador",
+        "educational"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "draft", "deprecated", "testing"],
+      "description": "Deployment status. Only 'active' characters are loaded by the server."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 500,
+      "description": "One-paragraph description of the character's role and personality."
+    },
+    "persona": {
+      "type": "object",
+      "required": ["tone", "style"],
+      "properties": {
+        "tone": {
+          "type": "string",
+          "description": "Comma-separated tone descriptors (e.g., 'warm, shrewd, direct with a touch of humor')."
+        },
+        "style": {
+          "type": "string",
+          "description": "Dialogue style (e.g., 'experienced storyteller, fair dealer')."
+        },
+        "voice_profile": {
+          "type": "string",
+          "description": "Voice archetype for TTS selection (e.g., 'older_male_warm', 'soft_female')."
+        },
+        "tts_voice": {
+          "type": "string",
+          "description": "Specific TTS voice ID (e.g., 'en_US-joe-medium')."
+        }
+      },
+      "additionalProperties": false
+    },
+    "archetype": {
+      "type": "string",
+      "enum": ["merchant", "guard", "innkeeper", "scholar", "healer", "custom"],
+      "description": "Built-in personality archetype. Used as fallback when no personality.json exists. Defaults to character type if omitted."
+    },
+    "knowledge_domains": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of knowledge domain tags this character covers."
+    },
+    "setting": {
+      "type": "object",
+      "description": "Optional world-building context for the character.",
+      "properties": {
+        "location": {
+          "type": "string",
+          "description": "Where this NPC lives/works (e.g., 'Ironhaven, Ironfoot's Emporium')."
+        },
+        "era": {
+          "type": "string",
+          "description": "Time period or world era (e.g., 'medieval fantasy', 'modern', 'sci-fi')."
+        },
+        "faction": {
+          "type": "string",
+          "description": "Primary faction or organization affiliation."
+        }
+      },
+      "additionalProperties": true
+    },
+    "immutable_core": {
+      "type": "object",
+      "description": "Non-negotiable behavioral rules. Character MUST obey these regardless of player input.",
+      "properties": {
+        "organization": { "type": "string" },
+        "mission": { "type": "string" },
+        "core_values": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "non_negotiables": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Hard rules the character must never violate."
+        }
+      },
+      "additionalProperties": true
+    },
+    "metacognition": {
+      "type": "object",
+      "description": "Self-awareness rules: what the character knows about itself.",
+      "properties": {
+        "boundaries": {
+          "type": "object",
+          "properties": {
+            "cannot_answer": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "must_escalate": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "disclosure": {
+          "type": "string",
+          "description": "What the character says when asked what it is."
+        }
+      },
+      "additionalProperties": true
+    },
+    "created": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 creation timestamp."
+    },
+    "id": {
+      "type": "string",
+      "description": "Legacy alias for character_id. Deprecated — use character_id."
+    }
+  },
+  "additionalProperties": true
+}

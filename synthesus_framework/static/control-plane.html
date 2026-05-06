@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synthesus 2.0 — Control Plane</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background: #0a0a0a; color: #e0e0e0; font-family: Inter, sans-serif; padding: 20px; }
+        .page-header { text-align: center; margin-bottom: 30px; }
+        .page-header h1 { color: #00ff88; }
+        .section { margin-bottom: 40px; }
+        .section h2 { color: #00ff88; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .badge { padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+        .badge.ai-vm { background: #00ff88; color: #000; }
+        .badge.emulation { background: #0088ff; color: #fff; }
+        .btn { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn.approve { background: #00ff88; color: #000; }
+        .btn.deny { background: #ff4444; color: #fff; }
+        .debug-toggle { margin-bottom: 10px; }
+        .docs-links { margin-top: 20px; }
+        .docs-links a { color: #00ff88; margin-right: 20px; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <h1><i class="fa-solid fa-server"></i> Control Plane</h1>
+        <p>Experimental view of device onboarding, approvals, and AI VM host setup.</p>
+        <div class="docs-links">
+            <a href="/docs/control_plane_api.md" target="_blank"><i class="fa-solid fa-book"></i> API Docs</a>
+            <a href="/docs/ai_vm_hosts.md" target="_blank"><i class="fa-solid fa-robot"></i> AI VM Hosts</a>
+            <a href="/console/README.md" target="_blank"><i class="fa-solid fa-terminal"></i> Console CLI</a>
+        </div>
+    </div>
+
+    <div class="section" id="devices-section">
+        <h2><i class="fa-solid fa-computer"></i> Devices</h2>
+        <div class="debug-toggle">
+            <label><input type="checkbox" id="debugMode"> Use debug fixtures</label>
+        </div>
+        <table id="devices-table">
+            <thead>
+                <tr><th>Name/ID</th><th>Type/OS</th><th>Status</th><th>Capabilities</th></tr>
+            </thead>
+            <tbody id="devices-body">
+                <tr><td colspan="4">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section" id="approvals-section">
+        <h2><i class="fa-solid fa-check-circle"></i> Approvals</h2>
+        <table id="approvals-table">
+            <thead>
+                <tr><th>ID</th><th>Device</th><th>Type</th><th>Description</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="approvals-body">
+                <tr><td colspan="6">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        async function checkFlags() {
+            const res = await fetch('/config/flags');
+            const flags = await res.json();
+            if (!flags.enable_control_plane) {
+                document.body.innerHTML = '<h1>Control Plane Disabled</h1><p>Set ENABLE_CONTROL_PLANE=true to enable.</p>';
+                return false;
+            }
+            return flags;
+        }
+
+        async function loadDevices(debug = false) {
+            const url = debug ? '/control/debug' : '/control/devices';
+            const res = await fetch(url);
+            const data = await res.json();
+            const devices = debug ? data.devices : data.devices;
+            const tbody = document.getElementById('devices-body');
+            tbody.innerHTML = '';
+            if (debug) document.getElementById('devices-section').insertAdjacentHTML('afterbegin', '<p><em>Using debug fixtures</em></p>');
+            devices.forEach(d => {
+                const caps = d.capabilities.map(c => `<span class="badge ${c.replace('_', '-')}">${c}</span>`).join('');
+                tbody.innerHTML += `<tr><td>${d.name} (${d.id})</td><td>${d.type}</td><td>${d.status}</td><td>${caps}</td></tr>`;
+            });
+        }
+
+        async function loadApprovals(debug = false) {
+            const url = debug ? '/control/debug' : '/control/approvals';
+            const res = await fetch(url);
+            const data = await res.json();
+            const approvals = debug ? data.approvals : data.approvals;
+            const tbody = document.getElementById('approvals-body');
+            tbody.innerHTML = '';
+            const isDev = window.location.hostname === 'localhost'; // simple dev check
+            approvals.forEach(a => {
+                const actions = a.status === 'pending' && isDev ? 
+                    `<button class="btn approve" onclick="resolve('${a.id}', 'approve')">Approve</button> <button class="btn deny" onclick="resolve('${a.id}', 'deny')">Deny</button>` : 
+                    '<em>Read-only (use CLI)</em>';
+                tbody.innerHTML += `<tr><td>${a.id}</td><td>${a.device_id}</td><td>${a.type}</td><td>${a.description || a.summary}</td><td>${a.status}</td><td>${actions}</td></tr>`;
+            });
+        }
+
+        async function resolve(id, decision) {
+            await fetch('/control/approvals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ approval_id: id, decision })
+            });
+            loadApprovals(document.getElementById('debugMode').checked);
+        }
+
+        window.onload = async () => {
+            const flags = await checkFlags();
+            if (!flags) return;
+            await loadDevices(false);
+            await loadApprovals(false);
+            document.getElementById('debugMode').addEventListener('change', async (e) => {
+                await loadDevices(e.target.checked);
+                await loadApprovals(e.target.checked);
+            });
+        };
+    </script>
+</body>
+</html>

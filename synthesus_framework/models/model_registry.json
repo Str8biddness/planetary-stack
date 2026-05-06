@@ -1,0 +1,76 @@
+{
+  "models": {
+    "intent_classifier": {
+      "name": "intent_classifier",
+      "version": "20260505-001606",
+      "samples": 5714,
+      "classes": 14,
+      "cv_accuracy": 0.9959747369582305,
+      "cv_std": 0.002321463182126694,
+      "onnx_path": "/home/workspace/synthesus_repo/models/onnx/intent_classifier_v20260505-001606.onnx",
+      "onnx_size_bytes": 249773,
+      "validation": "PASSED",
+      "training_data": "enhanced_synthetic"
+    },
+    "sentiment_analyzer": {
+      "name": "sentiment_analyzer",
+      "version": "20260505-001606",
+      "samples": 2504,
+      "classes": 6,
+      "cv_accuracy": 0.9864271457085827,
+      "cv_std": 0.026159129621406572,
+      "onnx_path": "/home/workspace/synthesus_repo/models/onnx/sentiment_analyzer_v20260505-001606.onnx",
+      "onnx_size_bytes": 50916,
+      "validation": "PASSED",
+      "training_data": "enhanced_synthetic"
+    },
+    "behavior_predictor": {
+      "name": "behavior_predictor",
+      "version": "20260505-001606",
+      "samples": 400,
+      "classes": 8,
+      "cv_accuracy": 0.6075,
+      "cv_std": 0.03316624790355401,
+      "onnx_path": "/home/workspace/synthesus_repo/models/onnx/behavior_predictor_v20260505-001606.onnx",
+      "onnx_size_bytes": 1154,
+      "validation": "PASSED",
+      "training_data": "enhanced_synthetic"
+    },
+    "dialogue_ranker": {
+      "name": "dialogue_ranker",
+      "version": "20260505-001606",
+      "samples": 9600,
+      "classes": 2,
+      "cv_accuracy": 0.35812499999999997,
+      "cv_std": 0.1416274455511125,
+      "onnx_path": "/home/workspace/synthesus_repo/models/onnx/dialogue_ranker_v20260505-001606.onnx",
+      "onnx_size_bytes": 686,
+      "validation": "PASSED",
+      "training_data": "enhanced_synthetic"
+    },
+    "emotion_detector": {
+      "name": "emotion_detector",
+      "version": "20260505-001606",
+      "samples": 3200,
+      "classes": 8,
+      "cv_accuracy": 1.0,
+      "cv_std": 0.0,
+      "onnx_path": "/home/workspace/synthesus_repo/models/onnx/emotion_detector_v20260505-001606.onnx",
+      "onnx_size_bytes": 0,
+      "validation": "N/A",
+      "training_data": "enhanced_synthetic"
+    },
+    "loot_balancer": {
+      "name": "loot_balancer",
+      "version": "20260505-001606",
+      "samples": 400,
+      "classes": 5,
+      "cv_accuracy": 0.30249999999999994,
+      "cv_std": 0.02,
+      "onnx_path": "/home/workspace/synthesus_repo/models/onnx/loot_balancer_v20260505-001606.onnx",
+      "onnx_size_bytes": 1001,
+      "validation": "PASSED",
+      "training_data": "enhanced_synthetic"
+    }
+  }
+}
