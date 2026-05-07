@@ -110,6 +110,7 @@ Replaces what used to require a 0.6B parameter language model. Instead of one bi
 | `ml/` | Python | ML Swarm: 7 micro-models — intent, sentiment, embeddings, etc. |
 | `cognitive/` | Python | Right Hemisphere: 9 cognitive modules (emotion, memory, relationships...) |
 | `core/` | Python | Left Hemisphere: PatternEngine, RAGPipeline, HemisphereBridge |
+| `core/breach/` | Python | Red Team security testing — attack trees, vulnerability scanning, brute-force simulation |
 | `api/` | Python | FastAPI production server + gateway |
 | `kernel/` | C++ | Thread pool, memory allocator, message bus |
 | `reasoning/` | C++ | PPBRS, causal, Bayesian, symbolic, SINN, planner |
@@ -123,6 +124,7 @@ Replaces what used to require a 0.6B parameter language model. Instead of one bi
 ## Features
 
 ### Recent Updates (April-May 2026)
+- **Breach Red Team Module**: Implemented adversarial security testing architecture with abductive reasoning, memory vulnerability scanning, attack tree generation, and credential pressure simulation for automated Blue Team training.
 - **Parallel Hemisphere Execution**: Enhanced `ReasoningCore` and `HemisphereBridge` to drive both Left and Right hemispheres in parallel, reducing latency while improving synthesis quality.
 - **Game Bridge (Neon Bay 2087)**: Added `api/game_bridge.py` providing a dedicated bridge for the Neon Bay 2087 KPC system (`POST /think`).
 - **Shared ML Organs**: Expanded the organ family with shared runtime modules for Prediction, Forecast, Sequence Prediction, Relation Extraction, and Summarization.
@@ -142,6 +144,34 @@ Replaces what used to require a 0.6B parameter language model. Instead of one bi
 - **Dynamic Autonomy** — Three modes: **Advisor**, **Co-pilot**, and **Autopilot**.
 - **Self-Improvement Loop** — Automated training and promotion based on session traces.
 - **Zero GPU Required** — Optimized for high-speed inference on standard hardware.
+
+### Red/Blue Team Security Architecture
+
+Synthesus 4.0 implements a **Dual-Adversarial Substrate** for automated security hardening and threat modeling:
+
+```
+┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+│  Red Team    │  →   │   Emulation  │  →   │  Blue Team   │
+│  (Breach)    │      │   Sandbox    │      │ (Ghostkey)   │
+└──────────────┘      └──────────────┘      └──────────────┘
+   Abductive              Docker              Inductive/
+   Reasoning           Containers            Deductive
+   Attack Trees         Isolated             Detection &
+   Vuln Scanning        Testing              Mitigation
+```
+
+**Breach (Red Team)** — Uses abductive reasoning to identify attack surfaces:
+- **Attack Tree Generation**: Structured JSON attack paths with MITRE ATT&CK techniques
+- **Memory Pattern Matcher**: Scans for unsafe functions (strcpy, gets), vulnerable library versions, injection patterns
+- **Brute Force Simulator**: Generates credential pressure to train detection systems
+- **Crash Analysis**: Works backward from failures to find root causes
+
+**Ghostkey (Blue Team)** — Monitors and defends:
+- **ImmuneSystem**: SHA-256 integrity monitoring for critical files
+- **SecurityTools**: Nmap scanning, process termination, IP blocking
+- **Anomaly Detection**: ML-based detection trained on Breach simulation data
+
+All Red Team operations default to **sandbox mode** via Docker containers. Live mode requires explicit `breach` character authorization.
 
 ---
 

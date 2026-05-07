@@ -39,6 +39,21 @@
     "nmap",
     "analyzer",
     "scraper",
-    "emulation"
-  ]
+    "emulation",
+    "exploit_modeler",
+    "memory_scan",
+    "brute_sim",
+    "breach_analysis"
+  ],
+  "breach_module": {
+    "version": "1.0.0",
+    "capabilities": [
+      "attack_tree_generation",
+      "memory_vulnerability_scanning",
+      "credential_pressure_simulation",
+      "abductive_crash_analysis"
+    ],
+    "live_mode_restricted": true,
+    "requires_sandbox": true
+  }
 }

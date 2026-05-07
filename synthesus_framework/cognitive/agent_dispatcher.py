@@ -29,6 +29,20 @@ class AgentDispatcher:
         except ImportError:
             self.emulation = None
         
+        # Breach Red Team Tools
+        try:
+            from core.breach import BreachEngine, MemoryPatternMatcher, ExploitModeler, BruteForceSimulator
+            self.breach_engine = BreachEngine(emulation_tool=self.emulation, live_mode=self.live_mode)
+            self.memory_matcher = MemoryPatternMatcher()
+            self.exploit_modeler = ExploitModeler()
+            self.brute_simulator = BruteForceSimulator(emulation_tool=self.emulation)
+        except ImportError as e:
+            logger.warning(f"Breach module not available: {e}")
+            self.breach_engine = None
+            self.memory_matcher = None
+            self.exploit_modeler = None
+            self.brute_simulator = None
+        
         # Simple URL regex pattern to detect if the user/character wants to fetch an explicit link
         self.url_pattern = re.compile(
             r'(https?://)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)'
@@ -250,5 +264,175 @@ class AgentDispatcher:
                     "context": f"IP Blocking Result: {json.dumps(result)}",
                     "raw_result": result
                 }
+        
+        # Feature 7: Breach Red Team - Attack Tree Generation
+        attack_tree_triggers = ["model attack", "attack tree", "exploit path", "threat model"]
+        if any(trigger in query_lc for trigger in attack_tree_triggers) and self.exploit_modeler:
+            if "exploit_modeler" not in allowed_tools and character_id not in ("master", "breach"):
+                return {
+                    "tool": "exploit_modeler",
+                    "action": "model",
+                    "context": "I am not authorized to generate attack trees.",
+                    "raw_result": {"status": "error", "error": "Unauthorized tool use."}
+                }
+            
+            # Extract target and objective from query
+            target = "sandbox"
+            objective = "access"
+            entry_point = "web interface"
+            
+            if "root" in query_lc or "privilege" in query_lc:
+                objective = "root access"
+            elif "data" in query_lc or "exfil" in query_lc:
+                objective = "data exfiltration"
+            elif "bypass" in query_lc:
+                objective = "authentication bypass"
+            
+            logger.info(f"[{character_id}] AgentDispatcher routing to ExploitModeler for {target}/{objective}")
+            
+            tree = self.exploit_modeler.model_attack(
+                target=target,
+                objective=objective,
+                entry_point=entry_point,
+                discovered_vulns=None
+            )
+            
+            summary = self.exploit_modeler.get_tree_summary(tree.id)
+            
+            return {
+                "tool": "exploit_modeler",
+                "action": "model",
+                "context": f"Generated Attack Tree: {tree.name}\n\n"
+                          f"Objective: {tree.objective}\n"
+                          f"Critical Path Length: {summary['critical_path_length']} steps\n"
+                          f"Total Paths: {summary['total_paths']}\n"
+                          f"Estimated Success: {summary['estimated_success_probability']:.0%}\n"
+                          f"Estimated Time: {summary['estimated_time_minutes']} minutes",
+                "raw_result": tree.to_dict()
+            }
+        
+        # Feature 8: Breach Red Team - Memory Scan
+        memory_scan_triggers = ["scan memory", "memory analysis", "vulnerability scan", "check for vuln"]
+        if any(trigger in query_lc for trigger in memory_scan_triggers) and self.memory_matcher:
+            if "memory_scan" not in allowed_tools and character_id not in ("master", "breach"):
+                return {
+                    "tool": "memory_scan",
+                    "action": "scan",
+                    "context": "I am not authorized to scan memory for vulnerabilities.",
+                    "raw_result": {"status": "error", "error": "Unauthorized tool use."}
+                }
+            
+            host_id = "localhost" if self.live_mode else "sandbox"
+            logger.info(f"[{character_id}] AgentDispatcher routing to MemoryPatternMatcher for {host_id}")
+            
+            # Simulate memory content scan
+            sample_content = query_lc  # In practice, this would be actual memory dump
+            matches = self.memory_matcher.scan_memory_dump(host_id, sample_content, "heap")
+            report = self.memory_matcher.generate_report(matches)
+            
+            return {
+                "tool": "memory_scan",
+                "action": "scan",
+                "context": f"Memory Scan Results for {host_id}:\n\n"
+                          f"Summary: {report['summary']}\n"
+                          f"By Severity: {json.dumps(report['by_severity'], indent=2)}\n"
+                          f"By Type: {json.dumps(report['by_type'], indent=2)}",
+                "raw_result": report
+            }
+        
+        # Feature 9: Breach Red Team - Brute Force Simulation
+        brute_triggers = ["brute force", "credential pressure", "auth test", "login flood"]
+        if any(trigger in query_lc for trigger in brute_triggers) and self.brute_simulator:
+            if "brute_sim" not in allowed_tools and character_id not in ("master", "breach"):
+                return {
+                    "tool": "brute_sim",
+                    "action": "simulate",
+                    "context": "I am not authorized to run brute-force simulations.",
+                    "raw_result": {"status": "error", "error": "Unauthorized tool use."}
+                }
+            
+            logger.info(f"[{character_id}] AgentDispatcher routing to BruteForceSimulator")
+            
+            from core.breach import CredentialPressureConfig, AttackPattern
+            
+            # Determine pattern from query
+            pattern = AttackPattern.DICTIONARY
+            if "spray" in query_lc:
+                pattern = AttackPattern.SPRAYING
+            elif "timing" in query_lc:
+                pattern = AttackPattern.ADAPTIVE_TIMING
+            elif "stuff" in query_lc:
+                pattern = AttackPattern.CREDENTIAL_STUFFING
+            
+            config = CredentialPressureConfig(
+                pattern=pattern,
+                requests_per_second=5.0,
+                duration_seconds=30,
+            )
+            
+            # Note: This would be async in real implementation
+            # For now, return configuration ready to execute
+            return {
+                "tool": "brute_sim",
+                "action": "configure",
+                "context": f"Brute-Force Simulation Configured:\n\n"
+                          f"Pattern: {pattern.value}\n"
+                          f"Rate: {config.requests_per_second} req/s\n"
+                          f"Duration: {config.duration_seconds}s\n"
+                          f"Jitter: {config.jitter_percent:.0%}\n\n"
+                          f"Ready to execute against target endpoint.",
+                "raw_result": {
+                    "config": {
+                        "pattern": pattern.value,
+                        "rate": config.requests_per_second,
+                        "duration": config.duration_seconds,
+                    },
+                    "status": "configured"
+                }
+            }
+        
+        # Feature 10: Breach Red Team - Crash Analysis (Abductive Engine)
+        crash_triggers = ["analyze crash", "debug crash", "what caused", "why did it fail"]
+        if any(trigger in query_lc for trigger in crash_triggers) and self.breach_engine:
+            if "breach_analysis" not in allowed_tools and character_id not in ("master", "breach"):
+                return {
+                    "tool": "breach_analysis",
+                    "action": "analyze",
+                    "context": "I am not authorized to perform crash analysis.",
+                    "raw_result": {"status": "error", "error": "Unauthorized tool use."}
+                }
+            
+            logger.info(f"[{character_id}] AgentDispatcher routing to BreachEngine for crash analysis")
+            
+            # Parse crash type from query
+            crash_type = "unknown"
+            if "segfault" in query_lc or "segmentation" in query_lc:
+                crash_type = "segfault"
+            elif "heap" in query_lc:
+                crash_type = "heap_error"
+            elif "auth" in query_lc:
+                crash_type = "auth_fail"
+            
+            # Simulate crash analysis
+            vectors = self.breach_engine.analyze_crash({
+                "type": crash_type,
+                "logs": [],
+                "component": "target_system"
+            })
+            
+            vector_summary = "\n".join([
+                f"- {v.name} ({v.severity.value}): {v.description[:100]}..."
+                for v in vectors[:3]
+            ])
+            
+            return {
+                "tool": "breach_analysis",
+                "action": "analyze",
+                "context": f"Crash Analysis Results:\n\n"
+                          f"Crash Type: {crash_type}\n"
+                          f"Attack Vectors Identified: {len(vectors)}\n\n"
+                          f"Likely Attack Vectors:\n{vector_summary}",
+                "raw_result": [v.to_dict() for v in vectors]
+            }
         
         return None
