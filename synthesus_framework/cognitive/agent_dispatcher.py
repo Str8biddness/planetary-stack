@@ -10,6 +10,7 @@ class AgentDispatcher:
     (like the WebScraper) instead of internal Cognitive Core / RAG alone.
     """
     def __init__(self):
+        self.live_mode = False # Default to Sandbox (Safe)
         try:
             from core.tools.scraper import WebScraper
             self.scraper = WebScraper()
@@ -58,9 +59,27 @@ class AgentDispatcher:
         
         query_lc = query.lower()
 
+        # Feature 6: Environment Boundary Management
+        if "enable live mode" in query_lc or "leave the sandbox" in query_lc:
+            self.live_mode = True
+            return {"tool": "system", "action": "config", "context": "ENVIRONMENT BOUNDARY BREACHED. Live Host access enabled. Operating in real VM environment."}
+        
+        if "enable sandbox mode" in query_lc or "enter the sandbox" in query_lc:
+            self.live_mode = False
+            return {"tool": "system", "action": "config", "context": "ENVIRONMENT BOUNDARY SECURED. Sandbox Mode active. All operations containerized."}
+
         # Feature 5: Emulation & Sandboxing
         emu_triggers = ["sandbox", "emulate", "virtual host", "spawn container"]
         if any(trigger in query_lc for trigger in emu_triggers) and self.emulation:
+            # If in Live Mode, we don't spawn a container, we point to the host
+            if self.live_mode:
+                return {
+                    "tool": "emulation",
+                    "action": "attach",
+                    "context": "Operating in Live Mode. Commands will execute directly on the virtual machine host.",
+                    "raw_result": {"host_id": "localhost"}
+                }
+            
             if "emulation" not in allowed_tools and character_id not in ("master", "synth"):
                 return {
                     "tool": "emulation",

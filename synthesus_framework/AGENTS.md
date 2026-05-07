@@ -215,3 +215,35 @@ For agents tasked with expanding this loop, the following architectural modules 
 - **Hardware Abstraction Layer (HAL) Mirror:** A module to translate bare-metal hardware signals into a virtualized state that the Quadbrain can "reason" about using its C(t) model.
 
 This architecture ensures that the defensive AI (Ghostkey) is trained on **realistic, scientifically applicable** data without ever exposing the primary host to risk.
+
+## 🛠️ Step-by-Step Implementation Guide for Future Agents
+
+Use this roadmap to build out the high-complexity adversarial and emulation modules.
+
+### Phase 1: The Emulengineering Core (Virtualization Layer)
+1.  **Objective:** Enable the AI to mirror hardware states.
+2.  **Steps:**
+    *   Extend `core/emulation_tool.py` to support **Snapshotting**. Implement a method to capture a process tree and memory map from the host.
+    *   Create a **Hardware Shadow** module that translates CPU/IO metrics into the `FluidState` (Psi) as "Proprioception" signals.
+    *   **How-To:** Use `docker commit` to create images of the sandbox after a vulnerability is "modeled" so the Blue Team can practice on a frozen state.
+
+### Phase 2: The Adversarial Discovery Engine (Red-Team Brain)
+1.  **Objective:** Implement the "Breach" persona's active scanning logic.
+2.  **Steps:**
+    *   Develop a **Memory Pattern Matcher**. This module should scan the `EmulationTool` sandbox memory for known insecure primitives (e.g., specific older glibc versions).
+    *   Wire the **Abductive Engine** to "Work Backward" from a theoretical crash. If Breach sees a crash in the sandbox, use abduction to find the instruction pointer that caused it.
+    *   **How-To:** In `agent_dispatcher.py`, add a tool called `exploit_modeler`. It should output high-fidelity "Attack Trees" (JSON) describing the path to root, not functional shellcode.
+
+### Phase 3: The Brute-Force Pressure Simulator (Training Layer)
+1.  **Objective:** Train the Blue Team to detect credential exhaustion.
+2.  **Steps:**
+    *   Create a **Traffic Generator** in the `EmulationTool` that sends high-frequency, varying-delay login attempts to the `api/` endpoints.
+    *   Update the **ImmuneSystem** (Blue Team) to detect these patterns using the `InductiveModule`.
+    *   **How-To:** Use a simple Python generator that pulls from a `dictionary.txt` lore file and injects them into the sandbox network stream.
+
+### Phase 4: Live Host Integration (The "Out-of-Sandbox" Toggle)
+1.  **Objective:** Safely transition from modeling to live system auditing.
+2.  **Steps:**
+    *   Implement the `LiveMode` flag in `AgentDispatcher` (Already Initialized).
+    *   Ensure all tools (Nmap, Analyzer) check `if self.live_mode: target = "host" else: target = "container"`.
+    *   **How-To:** Use a `system` directive command ("Leave the sandbox") to trigger the toggle. Require high-confidence C(t) scores from the Admin character before activation.
