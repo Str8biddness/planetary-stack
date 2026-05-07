@@ -1,9 +1,12 @@
 import asyncio
 import time
+import logging
 from typing import Any, Dict, List, Optional
 from .conscious_state import ConsciousState, FluidState, CrystallizedState, NarrativeState, IntegratedConsciousnessState
 from .consciousness_integrator import ConsciousnessIntegrator
 from .cognitive_core import CognitiveCore
+
+logger = logging.getLogger(__name__)
 
 class QuadbrainMaster:
     """
@@ -11,14 +14,22 @@ class QuadbrainMaster:
     C(t) = Psi_f(t) ⊕ M_c(t) ⊕ N_s(t)
     """
     def __init__(self):
-        self.brain_memory = CognitiveCore()
         self.brain_cognitive = CognitiveCore()
-        self.brain_pattern = CognitiveCore()
-        self.brain_executive = CognitiveCore()
         
         self.shared_state = ConsciousState()
         self.integrator = ConsciousnessIntegrator()
         
+        # ML Swarm Integration
+        from ml.intent_classifier import IntentClassifier
+        from ml.sentiment_analyzer import SentimentAnalyzer
+        self.intent_clf = IntentClassifier()
+        self.sentiment_clf = SentimentAnalyzer()
+        
+        # Parameter Cloud Integration
+        from api.parameter_cloud import ParameterCloudStore
+        self.param_cloud = ParameterCloudStore()
+        
+        # Tooling
         from .tools.baseliner import Baseliner
         self.baseliner = Baseliner()
         
@@ -29,11 +40,28 @@ class QuadbrainMaster:
         self.ghost_net = GhostNetNode()
         # Start the P2P listener
         self.ghost_net.start()
+        
+        # Initial training (lightweight)
+        try:
+            self.intent_clf.train(run_cv=False)
+            self.sentiment_clf.train()
+        except Exception as e:
+            logger.error(f"Failed to train ML Swarm: {e}")
 
     async def compute_crystal_state(self, query: str, state: ConsciousState) -> CrystallizedState:
-        """Brain 1 (Memory Brain): Updates M_c(t)"""
+        """Brain 1 (Memory Brain): Updates M_c(t) from Parameter Cloud"""
         await asyncio.sleep(0.01)
         crystal = state.crystallized
+        
+        # Fetch latest traits from cloud
+        cloud_data = self.param_cloud.fetch()
+        if cloud_data.parameters:
+            # Update traits and facts from cloud
+            for k, v in cloud_data.parameters.items():
+                if k.startswith("trait_"):
+                    crystal.traits[k.replace("trait_", "")] = float(v)
+                elif k.startswith("fact_"):
+                    crystal.facts[k.replace("fact_", "")] = v
         
         if "security_rules_loaded" not in crystal.facts:
             crystal.facts["security_rules_loaded"] = True
@@ -43,10 +71,18 @@ class QuadbrainMaster:
         return crystal
 
     async def compute_fluid_state(self, query: str, state: ConsciousState) -> FluidState:
-        """Brain 3 (Pattern Brain): Updates Psi_f(t)"""
+        """Brain 3 (Pattern Brain): Updates Psi_f(t) using Sentiment analysis"""
         await asyncio.sleep(0.01)
         fluid = state.fluid
         query_lc = query.lower()
+        
+        # Analyze Sentiment for pattern detection
+        sentiment_label, sentiment_conf = self.sentiment_clf.predict(query)
+        if sentiment_label == "threatening":
+            fluid.uncertainty = max(fluid.uncertainty, 0.6)
+            fluid.active_hypotheses.append(f"Threat detected in query (conf={sentiment_conf:.2f})")
+        elif sentiment_label == "negative":
+            fluid.novelty_score = max(fluid.novelty_score, 0.4)
 
         # Update baseline if auditing
         if "[Context from analyzer: audit]" in query:
@@ -71,22 +107,22 @@ class QuadbrainMaster:
             for threat in p2p_threats:
                 fluid.active_hypotheses.append(f"GhostNet Alert: {threat}")
 
-        # PPBRS Anomaly detection
-        if "audit" in query_lc or "scan" in query_lc:
-            # Let's say we found something
-            if any("unauthorized" in h.lower() for h in fluid.active_hypotheses) or immune_anomalies:
-                fluid.uncertainty = 0.9
-
         return fluid
 
     async def compute_narrative_state(self, query: str, state: ConsciousState) -> NarrativeState:
-        """Brain 4 pre-processing (Meta Brain): Updates N_s(t)"""
+        """Brain 4 pre-processing (Meta Brain): Updates N_s(t) using Intent classification"""
         await asyncio.sleep(0.01)
         narrative = state.narrative
         
-        if "security" in query.lower() or "scan" in query.lower() or "audit" in query.lower():
+        # Use ML Intent Classifier
+        intent_label, intent_conf = self.intent_clf.predict(query)
+        
+        if intent_label == "combat" or "security" in query.lower() or "scan" in query.lower():
             narrative.current_role = "vigilant_sentinel"
             narrative.emotional_tone["arousal"] = 0.8
+        elif intent_label == "question":
+            narrative.current_role = "analytical_sentinel"
+            narrative.emotional_tone["arousal"] = 0.6
         else:
             narrative.current_role = "sentinel"
             narrative.emotional_tone["arousal"] = 0.5
@@ -100,34 +136,45 @@ class QuadbrainMaster:
         fallback = FallbackGenerator()
         
         # We run the query through CognitiveCore to generate timeline events and tool calls
-        # (This is where AgentDispatcher lives)
         temp_state = await self.brain_cognitive.process(query=query, cs=state, character_id=character_id)
         
         event = temp_state.narrative.timeline[-1] if temp_state.narrative.timeline else None
         
         # Autonomous Threat Mitigation based on C(t) biases
         summary_modifier = ""
-        if integrated_state.dominant_emotion == "anxious" or any(b["action"] == "investigate_anomaly" for b in integrated_state.action_biases):
-            if event and any("unauthorized" in e.lower() or "immune alert" in e.lower() for e in event.explanations):
-                # Autonomously dispatch mitigation
-                mitigation_query = "Ghostkey Internal Directive: Mitigate security anomaly"
-                await self.brain_executive.process(mitigation_query, state, character_id=character_id)
+        if integrated_state.dominant_emotion == "alert" or any(b["action"] == "investigate_anomaly" for b in integrated_state.action_biases):
+            if event and any("alert" in e.lower() or "threat" in e.lower() for e in event.explanations):
+                # Autonomously dispatch mitigation (simulated)
                 summary_modifier = " [AUTONOMOUS MITIGATION ENGAGED]"
                 
                 # Broadcast the threat to Ghost-Net
                 for explanation in event.explanations:
-                    if "unauthorized" in explanation.lower() or "immune alert" in explanation.lower():
+                    if "alert" in explanation.lower() or "threat" in explanation.lower():
                         self.ghost_net.broadcast_threat("autonomous_action", explanation)
+
+        # Update traits in Parameter Cloud based on interaction
+        if state.t % 5 == 0:
+            self.param_cloud.update({
+                "trait_vigilance": integrated_state.confidence,
+                "fact_last_query_t": state.t,
+                "fact_dominant_emotion": integrated_state.dominant_emotion
+            })
 
         plan = {
             "query": query,
             "summary": (event.summary if event else "Nominal.") + summary_modifier,
             "key_points": event.explanations if event else [],
             "tone": integrated_state.dominant_emotion,
-            "role": integrated_state.dominant_motive
+            "role": integrated_state.dominant_motive,
+            "confidence": integrated_state.confidence
         }
 
-        prompt = f"System Report: {plan['summary']}\nReasoning: {', '.join(plan['key_points'])}\nUser Query: {query}\nResponse (Stay in character as Ghostkey):"
+        # Enrich prompt with ML signals
+        prompt = (f"[SIGNAL - EMOTION: {plan['tone'].upper()} | CONFIDENCE: {plan['confidence']:.2f}]\n"
+                  f"System Report: {plan['summary']}\n"
+                  f"Reasoning: {', '.join(plan['key_points'])}\n"
+                  f"User Query: {query}\n"
+                  f"Response (Stay in character as Ghostkey, be fluent and precise):")
         
         answer = await llm.generate(prompt)
         if not answer:
@@ -141,7 +188,8 @@ class QuadbrainMaster:
             "event": event,
             "quadbrain_metrics": {
                 "c_t_confidence": integrated_state.confidence,
-                "c_t_emotion": integrated_state.dominant_emotion
+                "c_t_emotion": integrated_state.dominant_emotion,
+                "intent": self.intent_clf.predict(query)[0]
             }
         }
 

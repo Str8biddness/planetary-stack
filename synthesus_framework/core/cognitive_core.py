@@ -31,6 +31,7 @@ class CognitiveCore:
         self.inductive = AIOSInductiveModule()
         self.abductive = AIOSAbductiveModule()
         self.agent_dispatcher = AgentDispatcher()
+        self.knowledge_cloud = KnowledgeCloud()
 
     def classify_intent(self, query: str) -> Dict[str, Any]:
         """
@@ -43,7 +44,7 @@ class CognitiveCore:
             Dict[str, Any]: A dictionary containing primary/secondary intents and confidence scores.
         """
         query_lower = query.lower()
-        scores = {"deductive": 0, "inductive": 0, "abductive": 0}
+        scores = {"deductive": 0, "inductive": 0, "abductive": 0, "knowledge": 0}
 
         # Deductive keywords
         deductive_keywords = ["prove", "show that", "therefore", "implies", "contradiction", "given that"]
@@ -63,6 +64,12 @@ class CognitiveCore:
             if kw in query_lower:
                 scores["abductive"] += 1
 
+        # Knowledge keywords
+        knowledge_keywords = ["what is", "who is", "tell me about", "history of", "lore", "describe"]
+        for kw in knowledge_keywords:
+            if kw in query_lower:
+                scores["knowledge"] += 1
+
         primary = max(scores, key=scores.get)
         primary_score = scores[primary]
         secondary = [k for k, v in scores.items() if v >= 0.5 * primary_score and k != primary]
@@ -75,15 +82,6 @@ class CognitiveCore:
             else:
                 primary = "deductive"
             secondary = []
-
-        # Tighten for explanation queries
-        SYMPTOM_WORDS = ["crash", "slowdown", "timeout", "error", "failure", "anomaly", "bug", "issue", "problem", "lag", "freeze", "hang"]
-        if query_lower.startswith(("explain ", "describe ", "what is", "how does")):
-            if not any(sym in query_lower for sym in SYMPTOM_WORDS):
-                scores["deductive"] += 1.5
-                primary = max(scores, key=scores.get)  # Recalculate primary if needed
-                primary_score = scores[primary]
-                secondary = [k for k, v in scores.items() if v >= 0.5 * primary_score and k != primary]
 
         return {"primary": primary, "secondary": secondary, "scores": scores}
 
@@ -326,6 +324,16 @@ class CognitiveCore:
         intent = self.classify_intent(query)
         parsed = self.parse_query(query, intent)
 
+        # ── Knowledge Cloud Lookup ──
+        cloud_results = self.knowledge_cloud.lookup_multi(query, top_k=2)
+        if cloud_results:
+            for res in cloud_results:
+                actions_taken.append({
+                    "description": f"Retrieved knowledge: {res['entity_name']}",
+                    "type": "knowledge_retrieval",
+                    "entity": res['entity_id']
+                })
+
         # Domain-specific adjustments
         domain = cs.fluid.current_domain
         if domain == "sysops":
@@ -357,6 +365,13 @@ class CognitiveCore:
         results: List[Dict[str, Any]] = []
         engines_used: List[str] = []
 
+        if primary == "knowledge" and cloud_results:
+            engines_used.append("knowledge_cloud")
+            results.append({
+                "type": "knowledge",
+                "summary": f"Retrieved world lore regarding {', '.join([r['entity_name'] for r in cloud_results])}."
+            })
+
         def run_mode(mode: str):
             if mode == "deductive":
                 engines_used.append("deductive")
@@ -375,6 +390,8 @@ class CognitiveCore:
             run_mode(mode)
 
         summary = self._summarize_results(query, results)
+        if cloud_results and "knowledge" not in [r["type"] for r in results]:
+             summary += f" Also referenced world lore about {cloud_results[0]['entity_name']}."
 
         # Add domain-specific warnings
         if domain == "sysops" and "recommend" in summary.lower():
@@ -388,12 +405,14 @@ class CognitiveCore:
             if r["type"] == "abductive":
                 for e in r.get("explanations", [])[:5]:
                     explanations_text.append(
-                        f"{e.hypothesis} (post={e.posterior_probability:.2f}, like={e.likelihood:.2f})"
+                        f"{e.hypothesis} (post={e.posterior_probability:.2f})"
                     )
             if r["type"] == "inductive":
                 analysis = r.get("analysis") or {}
                 for hyp in analysis.get("hypotheses", []):
                     explanations_text.append(hyp)
+            if r["type"] == "knowledge":
+                explanations_text.append(r["summary"])
 
         # Assign role and tone based on intent and outcome
         role = cs.narrative.current_role
