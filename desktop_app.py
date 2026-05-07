@@ -37,6 +37,7 @@ class GhostkeyDesktopApp(ctk.CTk):
     def __init__(self, loop):
         super().__init__()
         self.loop = loop
+        self.current_persona = "ghostkey"
         
         # Change to framework dir to ensure models/configs load correctly
         if IMPORT_SUCCESS:
@@ -44,12 +45,12 @@ class GhostkeyDesktopApp(ctk.CTk):
         
         self.master_ai = QuadbrainMaster()
 
-        self.title("GHOSTKEY QUAD BRAIN v4.0 - Desktop Terminal")
+        self.title("SYNTHESUS 4.0 - Multi-Persona Terminal")
         self.geometry("1100x700")
         
         # Theme
         ctk.set_appearance_mode("dark")
-        ctk.set_default_color_theme("blue")
+        self.theme_color = "#00ffcc"
 
         # Layout
         self.grid_columnconfigure(1, weight=1)
@@ -59,9 +60,16 @@ class GhostkeyDesktopApp(ctk.CTk):
         self.sidebar = ctk.CTkFrame(self, width=250, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         
-        self.logo_label = ctk.CTkLabel(self.sidebar, text="GHOSTKEY AI", 
+        self.logo_label = ctk.CTkLabel(self.sidebar, text="SYNTHESUS AI", 
                                       font=ctk.CTkFont(size=24, weight="bold", family="Consolas"))
         self.logo_label.pack(pady=30)
+
+        # Persona Swapper
+        self.persona_label = ctk.CTkLabel(self.sidebar, text="ACTIVE SUBSTRATE:", font=ctk.CTkFont(size=12))
+        self.persona_label.pack(pady=(0, 5))
+        self.persona_option = ctk.CTkOptionMenu(self.sidebar, values=["Ghostkey (Sentinel)", "Breach (Red-Team)"],
+                                               command=self.change_persona)
+        self.persona_option.pack(pady=(0, 20), padx=20)
 
         self.status_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.status_frame.pack(fill="x", padx=20)
@@ -105,6 +113,30 @@ class GhostkeyDesktopApp(ctk.CTk):
 
         # Metrics update loop
         self.update_metrics_loop()
+
+    def apply_persona_theme(self, persona):
+        if persona == "ghostkey":
+            self.theme_color = "#00ffcc" # Cyan-ish
+            ctk.set_default_color_theme("blue")
+        else:
+            self.theme_color = "#ff3333" # Red
+            ctk.set_default_color_theme("dark-blue")
+        
+        if hasattr(self, "chat_display"):
+            self.chat_display.configure(text_color=self.theme_color)
+        if hasattr(self, "transmit_btn"):
+            self.transmit_btn.configure(fg_color=self.theme_color if persona == "breach" else "#006666")
+
+    def change_persona(self, choice):
+        new_persona = "ghostkey" if "Ghostkey" in choice else "breach"
+        if new_persona == self.current_persona: return
+        
+        self.current_persona = new_persona
+        self.apply_persona_theme(new_persona)
+        
+        self.append_chat("SYSTEM", f"Re-initializing Quadbrain Substrate: {new_persona.upper()}...")
+        # Update current persona for AI think
+        self.append_chat(new_persona.upper(), "Substrate synchronized. Awaiting mission parameters.")
 
     def create_metric_bar(self, label, initial_val, color):
         lbl = ctk.CTkLabel(self.status_frame, text=label, font=ctk.CTkFont(size=12, family="Consolas"))
@@ -162,9 +194,9 @@ class GhostkeyDesktopApp(ctk.CTk):
     async def ai_think(self, query):
         try:
             # Quadbrain handles tool selection, reasoning, etc.
-            result = await self.master_ai.think(query, character_id="ghostkey")
+            result = await self.master_ai.think(query, character_id=self.current_persona)
             answer = result.get("answer", "Protocol error: No response.")
-            self.after(0, lambda: self.append_chat("GHOSTKEY", answer))
+            self.after(0, lambda: self.append_chat(self.current_persona.upper(), answer))
         except Exception as e:
             self.after(0, lambda: self.append_chat("ERROR", str(e)))
 

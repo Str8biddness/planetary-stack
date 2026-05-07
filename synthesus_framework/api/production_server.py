@@ -33,7 +33,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, cast, TYPE_CHECKING
 
 import importlib
-import faiss # type: ignore
+try:
+    import faiss # type: ignore
+except ImportError:
+    faiss = None
 import numpy as np # type: ignore
 
 from fastapi import FastAPI, HTTPException, Request, Depends, Header, BackgroundTasks, WebSocket, WebSocketDisconnect # type: ignore

@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional
 from .conscious_state import ConsciousState, NarrativeEvent
 from cognitive.agent_dispatcher import AgentDispatcher
+from .knowledge_cloud import KnowledgeCloud
 
 # Adjust import paths based on actual repo structure
 try:

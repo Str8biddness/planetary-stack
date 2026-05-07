@@ -21,6 +21,12 @@ class AgentDispatcher:
             self.security = SecurityTools()
         except ImportError:
             self.security = None
+
+        try:
+            from core.emulation_tool import EmulationTool
+            self.emulation = EmulationTool()
+        except ImportError:
+            self.emulation = None
         
         # Simple URL regex pattern to detect if the user/character wants to fetch an explicit link
         self.url_pattern = re.compile(
@@ -39,7 +45,6 @@ class AgentDispatcher:
         allowed_tools = []
         if character_id:
             # Adjust path to find characters from both synthesus/ and projects/
-            # Assuming current file is synthesus/cognitive/agent_dispatcher.py
             base_path = Path(__file__).parent.parent
             bio_path = base_path / "characters" / character_id / "bio.json"
             
@@ -52,6 +57,26 @@ class AgentDispatcher:
                     logger.error(f"Failed to load bio for {character_id}: {e}")
         
         query_lc = query.lower()
+
+        # Feature 5: Emulation & Sandboxing
+        emu_triggers = ["sandbox", "emulate", "virtual host", "spawn container"]
+        if any(trigger in query_lc for trigger in emu_triggers) and self.emulation:
+            if "emulation" not in allowed_tools and character_id not in ("master", "synth"):
+                return {
+                    "tool": "emulation",
+                    "action": "create",
+                    "context": "I am not authorized to spawn emulation sandboxes.",
+                    "raw_result": {"status": "error", "error": "Unauthorized tool use."}
+                }
+            
+            logger.info(f"[{character_id}] AgentDispatcher routing to EmulationTool.create_host")
+            host_id = self.emulation.create_host({"image": "ubuntu:latest", "cpu": "0.5", "memory": "256m"})
+            return {
+                "tool": "emulation",
+                "action": "create",
+                "context": f"Emulation sandbox spawned successfully. Host ID: {host_id}. Environment isolated.",
+                "raw_result": {"host_id": host_id}
+            }
 
         # Feature 1: Explicit URL scraping
         url_match = self.url_pattern.search(query)
