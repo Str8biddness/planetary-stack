@@ -39,12 +39,12 @@ class AttackCategory(Enum):
 @dataclass
 class AttackVector:
     """Structured representation of a discovered attack vector."""
-    id: str
-    name: str
-    description: str
-    category: AttackCategory
-    severity: AttackSeverity
-    target_component: str
+    id: str = ""
+    name: str = ""
+    description: str = ""
+    category: AttackCategory = AttackCategory.LOGIC_FLAW
+    severity: AttackSeverity = AttackSeverity.INFO
+    target_component: str = "unknown"
     prerequisites: List[str] = field(default_factory=list)
     steps: List[str] = field(default_factory=list)
     indicators: List[str] = field(default_factory=list)

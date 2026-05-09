@@ -30,12 +30,20 @@ class SecurityAgent:
         from core.tools.baseliner import Baseliner
         from core.tools.security import SecurityTools
         from core.tools.ghost_net import GhostNetNode
+        from core.tools.security_reasoner import SecurityReasoner
+        from core.tools.security_guardrails import SecurityGuardrails
+        from core.tools.autonomous_remediator import AutonomousRemediator
+        from core.tools.aegis_explainer import AegisExplainer
 
         self.alert_store = AlertStore()
         self.immune_system = ImmuneSystem()
         self.baseliner = Baseliner()
         self.security_tools = SecurityTools()
         self.ghost_net = GhostNetNode()
+        self.reasoner = SecurityReasoner()
+        self.guardrails = SecurityGuardrails()
+        self.remediator = AutonomousRemediator(self.guardrails)
+        self.explainer = AegisExplainer()
 
         # Breach engine (lazy-loaded to avoid heavy imports at startup)
         self._breach_engine = None
@@ -190,6 +198,35 @@ class SecurityAgent:
                     description=f"Threat received from GhostNet mesh: {threat}",
                     metadata={"threat_key": threat},
                 )
+
+            # 5. Advanced Reasoning Correlation
+            logger.info("SecurityAgent: Correlating alerts with reasoning engine...")
+            recent_alerts = self.alert_store.get_alerts(limit=50)
+            analysis = self.reasoner.analyze_threat(recent_alerts)
+            
+            if analysis["max_confidence"] > 0.7:
+                logger.warning(f"SecurityAgent: HIGH CONFIDENCE THREAT DETECTED ({analysis['max_confidence']*100:.1f}%)")
+                
+                # Generate Aegis Narrative
+                top_incident = analysis.get("top_threat", {})
+                narrative = self.explainer.narrate_incident(top_incident)
+                
+                self.alert_store.create_alert(
+                    severity="high",
+                    source="reasoner",
+                    title="High-Confidence Security Incident",
+                    description=narrative,
+                    metadata={"analysis": analysis, "narrative": narrative}
+                )
+                
+                # Autonomous Remediation
+                logger.info("SecurityAgent: Attempting autonomous remediation...")
+                for incident in analysis.get("top_threat", {}).get("correlated_alerts", []) + [analysis.get("top_threat")]:
+                    if incident and isinstance(incident, dict):
+                        await self.remediator.handle_incident(incident)
+
+                # Collective Defense: Share incident with other agents
+                self.ghost_net.broadcast_incident(analysis.get("top_threat"))
 
             elapsed_ms = (time.time() - t0) * 1000
             self._last_scan_time = time.time()
@@ -365,21 +402,32 @@ class SecurityAgent:
         else:
             overall_status = "secure"
 
+        # Get recent breach vectors
+        breach_engine = self._get_breach_engine()
+        breach_vectors = [v.to_dict() for v in breach_engine.get_attack_vectors()]
+
         return {
             "overall_status": overall_status,
             "alert_stats": alert_stats,
             "recent_alerts": recent_alerts,
             "recent_scans": recent_scans,
             "ghostnet_threats": threats,
+            "ghostnet_peers": self.ghost_net.get_peers(),
+            "shared_incidents": self.ghost_net.incidents,
+            "breach_vectors": breach_vectors,
             "last_scan_time": self._last_scan_time,
             "scan_interval_seconds": self._scan_interval_seconds,
             "is_scanning": self._scanning,
             "subsystems": {
                 "immune_system": "active",
                 "baseliner": f"samples={self.baseliner.sample_count}",
-                "ghostnet": "active" if self.ghost_net.running else "stopped",
+                "ghostnet": f"peers={len(self.ghost_net.peers)}",
                 "breach_engine": "loaded" if self._breach_engine else "standby",
+                "reasoner": "active",
+                "guardrails": "active",
+                "remediator": f"history={len(self.remediator.history)}",
             },
+            "remediation_history": self.remediator.get_history(10),
         }
 
     def get_threat_feed(self) -> List[Dict[str, Any]]:

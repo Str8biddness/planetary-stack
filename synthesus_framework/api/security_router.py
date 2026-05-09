@@ -194,6 +194,31 @@ async def security_status():
     return state
 
 
+@security_router.post("/chat")
+async def security_chat(request: Dict[str, Any]):
+    """Conversational interface to the security agent."""
+    agent = _get_agent()
+    message = request.get("message", "").lower()
+    
+    # Logic for handling specific security questions
+    if "status" in message or "how are we" in message:
+        state = agent.get_dashboard_state()
+        return {"response": f"System status is currently {state['overall_status'].upper()}. I am monitoring {len(state['recent_alerts'])} active alerts and {len(state['ghostnet_peers'])} collaborative peers."}
+    
+    if "threat" in message or "breach" in message:
+        recent = agent.alert_store.get_alerts(severity="high", limit=1)
+        if recent:
+            narrative = agent.explainer.narrate_incident(recent[0])
+            return {"response": f"I have detected potential activity. {narrative}"}
+        return {"response": "No high-confidence threats are currently active in the local environment."}
+
+    if "who are you" in message or "persona" in message:
+        return {"response": "I am Aegis, the Synthesus 4.0 Cognitive Security Officer. I utilize causal and Bayesian reasoning to protect your infrastructure with autonomous resilience."}
+
+    # Default generative response using Aegis Explainer logic
+    return {"response": "I am standing by for security commands. You can ask me about system status, current threats, or run a breach exercise."}
+
+
 @security_router.get("/report")
 async def security_report():
     """Generate a JSON security summary report."""

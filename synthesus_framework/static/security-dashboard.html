@@ -128,13 +128,62 @@
             </div>
         </section>
 
-        <!-- ─── Right: Threat Intel ─── -->
-        <section id="threat-panel" class="panel">
+        <!-- ─── Right: Threat Intel & Red Team ─── -->
+        <div id="intel-column" class="column">
+            <section id="network-panel" class="panel">
+                <div class="panel-header">
+                    <h2>Collaborative Network</h2>
+                    <span id="peer-count" class="badge">0 Peers</span>
+                </div>
+                <div id="peer-list" class="peer-list">
+                    <div class="empty-state">Searching for other agents...</div>
+                </div>
+            </section>
+
+            <section id="threat-panel" class="panel">
+                <div class="panel-header">
+                    <h2>Threat Intelligence</h2>
+                </div>
+                <div id="threat-feed" class="threat-feed">
+                    <div class="empty-state">No active threats.</div>
+                </div>
+            </section>
+
+            <section id="remediation-panel" class="panel">
+                <div class="panel-header">
+                    <h2>Remediation History</h2>
+                </div>
+                <div id="remediation-list" class="remediation-list">
+                    <div class="empty-state">No autonomous actions taken.</div>
+                </div>
+            </section>
+
+            <section id="red-team-panel" class="panel">
+                <div class="panel-header">
+                    <h2>Red Team Analysis</h2>
+                    <div class="header-actions">
+                        <span class="status-indicator-mini" id="red-team-status">STANDBY</span>
+                    </div>
+                </div>
+                <div id="vector-list" class="vector-list">
+                    <div class="empty-state">No breach exercises performed.</div>
+                </div>
+            </section>
+        </div>
+        <!-- ─── Bottom Left: Neural Chat ─── -->
+        <section id="chat-panel" class="panel">
             <div class="panel-header">
-                <h2>Threat Intelligence</h2>
+                <h2>Neural Chat</h2>
+                <span class="status-indicator-mini">AEGIS-V4</span>
             </div>
-            <div id="threat-feed" class="threat-feed">
-                <div class="empty-state">No active threats.</div>
+            <div id="chat-messages" class="chat-messages">
+                <div class="message system">
+                    Welcome, Commander. Aegis Neural Link established. How can I assist with security operations today?
+                </div>
+            </div>
+            <div class="chat-input-wrapper">
+                <input type="text" id="chat-input" placeholder="Ask Aegis anything..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+                <button id="btn-chat-send" onclick="sendChatMessage()">📡</button>
             </div>
         </section>
     </main>

@@ -152,6 +152,9 @@ async function triggerBreach() {
 
     if (result) {
         setActionStatus(`Breach complete: ${result.vectors_found} vectors found`, 'success');
+        if (result.vectors) {
+            renderVectorList(result.vectors);
+        }
         refreshDashboard();
     }
 }
@@ -234,6 +237,15 @@ function renderDashboard(state) {
 
     // Threats
     renderThreatFeed(state.ghostnet_threats || []);
+
+    // Red Team Vectors
+    renderVectorList(state.breach_vectors || []);
+
+    // Remediation History
+    renderRemediationList(state.remediation_history || []);
+
+    // Collaborative Network
+    renderPeerList(state.ghostnet_peers || []);
 }
 
 function updateOverallStatus(state) {
@@ -278,13 +290,31 @@ function renderAlertList(alerts) {
         return;
     }
 
-    container.innerHTML = alerts.map(alert => `
+    container.innerHTML = alerts.map(alert => {
+        const hasReasoning = alert.metadata && alert.metadata.analysis;
+        const analysis = hasReasoning ? alert.metadata.analysis : null;
+        
+        return `
         <div class="alert-card severity-${alert.severity}" onclick="toggleAlert(this, ${alert.id})">
             <div class="alert-header">
                 <span class="alert-title">${escapeHtml(alert.title)}</span>
                 <span class="alert-severity ${alert.severity}">${alert.severity}</span>
             </div>
             <div class="alert-desc">${escapeHtml(alert.description || '').slice(0, 120)}</div>
+            
+            ${hasReasoning ? `
+                <div class="reasoning-insight">
+                    <div class="insight-header">
+                        <span class="insight-icon">🧠</span>
+                        <span class="insight-label">Reasoning Engine Insight</span>
+                        <span class="insight-confidence">Confidence: ${(analysis.max_confidence * 100).toFixed(1)}%</span>
+                    </div>
+                    <div class="insight-body">
+                        ${analysis.analysis_trace.map(t => `<div class="trace-line">${escapeHtml(t)}</div>`).join('')}
+                    </div>
+                </div>
+            ` : ''}
+
             <div class="alert-meta">
                 <span>${alert.source}</span>
                 <span>${alert.status}</span>
@@ -295,7 +325,7 @@ function renderAlertList(alerts) {
                 ${alert.status !== 'resolved' ? `<button class="alert-action-btn" onclick="event.stopPropagation(); resolveAlert(${alert.id})">✕ Resolve</button>` : ''}
             </div>
         </div>
-    `).join('');
+    `;}).join('');
 }
 
 function renderScanList(scans) {
@@ -332,6 +362,91 @@ function renderThreatFeed(threats) {
             </div>
         `;
     }).join('');
+}
+
+function renderVectorList(vectors) {
+    const container = document.getElementById('vector-list');
+    if (!vectors || vectors.length === 0) {
+        container.innerHTML = '<div class="empty-state">No breach exercises performed.</div>';
+        return;
+    }
+
+    container.innerHTML = vectors.map(v => `
+        <div class="vector-entry">
+            <div class="vector-header">
+                <span class="vector-name">${escapeHtml(v.name)}</span>
+                <span class="vector-severity">${v.severity}</span>
+            </div>
+            <div class="vector-desc">${escapeHtml(v.description)}</div>
+            <div class="vector-target">Target: ${escapeHtml(v.target_component)}</div>
+        </div>
+    `).join('');
+}
+
+function renderRemediationList(history) {
+    const container = document.getElementById('remediation-list');
+    if (!history || history.length === 0) {
+        container.innerHTML = '<div class="empty-state">No autonomous actions taken.</div>';
+        return;
+    }
+
+    container.innerHTML = history.map(h => `
+        <div class="remediation-entry status-${h.status}">
+            <div class="rem-header">
+                <span class="rem-action">${h.action}</span>
+                <span class="rem-time">${formatTimeAgo(new Date(h.timestamp * 1000))}</span>
+            </div>
+            <div class="rem-result">${escapeHtml(h.result)}</div>
+        </div>
+    `).join('');
+}
+
+function renderPeerList(peers) {
+    const container = document.getElementById('peer-list');
+    const countBadge = document.getElementById('peer-count');
+    
+    if (countBadge) {
+        countBadge.textContent = `${peers.length} Peers`;
+    }
+
+    if (!peers || peers.length === 0) {
+        container.innerHTML = '<div class="empty-state">Searching for other agents...</div>';
+        return;
+    }
+
+    container.innerHTML = peers.map(p => `
+        <div class="peer-entry">
+            <div class="peer-icon"></div>
+            <div class="peer-info">
+                <div class="peer-name">${escapeHtml(p.id)}</div>
+                <div class="peer-addr">${escapeHtml(p.addr)}</div>
+            </div>
+            <div class="peer-status">${escapeHtml(p.status)}</div>
+        </div>
+    `).join('');
+}
+
+async function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    if (!message) return;
+
+    addMessageToChat('user', message);
+    input.value = '';
+
+    const result = await apiCall('/chat', 'POST', { message });
+    if (result && result.response) {
+        addMessageToChat('system', result.response);
+    }
+}
+
+function addMessageToChat(type, text) {
+    const container = document.getElementById('chat-messages');
+    const msg = document.createElement('div');
+    msg.className = `message ${type}`;
+    msg.textContent = text;
+    container.appendChild(msg);
+    container.scrollTop = container.scrollHeight;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -380,6 +495,9 @@ function prependAlert(alert) {
     const empty = container.querySelector('.empty-state');
     if (empty) empty.remove();
 
+    const hasReasoning = alert.metadata && alert.metadata.analysis;
+    const analysis = hasReasoning ? alert.metadata.analysis : null;
+
     const html = `
         <div class="alert-card severity-${alert.severity}" onclick="toggleAlert(this, ${alert.id})">
             <div class="alert-header">
@@ -387,6 +505,20 @@ function prependAlert(alert) {
                 <span class="alert-severity ${alert.severity}">${alert.severity}</span>
             </div>
             <div class="alert-desc">${escapeHtml(alert.description || '').slice(0, 120)}</div>
+
+            ${hasReasoning ? `
+                <div class="reasoning-insight">
+                    <div class="insight-header">
+                        <span class="insight-icon">🧠</span>
+                        <span class="insight-label">Reasoning Engine Insight</span>
+                        <span class="insight-confidence">Confidence: ${(analysis.max_confidence * 100).toFixed(1)}%</span>
+                    </div>
+                    <div class="insight-body">
+                        ${analysis.analysis_trace.map(t => `<div class="trace-line">${escapeHtml(t)}</div>`).join('')}
+                    </div>
+                </div>
+            ` : ''}
+
             <div class="alert-meta">
                 <span>${alert.source}</span>
                 <span>${alert.status}</span>

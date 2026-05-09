@@ -285,6 +285,58 @@ body {
     font-family: var(--font-mono);
 }
 
+.reasoning-insight {
+    margin: 8px 0;
+    padding: 10px;
+    background: rgba(0, 255, 204, 0.03);
+    border: 1px solid rgba(0, 255, 204, 0.1);
+    border-radius: 6px;
+}
+
+.insight-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-family: var(--font-mono);
+}
+
+.insight-icon { font-size: 14px; }
+
+.insight-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.insight-confidence {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text-secondary);
+}
+
+.insight-body {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.trace-line {
+    position: relative;
+    padding-left: 12px;
+    margin-bottom: 2px;
+}
+
+.trace-line::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    opacity: 0.5;
+}
+
 .alert-card .alert-actions {
     display: none;
     gap: 8px;
@@ -471,6 +523,235 @@ body {
 .threat-entry .threat-desc {
     color: var(--text-primary);
     line-height: 1.4;
+}
+
+/* ─── Red Team Panel ─────────────────────────────────────────────── */
+
+.vector-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.vector-entry {
+    padding: 12px;
+    margin-bottom: 8px;
+    background: rgba(255, 59, 92, 0.05);
+    border: 1px solid rgba(255, 59, 92, 0.1);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--critical);
+}
+
+.vector-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.vector-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--critical);
+}
+
+.vector-severity {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--critical);
+    color: #fff;
+}
+
+.vector-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.vector-target {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
+.status-indicator-mini {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+
+/* ─── Remediation Panel ──────────────────────────────────────────── */
+
+.remediation-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.remediation-entry {
+    padding: 10px 14px;
+    margin-bottom: 6px;
+    background: rgba(0, 255, 204, 0.05);
+    border: 1px solid rgba(0, 255, 204, 0.1);
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+}
+
+.remediation-entry.status-blocked {
+    border-left: 3px solid var(--medium);
+    background: rgba(255, 194, 61, 0.05);
+}
+
+.remediation-entry.status-success {
+    border-left: 3px solid var(--accent);
+}
+
+.remediation-entry.status-failed {
+    border-left: 3px solid var(--critical);
+}
+
+.rem-header {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    margin-bottom: 4px;
+}
+
+.rem-action {
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+}
+
+.rem-time { color: var(--text-muted); }
+
+.rem-result { color: var(--text-secondary); line-height: 1.4; }
+
+/* ─── Collaborative Network Panel ────────────────────────────────── */
+
+.peer-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.peer-entry {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+.peer-icon {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 12px;
+    box-shadow: 0 0 5px var(--accent);
+}
+
+.peer-info {
+    flex: 1;
+}
+
+.peer-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.peer-addr {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-muted);
+}
+
+.peer-status {
+    font-size: 9px;
+    color: var(--accent);
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+/* ─── Neural Chat Panel ──────────────────────────────────────────── */
+
+#chat-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.message {
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    line-height: 1.5;
+    max-width: 85%;
+}
+
+.message.system {
+    background: rgba(0, 255, 204, 0.05);
+    border: 1px solid rgba(0, 255, 204, 0.1);
+    color: var(--text-primary);
+    align-self: flex-start;
+    border-left: 3px solid var(--accent);
+}
+
+.message.user {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    align-self: flex-end;
+}
+
+.chat-input-wrapper {
+    display: flex;
+    padding: 12px;
+    border-top: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.2);
+    gap: 10px;
+}
+
+.chat-input-wrapper input {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    color: var(--text-primary);
+    font-family: var(--font-inter);
+    font-size: 13px;
+}
+
+.chat-input-wrapper button {
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius-sm);
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.chat-input-wrapper button:hover {
+    transform: scale(1.05);
 }
 
 /* ─── Action Bar ─────────────────────────────────────────────────── */
