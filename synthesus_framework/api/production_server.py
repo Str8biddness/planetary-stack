@@ -309,6 +309,17 @@ try:
 except Exception as e:
     logger.warning(f"Parameter Cloud V2 not available: {e}")
 
+# ─── Cybersecurity Agent API ──────────────────────────────────────────
+HAS_SECURITY_AGENT = False
+try:
+    from api.security_router import security_router, set_security_agent  # type: ignore
+    app.include_router(security_router, prefix="/api/v1/security", tags=["security"])
+    HAS_SECURITY_AGENT = True
+    logger.info("Security Agent API active at /api/v1/security")
+except Exception as e:
+    set_security_agent = None  # type: ignore
+    logger.warning(f"Security Agent not available: {e}")
+
 # Knowledge Cloud API mounted at /api/v1/knowledge
 try:
     from api.knowledge_cloud_router import router as knowledge_cloud_router, set_knowledge_cloud  # type: ignore
@@ -346,6 +357,7 @@ def local_inference_func(prompt: str, **kwargs) -> str:
 
 # ─── Global State ────────────────────────────────────────────────────
 _rag: Optional[RAGPipeline] = None
+_security_agent_instance = None  # SecurityAgent for cybersecurity operations
 _character_cache: Dict[str, Dict[str, Any]] = {}
 _cognitive_engines: Dict[str, Optional[CognitiveEngine]] = {}
 MAX_ENGINES = 50
@@ -471,6 +483,20 @@ class ConnectionManager:
             self.disconnect(dead)
 
 manager = ConnectionManager()
+
+# Security Dashboard WebSocket connections
+security_ws_manager = ConnectionManager()
+
+@app.websocket("/ws/security")
+async def security_websocket(websocket: WebSocket):
+    """WebSocket endpoint for real-time security dashboard updates."""
+    await security_ws_manager.connect(websocket)
+    try:
+        while True:
+            # Keep connection alive; push updates from background tasks
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        security_ws_manager.disconnect(websocket)
 
 # ─── Autonomous Lifecycle ───────────────────────────────────────────
 async def character_lifecycle_loop():
@@ -720,6 +746,20 @@ async def startup():
     
     # Start Database Metrics Persister
     asyncio.create_task(_persist_metrics_loop())
+    
+    # ── Initialize Cybersecurity Agent ──
+    global _security_agent_instance
+    if HAS_SECURITY_AGENT:
+        try:
+            from core.security_agent import SecurityAgent  # type: ignore
+            _security_agent_instance = SecurityAgent()
+            _security_agent_instance.start()
+            set_security_agent(_security_agent_instance)
+            await _security_agent_instance.start_scheduled_scanning(interval_seconds=300)
+            logger.info("Cybersecurity Agent active — scheduled scanning every 5 minutes.")
+        except Exception as e:
+            logger.warning(f"Security Agent failed to initialize: {e}")
+            _security_agent_instance = None
     
     logger.info("Server ready.")
 

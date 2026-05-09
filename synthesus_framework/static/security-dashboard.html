@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GHOSTKEY — Security Operations Center</title>
+    <meta name="description" content="Synthesus 4.0 Cybersecurity Agent Dashboard — Real-time threat monitoring, breach detection, and autonomous defense.">
+    <link rel="stylesheet" href="/static/css/security-dashboard.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- ═══ Header Bar ═══ -->
+    <header id="header">
+        <div class="header-left">
+            <div class="logo">
+                <span class="logo-icon">◆</span>
+                <span class="logo-text">GHOSTKEY</span>
+                <span class="logo-version">SOC v4.0</span>
+            </div>
+        </div>
+        <div class="header-center">
+            <div id="status-indicator" class="status-badge status-secure">
+                <span class="status-dot"></span>
+                <span id="status-text">INITIALIZING</span>
+            </div>
+            <div class="header-meta">
+                <span id="last-scan-label">Last scan: —</span>
+                <span class="divider">|</span>
+                <span id="uptime-label">Uptime: —</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <div id="active-threats-badge" class="threat-badge">
+                <span id="threat-count">0</span>
+                <span>ACTIVE</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ═══ Main Grid ═══ -->
+    <main id="dashboard-grid">
+
+        <!-- ─── Left: Alert Feed ─── -->
+        <section id="alert-panel" class="panel">
+            <div class="panel-header">
+                <h2>Alert Feed</h2>
+                <div class="filter-bar">
+                    <select id="severity-filter">
+                        <option value="">All Severity</option>
+                        <option value="critical">Critical</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                        <option value="info">Info</option>
+                    </select>
+                    <select id="status-filter">
+                        <option value="">All Status</option>
+                        <option value="new">New</option>
+                        <option value="acknowledged">Acknowledged</option>
+                        <option value="resolved">Resolved</option>
+                    </select>
+                </div>
+            </div>
+            <div id="alert-list" class="alert-list">
+                <div class="empty-state">No alerts yet. Run a scan to begin.</div>
+            </div>
+        </section>
+
+        <!-- ─── Center: System Overview ─── -->
+        <section id="system-panel" class="panel">
+            <div class="panel-header">
+                <h2>System Overview</h2>
+            </div>
+            <div class="metrics-grid">
+                <div class="metric-card" id="metric-integrity">
+                    <div class="metric-icon">🛡️</div>
+                    <div class="metric-label">Integrity</div>
+                    <div class="metric-value" id="integrity-value">—</div>
+                </div>
+                <div class="metric-card" id="metric-baseline">
+                    <div class="metric-icon">📊</div>
+                    <div class="metric-label">Baseline Samples</div>
+                    <div class="metric-value" id="baseline-value">0</div>
+                </div>
+                <div class="metric-card" id="metric-ghostnet">
+                    <div class="metric-icon">🌐</div>
+                    <div class="metric-label">GhostNet</div>
+                    <div class="metric-value" id="ghostnet-value">—</div>
+                </div>
+                <div class="metric-card" id="metric-breach">
+                    <div class="metric-icon">⚔️</div>
+                    <div class="metric-label">Breach Engine</div>
+                    <div class="metric-value" id="breach-value">—</div>
+                </div>
+            </div>
+
+            <!-- Alert Stats Bars -->
+            <div class="stats-section">
+                <h3>Alert Summary</h3>
+                <div class="stat-row">
+                    <span class="stat-label">Critical</span>
+                    <div class="stat-bar"><div class="stat-fill critical" id="bar-critical" style="width:0%"></div></div>
+                    <span class="stat-count" id="count-critical">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">High</span>
+                    <div class="stat-bar"><div class="stat-fill high" id="bar-high" style="width:0%"></div></div>
+                    <span class="stat-count" id="count-high">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Medium</span>
+                    <div class="stat-bar"><div class="stat-fill medium" id="bar-medium" style="width:0%"></div></div>
+                    <span class="stat-count" id="count-medium">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Low</span>
+                    <div class="stat-bar"><div class="stat-fill low" id="bar-low" style="width:0%"></div></div>
+                    <span class="stat-count" id="count-low">0</span>
+                </div>
+            </div>
+
+            <!-- Recent Scans -->
+            <div class="scans-section">
+                <h3>Recent Scans</h3>
+                <div id="scan-list" class="scan-list">
+                    <div class="empty-state">No scans recorded yet.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── Right: Threat Intel ─── -->
+        <section id="threat-panel" class="panel">
+            <div class="panel-header">
+                <h2>Threat Intelligence</h2>
+            </div>
+            <div id="threat-feed" class="threat-feed">
+                <div class="empty-state">No active threats.</div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ═══ Action Bar ═══ -->
+    <footer id="action-bar">
+        <button id="btn-full-scan" class="action-btn primary" onclick="triggerScan()">
+            <span class="btn-icon">🔍</span> Run Full Scan
+        </button>
+        <button id="btn-breach" class="action-btn danger" onclick="triggerBreach()">
+            <span class="btn-icon">⚔️</span> Breach Exercise
+        </button>
+        <button id="btn-brute" class="action-btn warning" onclick="triggerBrute()">
+            <span class="btn-icon">🔑</span> Brute-Force Sim
+        </button>
+        <button id="btn-report" class="action-btn secondary" onclick="exportReport()">
+            <span class="btn-icon">📄</span> Export Report
+        </button>
+        <div class="action-status">
+            <span id="action-status-text"></span>
+        </div>
+    </footer>
+
+    <script src="/static/js/security-dashboard.js"></script>
+</body>
+</html>
