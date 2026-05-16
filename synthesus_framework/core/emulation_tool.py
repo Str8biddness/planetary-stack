@@ -69,9 +69,10 @@ class EmulationTool:
             "category": "gm"
         },
     }
-    # In-memory registry for virtual hosts (now backed by Docker containers)
-    self.hosts: Dict[str, Dict[str, Any]] = {}
-    self.docker_available = self._check_docker()
+    def __init__(self):
+        # In-memory registry for virtual hosts (now backed by Docker containers)
+        self.hosts: Dict[str, Dict[str, Any]] = {}
+        self.docker_available = self._check_docker()
 
     def _check_docker(self) -> bool:
         try:

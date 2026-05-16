@@ -883,3 +883,70 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 - Attack trees are high-fidelity JSON descriptions of attack paths, NOT functional exploit code.
 - Memory scanning signatures are extensible; new CVE patterns can be added via `add_signature()`.
 
+
+## Current Session — 2026-05-16 (Character Refinement & Bug Fix)
+
+### Summary
+- Refined the **Gemini CLI** character persona from a generic scholar placeholder to a high-fidelity engineering agent.
+- Updated `bio.json`, `personality.json`, `patterns.json`, and `knowledge.json` for Gemini CLI.
+- Fixed a critical `NameError` in `core/emulation_tool.py` where `self` was used at the class level instead of inside `__init__`.
+- Rebuilt the character registry via `validate_character.py --all --fix-registry`.
+- Verified character intelligence through a smoke test script covering patterns, personality, and knowledge graph retrieval.
+
+### Verified
+- `characters/gemini_cli/bio.json`, `patterns.json`, `personality.json`, `knowledge.json`
+- `core/emulation_tool.py` (Compiles and initializes correctly)
+- `registry.json` updated with `gemini_cli` at `hemisphere_id: 9`
+- Character validation pass: `python validate_character.py Synthesus_4.0/synthesus_framework/characters/gemini_cli` -> ✅ VALID
+
+### Left Off
+- Some characters like `breach`, `deepseek_coder`, and `gpt4_architect` still have incomplete genomes (missing patterns/personality/knowledge).
+- The `PatternEngine` semantic matching could be further tuned to prevent pattern-bloat from overshadowing high-value Knowledge Graph entities.
+
+### Recommended Next Steps
+1. Complete the adversarial genome for the **Breach** character to enable full red-team simulations.
+2. Expand the `PatternEngine` to better prioritize `KnowledgeGraph` nodes when specific entities are detected in the query.
+3. Address the remaining character validation errors for `haven`, `lexis`, and `synth` regarding pattern ID formats and domain mismatches.
+
+### Notes
+- The Gemini CLI persona now responds with technical authority and uses a non-generic fallback module for unknown queries.
+- `EmulationTool` now correctly supports Docker-based sandboxing when available, with a clean simulation fallback.
+
+## Generative Transition — 2026-05-16
+
+### Summary
+- Transitioned **all characters** from templated responses to a generative dual-hemisphere reasoning model.
+- Refactored `CognitiveEngine` to pipe `KnowledgeGraph` and `PersonalityBank` lookups into the `PatternEngine` for dynamic synthesis.
+- Eliminated early-exit paths for static pattern templates by increasing the `match_score` threshold to 1.1.
+- Characters now blend factual knowledge with their unique voice patterns via Markov-based synthesis, ensuring every response is unique and "Real AI".
+- Verified the transition with a mock KAL integration test, confirming that characters now generate language rather than filling templates.
+
+### Verified
+- `cognitive/cognitive_engine.py`: `knowledge_graph_synthesized` and `personality_bank_synthesized` paths active.
+- `patterns_gen.synthesize_knowledge` is now the primary output module for cognitive reasoning.
+- Threshold `1.1` successfully bypasses Left Hemisphere static templates.
+
+### Recommended Next Steps
+- Fine-tune the `PatternEngine` order and temperature to improve the coherence of synthesized responses.
+- Implement a "Hybrid Synthesis" mode that can selectively use templates for critical identity prompts while remaining generative for lore and technical queries.
+
+## Google Drive Parameter Cloud — 2026-05-16
+
+### Summary
+- Integrated **Google Drive** as a persistent storage backend for the Parameter Cloud.
+- Implemented a **Hybrid Cache & Sync** architecture: real-time updates happen locally in PostgreSQL, with periodic background synchronization to Drive.
+- Added `cloud/drive_backend.py` to handle Google Drive API interactions (Folder ID: `1_fCFGR34kZEbCPSd2ojiKX0s_ongOta4`).
+- Added `DriveSyncWorker` to `api/parameter_cloud_v2.py` for batch shard synchronization.
+- Created `docs/drive_setup_guide.md` and `scripts/auth_gdrive.py` to facilitate OAuth 2.0 authorization.
+- New endpoints: `POST /parameter-cloud/v2/sync` and `GET /parameter-cloud/v2/sync-status`.
+
+### Verified
+- Dependencies installed: `google-api-python-client`, `google-auth-httplib2`, `google-auth-oauthlib`.
+- `api/parameter_cloud_v2.py` compiles and includes sync logic.
+
+### Left Off
+- User needs to follow `docs/drive_setup_guide.md` to provide `credentials.json` and perform the initial one-time authorization.
+
+### Recommended Next Steps
+1. Guide the user through the authorization process once they have their `credentials.json`.
+2. Implement automated bootstrap logic that downloads shards from Drive if the local DB is empty.

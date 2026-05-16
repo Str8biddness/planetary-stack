@@ -117,7 +117,7 @@ private:
 };
 
 
-PYBIND11_MODULE(synthesus_kernel, m) {
+PYBIND11_MODULE(_synthesus_kernel, m) {
     m.doc() = "Synthesus 2.0 C++ Kernel — pybind11 interface";
 
     // RouteResult
@@ -127,24 +127,41 @@ PYBIND11_MODULE(synthesus_kernel, m) {
         .def_readwrite("confidence", &PyRouteResult::confidence)
         .def_readwrite("module_used", &PyRouteResult::module_used);
 
+    // Message
+    py::class_<zo::Message>(m, "Message")
+        .def_readwrite("topic", &zo::Message::topic)
+        .def_readwrite("payload", &zo::Message::payload)
+        .def_readwrite("timestamp_ms", &zo::Message::timestamp_ms)
+        .def_readwrite("priority", &zo::Message::priority);
+
     // ThreadPool
     py::class_<zo::ThreadPool>(m, "ThreadPool")
-        .def(py::init<int>(), py::arg("size") = 4)
-        .def("submit", [](zo::ThreadPool& pool, py::function fn) {
+        .def(py::init<size_t>(), py::arg("size") = 4)
+        .def("enqueue", [](zo::ThreadPool& pool, py::function fn) {
             // Wraps Python callable for thread pool execution
-            pool.submit([fn]() { py::gil_scoped_acquire acquire; fn(); });
+            pool.enqueue([fn]() { 
+                py::gil_scoped_acquire acquire; 
+                try {
+                    fn(); 
+                } catch (py::error_already_set& e) {
+                    // Log or handle python error
+                }
+            });
         });
 
     // MessageBus
     py::class_<zo::MessageBus>(m, "MessageBus")
-        .def(py::init<>())
-        .def("publish", [](zo::MessageBus& bus, const std::string& topic, py::object data) {
-            bus.publish(topic, py::str(data).cast<std::string>());
-        })
+        .def_static("instance", &zo::MessageBus::instance, py::return_value_policy::reference)
+        .def("publish", py::overload_cast<const std::string&, const std::string&, int>(&zo::MessageBus::publish),
+             py::arg("topic"), py::arg("payload"), py::arg("priority") = 0)
         .def("subscribe", [](zo::MessageBus& bus, const std::string& topic, py::function handler) {
-            bus.subscribe(topic, [handler](const std::string& data) {
+            bus.subscribe(topic, [handler](const zo::Message& msg) {
                 py::gil_scoped_acquire acquire;
-                handler(data);
+                try {
+                    handler(msg);
+                } catch (py::error_already_set& e) {
+                    // Log or handle python error
+                }
             });
         });
 

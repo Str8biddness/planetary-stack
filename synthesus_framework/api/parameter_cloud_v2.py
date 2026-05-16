@@ -5,6 +5,8 @@
 import os
 import json
 import asyncpg
+import asyncio
+import logging
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
 from datetime import datetime
@@ -12,6 +14,10 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel, Field
 import hashlib
 import struct
+
+from cloud.drive_backend import DriveBackend
+
+logger = logging.getLogger("parameter_cloud_v2")
 
 router = APIRouter(prefix="/parameter-cloud/v2", tags=["parameter-cloud-v2"])
 
@@ -534,3 +540,113 @@ def _merge_values(existing: Any, new: Any, value_type: str) -> Any:
             return merged
     
     return new
+
+class DriveSyncWorker:
+    """Manages periodic synchronization of local parameters to Google Drive."""
+    
+    def __init__(self, folder_id: str = "1_fCFGR34kZEbCPSd2ojiKX0s_ongOta4"):
+        self.folder_id = folder_id
+        self.backend: Optional[DriveBackend] = None
+        self.is_syncing = False
+        self.last_sync_time: Optional[datetime] = None
+        self._sync_task: Optional[asyncio.Task] = None
+        
+        try:
+            self.backend = DriveBackend(folder_id)
+            logger.info(f"DriveSyncWorker initialized with folder {folder_id}")
+        except Exception as e:
+            logger.warning(f"DriveSyncWorker failed to init backend: {e}")
+
+    async def start(self, interval_seconds: int = 3600):
+        """Start the background sync loop."""
+        if self._sync_task:
+            return
+        self._sync_task = asyncio.create_task(self._run_loop(interval_seconds))
+
+    async def _run_loop(self, interval_seconds: int):
+        while True:
+            await asyncio.sleep(interval_seconds)
+            try:
+                await self.sync_now()
+            except Exception as e:
+                logger.error(f"Background sync failed: {e}")
+
+    async def sync_now(self) -> Dict[str, Any]:
+        """Perform a full synchronization of all shards to Drive."""
+        if self.is_syncing:
+            return {"status": "already_syncing"}
+            
+        if not self.backend:
+            raise HTTPException(status_code=503, detail="Drive backend not configured")
+
+        self.is_syncing = True
+        start_time = datetime.now()
+        shards_synced = 0
+        total_size = 0
+        
+        try:
+            pool = await get_db_pool()
+            async with pool.acquire() as conn:
+                # 1. Fetch list of shards from DB
+                shards = await conn.fetch("SELECT DISTINCT shard_key FROM parameters")
+                
+                for shard_row in shards:
+                    shard_key = shard_row['shard_key']
+                    
+                    # 2. Export shard to JSON
+                    rows = await conn.fetch(
+                        "SELECT * FROM parameters WHERE shard_key = $1", 
+                        shard_key
+                    )
+                    
+                    shard_data = []
+                    for row in rows:
+                        shard_data.append({
+                            "namespace": row['namespace'],
+                            "param_key": row['param_key'],
+                            "value_type": row['value_type'],
+                            "value": _deserialize_value(row),
+                            "metadata": json.loads(row['metadata']) if row['metadata'] else None,
+                            "version": row['version'],
+                            "updated_at_ms": row['updated_at_ms']
+                        })
+                    
+                    # 3. Upload to Drive
+                    content = json.dumps(shard_data, indent=2).encode('utf-8')
+                    file_name = f"shard_{shard_key}.json"
+                    self.backend.upload_file(file_name, content, 'application/json')
+                    
+                    shards_synced += 1
+                    total_size += len(content)
+                    logger.info(f"Synced shard {shard_key} to Drive ({len(content)} bytes)")
+            
+            self.last_sync_time = datetime.now()
+            return {
+                "status": "success",
+                "shards_synced": shards_synced,
+                "total_size_bytes": total_size,
+                "latency_ms": (datetime.now() - start_time).total_seconds() * 1000
+            }
+        finally:
+            self.is_syncing = False
+
+# Global sync worker
+drive_sync = DriveSyncWorker()
+
+@router.post("/sync")
+async def trigger_sync():
+    """Manually trigger a sync to Google Drive"""
+    return await drive_sync.sync_now()
+
+@router.get("/sync-status")
+async def get_sync_status():
+    """Get the current status of Drive synchronization"""
+    return {
+        "is_syncing": drive_sync.is_syncing,
+        "last_sync": drive_sync.last_sync_time,
+        "folder_id": drive_sync.folder_id,
+        "backend_ready": drive_sync.backend is not None
+    }
+
+# Start sync loop on startup (if possible with current FastAPI lifecycle)
+# In production, this would be hooked into app.on_event("startup")
