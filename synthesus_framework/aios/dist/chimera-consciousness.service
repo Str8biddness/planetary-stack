@@ -1,0 +1,13 @@
+[Unit]
+Description=Chimera Consciousness Engine
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/chimera/consciousness/engine.py
+Restart=always
+User=root
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
