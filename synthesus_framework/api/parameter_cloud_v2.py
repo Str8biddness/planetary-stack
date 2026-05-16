@@ -4,6 +4,8 @@
 
 import os
 import json
+import zstandard as zstd
+import time
 import asyncpg
 import asyncio
 import logging
@@ -572,7 +574,7 @@ class DriveSyncWorker:
                 logger.error(f"Background sync failed: {e}")
 
     async def sync_now(self) -> Dict[str, Any]:
-        """Perform a full synchronization of all shards to Drive."""
+        """Perform a delta synchronization of shards to Drive using compression."""
         if self.is_syncing:
             return {"status": "already_syncing"}
             
@@ -582,16 +584,32 @@ class DriveSyncWorker:
         self.is_syncing = True
         start_time = datetime.now()
         shards_synced = 0
-        total_size = 0
+        total_uncompressed_size = 0
+        total_compressed_size = 0
         
+        # Load sync tracking (in production, use a dedicated DB table)
+        tracking_file = "drive_sync_tracking.json"
+        tracking_data = {}
+        if os.path.exists(tracking_file):
+            with open(tracking_file, 'r') as f:
+                tracking_data = json.load(f)
+
         try:
             pool = await get_db_pool()
             async with pool.acquire() as conn:
-                # 1. Fetch list of shards from DB
-                shards = await conn.fetch("SELECT DISTINCT shard_key FROM parameters")
+                # 1. Fetch list of shards and their max update times
+                shards = await conn.fetch("SELECT shard_key, MAX(updated_at_ms) as last_update FROM parameters GROUP BY shard_key")
+                
+                cctx = zstd.ZstdCompressor(level=3)
                 
                 for shard_row in shards:
                     shard_key = shard_row['shard_key']
+                    last_update = shard_row['last_update']
+                    
+                    # DELTA CHECK: Only sync if shard has new data
+                    prev_update = tracking_data.get(shard_key, 0)
+                    if last_update <= prev_update:
+                        continue
                     
                     # 2. Export shard to JSON
                     rows = await conn.fetch(
@@ -611,23 +629,35 @@ class DriveSyncWorker:
                             "updated_at_ms": row['updated_at_ms']
                         })
                     
-                    # 3. Upload to Drive
-                    content = json.dumps(shard_data, indent=2).encode('utf-8')
-                    file_name = f"shard_{shard_key}.json"
-                    self.backend.upload_file(file_name, content, 'application/json')
+                    # 3. Compress and Upload to Drive
+                    raw_content = json.dumps(shard_data).encode('utf-8')
+                    compressed_content = cctx.compress(raw_content)
                     
+                    file_name = f"shard_{shard_key}.zst"
+                    self.backend.upload_file(file_name, compressed_content, 'application/zstd')
+                    
+                    tracking_data[shard_key] = last_update
                     shards_synced += 1
-                    total_size += len(content)
-                    logger.info(f"Synced shard {shard_key} to Drive ({len(content)} bytes)")
+                    total_uncompressed_size += len(raw_content)
+                    total_compressed_size += len(compressed_content)
+                    
+                    logger.info(f"Synced shard {shard_key} (Delta): {len(raw_content)} -> {len(compressed_content)} bytes")
             
+            # Save updated tracking data
+            with open(tracking_file, 'w') as f:
+                json.dump(tracking_data, f)
+
             self.last_sync_time = datetime.now()
             return {
                 "status": "success",
                 "shards_synced": shards_synced,
-                "total_size_bytes": total_size,
+                "uncompressed_bytes": total_uncompressed_size,
+                "compressed_bytes": total_compressed_size,
+                "compression_ratio": f"{total_uncompressed_size / total_compressed_size:.2f}x" if total_compressed_size > 0 else "0",
                 "latency_ms": (datetime.now() - start_time).total_seconds() * 1000
             }
         finally:
+            self.is_syncing = False
             self.is_syncing = False
 
 # Global sync worker
