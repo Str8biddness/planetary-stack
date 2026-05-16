@@ -1,6 +1,7 @@
 import socket
 import logging
 import time
+import asyncio
 from zeroconf import IPVersion, ServiceInfo, Zeroconf, ServiceBrowser
 
 from . import grpc_server
@@ -9,7 +10,7 @@ from .grpc_client import ClusterClient
 logger = logging.getLogger("aios_discovery")
 
 class SynthesusDiscovery:
-    """Handles local network discovery and clustering for Synthesus AIOS nodes."""
+    """Handles local network discovery, leader election, and clustering."""
     
     def __init__(self, node_id: str, rest_port: int = 5010, grpc_port: int = 5051):
         self.node_id = node_id
@@ -19,15 +20,47 @@ class SynthesusDiscovery:
         self.peers = {}
         self.grpc_clients = {}
         self._grpc_server = None
+        
+        # Leader Election State
+        self.master_node = None
+        self.is_master = False
+        self._election_task = None
 
     def start_grpc(self):
         """Start the gRPC server for this node."""
         self._grpc_server = grpc_server.serve(self.node_id, self.grpc_port)
 
+    async def start_election_loop(self):
+        """Periodically check for master health and elect a new one if needed."""
+        while True:
+            await asyncio.sleep(5)
+            if not self.master_node or not self._is_node_alive(self.master_node):
+                await self.elect_leader()
+
+    def _is_node_alive(self, node_id):
+        # In a real Raft implementation, this would use heartbeats.
+        # For now, we check the discovered peers list.
+        return any(p['node_id'] == node_id for p in self.peers.values())
+
+    async def elect_leader(self):
+        """Simple lexicographical leader election."""
+        logger.info("Initiating leader election...")
+        all_nodes = [self.node_id] + [p['node_id'] for p in self.peers.values()]
+        new_master = min(all_nodes) # Lowest ID wins
+        
+        if new_master == self.node_id:
+            if not self.is_master:
+                logger.info("I AM NOW THE MASTER NODE")
+                self.is_master = True
+        else:
+            self.is_master = False
+            logger.info(f"Leader elected: {new_master}")
+            
+        self.master_node = new_master
+
     def get_local_ip(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
-            # doesn't even have to be reachable
             s.connect(('10.255.255.255', 1))
             IP = s.getsockname()[0]
         except Exception:
@@ -42,7 +75,8 @@ class SynthesusDiscovery:
         desc = {
             'node_id': self.node_id, 
             'version': '4.0.0',
-            'grpc_port': str(self.grpc_port)
+            'grpc_port': str(self.grpc_port),
+            'is_master': str(self.is_master)
         }
         
         info = ServiceInfo(
@@ -54,13 +88,11 @@ class SynthesusDiscovery:
             server=f"{self.node_id}.local.",
         )
         
-        logger.info(f"Advertising Synthesus node {self.node_id} at {local_ip}:{self.rest_port} (gRPC: {self.grpc_port})")
         self.zeroconf.register_service(info)
 
     def browse(self):
         """Start browsing for other Synthesus nodes."""
-        browser = ServiceBrowser(self.zeroconf, "_synthesus._tcp.local.", self)
-        return browser
+        return ServiceBrowser(self.zeroconf, "_synthesus._tcp.local.", self)
 
     def remove_service(self, zc: Zeroconf, type_: str, name: str) -> None:
         if name in self.peers:
@@ -88,8 +120,7 @@ class SynthesusDiscovery:
             # Connect gRPC client
             target = f"{address}:{g_port}"
             self.grpc_clients[node_id] = ClusterClient(target)
-            
-            logger.info(f"Connected to peer node: {node_id} at {address} (REST: {info.port}, gRPC: {g_port})")
+            logger.info(f"Connected to peer node: {node_id}")
 
     def update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
         pass
@@ -99,17 +130,3 @@ class SynthesusDiscovery:
         self.zeroconf.close()
         if self._grpc_server:
             self._grpc_server.stop(0)
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    node_name = socket.gethostname()
-    discovery = SynthesusDiscovery(node_id=node_name)
-    discovery.start_grpc()
-    discovery.advertise()
-    discovery.browse()
-    
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        discovery.stop()
