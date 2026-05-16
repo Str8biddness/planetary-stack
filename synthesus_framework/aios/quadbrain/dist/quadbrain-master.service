@@ -1,0 +1,14 @@
+[Unit]
+Description=Synthesus Quadbrain Master Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -m aios.quadbrain.launcher --mode master
+Restart=always
+User=root
+Environment=PYTHONUNBUFFERED=1
+Environment=SYNT_MODE=quadbrain
+
+[Install]
+WantedBy=multi-user.target
