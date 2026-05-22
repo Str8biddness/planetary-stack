@@ -1,0 +1,491 @@
+{
+  "transitions": {
+    "cloud_castle": {
+      "cloud_combat": {
+        "weight": 1.0,
+        "context_buckets": [
+          "combat"
+        ]
+      },
+      "cloud_dragon": {
+        "weight": 1.0,
+        "context_buckets": [
+          "combat"
+        ]
+      }
+    },
+    "cloud_combat": {
+      "cloud_castle": {
+        "weight": 1.0,
+        "context_buckets": [
+          "combat"
+        ]
+      },
+      "cloud_dragon": {
+        "weight": 1.0,
+        "context_buckets": [
+          "combat"
+        ]
+      },
+      "cloud_battle": {
+        "weight": 1.0,
+        "context_buckets": [
+          "combat"
+        ]
+      },
+      "cloud_orc": {
+        "weight": 1.0,
+        "context_buckets": [
+          "combat"
+        ]
+      }
+    },
+    "cloud_dragon": {
+      "cloud_castle": {
+        "weight": 1.0,
+        "context_buckets": [
+          "combat"
+        ]
+      },
+      "cloud_combat": {
+        "weight": 1.0,
+        "context_buckets": [
+          "combat"
+        ]
+      }
+    },
+    "cloud_gold": {
+      "cloud_merchant": {
+        "weight": 1.0,
+        "context_buckets": [
+          "commerce"
+        ]
+      },
+      "cloud_trade": {
+        "weight": 1.0,
+        "context_buckets": [
+          "commerce"
+        ]
+      }
+    },
+    "cloud_merchant": {
+      "cloud_gold": {
+        "weight": 1.0,
+        "context_buckets": [
+          "commerce"
+        ]
+      },
+      "cloud_trade": {
+        "weight": 1.0,
+        "context_buckets": [
+          "commerce"
+        ]
+      },
+      "cloud_road": {
+        "weight": 1.0,
+        "context_buckets": [
+          "commerce"
+        ]
+      },
+      "cloud_travel": {
+        "weight": 1.0,
+        "context_buckets": [
+          "commerce"
+        ]
+      }
+    },
+    "cloud_trade": {
+      "cloud_gold": {
+        "weight": 1.0,
+        "context_buckets": [
+          "commerce"
+        ]
+      },
+      "cloud_merchant": {
+        "weight": 1.0,
+        "context_buckets": [
+          "commerce"
+        ]
+      }
+    },
+    "cloud_magic": {
+      "cloud_wizard": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      },
+      "cloud_spell": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      },
+      "cloud_healing": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      },
+      "cloud_potion": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      }
+    },
+    "cloud_wizard": {
+      "cloud_magic": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      },
+      "cloud_spell": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      }
+    },
+    "cloud_spell": {
+      "cloud_wizard": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      },
+      "cloud_magic": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      }
+    },
+    "cloud_elf": {
+      "cloud_forest": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      },
+      "cloud_lore": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      }
+    },
+    "cloud_forest": {
+      "cloud_elf": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      },
+      "cloud_lore": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      }
+    },
+    "cloud_lore": {
+      "cloud_elf": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      },
+      "cloud_forest": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      }
+    },
+    "cloud_crafting": {
+      "cloud_dwarf": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      },
+      "cloud_mountain": {
+        "weight": 1.0,
+        "context_buckets": [
+          "travel"
+        ]
+      }
+    },
+    "cloud_dwarf": {
+      "cloud_crafting": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      },
+      "cloud_mountain": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      }
+    },
+    "cloud_mountain": {
+      "cloud_crafting": {
+        "weight": 1.0,
+        "context_buckets": [
+          "travel"
+        ]
+      },
+      "cloud_dwarf": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      }
+    },
+    "cloud_battle": {
+      "cloud_orc": {
+        "weight": 1.0,
+        "context_buckets": [
+          "combat"
+        ]
+      },
+      "cloud_combat": {
+        "weight": 1.0,
+        "context_buckets": [
+          "combat"
+        ]
+      }
+    },
+    "cloud_orc": {
+      "cloud_battle": {
+        "weight": 1.0,
+        "context_buckets": [
+          "combat"
+        ]
+      },
+      "cloud_combat": {
+        "weight": 1.0,
+        "context_buckets": [
+          "combat"
+        ]
+      }
+    },
+    "cloud_healing": {
+      "cloud_magic": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      },
+      "cloud_potion": {
+        "weight": 1.0,
+        "context_buckets": [
+          "magic"
+        ]
+      }
+    },
+    "cloud_potion": {
+      "cloud_healing": {
+        "weight": 1.0,
+        "context_buckets": [
+          "magic"
+        ]
+      },
+      "cloud_magic": {
+        "weight": 1.0,
+        "context_buckets": [
+          "lore"
+        ]
+      }
+    },
+    "cloud_adventure": {
+      "cloud_quest": {
+        "weight": 1.0,
+        "context_buckets": [
+          "quest"
+        ]
+      },
+      "cloud_treasure": {
+        "weight": 1.0,
+        "context_buckets": [
+          "quest"
+        ]
+      }
+    },
+    "cloud_quest": {
+      "cloud_adventure": {
+        "weight": 1.0,
+        "context_buckets": [
+          "quest"
+        ]
+      },
+      "cloud_treasure": {
+        "weight": 1.0,
+        "context_buckets": [
+          "quest"
+        ]
+      }
+    },
+    "cloud_treasure": {
+      "cloud_adventure": {
+        "weight": 1.0,
+        "context_buckets": [
+          "quest"
+        ]
+      },
+      "cloud_quest": {
+        "weight": 1.0,
+        "context_buckets": [
+          "quest"
+        ]
+      }
+    },
+    "cloud_social": {
+      "cloud_tavern": {
+        "weight": 1.0,
+        "context_buckets": [
+          "social"
+        ]
+      },
+      "cloud_drink": {
+        "weight": 1.0,
+        "context_buckets": [
+          "social"
+        ]
+      }
+    },
+    "cloud_tavern": {
+      "cloud_social": {
+        "weight": 1.0,
+        "context_buckets": [
+          "social"
+        ]
+      },
+      "cloud_drink": {
+        "weight": 1.0,
+        "context_buckets": [
+          "social"
+        ]
+      }
+    },
+    "cloud_drink": {
+      "cloud_tavern": {
+        "weight": 1.0,
+        "context_buckets": [
+          "social"
+        ]
+      },
+      "cloud_social": {
+        "weight": 1.0,
+        "context_buckets": [
+          "social"
+        ]
+      }
+    },
+    "cloud_road": {
+      "cloud_travel": {
+        "weight": 1.0,
+        "context_buckets": [
+          "travel"
+        ]
+      },
+      "cloud_merchant": {
+        "weight": 1.0,
+        "context_buckets": [
+          "commerce"
+        ]
+      }
+    },
+    "cloud_travel": {
+      "cloud_road": {
+        "weight": 1.0,
+        "context_buckets": [
+          "travel"
+        ]
+      },
+      "cloud_merchant": {
+        "weight": 1.0,
+        "context_buckets": [
+          "commerce"
+        ]
+      }
+    }
+  },
+  "metadata": {
+    "version": "learned-v1.0",
+    "description": "Automatically learned transitions from dialogue data",
+    "created": "2026-04-06",
+    "num_edges": 60,
+    "context_buckets": [
+      "combat",
+      "lore",
+      "commerce",
+      "magic",
+      "social",
+      "quest",
+      "travel",
+      "general",
+      "general"
+    ],
+    "learning_method": "co-occurrence analysis",
+    "data_sources": [
+      "kaggle_grounding_v1.txt",
+      "world_building_v1.txt"
+    ],
+    "notes": [
+      "Learned from dialogue co-occurrence patterns",
+      "Weights scaled from co-occurrence frequency",
+      "Context buckets assigned by keyword matching",
+      "Can be combined with hand-curated transitions"
+    ]
+  },
+  "context_buckets_detail": {
+    "combat": [
+      "orc",
+      "battle",
+      "combat",
+      "dragon"
+    ],
+    "lore": [
+      "wizard",
+      "dwarf",
+      "spell",
+      "elf",
+      "lore",
+      "magic"
+    ],
+    "commerce": [
+      "trade",
+      "gold",
+      "merchant"
+    ],
+    "magic": [
+      "potion",
+      "healing"
+    ],
+    "social": [
+      "social",
+      "tavern"
+    ],
+    "quest": [
+      "adventure",
+      "quest",
+      "treasure"
+    ],
+    "travel": [
+      "road",
+      "travel",
+      "forest",
+      "mountain",
+      "castle"
+    ],
+    "general": [
+      "drink",
+      "crafting"
+    ]
+  }
+}
