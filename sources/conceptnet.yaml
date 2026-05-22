@@ -2,6 +2,13 @@ version: "1"
 id: conceptnet5_assertions
 name: ConceptNet 5.7 assertions
 source_type: gzip_tsv
+license:
+  spdx: "CC-BY-SA-4.0"
+  notes: >
+    ConceptNet 5 is distributed under Creative Commons Attribution-ShareAlike.
+    Attribute "the ConceptNet project" and preserve the license on any derived
+    work that exposes raw assertions. Derived semantic indices are typically
+    treated as transformative.
 url: https://s3.amazonaws.com/conceptnet/downloads/2019/edges/conceptnet-assertions-5.7.0.csv.gz
 docs: https://github.com/commonsense/conceptnet5/wiki/Downloads
 cache_path: data/conceptnet/conceptnet-assertions-5.7.0.csv.gz

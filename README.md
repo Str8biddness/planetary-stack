@@ -4,6 +4,19 @@ Standalone public repository for the Synthesus Knowledge Cloud data supply chain
 
 This repo exists so anyone running Synthesus locally can bootstrap the shared knowledge layer without rebuilding the corpus, while still preserving the source manifests, grounding corpora, pattern banks, and synthetic narrative generation pipeline needed to audit or regenerate the cloud.
 
+## What's new in 0.2.0
+
+- Provenance metadata in `artifacts/manifest.json` (package version, git sha, profile, embedder fingerprint, dataset versions, host).
+- Mirror failover via `SYNTHESUS_KNOWLEDGE_MIRRORS` or repeatable `--mirror`.
+- Parallel + resumable downloads (HTTP Range), with retry and exponential backoff.
+- `status` command — local vs remote drift report.
+- `bootstrap` command — one-shot install for local Synthesus runtimes.
+- `build` command — profile-aware rebuild orchestrator (dry-run by default).
+- `stamp-manifest`, `verify-source-manifest`, `info`, `serve` commands.
+- License declarations in `sources/*.yaml`.
+
+See `docs/PROVENANCE.md`, `docs/MIRRORS.md`, `docs/BOOTSTRAP.md`, `docs/BUILD.md`, and `CHANGELOG.md`.
+
 ## Public mirror
 
 The always-online artifact mirror is:
@@ -117,16 +130,41 @@ python scripts/sync_knowledge_cloud.py --dest ./data --base-url "file://$PWD/art
 
 ## Python package / CLI
 
-The repo now includes a self-contained Python package and CLI. Use it directly without installation:
+The repo includes a self-contained Python package and CLI. Use it directly without installation:
 
 ```bash
-python -m synthesus_knowledge_cloud validate --root artifacts
-python -m synthesus_knowledge_cloud validate-sources --root .
-python -m synthesus_knowledge_cloud build-source-manifest --root .
-python -m synthesus_knowledge_cloud inspect-profile profiles/public-base.yaml
+python -m synthesus_knowledge_cloud --help
 ```
 
-Or install it in editable mode and use `synthesus-kc`. See `docs/PACKAGE_CLI.md`.
+Common commands:
+
+```bash
+synthesus-kc validate --root artifacts
+synthesus-kc validate-sources --root .
+synthesus-kc verify-source-manifest --root .
+synthesus-kc build-source-manifest --root .
+synthesus-kc inspect-profile profiles/public-base.yaml
+
+synthesus-kc sync --dest ./data --workers 4
+synthesus-kc status --local ./data
+synthesus-kc bootstrap --target ~/.synthesus/data
+
+synthesus-kc build profiles/public-base.yaml            # dry run
+synthesus-kc build profiles/public-base.yaml --execute  # full rebuild
+synthesus-kc stamp-manifest --profile profiles/public-base.yaml
+
+synthesus-kc info     # diagnostics
+synthesus-kc serve    # local dev HTTP mirror over artifacts/
+```
+
+Or install in editable mode:
+
+```bash
+python -m pip install -e .
+synthesus-kc --version
+```
+
+See `docs/PACKAGE_CLI.md`.
 
 ## Validation
 

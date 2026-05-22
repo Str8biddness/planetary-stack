@@ -1,7 +1,7 @@
 {
   "version": "1",
   "kind": "synthesus-knowledge-source-plane",
-  "generated_at": "2026-05-22T06:51:23.516846+00:00",
+  "generated_at": "2026-05-22T07:04:29.544412+00:00",
   "roots": [
     "sources",
     "pipelines",
@@ -13,8 +13,8 @@
   "artifacts": [
     {
       "path": "sources/conceptnet.yaml",
-      "size": 427,
-      "sha256": "f449e0e6f5a5abe73acc113d81c1e7232e0ab7dcbc00ad5a898b48a6875a004d"
+      "size": 736,
+      "sha256": "e531b046f9c9636442991f0de542978a1ea2f6fac2f644faf6ccd0f4ef8af588"
     },
     {
       "path": "sources/datasets.yaml",
@@ -23,18 +23,18 @@
     },
     {
       "path": "sources/huggingface.yaml",
-      "size": 1100,
-      "sha256": "2349baa7c5fd728a7494bb17aceecc90cc01daed79ca3d2d643136eb1dea7d2c"
+      "size": 965,
+      "sha256": "0c22560573e4422cf656085391891804025aa22184cda55c5285759c2962dea6"
     },
     {
       "path": "sources/jeopardy.yaml",
-      "size": 565,
-      "sha256": "92aae442c7cc4be6b46f7c424ba7118f28f2f58cb6c0cd2507644c3a0cf2128a"
+      "size": 941,
+      "sha256": "0397278c55585ae06228a29113e51f36e3e15e1032d97323cd13869e902d9ca5"
     },
     {
       "path": "sources/kaggle.yaml",
-      "size": 530,
-      "sha256": "0f77545d65ce8bbea05dfd1fd16f66936e8311cbbcee6f8b63a7bbd4d2cd8806"
+      "size": 713,
+      "sha256": "42fda4f3185356c0591cb945a98348e65bb9d14074180d836461d29fe87f6da5"
     },
     {
       "path": "pipelines/__init__.py",

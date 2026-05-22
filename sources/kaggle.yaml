@@ -1,13 +1,22 @@
 version: "1"
+id: kaggle_pending
+name: Kaggle datasets (planned)
+source_type: kaggle_api
+license:
+  spdx: "MIXED"
+  notes: >
+    Kaggle datasets carry per-dataset licenses. Any dataset enabled here must
+    declare its SPDX license individually under `pending[].license`. The
+    rebuild pipeline must refuse to ingest a Kaggle dataset without a declared
+    license.
 status: planned
-ame: kaggle-source-plane
-purpose: >
-  Kaggle source declarations. Current production loader uses public GitHub TSV
-  Jeopardy data and does not require Kaggle credentials. Future Kaggle datasets
-  should be declared here with dataset slug, license, local cache path, and
-  transform contract.
-
-rules:
-  - Keep Kaggle credentials out of this repository.
-  - Store dataset slug, expected files, checksum, license, and transform function.
-  - Prefer source manifests over committing raw Kaggle archives.
+default_enabled: false
+pending:
+  - id: trivia_qa
+    repo: trivia-qa
+    license:
+      spdx: "Apache-2.0"
+loader: pipelines/ingest/kaggle_api_loader.py::load_kaggle
+notes:
+  - Requires KAGGLE_USERNAME and KAGGLE_KEY in environment.
+  - Loader is intentionally not implemented yet; declared here to fix the integration contract.

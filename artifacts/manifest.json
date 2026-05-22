@@ -1,6 +1,10 @@
 {
   "version": "1",
+  "kind": "synthesus-knowledge-artifacts",
   "generated_at": "2026-04-24T01:07:13.812860+00:00",
+  "roots": [
+    "."
+  ],
   "artifacts": [
     {
       "path": "faiss.index",
@@ -11,31 +15,6 @@
       "path": "faiss_metadata.json",
       "size": 256881112,
       "sha256": "5cbc48ef69c169ec408bf5aed7e81f611ab8f8c2c31027aeb9aac3a0becad4ff"
-    },
-    {
-      "path": "models/swarm_embedder.pkl",
-      "size": 4443817,
-      "sha256": "b0489baaf1d0ee71a301f9c80dc09f0edc9cfa73f3f6c2bac6eaf346b26039a7"
-    },
-    {
-      "path": "knowledge_cloud/world_lore.json",
-      "size": 39476,
-      "sha256": "05bceeefd9c43d7338e24311aaa1557953c72bdc6de9dc57936d5b0d4c887347"
-    },
-    {
-      "path": "knowledge_cloud/transitions.json",
-      "size": 3169,
-      "sha256": "7a87f396fa5d22ae96860a9749871232ab6afb0813dc9c382bc5f3a93519cdcd"
-    },
-    {
-      "path": "knowledge_cloud/learned_transitions.json",
-      "size": 8941,
-      "sha256": "c48d9454cb1f6a2fb1fc60f87f68b841234b882d036a69041d8190b856cb2d88"
-    },
-    {
-      "path": "knowledge_cloud/chaining_patterns.json",
-      "size": 2837,
-      "sha256": "89997b0848bd622eb4a34314acddb99888abb9aaef09c09da50a7365dd851731"
     },
     {
       "path": "knowledge.kndb",
@@ -51,6 +30,97 @@
       "path": "knowledge.meta.db",
       "size": 2351104,
       "sha256": "a010bcb27416196eb3d3235704e75acdb1bc7e91ddeee56d87247a63bd43faa7"
+    },
+    {
+      "path": "knowledge_cloud/chaining_patterns.json",
+      "size": 2837,
+      "sha256": "89997b0848bd622eb4a34314acddb99888abb9aaef09c09da50a7365dd851731"
+    },
+    {
+      "path": "knowledge_cloud/learned_transitions.json",
+      "size": 8941,
+      "sha256": "c48d9454cb1f6a2fb1fc60f87f68b841234b882d036a69041d8190b856cb2d88"
+    },
+    {
+      "path": "knowledge_cloud/transitions.json",
+      "size": 3169,
+      "sha256": "7a87f396fa5d22ae96860a9749871232ab6afb0813dc9c382bc5f3a93519cdcd"
+    },
+    {
+      "path": "knowledge_cloud/world_lore.json",
+      "size": 39476,
+      "sha256": "05bceeefd9c43d7338e24311aaa1557953c72bdc6de9dc57936d5b0d4c887347"
+    },
+    {
+      "path": "models/swarm_embedder.pkl",
+      "size": 4443817,
+      "sha256": "b0489baaf1d0ee71a301f9c80dc09f0edc9cfa73f3f6c2bac6eaf346b26039a7"
     }
-  ]
+  ],
+  "build": {
+    "package_version": "0.2.0",
+    "generated_by": "synthesus-kc build",
+    "profile": "public-base",
+    "git_commit": "2b281179b77e06d50808d83109bf2e966cbde386",
+    "git_short_commit": "2b28117",
+    "git_branch": "main",
+    "git_dirty": true,
+    "python_version": "3.12.1",
+    "platform": "Linux-4.4.0-x86_64-with-glibc2.36",
+    "host": "modal",
+    "embedder": {
+      "path": "models/swarm_embedder.pkl",
+      "sha256": "b0489baaf1d0ee71a301f9c80dc09f0edc9cfa73f3f6c2bac6eaf346b26039a7",
+      "size": 4443817
+    },
+    "datasets": {
+      "conceptnet": {
+        "version": "1",
+        "id": "conceptnet5_assertions",
+        "name": "ConceptNet 5.7 assertions",
+        "source_type": "gzip_tsv",
+        "license": ""
+      },
+      "huggingface": {
+        "version": "1",
+        "id": "huggingface_pending",
+        "name": "Hugging Face datasets (planned)",
+        "source_type": "huggingface_datasets",
+        "license": ""
+      },
+      "jeopardy": {
+        "version": "1",
+        "id": "jeopardy_clue_dataset",
+        "name": "Jeopardy clue dataset",
+        "source_type": "github_tsv",
+        "license": ""
+      },
+      "kaggle": {
+        "version": "1",
+        "id": "kaggle_pending",
+        "name": "Kaggle datasets (planned)",
+        "source_type": "kaggle_api",
+        "license": ""
+      }
+    },
+    "extra": {
+      "embed_dim": 128,
+      "sample_jeopardy": 87500,
+      "sample_conceptnet": 75000,
+      "outputs": {
+        "faiss": true,
+        "kndb": true,
+        "sqlite_meta": true,
+        "source_manifest": true
+      },
+      "sources": [
+        "jeopardy",
+        "conceptnet",
+        "world_lore",
+        "synthetic_lore",
+        "character_patterns"
+      ]
+    }
+  },
+  "manifest_revised_at": "2026-05-22T07:01:34.427370+00:00"
 }

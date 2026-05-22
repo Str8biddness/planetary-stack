@@ -40,6 +40,16 @@ def sha256_file(path: Path) -> str:
 def iter_manifest_files(root: Path, include_roots: Sequence[str], exclude: Iterable[str] = ()) -> Iterable[Path]:
     excluded = {item.replace("\\", "/") for item in exclude}
     for rel_root in include_roots:
+        if rel_root in (".", ""):
+            base = root
+            for path in sorted(base.rglob("*")):
+                if not path.is_file():
+                    continue
+                rel = path.relative_to(root).as_posix()
+                if rel in excluded:
+                    continue
+                yield path
+            continue
         base = root / rel_root
         if not base.exists():
             continue
@@ -63,6 +73,9 @@ def build_manifest(
 ) -> dict:
     root_path = Path(root).resolve()
     exclude = {output_path} if output_path else set()
+    # When listing the artifact root flat (".") we never want manifest.json itself.
+    if include_roots in (["."], (".",)):
+        exclude.add("manifest.json")
     artifacts = []
     for path in iter_manifest_files(root_path, include_roots, exclude=exclude):
         artifacts.append(
@@ -113,5 +126,30 @@ def validate_manifest(root: str | Path, manifest_name: str = "manifest.json") ->
             continue
         digest = sha256_file(path)
         if digest != item["sha256"]:
+            failures.append(f"sha256 mismatch {rel}")
+    return ValidationResult(checked=checked, failures=tuple(failures))
+
+
+def verify_source_manifest(
+    repo_root: str | Path = ".",
+    manifest_path: str | Path = "manifests/source_manifest.json",
+) -> ValidationResult:
+    """Re-hash every file listed in the source manifest and report drift."""
+    root_path = Path(repo_root).resolve()
+    manifest = load_manifest(root_path / manifest_path)
+    failures: list[str] = []
+    checked = 0
+    for item in manifest.get("artifacts", []):
+        checked += 1
+        rel = item["path"].replace("\\", "/")
+        path = root_path / rel
+        if not path.exists():
+            failures.append(f"missing {rel}")
+            continue
+        size = path.stat().st_size
+        if size != int(item["size"]):
+            failures.append(f"size mismatch {rel}: expected {item['size']}, got {size}")
+            continue
+        if sha256_file(path) != item["sha256"]:
             failures.append(f"sha256 mismatch {rel}")
     return ValidationResult(checked=checked, failures=tuple(failures))
