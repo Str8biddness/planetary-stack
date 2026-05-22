@@ -42,6 +42,15 @@ docs/                   # integration, source, rebuild, and data-model documenta
 scripts/                # client sync + validation utilities
 ```
 
+## Corpus planes
+
+Two new public-source corpora ship with the repo as of 0.3.0:
+
+- **`corpus/hardware_blueprints/`** — 874 structured entries across CPU (x86/ARM/RISC-V/other), GPU, NPU, TPU, QPU, FPGA, memory, storage, motherboard, firmware, and interconnect categories. Sourced from Wikipedia (CC-BY-SA-4.0), OpenAlex research abstracts (CC0 metadata), and curated vendor documentation pointers. See `corpus/hardware_blueprints/INDEX.md`.
+- **`corpus/emulation/`** — 727 structured entries across hypervisors, container runtimes, emulators (console/PC/arcade/handheld/mobile), and virtualization/translation/isolation concepts. Same source mix. See `corpus/emulation/INDEX.md`.
+
+Both corpora are idempotently rebuildable via `pipelines/ingest_corpus/` (Wikipedia + OpenAlex fetchers) and wired into the new `profiles/hardware-emulation.yaml` build profile.
+
 ## Artifact layout
 
 ```text

@@ -58,13 +58,13 @@
     }
   ],
   "build": {
-    "package_version": "0.2.0",
+    "package_version": "0.3.0",
     "generated_by": "synthesus-kc build",
-    "profile": "public-base",
-    "git_commit": "2b281179b77e06d50808d83109bf2e966cbde386",
-    "git_short_commit": "2b28117",
+    "profile": "hardware-emulation",
+    "git_commit": "7eae8f14317defc68487e1cf43479d49f30bd406",
+    "git_short_commit": "7eae8f1",
     "git_branch": "main",
-    "git_dirty": true,
+    "git_dirty": false,
     "python_version": "3.12.1",
     "platform": "Linux-4.4.0-x86_64-with-glibc2.36",
     "host": "modal",
@@ -105,8 +105,8 @@
     },
     "extra": {
       "embed_dim": 128,
-      "sample_jeopardy": 87500,
-      "sample_conceptnet": 75000,
+      "sample_jeopardy": 20000,
+      "sample_conceptnet": 20000,
       "outputs": {
         "faiss": true,
         "kndb": true,
@@ -114,13 +114,12 @@
         "source_manifest": true
       },
       "sources": [
+        "corpus_hardware_blueprints",
+        "corpus_emulation",
         "jeopardy",
-        "conceptnet",
-        "world_lore",
-        "synthetic_lore",
-        "character_patterns"
+        "conceptnet"
       ]
     }
   },
-  "manifest_revised_at": "2026-05-22T07:01:34.427370+00:00"
+  "manifest_revised_at": "2026-05-22T09:58:50.125020+00:00"
 }

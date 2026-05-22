@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.3.0 — 2026-05-22
+
+Hardware-Aware Bare-Metal AI foundation. Introduced two new public-source corpora and the ingestion pipeline behind them.
+
+### Added
+- **`corpus/hardware_blueprints/`** — 874 entries across CPU (x86/ARM/RISC-V/other), GPU, NPU, TPU, QPU, FPGA, memory, storage, motherboard, firmware, and interconnect categories.
+  - 193 Wikipedia extracts (CC-BY-SA-4.0)
+  - 663 OpenAlex research papers (CC0 metadata, reconstructed abstracts)
+  - 18 curated datasheet/standards pointers (vendor URLs only; no PDF vendoring)
+- **`corpus/emulation/`** — 727 entries across hypervisors, container runtimes, console/PC/arcade/mobile/handheld emulators, virtualization concepts, translation concepts, and isolation concepts.
+  - 85 Wikipedia extracts (CC-BY-SA-4.0)
+  - 626 OpenAlex research papers
+  - 16 foundational documentation pointers (QEMU, KVM, Xen, Firecracker, gVisor, Kata, crosvm, Cloud Hypervisor, Bochs, libvirt, MAME, Dolphin, Intel VT-x / AMD SVM)
+- **`pipelines/ingest_corpus/`** — three new fetchers
+  - `wikipedia_fetcher.py` — MediaWiki API, idempotent, resumable
+  - `papers_fetcher.py` — OpenAlex backend (chosen because arXiv export is IP-rate-limited from shared sandboxes)
+  - `corpus_loader.py` — adapter that yields populator-compatible knowledge entries from the corpus JSONLs
+- **`profiles/hardware-emulation.yaml`** — new build profile binding the corpora into a Knowledge Cloud rebuild plan.
+- **Schemas** at `corpus/hardware_blueprints/schema.json` and `corpus/emulation/schema.json`.
+- **Per-corpus `INDEX.md`** documenting composition, licenses, rebuild commands, and expansion paths.
+- `corpus/` added to the source-plane validator and source-manifest builder.
+
+### Notes
+- Total corpus footprint is ~4 MB (1,601 structured entries).
+- Vendor microarchitecture, RTL, full datasheets, and proprietary schematics are intentionally **not** vendored; we point to their public URLs only.
+- Corpus is a source plane: the runtime FAISS bundle in `artifacts/` is unchanged this release. Rebuilding the bundle to include the corpus requires running `synthesus-kc build profiles/hardware-emulation.yaml --execute` in an environment with the full Synthesus toolchain (faiss-cpu, sklearn, etc.).
+
 ## 0.2.0 — 2026-05-22
 
 Major optimization pass. The Knowledge Cloud repo is now an auditable, robust supply chain rather than a static bundle.

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EmulationCorpusEntry",
+  "type": "object",
+  "required": ["id", "category", "title", "summary", "source"],
+  "properties": {
+    "id": {"type": "string"},
+    "category": {"type": "string", "enum": [
+      "hypervisor_type1", "hypervisor_type2", "container_runtime",
+      "emulator_pc", "emulator_console", "emulator_handheld",
+      "emulator_arcade", "emulator_mobile", "emulator_mainframe_retro",
+      "concept_virtualization", "concept_translation",
+      "concept_isolation", "concept_io_virtualization",
+      "research_paper"
+    ]},
+    "title": {"type": "string"},
+    "summary": {"type": "string"},
+    "facts": {"type": "array", "items": {"type": "string"}},
+    "authors": {"type": "array", "items": {"type": "string"}},
+    "year": {"type": ["integer", "null"]},
+    "source": {
+      "type": "object",
+      "required": ["url", "license"],
+      "properties": {
+        "url": {"type": "string"},
+        "license": {"type": "string"},
+        "fetched_at": {"type": "string", "format": "date-time"},
+        "attribution": {"type": "string"}
+      }
+    }
+  }
+}

@@ -16,6 +16,7 @@ DEFAULT_SOURCE_ROOTS = [
     "synthetic",
     "grounding_corpus",
     "support_models",
+    "corpus",
 ]
 
 

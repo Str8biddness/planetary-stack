@@ -1,6 +1,6 @@
 """Synthesus Knowledge Cloud packaging and artifact utilities."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from .manifest import build_manifest, sha256_file, validate_manifest, write_manifest
 from .provenance import (

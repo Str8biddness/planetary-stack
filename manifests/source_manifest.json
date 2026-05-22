@@ -1,14 +1,15 @@
 {
   "version": "1",
   "kind": "synthesus-knowledge-source-plane",
-  "generated_at": "2026-05-22T07:04:29.544412+00:00",
+  "generated_at": "2026-05-22T09:58:50.420158+00:00",
   "roots": [
     "sources",
     "pipelines",
     "patterns",
     "synthetic",
     "grounding_corpus",
-    "support_models"
+    "support_models",
+    "corpus"
   ],
   "artifacts": [
     {
@@ -40,6 +41,11 @@
       "path": "pipelines/__init__.py",
       "size": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pipelines/__pycache__/__init__.cpython-312.pyc",
+      "size": 160,
+      "sha256": "2253d14053cb7406295acd3db6ef94ccd4c3d76d09cb67e9c50774dfb71f765d"
     },
     {
       "path": "pipelines/build/__init__.py",
@@ -90,6 +96,56 @@
       "path": "pipelines/ingest/kaggle_loader.py",
       "size": 14704,
       "sha256": "af8507cbf17d713e85c0ad1cef48ed85775344675c57dc0a3d00e95da0f08c87"
+    },
+    {
+      "path": "pipelines/ingest_corpus/__init__.py",
+      "size": 62,
+      "sha256": "db762ccfae94a09d0788cec1237060da0bedff877ede63af2dbc78c31fdab247"
+    },
+    {
+      "path": "pipelines/ingest_corpus/__pycache__/__init__.cpython-312.pyc",
+      "size": 244,
+      "sha256": "7200bb343db3bb978419b2ae9593db8c700bcab1155fd8b6efea672dc18f4eb3"
+    },
+    {
+      "path": "pipelines/ingest_corpus/__pycache__/arxiv_fetcher.cpython-312.pyc",
+      "size": 9169,
+      "sha256": "88c794062a958caf8adb045ead16547c3673b7963f2863cb34d51bf3bb0d61f1"
+    },
+    {
+      "path": "pipelines/ingest_corpus/__pycache__/corpus_loader.cpython-312.pyc",
+      "size": 7155,
+      "sha256": "62326940cbb23934d484bc666516d730838ff641184d20c43faebbbe35a5a5ad"
+    },
+    {
+      "path": "pipelines/ingest_corpus/__pycache__/papers_fetcher.cpython-312.pyc",
+      "size": 9726,
+      "sha256": "38c907c1c2a9bfa76645a17dd3b63fe8e1c3e3bb4fd0031d91fa0c8d96138b6d"
+    },
+    {
+      "path": "pipelines/ingest_corpus/__pycache__/wikipedia_fetcher.cpython-312.pyc",
+      "size": 10124,
+      "sha256": "404774e37a97e5dba5ab18d8d22d93dcf4fd7ca2022abae574b6c0276bde7714"
+    },
+    {
+      "path": "pipelines/ingest_corpus/arxiv_fetcher.py",
+      "size": 5931,
+      "sha256": "e67c8a854a60fe67bf3116d88f9d836fa1780ddd46f8e3062af1caf8db3dd338"
+    },
+    {
+      "path": "pipelines/ingest_corpus/corpus_loader.py",
+      "size": 4810,
+      "sha256": "e7376b19e5005f8987d107e7b6f8c732ae37a1f7e205023777177e3397c9fb1c"
+    },
+    {
+      "path": "pipelines/ingest_corpus/papers_fetcher.py",
+      "size": 5994,
+      "sha256": "153f521262af9edf52e30d6e006e51cc92612456ce6e7ff9d48dac278707d9f4"
+    },
+    {
+      "path": "pipelines/ingest_corpus/wikipedia_fetcher.py",
+      "size": 6609,
+      "sha256": "01a4addd874823b153c10207103624ec1dba845462faed8f5a72755ae1991bbb"
     },
     {
       "path": "pipelines/publish/__init__.py",
@@ -405,6 +461,251 @@
       "path": "support_models/vocab_sysops.pkl",
       "size": 1023433,
       "sha256": "848c9eee6d7a2a1ff0cfb5d0008ab1042be8d836cda0aab25af8ebd5c5a4dd1f"
+    },
+    {
+      "path": "corpus/emulation/INDEX.md",
+      "size": 1909,
+      "sha256": "affec263a9ed8bce0537f4c8d794b837d0a91fb4571bfef9dcae7ae75f99972e"
+    },
+    {
+      "path": "corpus/emulation/entries/concept_io_virtualization.jsonl",
+      "size": 15538,
+      "sha256": "1902c08974d44e441a224cc9501e655b96148df67d6036bd69f385da58c8642d"
+    },
+    {
+      "path": "corpus/emulation/entries/concept_isolation.jsonl",
+      "size": 31676,
+      "sha256": "4450f3b9988cc837b041a59fec19656b951bc1136d09ba2e9a482a522709c413"
+    },
+    {
+      "path": "corpus/emulation/entries/concept_translation.jsonl",
+      "size": 46787,
+      "sha256": "e5e17f1af9f797bd63969416f8705190ef175eb36b7cd534b4277666a37cdc74"
+    },
+    {
+      "path": "corpus/emulation/entries/concept_virtualization.jsonl",
+      "size": 97982,
+      "sha256": "a7a7e570d8652713919b41de8f4d020d7eb2e10de9ae8e28e50b5fac31e0e18f"
+    },
+    {
+      "path": "corpus/emulation/entries/container_runtime.jsonl",
+      "size": 28890,
+      "sha256": "8f74ab38d20ff3a46977adac9672d0ec89bd6b1c2113b89e3a1e6ddefa1442d1"
+    },
+    {
+      "path": "corpus/emulation/entries/emulator_arcade.jsonl",
+      "size": 8622,
+      "sha256": "feaa0f12cc0ec7bac847544143888961218cf5350beddbd4a87b2468f394cd41"
+    },
+    {
+      "path": "corpus/emulation/entries/emulator_console.jsonl",
+      "size": 64892,
+      "sha256": "229bf180f382f4964d4eb9b35c8e782b89f3670a5ec2e99cf7468ad8ce8625ac"
+    },
+    {
+      "path": "corpus/emulation/entries/emulator_handheld.jsonl",
+      "size": 10032,
+      "sha256": "a416309a32ab0e48485ce75fd67a4dc6e787f699f4df43ae4ab723aeb6ea4213"
+    },
+    {
+      "path": "corpus/emulation/entries/emulator_mainframe_retro.jsonl",
+      "size": 14177,
+      "sha256": "4130a18f718126a2f95bc5389e0585cf386ea871e223b78973a3a9f5ffa87b65"
+    },
+    {
+      "path": "corpus/emulation/entries/emulator_mobile.jsonl",
+      "size": 8922,
+      "sha256": "d98816e296fc08bbdaca59795d4ca3e42727415982eaaab1b2008b893e3b4cdf"
+    },
+    {
+      "path": "corpus/emulation/entries/emulator_pc.jsonl",
+      "size": 41735,
+      "sha256": "dee805546f2e0902e5ea5ee70f6ce7de83795a19611e349b703081f321aabc16"
+    },
+    {
+      "path": "corpus/emulation/entries/foundational_pointers.jsonl",
+      "size": 8828,
+      "sha256": "feb311ac96a9596d520acb22aa746434f3089dd1205b17d2fcb072b4e97e9883"
+    },
+    {
+      "path": "corpus/emulation/entries/hypervisor_type1.jsonl",
+      "size": 41938,
+      "sha256": "a0e3c3f8f44463511a55c2c0995bcbdfed62e733383154e32f93ba785fab29a2"
+    },
+    {
+      "path": "corpus/emulation/entries/hypervisor_type2.jsonl",
+      "size": 28062,
+      "sha256": "97eda93ef268a8f508ecbdf5570486f9c0dc7b9b1f22be625010a5439d2f08e3"
+    },
+    {
+      "path": "corpus/emulation/entries/research_paper.jsonl",
+      "size": 1209359,
+      "sha256": "dbabee8857024384522d7d50988ec806ea2486caf70bd844c7bff4b839bc9f7b"
+    },
+    {
+      "path": "corpus/emulation/schema.json",
+      "size": 1154,
+      "sha256": "8c2939fd9dd9e36a6faf033b34aec60814eb9b802ecf6679d41e58601135f6b9"
+    },
+    {
+      "path": "corpus/emulation/seeds/arxiv_queries.yaml",
+      "size": 1254,
+      "sha256": "7f22cd98c25686d216de86a127c69b71fdb2aa53cf702e82714796d8424439aa"
+    },
+    {
+      "path": "corpus/emulation/seeds/wikipedia_seeds.yaml",
+      "size": 2239,
+      "sha256": "eddc42dc824a56b46adbd6a46f6b30c1ddef0dc91a20ee02532f0c8b706efc53"
+    },
+    {
+      "path": "corpus/hardware_blueprints/INDEX.md",
+      "size": 2434,
+      "sha256": "b26151e224a7cd57cb26f80667480fb250d9b0e5f9b398cb50c192f169931292"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/cpu_arm.jsonl",
+      "size": 146434,
+      "sha256": "c3aa37e32925a70f9a54ac923050d4e9efa2fa126fbbbf32fc4f09239bd6df4e"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/cpu_other.jsonl",
+      "size": 41553,
+      "sha256": "c8e8b52142418b00641b362f5c259c7c7c18091cd5b96ba265b60ab7e64c1ffb"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/cpu_riscv.jsonl",
+      "size": 24848,
+      "sha256": "e9583f1017937439f67952d4c0185612ec5cd8f9eb3a4917ba077a9a6a1537af"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/cpu_x86.jsonl",
+      "size": 270299,
+      "sha256": "2cfdeda9cb5fe54293a1f55c54dc162a624f8888e3a142eda493a36b45a2adba"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/datasheet_pointers.jsonl",
+      "size": 10693,
+      "sha256": "4444f68ff3a959b4f8f27bfe7cdbfe8f360b12a557e08c401bea48d5a4d9ee9f"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/firmware_bios_uefi.jsonl",
+      "size": 18324,
+      "sha256": "2f509082c1d3ea576ca68579b4e417f6bed87993f9ec972ea7b4faa87ed38fea"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/fpga.jsonl",
+      "size": 19686,
+      "sha256": "d0458ffd6d80eb5024f707238fea421cc18be804aa6c7f4d9002de02c7aee314"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/gpu_discrete.jsonl",
+      "size": 80149,
+      "sha256": "383805d99ffea47557710adef40cfdb1c2e53ff1a076fc2f1d061d77375edaef"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/gpu_integrated.jsonl",
+      "size": 30255,
+      "sha256": "84a1105bb77da253b9f6e1b17007dd52aff5ccfa5fdaaa28ec0428c343f4762c"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/interconnect_fabric.jsonl",
+      "size": 17595,
+      "sha256": "06a1d91104434a032b6a97eebcd6c63bc25fa7d50a8bea22705e234c633c9a55"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/interconnect_pcie.jsonl",
+      "size": 25878,
+      "sha256": "cefb13cfe5a9fe38b6d97e0ba100a859149ae3326ee1eb45077004220be49c40"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/interconnect_storage_bus.jsonl",
+      "size": 14958,
+      "sha256": "04a5327cc9a67a964251850d65d514e99c1a7a3574ca3a58e76e67cd7380c0e5"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/interconnect_usb_thunderbolt.jsonl",
+      "size": 32684,
+      "sha256": "0f46a9f6ae09460ef7025389d95399726c6a0343b277c34a457ea83532db746b"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/memory_cache.jsonl",
+      "size": 16026,
+      "sha256": "f4fd805a69f1a2582c7f61d974d57963c87ca0467a7b9a364217bd9b5a9dd5db"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/memory_dram.jsonl",
+      "size": 85027,
+      "sha256": "5d558e26c24365bdbdc3b5867ecd2c8e4265b107eea7cd3f52f664f193b0ccbc"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/memory_hbm.jsonl",
+      "size": 7007,
+      "sha256": "5a0dece0a9b49ca85f5b0f045887ae1cc3a5d26f244e376a0c0ac798528eb5ed"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/motherboard_chipset.jsonl",
+      "size": 7591,
+      "sha256": "8062e9e757b51bb1e5654951943bb3e131012f547285b186cdc007390cda4316"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/motherboard_form_factor.jsonl",
+      "size": 25653,
+      "sha256": "f246a72232a993d60351b83899b415577dd44aaa61c98239a35b8f29c3493ecc"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/npu.jsonl",
+      "size": 40953,
+      "sha256": "54e86a1b62f720bf9d0836050da6c61d43255a782ae2d21b8beeb1b84847c64f"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/qpu.jsonl",
+      "size": 37964,
+      "sha256": "e711696d7233b04d556939b30eb1560189e70a2f00bbab98aaf78a5aba75f84b"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/research_paper.jsonl",
+      "size": 1309720,
+      "sha256": "6048cf650a2c3247cdde5349389fef8ad373e1cdac459ad37bd032ae49d25387"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/soc_mobile_tv_embedded.jsonl",
+      "size": 33673,
+      "sha256": "4b7cbcf3d0b79c4cdb24b76988156d0a4ca4a3786976065ce8852d35ca405228"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/storage_hdd.jsonl",
+      "size": 35340,
+      "sha256": "b17135a9ba6e83b397c4745029a8fe54e21078bd72f0b3402c761cafc305c37d"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/storage_optical_tape.jsonl",
+      "size": 40132,
+      "sha256": "fa69b74381e9ffc6b034fe5536649250f468e95ff781375077eeaaad4763c593"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/storage_ssd.jsonl",
+      "size": 26888,
+      "sha256": "0da40a379c8a6620e32cf353a6c5d574a73174da04f7d346939bd3d6b17b263d"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/tpu.jsonl",
+      "size": 7775,
+      "sha256": "8713cf8f9eb1bdc3de8653f9df07aa0e0a3bb475474162e4aedd9698ef635630"
+    },
+    {
+      "path": "corpus/hardware_blueprints/schema.json",
+      "size": 1477,
+      "sha256": "0606f50285685caa541f210066a1404c6211018eaebabb5cba7d953827d32666"
+    },
+    {
+      "path": "corpus/hardware_blueprints/seeds/openalex_queries.yaml",
+      "size": 1311,
+      "sha256": "5847c4becc3798af6fa42fc109f3f757c5cd2ec765fc9e27d5465afc3e2af6a6"
+    },
+    {
+      "path": "corpus/hardware_blueprints/seeds/wikipedia_seeds.yaml",
+      "size": 5330,
+      "sha256": "705e6ff755091e79c04172fae442e26bf1f23a0a4c236226f5a8aa1f0cb1e3a4"
     }
   ]
 }

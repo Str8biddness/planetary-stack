@@ -1,0 +1,302 @@
+version: "1"
+description: >
+  Seed list of Wikipedia article titles for the hardware blueprint corpus.
+  Each entry is fetched from the Wikipedia REST + Query APIs (CC-BY-SA-4.0)
+  and emitted as a structured JSONL entry under entries/<category>.jsonl.
+
+cpu_x86:
+  - Intel Core i3
+  - Intel Core i5
+  - Intel Core i7
+  - Intel Core i9
+  - Intel Core (2nd generation)
+  - Intel Core (3rd generation)
+  - Intel Core (4th generation)
+  - Intel Core (5th generation)
+  - Intel Core (6th generation)
+  - Intel Core (7th generation)
+  - Intel Core (8th generation)
+  - Intel Core (9th generation)
+  - Intel Core (10th generation)
+  - Intel Core (11th generation)
+  - Intel Core (12th generation)
+  - Intel Core (13th generation)
+  - Intel Core (14th generation)
+  - Intel Core Ultra
+  - Intel Xeon
+  - Intel Xeon Scalable
+  - Intel Atom
+  - Intel Pentium
+  - Intel Celeron
+  - Intel Itanium
+  - AMD Ryzen
+  - AMD Ryzen 3
+  - AMD Ryzen 5
+  - AMD Ryzen 7
+  - AMD Ryzen 9
+  - AMD Ryzen Threadripper
+  - AMD EPYC
+  - AMD FX
+  - AMD Athlon
+  - AMD Phenom
+  - AMD Opteron
+  - AMD A-Series
+  - Zen (first generation)
+  - Zen 2
+  - Zen 3
+  - Zen 4
+  - Zen 5
+  - Skylake (microarchitecture)
+  - Kaby Lake
+  - Coffee Lake
+  - Comet Lake
+  - Ice Lake (microprocessor)
+  - Tiger Lake
+  - Alder Lake
+  - Raptor Lake
+  - Meteor Lake
+  - Arrow Lake
+  - Lunar Lake
+  - Sapphire Rapids
+  - Emerald Rapids
+  - Granite Rapids
+  - x86
+  - X86-64
+  - X86 instruction listings
+  - Advanced Vector Extensions
+  - AVX-512
+  - SSE4
+  - Intel AMX
+  - Hyper-threading
+
+cpu_arm:
+  - ARM architecture family
+  - ARM Cortex-A
+  - ARM Cortex-A53
+  - ARM Cortex-A55
+  - ARM Cortex-A57
+  - ARM Cortex-A72
+  - ARM Cortex-A73
+  - ARM Cortex-A75
+  - ARM Cortex-A76
+  - ARM Cortex-A77
+  - ARM Cortex-A78
+  - ARM Cortex-X1
+  - ARM Cortex-X2
+  - ARM Cortex-X3
+  - ARM Cortex-X4
+  - ARM Cortex-M
+  - ARM Cortex-R
+  - ARM big.LITTLE
+  - AArch64
+  - ARMv8
+  - ARMv9
+  - Apple silicon
+  - Apple M1
+  - Apple M2
+  - Apple M3
+  - Apple M4
+  - Qualcomm Snapdragon
+  - Samsung Exynos
+  - MediaTek Dimensity
+  - HiSilicon Kirin
+  - Nvidia Tegra
+  - Allwinner Technology
+  - Rockchip
+  - Amlogic
+  - Realtek
+  - Broadcom BCM2837
+
+cpu_riscv:
+  - RISC-V
+  - SiFive
+  - SiFive U54
+  - SiFive U74
+  - Rocket chip
+  - BOOM (microprocessor)
+  - LowRISC
+  - OpenTitan
+  - WD SweRV
+  - Andes Technology
+
+cpu_other:
+  - PowerPC
+  - IBM POWER10
+  - IBM POWER9
+  - MIPS architecture
+  - SPARC
+  - Itanium
+  - DEC Alpha
+
+gpu_discrete:
+  - Nvidia GeForce
+  - Nvidia GeForce 30 series
+  - Nvidia GeForce 40 series
+  - Nvidia GeForce 50 series
+  - Nvidia RTX
+  - Nvidia Tesla
+  - Nvidia Ampere
+  - Nvidia Hopper (microarchitecture)
+  - Nvidia Blackwell (microarchitecture)
+  - Nvidia Ada Lovelace (microarchitecture)
+  - Nvidia Turing (microarchitecture)
+  - Nvidia Volta
+  - Nvidia Pascal (microarchitecture)
+  - Nvidia Maxwell (microarchitecture)
+  - Nvidia Kepler (microarchitecture)
+  - Nvidia Fermi (microarchitecture)
+  - AMD Radeon
+  - Radeon RX 6000 series
+  - Radeon RX 7000 series
+  - Radeon RX 9000 series
+  - RDNA (microarchitecture)
+  - RDNA 2
+  - RDNA 3
+  - RDNA 4
+  - CDNA (microarchitecture)
+  - Graphics Core Next
+  - AMD Vega
+  - AMD Instinct
+  - Intel Arc
+  - Intel Xe
+
+gpu_integrated:
+  - Intel Iris
+  - Intel HD Graphics
+  - AMD APU
+  - Mali (GPU)
+  - Adreno
+  - PowerVR
+  - Apple GPU
+
+npu:
+  - Neural Engine
+  - Edge TPU
+  - Qualcomm Hexagon
+  - AMD XDNA
+  - Intel Movidius
+  - Cerebras
+  - Graphcore
+  - Tenstorrent
+  - Groq
+
+tpu:
+  - Tensor Processing Unit
+
+qpu:
+  - Quantum processor
+  - Sycamore processor
+  - IBM Eagle
+  - IBM Condor
+  - IonQ
+  - Rigetti Computing
+  - Xanadu Quantum Technologies
+  - QuEra Computing
+  - PsiQuantum
+
+fpga:
+  - Field-programmable gate array
+  - Xilinx
+  - AMD Versal
+  - Intel Agilex
+  - Lattice Semiconductor
+
+memory_dram:
+  - DRAM
+  - DDR SDRAM
+  - DDR2 SDRAM
+  - DDR3 SDRAM
+  - DDR4 SDRAM
+  - DDR5 SDRAM
+  - LPDDR
+  - LPDDR4
+  - LPDDR5
+  - GDDR SDRAM
+  - GDDR6
+  - GDDR6X
+  - GDDR7
+  - ECC memory
+  - Registered memory
+
+memory_hbm:
+  - High Bandwidth Memory
+
+memory_cache:
+  - CPU cache
+  - Translation lookaside buffer
+  - Cache coherence
+
+storage_ssd:
+  - Solid-state drive
+  - NAND flash
+  - 3D XPoint
+  - TLC NAND
+  - QLC NAND
+  - SLC NAND
+  - MLC NAND
+  - NVM Express
+
+storage_hdd:
+  - Hard disk drive
+  - Perpendicular magnetic recording
+  - Shingled magnetic recording
+  - HAMR
+
+storage_optical_tape:
+  - Optical disc drive
+  - Blu-ray
+  - DVD
+  - Magnetic tape data storage
+  - LTO Ultrium
+
+motherboard_form_factor:
+  - ATX
+  - MicroATX
+  - Mini-ITX
+  - BTX (form factor)
+  - Server motherboard
+
+motherboard_chipset:
+  - Chipset
+  - Intel 600 series chipsets
+  - Intel 700 series chipsets
+  - Intel 800 series chipsets
+  - AMD 600 chipset
+  - AMD 800 chipset
+
+firmware_bios_uefi:
+  - BIOS
+  - Unified Extensible Firmware Interface
+  - Coreboot
+
+interconnect_pcie:
+  - PCI Express
+  - PCIe 4.0
+  - PCIe 5.0
+  - PCIe 6.0
+
+interconnect_usb_thunderbolt:
+  - USB
+  - USB-C
+  - USB4
+  - Thunderbolt (interface)
+
+interconnect_storage_bus:
+  - Serial ATA
+  - Serial Attached SCSI
+  - U.2
+
+interconnect_fabric:
+  - NVLink
+  - Infinity Fabric
+  - Compute Express Link
+
+soc_mobile_tv_embedded:
+  - Raspberry Pi
+  - System on a chip
+  - Set-top box
+  - Smart TV
+  - BCM2711
+  - BCM2712
+  - Nvidia Jetson
+  - Coral (machine learning hardware)
