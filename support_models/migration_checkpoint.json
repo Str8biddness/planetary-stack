@@ -1,0 +1,27 @@
+{
+  "completed_datasets": [
+    "databricks/databricks-dolly-15k_default",
+    "rajpurkar/squad_v2_default",
+    "rajpurkar/squad_default",
+    "allenai/ai2_arc_ARC-Easy",
+    "aps/super_glue_boolq",
+    "mandarjoshi/trivia_qa_rc",
+    "Rowan/hellaswag_default",
+    "allenai/openbookqa_main",
+    "takala/financial_phrasebank_sentences_allagree",
+    "huggingartists/wikipedia_default",
+    "openlifescienceai/medmcqa_default",
+    "character_patterns",
+    "tatsu-lab/alpaca_default",
+    "openai/gsm8k_main",
+    "Intel/orca_dpo_pairs_default",
+    "allenai/ai2_arc_ARC-Challenge",
+    "derek-thomas/ScienceQA_default",
+    "allenai/sciq_default",
+    "truthfulqa/truthful_qa_generation",
+    "tau/commonsense_qa_default"
+  ],
+  "total_embedded": 1809,
+  "status": "complete",
+  "completed_at": "2026-03-21 02:36:59"
+}

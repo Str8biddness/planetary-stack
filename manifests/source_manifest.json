@@ -1,0 +1,370 @@
+{
+  "version": "1",
+  "kind": "synthesus-knowledge-source-plane",
+  "generated_at": "2026-05-22T04:49:22.241369+00:00",
+  "roots": [
+    "sources",
+    "pipelines",
+    "patterns",
+    "synthetic",
+    "grounding_corpus",
+    "support_models"
+  ],
+  "artifacts": [
+    {
+      "path": "sources/conceptnet.yaml",
+      "size": 427,
+      "sha256": "f449e0e6f5a5abe73acc113d81c1e7232e0ab7dcbc00ad5a898b48a6875a004d"
+    },
+    {
+      "path": "sources/datasets.yaml",
+      "size": 5092,
+      "sha256": "7562d99f263bb4efa31373af2b8a1eb053677892c08a3f90242177cc6822b5bc"
+    },
+    {
+      "path": "sources/huggingface.yaml",
+      "size": 1100,
+      "sha256": "2349baa7c5fd728a7494bb17aceecc90cc01daed79ca3d2d643136eb1dea7d2c"
+    },
+    {
+      "path": "sources/jeopardy.yaml",
+      "size": 565,
+      "sha256": "92aae442c7cc4be6b46f7c424ba7118f28f2f58cb6c0cd2507644c3a0cf2128a"
+    },
+    {
+      "path": "sources/kaggle.yaml",
+      "size": 530,
+      "sha256": "0f77545d65ce8bbea05dfd1fd16f66936e8311cbbcee6f8b63a7bbd4d2cd8806"
+    },
+    {
+      "path": "pipelines/build/kn_populator.py",
+      "size": 18319,
+      "sha256": "e2d6e97761e06de599d50481c3bf44122175223c3e94bb6d19fa76a74e3446aa"
+    },
+    {
+      "path": "pipelines/build/run_population.py",
+      "size": 5017,
+      "sha256": "67cf808e6170635dd590a13b1ef47f41bd4db8673e6844eae3239b1b145ab90e"
+    },
+    {
+      "path": "pipelines/build/swarm_embedder.py",
+      "size": 6704,
+      "sha256": "a8510066e7c2f0001b4ab233b6ab54b6013110d5d817685cf413835e2d14685d"
+    },
+    {
+      "path": "pipelines/ingest/kaggle_loader.py",
+      "size": 14704,
+      "sha256": "af8507cbf17d713e85c0ad1cef48ed85775344675c57dc0a3d00e95da0f08c87"
+    },
+    {
+      "path": "pipelines/publish/cloud_sync.py",
+      "size": 14234,
+      "sha256": "911e9514d56bf3f8bc22660a6ef2d1e42d6c828f81d974122d5ae8cc96a7f898"
+    },
+    {
+      "path": "pipelines/publish/health_check.py",
+      "size": 4434,
+      "sha256": "7d2560de1f5b6266b5619d90e00d39776eded2e32d13b21c59cc8e303790f691"
+    },
+    {
+      "path": "pipelines/publish/manifest_manager.py",
+      "size": 3267,
+      "sha256": "3dea969f013253fe9734ff07e37fea660588181a3cd61c10b586cb475e8b5803"
+    },
+    {
+      "path": "patterns/characters/computress/bio.json",
+      "size": 5868,
+      "sha256": "7cc040f5436efb319a24a28c9ba9d633a50cf8ae71498c3c82954164518bd8e0"
+    },
+    {
+      "path": "patterns/characters/computress/knowledge.json",
+      "size": 20615,
+      "sha256": "ed0a01dd96f45d64a47a4b6bb2c93abef84ab9f0bb3155b7f1d61b97b7f1ab42"
+    },
+    {
+      "path": "patterns/characters/computress/patterns.json",
+      "size": 5586574,
+      "sha256": "50c50db24c12298b1a95e084deb3d6ad78e47becfb7c963227e049d9c6b2abb1"
+    },
+    {
+      "path": "patterns/characters/computress/personality.json",
+      "size": 12605,
+      "sha256": "14a7a0434693ca0495b4058f3662a068d2b41e1036b9d655010a72da82c67317"
+    },
+    {
+      "path": "patterns/characters/garen/bio.json",
+      "size": 1607,
+      "sha256": "dafaab280a09845401fe81286ed79fc560b1970da3c9209871e0111e194c1be6"
+    },
+    {
+      "path": "patterns/characters/garen/knowledge.json",
+      "size": 16439,
+      "sha256": "9093a8659f67eb7f9a93d63988c4b781059bdddde03afda935a0748747c775a4"
+    },
+    {
+      "path": "patterns/characters/garen/patterns.json",
+      "size": 5187454,
+      "sha256": "1d6ee049f12f54bc38ff766a190e2edab2e7b0621b60ffcd1bc05d40a6c32aa5"
+    },
+    {
+      "path": "patterns/characters/garen/personality.json",
+      "size": 10388,
+      "sha256": "7b90ff261f6efff5a0c17c0daae9d24b1d5fe86b22a1ea7346b460ba4a49d095"
+    },
+    {
+      "path": "patterns/characters/ghostkey/bio.json",
+      "size": 2091,
+      "sha256": "5a283150c99d80ea6e176f5e30b0d9f6dbf363ec7c693f5ac4cb56da04535eef"
+    },
+    {
+      "path": "patterns/characters/ghostkey/knowledge.json",
+      "size": 3607,
+      "sha256": "e40dba7f48af9f332b6d033084a954f7a2b0e9124536f6cd811cf455b226700d"
+    },
+    {
+      "path": "patterns/characters/haven/bio.json",
+      "size": 1951,
+      "sha256": "4df0d84be54ee3e169926f664b6b5f7f793fdc38d215a83740d50bef700250e3"
+    },
+    {
+      "path": "patterns/characters/haven/knowledge.json",
+      "size": 12253,
+      "sha256": "c5e581d1360a4f75bf92daaab724ce9ab4440cf914c932f6cf84a55a34ae5f29"
+    },
+    {
+      "path": "patterns/characters/haven/patterns.json",
+      "size": 5378325,
+      "sha256": "7959cd7d1f7f669606b40e1f93a92e387a75acd65070960904c32d73d1b94b07"
+    },
+    {
+      "path": "patterns/characters/haven/personality.json",
+      "size": 7930,
+      "sha256": "0758d9d15f129dc73dbf6838c017c669b4535d6c190849ccb0af8cf9d1c9371f"
+    },
+    {
+      "path": "patterns/characters/lexis/bio.json",
+      "size": 2270,
+      "sha256": "f70e71a2d172d3971da04f2b1658fda2ae2b2c44716bdab3b170f6153bdcf08b"
+    },
+    {
+      "path": "patterns/characters/lexis/knowledge.json",
+      "size": 16717,
+      "sha256": "262a5490c0d89e1b5c72f04f0e974f2bb768fba45309cd6e4e76157befbe8b66"
+    },
+    {
+      "path": "patterns/characters/lexis/patterns.json",
+      "size": 5233671,
+      "sha256": "93450b49685959137daa41bf87a26dcb62fac120eeb72230bc3cab8d0e56908d"
+    },
+    {
+      "path": "patterns/characters/lexis/personality.json",
+      "size": 11020,
+      "sha256": "baf6c72eecb01cb366dc18c7abd6e827ae327916bedb3487f1f5d2dfa9759d96"
+    },
+    {
+      "path": "patterns/characters/registry.json",
+      "size": 6349,
+      "sha256": "2643fd806ad239c4e3ee0cf2f84e3ffa98350010529eb9ca8b86dbb154676209"
+    },
+    {
+      "path": "patterns/characters/schema/bio.json",
+      "size": 5804,
+      "sha256": "a1103b9eea33e0c838850d872837d61f3cdb6e0d5c7b7bb6da4e2fdbe8b08baa"
+    },
+    {
+      "path": "patterns/characters/schema/bio.schema.json",
+      "size": 5516,
+      "sha256": "76eaa302ffd977b8ac92e780e17e1e1582a415103f75bb7752c3dc87b1479ed9"
+    },
+    {
+      "path": "patterns/characters/schema/knowledge.json",
+      "size": 3682,
+      "sha256": "b2f3ae81a10397396c080adb235ee1d90f074cee451efb2b1b2f8b313bcb4fe6"
+    },
+    {
+      "path": "patterns/characters/schema/knowledge.schema.json",
+      "size": 3330,
+      "sha256": "a445fcde4c655a1caeb311fd8ee768779ddd471805ba03a4af92f2a828160ec4"
+    },
+    {
+      "path": "patterns/characters/schema/patterns.json",
+      "size": 3595,
+      "sha256": "7f28dc102e8ac23f91b32f736ffbfb5abcdea80ab0fed92f9276219672a810a1"
+    },
+    {
+      "path": "patterns/characters/schema/patterns.schema.json",
+      "size": 3401,
+      "sha256": "4196c25820209d9d0ad04e6f18a5e78512d74517fba6e5480864646e317bfa13"
+    },
+    {
+      "path": "patterns/characters/schema/personality.json",
+      "size": 2756,
+      "sha256": "2819dad4a60fa45eaacc5a035a6ae7e9704d0daac0d380bcbf4e9b1297834027"
+    },
+    {
+      "path": "patterns/characters/schema/personality.schema.json",
+      "size": 2559,
+      "sha256": "81b72e95e0c31ed52bb1715d79792b8977fe6e6ba98d6afd558c3cb6fb720c67"
+    },
+    {
+      "path": "patterns/characters/synth/bio.json",
+      "size": 2226,
+      "sha256": "ffd76e02856c9f2aea5a46ade46644054b36645cd99470b5aa967a9a5dd7856d"
+    },
+    {
+      "path": "patterns/characters/synth/knowledge.json",
+      "size": 18769,
+      "sha256": "f9158facda999662b4e064d6ae2f8b93ca66da4bbfcd7594d27bd8f22750d96b"
+    },
+    {
+      "path": "patterns/characters/synth/patterns.json",
+      "size": 5535468,
+      "sha256": "92eeca60fd0baa994b15fdeaf516f873ac2b0723a2b0c8c07c09456c15f793db"
+    },
+    {
+      "path": "patterns/characters/synth/personality.json",
+      "size": 13552,
+      "sha256": "fe85b881fccf5ee4ee08a005c0af113a901661b0146db5b8ae8c79756431a667"
+    },
+    {
+      "path": "patterns/characters/synthesus/bio.json",
+      "size": 5925,
+      "sha256": "0814b996cd275de13fc351c874bcf2729af44c20bfeee7ef563bb881e5626570"
+    },
+    {
+      "path": "patterns/characters/synthesus/knowledge.json",
+      "size": 15841,
+      "sha256": "58615085781ca8ea0ea00ccd3804603f400efc1e05b9e45e1662a3ae081f2351"
+    },
+    {
+      "path": "patterns/characters/synthesus/patterns.json",
+      "size": 78313,
+      "sha256": "92c9d91789cff192ca1d980cca7a93358c2f634a3bb261bffe3032be016c8d99"
+    },
+    {
+      "path": "patterns/characters/synthesus/personality.json",
+      "size": 10827,
+      "sha256": "0dfb964d33f2d07b3c1db2871740e7e5ead417119fce279b62dfcb2c58b0d238"
+    },
+    {
+      "path": "patterns/global/initial_patterns.json",
+      "size": 1297,
+      "sha256": "85a40c9d0c6a7f6574983a738b511bf9a31553030d9c62966854cbe60ac63cf6"
+    },
+    {
+      "path": "synthetic/generation_scripts/add_slots_to_cloud.py",
+      "size": 10712,
+      "sha256": "c3966640f2e6a95b0a38fd6480b0f8363134c471b648bd0f90f446f945e7dbd7"
+    },
+    {
+      "path": "synthetic/generation_scripts/generate_bulk_patterns.py",
+      "size": 4327,
+      "sha256": "ab31d5697bfdb0047572ffd79924b866e91657751bcac5b586f1775b184e3fc6"
+    },
+    {
+      "path": "synthetic/generation_scripts/ingest_pattern_lm.py",
+      "size": 3672,
+      "sha256": "7199aba9c0da8e6d2e4ec358596bedcc12d990b6a98ccf0b8f16048b08f57904"
+    },
+    {
+      "path": "synthetic/generation_scripts/learn_transitions.py",
+      "size": 8368,
+      "sha256": "f379cfe3f7417594a3622168e2312121dfd9bfb7ab3b862b232f1881f0d445dc"
+    },
+    {
+      "path": "synthetic/generation_scripts/mass_generate_entries.py",
+      "size": 10641,
+      "sha256": "7fb07d687837a142155e18b5e8d24a3a1cf766d5f2949eebc2aa5905977ec24b"
+    },
+    {
+      "path": "synthetic/generation_scripts/seed_patterns.py",
+      "size": 1000,
+      "sha256": "641e58c5cdf4f1bfac87a21092e8aab86d9364095ef260e9793d3b13ffc111d9"
+    },
+    {
+      "path": "synthetic/lore_forge/lore_forge.py",
+      "size": 22601,
+      "sha256": "b04623a61321011ec770e7f7757834917cb22c9f5fd719bf737c9a8a46949733"
+    },
+    {
+      "path": "grounding_corpus/agent_abilities_v1.txt",
+      "size": 7645,
+      "sha256": "cedcd2d9efa288759657b94c8df5fd17e85a40caccfd2ff03d6ca19eeb810f42"
+    },
+    {
+      "path": "grounding_corpus/aivm_compendium.txt",
+      "size": 2607,
+      "sha256": "84279e8c86f608001d9cb7b99cb91ef439b9d9c0fceec8998472f2f5fe588e0e"
+    },
+    {
+      "path": "grounding_corpus/kaggle_grounding_v1.txt",
+      "size": 3188335,
+      "sha256": "0cbd23e23dcddd9420408d7d51b28aabb984893538644ce0f86fb7c6ee74f29c"
+    },
+    {
+      "path": "grounding_corpus/massive_coding_v1.txt",
+      "size": 2480298,
+      "sha256": "50023b73ec6cad64bde6b2d25cd07c8a2b182c58c7eade62d8bb16fe83e0c4e6"
+    },
+    {
+      "path": "grounding_corpus/massive_grounding_v1.txt",
+      "size": 2269171,
+      "sha256": "f1a39385b6cfdbe963e903e6c5cf5c02080937ddedc46f6e46f5b46b0789233d"
+    },
+    {
+      "path": "grounding_corpus/samsung_firmware_notes.txt",
+      "size": 864,
+      "sha256": "c2f9c6200bee187b2591c2f56b4790f9ef85f94d9befbb2b08d9b6a1d0e849e0"
+    },
+    {
+      "path": "grounding_corpus/unified_grounding_v1.txt",
+      "size": 474637,
+      "sha256": "338c2a922dc5c6242cd10d533aea72696b2d580ca31d18261873d6b999af7c1f"
+    },
+    {
+      "path": "grounding_corpus/world_building_v1.txt",
+      "size": 3980809,
+      "sha256": "872cc3c251280b9c3c56e85f014094f798b44759ba21c2e9212412dfacfa25f4"
+    },
+    {
+      "path": "support_models/chat_policy_prior.pkl",
+      "size": 49137,
+      "sha256": "c1f05b7fd29afb2ab9262ef2f37494711781c251a393925bfcc8bc3e5e96dc66"
+    },
+    {
+      "path": "support_models/enrichment_r2_checkpoint.json",
+      "size": 363,
+      "sha256": "2a686a08aad9f2dfd4cd7e4a342a6746e89b458f5591f0a16ee81125d18ffa18"
+    },
+    {
+      "path": "support_models/migration_checkpoint.json",
+      "size": 821,
+      "sha256": "6e3809c8b66df6c27664d96dde6370cc70958f5dde1c0ef80bcf2febf006d9ec"
+    },
+    {
+      "path": "support_models/parameter_cloud.json",
+      "size": 89,
+      "sha256": "09eda26dd59160133f2704eeb84ccbf4c168ff6bf87112292b8a0313b49f2fcd"
+    },
+    {
+      "path": "support_models/parameter_cloud_v2_stats.json",
+      "size": 470,
+      "sha256": "8b1e54e453be45fba1fc118f0657f23252f41f43369932a8ad456e79d5368138"
+    },
+    {
+      "path": "support_models/vocab_general.pkl",
+      "size": 455323,
+      "sha256": "7d0381edd35e89d4e095467cf5fb86855543ba399e290800416f13ccc95b203d"
+    },
+    {
+      "path": "support_models/vocab_gm_dialogue.pkl",
+      "size": 1311106,
+      "sha256": "afda0e45186ac35e2575742bde2e56a498685f8adb55e1cc58cb679614c6cb89"
+    },
+    {
+      "path": "support_models/vocab_sysops.pkl",
+      "size": 1023433,
+      "sha256": "848c9eee6d7a2a1ff0cfb5d0008ab1042be8d836cda0aab25af8ebd5c5a4dd1f"
+    }
+  ]
+}

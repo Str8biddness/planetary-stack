@@ -1,0 +1,11 @@
+version: "1"
+id: conceptnet5_assertions
+name: ConceptNet 5.7 assertions
+source_type: gzip_tsv
+url: https://s3.amazonaws.com/conceptnet/downloads/2019/edges/conceptnet-assertions-5.7.0.csv.gz
+docs: https://github.com/commonsense/conceptnet5/wiki/Downloads
+cache_path: data/conceptnet/conceptnet-assertions-5.7.0.csv.gz
+loader: pipelines/ingest/kaggle_loader.py::load_conceptnet
+entry_source: conceptnet5
+filters:
+  language: en

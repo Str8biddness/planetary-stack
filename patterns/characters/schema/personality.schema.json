@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "synthesus://character/personality.schema.json",
+  "title": "Synthesus Character Personality Bank",
+  "description": "Pre-authored creative/personal responses. Defines how the character responds to off-script, creative, or personal questions.",
+  "type": "object",
+  "required": ["responses"],
+  "properties": {
+    "character_id": {
+      "type": "string",
+      "description": "Must match parent directory name."
+    },
+    "archetype": {
+      "type": "string",
+      "description": "Personality archetype tag. Built-in: merchant, guard, innkeeper, scholar, healer."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "responses": {
+      "type": "object",
+      "description": "Map of intent category → array of response options.",
+      "properties": {
+        "song":                { "$ref": "#/$defs/response_list" },
+        "joke":                { "$ref": "#/$defs/response_list" },
+        "favorite":            { "$ref": "#/$defs/response_list" },
+        "opinion":             { "$ref": "#/$defs/response_list" },
+        "personal":            { "$ref": "#/$defs/response_list" },
+        "philosophical":       { "$ref": "#/$defs/response_list" },
+        "compliment_response": { "$ref": "#/$defs/response_list" },
+        "insult_response":     { "$ref": "#/$defs/response_list" },
+        "creative_request":    { "$ref": "#/$defs/response_list" },
+        "rumor":               { "$ref": "#/$defs/response_list" },
+        "advice":              { "$ref": "#/$defs/response_list" }
+      },
+      "additionalProperties": { "$ref": "#/$defs/response_list" }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "response_list": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/personality_response" },
+      "description": "One or more response options. Engine picks randomly for variety."
+    },
+    "personality_response": {
+      "type": "object",
+      "required": ["text"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Default response text. Written in first person, in-character."
+        },
+        "emotion_variants": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Emotion → alternate text. If NPC is in a matching emotion state, this variant is used instead."
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

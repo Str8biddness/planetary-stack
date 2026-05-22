@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "synthesus://character/patterns.schema.json",
+  "title": "Synthesus Character Patterns",
+  "description": "Left-hemisphere dialogue patterns. Defines what the character SAYS in response to matched triggers.",
+  "type": "object",
+  "properties": {
+    "character_id": {
+      "type": "string",
+      "description": "Must match the parent directory name."
+    },
+    "hemisphere_id": {
+      "type": "integer",
+      "description": "Must match bio.json hemisphere_id."
+    },
+    "pattern_schema": {
+      "type": "string",
+      "const": "ppbrs_v2",
+      "description": "Schema version marker."
+    },
+    "synthetic_patterns": {
+      "type": "array",
+      "description": "Domain-specific high-confidence patterns. Score at full confidence value.",
+      "items": { "$ref": "#/$defs/pattern" }
+    },
+    "generic_patterns": {
+      "type": "array",
+      "description": "Universal patterns (greetings, farewells). Penalized 0.7x during scoring.",
+      "items": { "$ref": "#/$defs/pattern" }
+    },
+    "fallback": {
+      "type": "string",
+      "description": "Response when no pattern matches and all cognitive modules miss."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "created": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["synthetic_patterns", "fallback"],
+  "additionalProperties": true,
+  "$defs": {
+    "pattern": {
+      "type": "object",
+      "required": ["id", "trigger", "response_template", "confidence"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}_[A-Z]+_\\d{3}$",
+          "description": "Pattern ID. Format: {SP|GP}_{CHAR}_{NNN} (e.g., SP_GAREN_001, GP_HAVEN_002)."
+        },
+        "trigger": {
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1
+            }
+          ],
+          "description": "One or more trigger phrases. Matching uses token overlap with geometric mean scoring."
+        },
+        "response_template": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The NPC's response text. Supports {variable} substitution by the compositor."
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Base confidence score (0-1). Must be >= 0.55 (MATCH_QUALITY_THRESHOLD) to fire."
+        },
+        "domain": {
+          "type": "string",
+          "description": "Knowledge domain tag (must be in bio.knowledge_domains)."
+        },
+        "emotion_variants": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Emotion → alternate response text. Keys are emotion state names (friendly, afraid, etc.)."
+        },
+        "requires_trust": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Minimum trust score to activate this pattern."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Metadata tags for categorization and test harness filtering."
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

@@ -1,18 +1,33 @@
 # Synthesus Knowledge Cloud
 
-Standalone public artifact repository for the Synthesus FAISS Knowledge Cloud.
+Standalone public repository for the Synthesus Knowledge Cloud data supply chain.
 
-This repo exists so anyone running Synthesus locally can bootstrap the shared knowledge layer without rebuilding the corpus. It contains the FAISS index, metadata, KNDatabase sidecars, world-lore JSON, transition/chaining data, the trained swarm embedder, and a cryptographic manifest.
+This repo exists so anyone running Synthesus locally can bootstrap the shared knowledge layer without rebuilding the corpus, while still preserving the source manifests, grounding corpora, pattern banks, and synthetic narrative generation pipeline needed to audit or regenerate the cloud.
 
 ## Public mirror
 
-The always-online mirror is:
+The always-online artifact mirror is:
 
 ```text
 https://zo.pub/syntech/synthesus-knowledge
 ```
 
 Synthesus defaults to this URL through `SYNTHESUS_KNOWLEDGE_CLOUD_URL` unless sync is disabled.
+
+## Repository layout
+
+```text
+artifacts/              # compiled runtime bundle for local Synthesus installs
+sources/                # upstream dataset manifests and license/fetch metadata
+pipelines/              # ingestion, build, validation, and publish pipeline code
+patterns/               # global + character pattern/knowledge/persona seed data
+synthetic/              # lore forge, transition learning, synthetic generation scripts
+grounding_corpus/       # curated/generated grounding text corpora
+support_models/         # vocabularies, priors, checkpoints, small support artifacts
+manifests/              # source-plane manifests generated from this repository
+docs/                   # integration, source, rebuild, and data-model documentation
+scripts/                # client sync + validation utilities
+```
 
 ## Artifact layout
 
@@ -33,8 +48,6 @@ artifacts/
     chaining_patterns.json
 ```
 
-Current manifest summary:
-
 | Artifact | Purpose |
 |---|---|
 | `faiss.index` | Vector index for semantic retrieval |
@@ -47,6 +60,26 @@ Current manifest summary:
 | `knowledge.kndb` | KNDatabase binary payload |
 | `knowledge.kndb.meta.db` | KNDatabase metadata sidecar |
 | `knowledge.meta.db` | Additional knowledge metadata sidecar |
+
+## Source and generation planes
+
+The cloud is more than the FAISS files. The repo also carries:
+
+- Jeopardy and ConceptNet source manifests
+- planned Hugging Face and Kaggle source manifests
+- generated grounding corpora such as `world_building_v1.txt` and `massive_grounding_v1.txt`
+- global and character-specific pattern banks
+- character knowledge/personality/bio seeds
+- synthetic lore generation scripts
+- transition-learning scripts
+- small vocab/policy/checkpoint support artifacts
+
+See:
+
+- `docs/DATA_MODEL.md`
+- `docs/SOURCES.md`
+- `docs/REBUILDING.md`
+- `docs/PIPELINE_ROADMAP.md`
 
 ## Use from Synthesus
 
@@ -68,7 +101,7 @@ export SYNTHESUS_KNOWLEDGE_SYNC_MODE=off
 
 ## Use without Synthesus
 
-Download and verify the bundle directly:
+Download and verify the compiled runtime bundle directly:
 
 ```bash
 python scripts/sync_knowledge_cloud.py --dest ./data
@@ -81,18 +114,21 @@ To download from the checked-in `artifacts/` folder instead of the public mirror
 python scripts/sync_knowledge_cloud.py --dest ./data --base-url "file://$PWD/artifacts"
 ```
 
-## Publish/update workflow
-
-1. Build or refresh the bundle in a staging directory.
-2. Regenerate `manifest.json` with SHA-256 and byte sizes.
-3. Replace `artifacts/` in this repo.
-4. Validate locally:
+## Validation
 
 ```bash
 python scripts/validate_bundle.py --root artifacts
+python scripts/validate_source_planes.py --root .
+python scripts/build_source_manifest.py --root .
 python scripts/sync_knowledge_cloud.py --dest /tmp/synthesus-kc-smoke --base-url "file://$PWD/artifacts"
 ```
 
+## Publish/update workflow
+
+1. Build or refresh the bundle in a staging directory.
+2. Regenerate `artifacts/manifest.json` with SHA-256 and byte sizes.
+3. Replace `artifacts/` in this repo.
+4. Validate locally.
 5. Commit and push this repo.
 6. Sync the hosted mirror:
 
@@ -102,10 +138,11 @@ zopub sync synthesus-knowledge artifacts
 
 ## Versioning contract
 
-- `manifest.json` uses `version: "1"`.
+- `artifacts/manifest.json` uses `version: "1"`.
 - Artifact paths are part of the public client contract.
 - Clients must verify size and SHA-256 before trusting downloaded files.
 - Missing optional artifacts should degrade behavior, not break startup.
+- Source-plane manifests exist for rebuild/audit workflows, not runtime sync.
 
 ## License
 

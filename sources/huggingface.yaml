@@ -1,0 +1,23 @@
+version: "1"
+status: planned
+name: huggingface-source-plane
+purpose: >
+  Placeholder manifest for Hugging Face datasets that should feed future
+  Synthesus Knowledge Cloud rebuilds. This repo currently preserves the
+  generated/compiled outputs and local grounding corpora; exact Hugging Face
+  dataset IDs must be pinned before automated fetch is enabled.
+
+candidate_datasets:
+  - id: metamathqa
+    role: mathematical reasoning and structured problem-solving knowledge.
+    expected_transform: question_answer_to_knowledge_entry
+    license_gate: verify before vendoring or mirroring.
+  - id: opencharacter_dialogue
+    role: character dialogue, persona consistency, and narrative response patterns.
+    expected_transform: dialogue_to_patterns_and_grounding_entries
+    license_gate: verify before vendoring or mirroring.
+
+rules:
+  - Pin dataset name, revision, split, license, and transform function before enabling ingestion.
+  - Do not mirror raw Hugging Face data in this repo unless license permits redistribution.
+  - Prefer fetch-on-rebuild with checksums over unversioned local downloads.
