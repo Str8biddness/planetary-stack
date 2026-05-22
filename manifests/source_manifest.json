@@ -1,7 +1,7 @@
 {
   "version": "1",
   "kind": "synthesus-knowledge-source-plane",
-  "generated_at": "2026-05-22T04:49:22.241369+00:00",
+  "generated_at": "2026-05-22T06:51:23.516846+00:00",
   "roots": [
     "sources",
     "pipelines",
@@ -37,14 +37,39 @@
       "sha256": "0f77545d65ce8bbea05dfd1fd16f66936e8311cbbcee6f8b63a7bbd4d2cd8806"
     },
     {
+      "path": "pipelines/__init__.py",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pipelines/build/__init__.py",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pipelines/build/__pycache__/kn_populator.cpython-312.pyc",
+      "size": 23521,
+      "sha256": "ec2ce2258ac704765c5082572252b269a4004b582e054fe374128fb233029724"
+    },
+    {
+      "path": "pipelines/build/__pycache__/run_population.cpython-312.pyc",
+      "size": 7620,
+      "sha256": "57fbaaa3c1cc41b7f04738682787f6060136f3c6eb3c3d3b4f2e495f23bcbbab"
+    },
+    {
+      "path": "pipelines/build/__pycache__/swarm_embedder.cpython-312.pyc",
+      "size": 8255,
+      "sha256": "af85eb312960ece2f47df43db14ad99f19192968b51ff8d819573b0100982d4d"
+    },
+    {
       "path": "pipelines/build/kn_populator.py",
-      "size": 18319,
-      "sha256": "e2d6e97761e06de599d50481c3bf44122175223c3e94bb6d19fa76a74e3446aa"
+      "size": 18321,
+      "sha256": "beb16a1553e2ac34ea34b46adf08ec4c813fb3fcbe008e65318945e45c210ab6"
     },
     {
       "path": "pipelines/build/run_population.py",
-      "size": 5017,
-      "sha256": "67cf808e6170635dd590a13b1ef47f41bd4db8673e6844eae3239b1b145ab90e"
+      "size": 5001,
+      "sha256": "2bd490374850fb8c853c1c70a37aa31c83569493b39d082a464164bc1d0529c5"
     },
     {
       "path": "pipelines/build/swarm_embedder.py",
@@ -52,9 +77,24 @@
       "sha256": "a8510066e7c2f0001b4ab233b6ab54b6013110d5d817685cf413835e2d14685d"
     },
     {
+      "path": "pipelines/ingest/__init__.py",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pipelines/ingest/__pycache__/kaggle_loader.cpython-312.pyc",
+      "size": 16586,
+      "sha256": "c4828aba857c650ed4a56d6823cedd9de92819952b0a13c735510229e393fff2"
+    },
+    {
       "path": "pipelines/ingest/kaggle_loader.py",
       "size": 14704,
       "sha256": "af8507cbf17d713e85c0ad1cef48ed85775344675c57dc0a3d00e95da0f08c87"
+    },
+    {
+      "path": "pipelines/publish/__init__.py",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
       "path": "pipelines/publish/cloud_sync.py",

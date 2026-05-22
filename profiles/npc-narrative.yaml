@@ -1,0 +1,24 @@
+name: npc-narrative
+description: Narrative simulation and NPC grounding profile.
+sources:
+  - world_lore
+  - synthetic_lore
+  - character_patterns
+  - learned_transitions
+  - conceptnet
+limits:
+  max_entries: 150000
+  max_source_fraction:
+    world_lore: 0.25
+    synthetic_lore: 0.30
+    character_patterns: 0.25
+    learned_transitions: 0.10
+    conceptnet: 0.10
+embedding:
+  model: swarm_embedder
+  dim: 128
+outputs:
+  faiss: true
+  kndb: true
+  sqlite_meta: true
+  source_manifest: true

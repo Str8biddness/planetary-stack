@@ -1,0 +1,23 @@
+name: public-base
+description: Baseline public Knowledge Cloud profile for local Synthesus installs.
+sources:
+  - jeopardy
+  - conceptnet
+  - world_lore
+  - synthetic_lore
+  - character_patterns
+limits:
+  max_entries: 250000
+  max_source_fraction:
+    jeopardy: 0.35
+    conceptnet: 0.30
+    synthetic_lore: 0.20
+    character_patterns: 0.15
+embedding:
+  model: swarm_embedder
+  dim: 128
+outputs:
+  faiss: true
+  kndb: true
+  sqlite_meta: true
+  source_manifest: true

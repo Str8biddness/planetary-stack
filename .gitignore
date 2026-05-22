@@ -6,7 +6,7 @@ __pycache__/
 .env
 .env.*
 dist/
-build/
+/build/
 *.egg-info/
 
 # Runtime scratch/download targets

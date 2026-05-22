@@ -1,0 +1,22 @@
+name: full-local
+description: Full local rebuild profile using every available public/source and synthetic plane.
+sources:
+  - jeopardy
+  - conceptnet
+  - huggingface_declared
+  - kaggle_declared
+  - grounding_corpus
+  - world_lore
+  - synthetic_lore
+  - character_patterns
+  - support_models
+limits:
+  max_entries: null
+embedding:
+  model: swarm_embedder
+  dim: 128
+outputs:
+  faiss: true
+  kndb: true
+  sqlite_meta: true
+  source_manifest: true

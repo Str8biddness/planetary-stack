@@ -114,6 +114,20 @@ To download from the checked-in `artifacts/` folder instead of the public mirror
 python scripts/sync_knowledge_cloud.py --dest ./data --base-url "file://$PWD/artifacts"
 ```
 
+
+## Python package / CLI
+
+The repo now includes a self-contained Python package and CLI. Use it directly without installation:
+
+```bash
+python -m synthesus_knowledge_cloud validate --root artifacts
+python -m synthesus_knowledge_cloud validate-sources --root .
+python -m synthesus_knowledge_cloud build-source-manifest --root .
+python -m synthesus_knowledge_cloud inspect-profile profiles/public-base.yaml
+```
+
+Or install it in editable mode and use `synthesus-kc`. See `docs/PACKAGE_CLI.md`.
+
 ## Validation
 
 ```bash

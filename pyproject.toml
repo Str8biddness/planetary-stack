@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "synthesus-knowledge-cloud"
+version = "0.1.0"
+description = "Standalone utilities and artifact manifests for the Synthesus Knowledge Cloud."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Synthesus / Dakin Ellegood" }
+]
+dependencies = [
+  "requests>=2.31.0",
+  "PyYAML>=6.0.1"
+]
+
+[project.scripts]
+synthesus-kc = "synthesus_knowledge_cloud.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["synthesus_knowledge_cloud*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
