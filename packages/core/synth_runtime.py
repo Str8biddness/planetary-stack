@@ -40,7 +40,9 @@ from manifestation_engine import ManifestationEngine
 from vpu_coordinator import VpuCoordinator
 from sllm_coordinator import SllmCoordinator
 from hybrid_transformer_coordinator import HybridTransformerCoordinator
-from mirror_sync_bridge import MirrorSyncBridge
+from computress.coordinator import ComputressCoordinator
+from kernel.mirror_sync_bridge import MirrorSyncBridge
+
 
 # AIVM Kernel imports
 from aivm.kernel.core import AIVMKernel
@@ -53,6 +55,15 @@ PROJ_ROOT = Path(__file__).resolve().parent.parent
 # ---------------------------------------------------------------------------
 # SynthRuntime
 # ---------------------------------------------------------------------------
+
+# Global runtime instance for access from other modules
+_runtime: Optional[SynthRuntime] = None
+
+def get_runtime(data_dir: Optional[str] = None) -> SynthRuntime:
+    global _runtime
+    if _runtime is None:
+        _runtime = SynthRuntime(data_dir=data_dir)
+    return _runtime
 
 class SynthRuntime:
     """
@@ -85,6 +96,7 @@ class SynthRuntime:
             framework_root=Path(__file__).resolve().parent.parent,
             iso_root=Path("/home/dakin/customiso")
         )
+        self._computress_coordinator = ComputressCoordinator()
 
         # AIOS Hardware Integration (EmulEngine)
         try:
@@ -164,6 +176,7 @@ class SynthRuntime:
             memory_store=self._memory_store,
             manifestation_engine=self._manifestation,
             scraper=self._scraper,
+            computress_coordinator=self._computress_coordinator,
             safe_mode=self.guest_mode # Enforce contract §10 on ISO
         )
 

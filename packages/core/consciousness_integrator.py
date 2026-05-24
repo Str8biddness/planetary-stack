@@ -1,6 +1,6 @@
 from typing import Dict, Any, List
 import logging
-from .conscious_state import FluidState, CrystallizedState, NarrativeState, IntegratedConsciousnessState
+from conscious_state import FluidState, CrystallizedState, NarrativeState, IntegratedConsciousnessState
 
 logger = logging.getLogger(__name__)
 

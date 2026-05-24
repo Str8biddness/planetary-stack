@@ -3,9 +3,9 @@ from typing import Any, Dict, List, Optional
 import time
 import threading
 
-from .conscious_state import ConsciousState, NarrativeEvent
-from .cognitive_core import CognitiveCore
-from .synthesus_master import SynthesusMaster
+from conscious_state import ConsciousState, NarrativeEvent
+from cognitive_core import CognitiveCore
+from synthesus_master import SynthesusMaster
 
 
 @dataclass

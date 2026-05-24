@@ -2,14 +2,14 @@ import asyncio
 import time
 import logging
 from typing import Any, Dict, List, Optional
-from .conscious_state import ConsciousState, FluidState, CrystallizedState, NarrativeState, IntegratedConsciousnessState
-from .consciousness_integrator import ConsciousnessIntegrator
-from .cognitive_core import CognitiveCore
-from .synth_runtime import get_runtime
+from conscious_state import ConsciousState, FluidState, CrystallizedState, NarrativeState, IntegratedConsciousnessState
+from consciousness_integrator import ConsciousnessIntegrator
+from cognitive_core import CognitiveCore
+from synth_runtime import get_runtime
 
 # Reasoning tracer integration
 try:
-    from .reasoning_tracer import get_tracer, Hemisphere, TraceEventType
+    from reasoning_tracer import get_tracer, Hemisphere, TraceEventType
     _tracer = get_tracer(enable_streaming=True)
     _TRACING_ENABLED = True
 except ImportError:
@@ -41,13 +41,13 @@ class QuadbrainMaster:
         self.param_cloud = ParameterCloudStore()
         
         # Tooling
-        from .tools.baseliner import Baseliner
+        from tools.baseliner import Baseliner
         self.baseliner = Baseliner()
         
-        from .tools.immune_system import ImmuneSystem
+        from tools.immune_system import ImmuneSystem
         self.immune_system = ImmuneSystem()
         
-        from .tools.ghost_net import GhostNetNode
+        from tools.ghost_net import GhostNetNode
         self.ghost_net = GhostNetNode()
         # Start the P2P listener
         self.ghost_net.start()
@@ -189,7 +189,7 @@ class QuadbrainMaster:
 
     async def execute_action(self, query: str, integrated_state: IntegratedConsciousnessState, state: ConsciousState, character_id: str, trace_id: Optional[str] = None) -> Dict[str, Any]:
         """Brain 2 & 4 (Cognitive/Executive): Takes C(t) and produces actions and rendering."""
-        from .generation.llm_bridge import LLMBridge, FallbackGenerator
+        from generation.llm_bridge import LLMBridge, FallbackGenerator
         llm = LLMBridge()
         fallback = FallbackGenerator()
         

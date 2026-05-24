@@ -12,7 +12,7 @@ Provides:
 
 from __future__ import annotations
 
-from .model_loader import (
+from model_loader import (
     ModelLoader,
     ModelRegistry,
     ModelState,
@@ -23,7 +23,7 @@ from .model_loader import (
     InferenceResult,
 )
 
-from .execution_engine import (
+from execution_engine import (
     ExecutionEngine,
     InstructionDispatcher,
     ResourcePool,
@@ -33,7 +33,7 @@ from .execution_engine import (
     ResourceAllocation,
 )
 
-from .orchestrator import (
+from orchestrator import (
     AIVMOrchestrator,
     AIVMStatus,
     AIVMConfig,

@@ -6,8 +6,8 @@ Orchestration and high-level runtime components.
 """
 
 # Re-enable relative imports for standard package behavior
-from .synth_runtime import SynthRuntime
-from .quadbrain_master import QuadbrainMaster
+from synth_runtime import SynthRuntime
+from quadbrain_master import QuadbrainMaster
 
 __all__ = [
     "SynthRuntime",

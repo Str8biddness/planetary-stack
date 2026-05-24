@@ -150,7 +150,7 @@ class AmplificationBridge:
         # Update autonomy config if available
         if self.master and hasattr(self.master, 'core'):
             try:
-                from ..organs.autonomyConfig import AUTO_CONFIG, AutonomyLevel
+                from .organs.autonomyConfig import AUTO_CONFIG, AutonomyLevel
                 domain_config = AUTO_CONFIG.get(metrics.domain)
                 if domain_config:
                     # Increase autonomy level if not already at max
@@ -180,7 +180,7 @@ class AmplificationBridge:
         # Update autonomy config if available
         if self.master and hasattr(self.master, 'core'):
             try:
-                from ..organs.autonomyConfig import AUTO_CONFIG, AutonomyLevel
+                from .organs.autonomyConfig import AUTO_CONFIG, AutonomyLevel
                 domain_config = AUTO_CONFIG.get(metrics.domain)
                 if domain_config:
                     # Decrease autonomy level if not already at minimum

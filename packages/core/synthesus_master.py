@@ -2,15 +2,15 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .conscious_state import ConsciousState, NarrativeEvent
-from .cognitive_core import CognitiveCore
+from conscious_state import ConsciousState, NarrativeEvent
+from cognitive_core import CognitiveCore
 try:
-    from .log_ingest import ingest_system_metric
+    from log_ingest import ingest_system_metric
 except Exception:
     ingest_system_metric = None
-from .aios_kernel_tool import AIOSKernelTool
-from .generation.organ_param_mapper import map_organs_to_config, build_response_plan
-from .generation.decoder import decode_response
+from aios_kernel_tool import AIOSKernelTool
+from generation.organ_param_mapper import map_organs_to_config, build_response_plan
+from generation.decoder import decode_response
 
 
 class SynthesusMaster:

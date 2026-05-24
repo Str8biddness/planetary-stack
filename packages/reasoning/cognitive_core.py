@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional
-from .conscious_state import ConsciousState, NarrativeEvent
+from conscious_state import ConsciousState, NarrativeEvent
 from cognitive.agent_dispatcher import AgentDispatcher
-from .knowledge_cloud import KnowledgeCloud
+from knowledge_cloud import KnowledgeCloud
 
 # Adjust import paths based on actual repo structure
 try:
@@ -14,7 +14,7 @@ except ImportError:
         from reasoning.inductive_engine import AIOSInductiveModule
         from reasoning.abductive_engine import AIOSAbductiveModule
     except ImportError:
-        from .dummy_reasons import AIOSDeductiveModule, AIOSInductiveModule, AIOSAbductiveModule
+        from dummy_reasons import AIOSDeductiveModule, AIOSInductiveModule, AIOSAbductiveModule
 
 
 class CognitiveCore:

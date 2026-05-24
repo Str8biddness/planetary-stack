@@ -10,6 +10,7 @@ from ..devices.vqd import VQD
 from ..devices.vgd import VGD
 from ..devices.vrd import VRD
 from ..devices.vtd import VTD
+from ..devices.vdd import VDD
 from ..devices.stubs import VND, VSLLM
 from ..isolation.guard import FaultGuard
 from ..snapshot.manager import SnapshotManager
@@ -30,6 +31,7 @@ class AIVMKernel:
                  memory_store: Optional[Any] = None,
                  manifestation_engine: Optional[Any] = None,
                  scraper: Optional[Any] = None,
+                 computress_coordinator: Optional[Any] = None,
                  enable_scheduler: bool = True,
                  safe_mode: bool = False):
         self._npcs: Dict[str, NPC] = {}
@@ -37,6 +39,7 @@ class AIVMKernel:
         self._memory_store = memory_store
         self._manifestation = manifestation_engine
         self._scraper = scraper
+        self._computress = computress_coordinator
         self.safe_mode = safe_mode
         
         self._scheduler: Optional[AIVMScheduler] = None
@@ -81,7 +84,8 @@ class AIVMKernel:
                 manifestation_engine=self._manifestation,
                 scraper=self._scraper
             )
-            logger.info(f"Kernel: NPC {identity.id} authorized as AGENT. VTD mounted.")
+            npc.mounted_devices["VDD"] = VDD(self._computress)
+            logger.info(f"Kernel: NPC {identity.id} authorized as AGENT. VTD and VDD mounted.")
 
         # Enforcement of Safe Mode (§10 of Contract)
         if self.safe_mode and permission == PermissionLevel.GUEST:

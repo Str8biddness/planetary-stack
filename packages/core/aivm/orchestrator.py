@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
-from .execution_engine import (
+from execution_engine import (
     ExecutionEngine,
     InstructionDispatcher,
     InstructionResult,
@@ -32,16 +32,16 @@ from .execution_engine import (
     ResourcePool,
     VMInstruction,
 )
-from .model_loader import (
+from model_loader import (
     InferenceResult as ModelInferenceResult,
     ModelLoader,
     ModelState,
 )
-from .isolation_layer import ModelIsolationLayer, ModelIsolationConfig, IsolationMode
-from .sandbox import SandboxManager, SandboxConfig, ModelSandbox, IsolationLevel
-from .context_manager import ExecutionContextManager, ContextState, ExecutionContext
-from .inference_scheduler import InferenceScheduler, InferencePriority, InferenceRequest
-from .error_recovery import (
+from isolation_layer import ModelIsolationLayer, ModelIsolationConfig, IsolationMode
+from sandbox import SandboxManager, SandboxConfig, ModelSandbox, IsolationLevel
+from context_manager import ExecutionContextManager, ContextState, ExecutionContext
+from inference_scheduler import InferenceScheduler, InferencePriority, InferenceRequest
+from error_recovery import (
     ErrorRecoveryManager,
     ErrorSeverity,
     CircuitBreakerConfig,

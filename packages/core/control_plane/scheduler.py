@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 import time
 import uuid
 from datetime import datetime, timedelta
-from .parameter_sweep import ParameterSweep, SweepStrategy, Trial
+from parameter_sweep import ParameterSweep, SweepStrategy, Trial
 
 class ExperimentScheduler:
     """
@@ -77,7 +77,7 @@ class ExperimentScheduler:
 
             # Add parameter spaces
             if parameters:
-                from .parameter_sweep import ParameterSpace
+                from parameter_sweep import ParameterSpace
                 for name, config in parameters.items():
                     sweep.add_parameter(name, ParameterSpace(
                         name=name,
