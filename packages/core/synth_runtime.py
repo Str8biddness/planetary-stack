@@ -268,8 +268,17 @@ class SynthRuntime:
                 name=bio.get("name", character_id), 
                 archetype=bio.get("archetype", "default")
             )
-            permission = PermissionLevel.AGENT if bio.get("permission") == "agent" else PermissionLevel.GUEST
-            self._aivm_kernel.spawn_npc(identity, permission=permission)
+            # Authorization & Priority
+            perm_str = bio.get("permission") or bio.get("aivm_metadata", {}).get("permission_level", "guest")
+            permission = PermissionLevel.AGENT if perm_str == "agent" else PermissionLevel.GUEST
+            
+            sched_str = bio.get("scheduler") or bio.get("aivm_metadata", {}).get("scheduler_class", "realtime_supporting")
+            try:
+                scheduler = SchedulerClass(sched_str)
+            except ValueError:
+                scheduler = SchedulerClass.REALTIME_SUPPORTING
+
+            self._aivm_kernel.spawn_npc(identity, permission=permission, scheduler=scheduler)
 
         return loaded
 
