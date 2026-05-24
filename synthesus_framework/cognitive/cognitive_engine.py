@@ -215,6 +215,8 @@ class CognitiveEngine:
         self.patterns_gen = PatternEngine(substrate=self.substrate)
         self.kal_client = kal_client
 
+        self._memory_store = None
+
         # Module 15: Dialogue Memory (Multi-turn conversation support)
         dialogue_memory_path = str(self._persist_dir / "dialogue_memory") if self._persist_dir else "data/dialogue_memory"
         self.dialogue_memory = DialogueMemory(dialogue_memory_path)
@@ -668,6 +670,14 @@ class CognitiveEngine:
             }
         }
 
+    def set_shared_layers(self, knowledge_cloud: Any = None, substrate: Any = None, memory_store: Any = None) -> None:
+        if knowledge_cloud is not None:
+            self.knowledge_cloud = knowledge_cloud
+        if substrate is not None:
+            self.substrate = substrate
+        if memory_store is not None:
+            self._memory_store = memory_store
+
     def process_query(
         self,
         player_id: str,
@@ -925,7 +935,7 @@ class CognitiveEngine:
                 matched_pattern["response_template"] = world_result["pattern_overrides"][pat_id]
 
         # Only run Knowledge Graph/Cloud if we don't have a very high confidence pattern match
-        if not matched_pattern or match_score < 1.1:
+        if not matched_pattern or match_score < 0.85:
             # Queries that clearly ask about more than one thing should avoid the
             # single-entity Knowledge Graph shortcut so the Knowledge Cloud synthesis path can handle conjunction-based prompts like 'dragons and healing potions'.
             if not multi_entity_query:
@@ -936,28 +946,21 @@ class CognitiveEngine:
                     emotion=emotion_str,
                 )
                 if kg_result:
-                    # [DUAL HEMI]: Synthesize response from Knowledge Graph facts
-                    voice_patterns = [p.get("response_template", "") for p in self.patterns.get("synthetic_patterns", [])][:8]
-                    response = await self.patterns_gen.synthesize_knowledge(
-                        knowledge_texts=[kg_result["response"]],
-                        voice_texts=voice_patterns,
-                        query=query
-                    ) or kg_result["response"]
-
+                    response = kg_result["response"]
                     self.tracker.record_npc_response(player_id, response)
                     self.recall.record_response(player_id, response)
                     self._local_handled += 1
                     self._knowledge_handled += 1
                     return self._build_result(
                         response=response,
-                        source="knowledge_graph_synthesized",
+                        source="knowledge_graph",
                         confidence=kg_result["confidence"],
                         emotion=current_emotion,
                         rel_result=rel_result,
                         conv_context=conv_context,
                         world_result=world_result,
                         match_score=kg_result["confidence"],
-                        pattern_id=f"kg_gen_{kg_result['entity_id']}",
+                        pattern_id=f"kg_{kg_result['entity_id']}",
                         start_time=start_time,
                         actions_taken=actions_taken,
                         kal_context=kal_context,
@@ -1046,7 +1049,7 @@ class CognitiveEngine:
             escalation.total_score = min(escalation.total_score + ml_escalation_risk * 0.3, 1.0)
 
         # ── Decision: Local or Escalate? ──
-        if matched_pattern and match_score >= 1.1:
+        if matched_pattern and match_score >= 0.55:
             # Local handling via cognitive engine
             # Merge all context for the compositor
             full_context = {
@@ -1155,28 +1158,21 @@ class CognitiveEngine:
                 emotion=emotion_str,
             )
             if kg_result:
-                # [DUAL HEMI]: Synthesize response from Knowledge Graph facts
-                voice_patterns = [p.get("response_template", "") for p in self.patterns.get("synthetic_patterns", [])][:8]
-                response = await self.patterns_gen.synthesize_knowledge(
-                    knowledge_texts=[kg_result["response"]],
-                    voice_texts=voice_patterns,
-                    query=query
-                ) or kg_result["response"]
-
+                response = kg_result["response"]
                 self.tracker.record_npc_response(player_id, response)
                 self.recall.record_response(player_id, response)
                 self._local_handled += 1
                 self._knowledge_handled += 1
                 return self._build_result(
                     response=response,
-                    source="knowledge_graph_synthesized",
+                    source="knowledge_graph",
                     confidence=kg_result["confidence"],
                     emotion=current_emotion,
                     rel_result=rel_result,
                     conv_context=conv_context,
                     world_result=world_result,
                     match_score=kg_result["confidence"],
-                    pattern_id=f"kg_gen_{kg_result['entity_id']}",
+                    pattern_id=f"kg_{kg_result['entity_id']}",
                     start_time=start_time,
                     actions_taken=actions_taken,
                     kal_context=kal_context,
@@ -1189,28 +1185,21 @@ class CognitiveEngine:
                 emotion=emotion_str,
             )
             if pb_result:
-                # [DUAL HEMI]: Synthesize response from Personality Bank response
-                voice_patterns = [p.get("response_template", "") for p in self.patterns.get("synthetic_patterns", [])][:12]
-                response = await self.patterns_gen.synthesize_knowledge(
-                    knowledge_texts=[pb_result["response"]],
-                    voice_texts=voice_patterns,
-                    query=query
-                ) or pb_result["response"]
-
+                response = pb_result["response"]
                 self.tracker.record_npc_response(player_id, response)
                 self.recall.record_response(player_id, response)
                 self._local_handled += 1
                 self._personality_handled += 1
                 return self._build_result(
                     response=response,
-                    source="personality_bank_synthesized",
+                    source="personality_bank",
                     confidence=pb_result["confidence"],
                     emotion=current_emotion,
                     rel_result=rel_result,
                     conv_context=conv_context,
                     world_result=world_result,
                     match_score=pb_result["confidence"],
-                    pattern_id=f"pb_gen_{pb_result['intent']}",
+                    pattern_id=f"pb_{pb_result['intent']}",
                     start_time=start_time,
                     actions_taken=actions_taken,
                     kal_context=kal_context,
@@ -1339,6 +1328,16 @@ class CognitiveEngine:
             )
 
         self.knowledge_cloud.upsert_entry(target_entry)
+        if self._memory_store is not None:
+            try:
+                self._memory_store.store_semantic(
+                    character_id=self.character_id,
+                    content=f"Witnessed {target_entry.entity_id}: {fact}",
+                    importance=0.6,
+                    tags=["knowledge_cloud", "witness"],
+                )
+            except Exception:
+                pass
 
     def get_stats(self) -> Dict[str, Any]:
         """Return engine statistics."""

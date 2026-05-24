@@ -80,11 +80,10 @@ class SymbolicCore:
         self.rules = self._load_default_rules()
 
     def _load_default_rules(self) -> List[Dict[str, Any]]:
-        import re
         return [
             {
                 "id": "greeting_rule",
-                "condition": lambda q, ctx: any(re.search(rf"\b{word}\b", q.lower()) for word in ["hello", "hi", "greetings", "hey"]),
+                "condition": lambda q, ctx: any(word in q.lower() for word in ["hello", "hi", "greetings"]),
                 "action": "provide_base_greeting",
                 "priority": 10
             },

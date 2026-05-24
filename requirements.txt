@@ -1,0 +1,33 @@
+# Synthesus 4.0 - Global Requirements
+# Updated: 2026-05-23
+
+# --- Core Infrastructure ---
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+httpx>=0.25.0
+pydantic>=2.4.0
+python-dotenv>=1.0.0
+rich>=13.0.0
+tenacity>=8.2.0
+jinja2>=3.1.0
+cryptography>=41.0.0
+PyYAML>=6.0.1
+
+# --- Intelligence & Reasoning ---
+numpy>=1.24.0
+scipy>=1.11.0
+scikit-learn>=1.3.0
+faiss-cpu>=1.7.4
+torch>=2.1.0
+qiskit>=0.45.0  # For VQD simulation
+
+# --- Web Ingress & Cluster Sync ---
+beautifulsoup4>=4.12.0
+apscheduler>=3.10.0  # For Mirror Sync Daemon
+
+# --- System & Deployment ---
+# (External system dependencies)
+# - cmake >= 3.18
+# - build-essential (g++, make)
+# - genisoimage / mkisofs
+# - libkvm-dev

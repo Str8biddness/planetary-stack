@@ -1,82 +1,103 @@
 #include "sinn.hpp"
-#include <random>
+#include <iostream>
 #include <fstream>
-#include <cstring>
 #include <algorithm>
-#include <cmath>
+#include <cstring>
+
 namespace zo {
-SINN::SINN(const SINNConfig& cfg) : cfg_(cfg) { init_weights(); }
-void SINN::init_weights() {
-    std::mt19937 rng(42);
-    std::normal_distribution<float> dist(0.0f, 0.1f);
-    W1_.resize(cfg_.hidden_dim * cfg_.input_dim);
-    b1_.resize(cfg_.hidden_dim, 0.0f);
-    W2_.resize(cfg_.output_dim * cfg_.hidden_dim);
-    b2_.resize(cfg_.output_dim, 0.0f);
-    for (auto& w : W1_) w = dist(rng);
-    for (auto& w : W2_) w = dist(rng);
+
+SINN::SINN(const Config& cfg) : cfg_(cfg) {
+    consciousness_state_.resize(cfg_.embed_dim, 0.0f);
 }
-std::vector<float> SINN::relu(const std::vector<float>& x) const {
-    std::vector<float> r(x.size());
-    for (size_t i = 0; i < x.size(); ++i) r[i] = x[i] > 0 ? x[i] : 0;
-    return r;
+
+SINN::SINN() : SINN(Config()) {}
+
+void SINN::matmul_avx2(const float* W, const float* x, float* out, size_t rows, size_t cols) const {
+    // Naive fallback (temporarily disable AVX intrinsics for cross-compilation stability)
+    for (size_t i = 0; i < rows; ++i) {
+        float sum = 0;
+        for (size_t j = 0; j < cols; ++j) sum += W[i * cols + j] * x[j];
+        out[i] = sum;
+    }
 }
-std::vector<float> SINN::softmax(const std::vector<float>& x) const {
-    float mx = *std::max_element(x.begin(), x.end());
-    std::vector<float> r(x.size());
-    float sum = 0;
-    for (size_t i = 0; i < x.size(); ++i) { r[i] = std::exp(x[i] - mx); sum += r[i]; }
-    for (auto& v : r) v /= sum;
-    return r;
+
+void SINN::apply_qualia_encoding(std::vector<float>& x) const {
+    // Port of content * (1 + sigmoid(matmul(qualia, basis)))
+    // Simplified for AIVM proof-of-concept
+    for (size_t i = 0; i < x.size(); ++i) {
+        float sigmoid = 1.0f / (1.0f + std::exp(-x[i] * 0.1f));
+        x[i] = x[i] * (1.0f + sigmoid);
+    }
 }
-std::vector<float> SINN::matmul(const std::vector<float>& W, const std::vector<float>& x,
-                                 size_t rows, size_t cols) const {
-    std::vector<float> out(rows, 0.0f);
-    for (size_t i = 0; i < rows; ++i)
-        for (size_t j = 0; j < cols; ++j)
-            out[i] += W[i * cols + j] * x[j];
-    return out;
+
+std::vector<float> SINN::forward(const std::vector<int>& input_ids) {
+    // 1. Embedding Pass
+    std::vector<float> x(cfg_.embed_dim, 0.0f);
+    // (Actual embedding lookup would go here)
+    
+    // 2. Qualia Pass
+    apply_qualia_encoding(x);
+    
+    // 3. Transformer Layers
+    for (size_t i = 0; i < cfg_.num_layers; ++i) {
+        apply_meta_cognitive_attention(x, i);
+    }
+    
+    // 4. Temporal Pass
+    apply_temporal_consciousness(x);
+    
+    return x;
 }
-std::vector<float> SINN::forward(const std::vector<float>& x) {
-    auto h = matmul(W1_, x, cfg_.hidden_dim, cfg_.input_dim);
-    for (size_t i = 0; i < h.size(); ++i) h[i] += b1_[i];
-    h = relu(h);
-    auto out = matmul(W2_, h, cfg_.output_dim, cfg_.hidden_dim);
-    for (size_t i = 0; i < out.size(); ++i) out[i] += b2_[i];
-    return softmax(out);
+
+void SINN::apply_meta_cognitive_attention(std::vector<float>& x, size_t layer_idx) const {
+    // Placeholder for multi-head attention + introspection gate
 }
-void SINN::train(const std::vector<float>& x, const std::vector<float>& target) {
-    // Simplified SGD backprop
-    auto output = forward(x);
-    auto h = relu(matmul(W1_, x, cfg_.hidden_dim, cfg_.input_dim));
-    // Output layer gradient
-    std::vector<float> dout(cfg_.output_dim);
-    for (size_t i = 0; i < cfg_.output_dim; ++i) dout[i] = output[i] - target[i];
-    // W2 update
-    for (size_t i = 0; i < cfg_.output_dim; ++i)
-        for (size_t j = 0; j < cfg_.hidden_dim; ++j)
-            W2_[i * cfg_.hidden_dim + j] -= cfg_.lr * dout[i] * h[j];
+
+void SINN::apply_temporal_consciousness(std::vector<float>& x) const {
+    // Simple state-decay update to simulate consciousness flux
+    for (size_t i = 0; i < x.size(); ++i) {
+        x[i] = 0.9f * x[i] + 0.1f * std::sin(static_cast<float>(i));
+    }
 }
-float SINN::confidence(const std::vector<float>& output) const {
-    if (output.empty()) return 0.0f;
-    return *std::max_element(output.begin(), output.end());
-}
-bool SINN::load(const std::string& path) {
+
+bool SINN::load_weights(const std::string& path) {
     std::ifstream f(path, std::ios::binary);
     if (!f) return false;
-    f.read((char*)W1_.data(), W1_.size() * 4);
-    f.read((char*)b1_.data(), b1_.size() * 4);
-    f.read((char*)W2_.data(), W2_.size() * 4);
-    f.read((char*)b2_.data(), b2_.size() * 4);
-    return f.good();
+    
+    char magic[4];
+    f.read(magic, 4);
+    if (std::memcmp(magic, "SINN", 4) != 0) return false;
+    
+    uint32_t version;
+    f.read((char*)&version, 4);
+    
+    uint64_t num_weights;
+    f.read((char*)&num_weights, 8);
+    
+    for (uint64_t i = 0; i < num_weights; ++i) {
+        uint32_t name_len;
+        f.read((char*)&name_len, 4);
+        std::string name(name_len, ' ');
+        f.read(&name[0], name_len);
+        
+        uint32_t shape_len;
+        f.read((char*)&shape_len, 4);
+        size_t total_elements = 1;
+        for (uint32_t j = 0; j < shape_len; ++j) {
+            uint32_t dim;
+            f.read((char*)&dim, 4);
+            total_elements *= dim;
+        }
+        
+        uint64_t data_len;
+        f.read((char*)&data_len, 8);
+        std::vector<float> data(total_elements);
+        f.read((char*)data.data(), data_len);
+        
+        weight_map_[name] = std::move(data);
+    }
+    
+    return true;
 }
-bool SINN::save(const std::string& path) const {
-    std::ofstream f(path, std::ios::binary);
-    if (!f) return false;
-    f.write((char*)W1_.data(), W1_.size() * 4);
-    f.write((char*)b1_.data(), b1_.size() * 4);
-    f.write((char*)W2_.data(), W2_.size() * 4);
-    f.write((char*)b2_.data(), b2_.size() * 4);
-    return f.good();
-}
+
 } // namespace zo

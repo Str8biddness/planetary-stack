@@ -3,7 +3,6 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <random>
-#include <algorithm>
 namespace zo {
 Plan Planner::astar(const std::string& start, const std::string& goal,
                     TransitionFn transitions, HeuristicFn heuristic, size_t max_nodes) const {

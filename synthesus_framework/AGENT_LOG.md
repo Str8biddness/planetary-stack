@@ -883,70 +883,88 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 - Attack trees are high-fidelity JSON descriptions of attack paths, NOT functional exploit code.
 - Memory scanning signatures are extensible; new CVE patterns can be added via `add_signature()`.
 
-
-## Current Session — 2026-05-16 (Character Refinement & Bug Fix)
+## Current Session — 2026-05-23 (Hardware Profile Pybind Exposure)
 
 ### Summary
-- Refined the **Gemini CLI** character persona from a generic scholar placeholder to a high-fidelity engineering agent.
-- Updated `bio.json`, `personality.json`, `patterns.json`, and `knowledge.json` for Gemini CLI.
-- Fixed a critical `NameError` in `core/emulation_tool.py` where `self` was used at the class level instead of inside `__init__`.
-- Rebuilt the character registry via `validate_character.py --all --fix-registry`.
-- Verified character intelligence through a smoke test script covering patterns, personality, and knowledge graph retrieval.
+- Exposed EmulEngineering host hardware profile data through `_synthesus_kernel`.
+- Bound `HostHardwareMap`, `CpuProfile`, and `MemoryProfile` in `kernel/pybind_module.cpp`.
+- Added `EmulEngine.get_host_map()` to the Python binding.
+- Added and populated `cpu.cores` in the hardware profiler so Python callers can read `host.cpu.cores` alongside `host.cpu.model`, `host.cpu.features`, `host.memory.total_ram_mb`, and `host.accelerators`.
 
 ### Verified
-- `characters/gemini_cli/bio.json`, `patterns.json`, `personality.json`, `knowledge.json`
-- `core/emulation_tool.py` (Compiles and initializes correctly)
-- `registry.json` updated with `gemini_cli` at `hemisphere_id: 9`
-- Character validation pass: `python validate_character.py Synthesus_4.0/synthesus_framework/characters/gemini_cli` -> ✅ VALID
+- `cmake --build build --target _synthesus_kernel -j2` completed successfully.
+- Python smoke test with `python3` imported `build/_synthesus_kernel`, initialized `EmulEngine`, called `get_host_map()`, and verified nested CPU, memory, and accelerator attributes are accessible.
+- Build still emits an existing unrelated ODR warning for duplicate `ContextEntry` definitions in `memory/working_memory.hpp` and `core/context_memory.hpp`.
 
-### Left Off
-- Some characters like `breach`, `deepseek_coder`, and `gpt4_architect` still have incomplete genomes (missing patterns/personality/knowledge).
-- The `PatternEngine` semantic matching could be further tuned to prevent pattern-bloat from overshadowing high-value Knowledge Graph entities.
+### Left Off / Next Steps
+- No follow-up required for the hardware profile binding.
+- Future cleanup could address the unrelated `ContextEntry` ODR warning.
 
-### Recommended Next Steps
-1. Complete the adversarial genome for the **Breach** character to enable full red-team simulations.
-2. Expand the `PatternEngine` to better prioritize `KnowledgeGraph` nodes when specific entities are detected in the query.
-3. Address the remaining character validation errors for `haven`, `lexis`, and `synth` regarding pattern ID formats and domain mismatches.
+### Architectural Notes
+- The C++ structs remain `CPUInfo` and `MemoryInfo`; the pybind surface exposes them as `CpuProfile` and `MemoryProfile` to match the requested Python API.
+
+## Current Session — 2026-05-23 (Virtual Parameter Device)
+
+### Summary
+- Implemented `synthesus::kernel::vmm::VirtualParameterDevice` as an MMIO-backed C++ device for treating Knowledge Cloud parameters as virtual hardware.
+- Added a generic `MMIODevice` interface and dispatch path in `kernel/vmm/vmm.cpp` so `KVM_EXIT_MMIO` can be serviced by registered virtual devices.
+- Updated `EmulEngine` to recognize `parameter` / `param` / `vpd` targets, fetch bytes through a parameter lookup callback, map them into VPD, and register the device before VMM execution.
+- Exposed `set_parameter_lookup`, `map_parameter`, and `mapped_parameter_count` through `_synthesus_kernel`.
+- Extended `kernel/hardware_cloud_bridge.py` so the existing bridge attaches both blueprint lookup and Knowledge/Parameter Cloud byte lookup for VPD.
+- Documented the VPD register map and the recommended PPBRS/MMIO access pattern in `docs/VIRTUAL_PARAMETER_DEVICE.md`.
+
+### Verified
+- `cmake --build build --target test_emul _synthesus_kernel -j2` completed successfully.
+- `python3 -m py_compile kernel/hardware_cloud_bridge.py` completed successfully.
+- VPD pybind smoke test mapped one byte payload through `set_parameter_lookup`.
+- Build still emits the existing unrelated ODR warning for duplicate `ContextEntry` definitions in `memory/working_memory.hpp` and `core/context_memory.hpp`.
 
 ### Notes
-- The Gemini CLI persona now responds with technical authority and uses a non-generic fallback module for unknown queries.
-- `EmulationTool` now correctly supports Docker-based sandboxing when available, with a clean simulation fallback.
+- The VPD MMIO window defaults to `0xF0000000` with a `VPD1` magic register at offset `0x00`.
+- Reasoning modules should consume parameters through an optional adapter so existing non-VPD scoring paths remain source-compatible.
 
-## Generative Transition — 2026-05-16
-
-### Summary
-- Transitioned **all characters** from templated responses to a generative dual-hemisphere reasoning model.
-- Refactored `CognitiveEngine` to pipe `KnowledgeGraph` and `PersonalityBank` lookups into the `PatternEngine` for dynamic synthesis.
-- Eliminated early-exit paths for static pattern templates by increasing the `match_score` threshold to 1.1.
-- Characters now blend factual knowledge with their unique voice patterns via Markov-based synthesis, ensuring every response is unique and "Real AI".
-- Verified the transition with a mock KAL integration test, confirming that characters now generate language rather than filling templates.
-
-### Verified
-- `cognitive/cognitive_engine.py`: `knowledge_graph_synthesized` and `personality_bank_synthesized` paths active.
-- `patterns_gen.synthesize_knowledge` is now the primary output module for cognitive reasoning.
-- Threshold `1.1` successfully bypasses Left Hemisphere static templates.
-
-### Recommended Next Steps
-- Fine-tune the `PatternEngine` order and temperature to improve the coherence of synthesized responses.
-- Implement a "Hybrid Synthesis" mode that can selectively use templates for critical identity prompts while remaining generative for lore and technical queries.
-
-## Google Drive Parameter Cloud — 2026-05-16
+## Current Session — 2026-05-23 (VPD Hex-View Dump)
 
 ### Summary
-- Integrated **Google Drive** as a persistent storage backend for the Parameter Cloud.
-- Implemented a **Hybrid Cache & Sync** architecture: real-time updates happen locally in PostgreSQL, with periodic background synchronization to Drive.
-- Added `cloud/drive_backend.py` to handle Google Drive API interactions (Folder ID: `1_fCFGR34kZEbCPSd2ojiKX0s_ongOta4`).
-- Added `DriveSyncWorker` to `api/parameter_cloud_v2.py` for batch shard synchronization.
-- Created `docs/drive_setup_guide.md` and `scripts/auth_gdrive.py` to facilitate OAuth 2.0 authorization.
-- New endpoints: `POST /parameter-cloud/v2/sync` and `GET /parameter-cloud/v2/sync-status`.
+- Added `VirtualParameterDevice::dump()` to snapshot the VPD MMIO base, register block, and selected parameter byte window.
+- Exposed `EmulEngine.dump_vpd()` through `_synthesus_kernel` as a JSON-ready Python dict with integer values and hex mirrors for registers and byte data.
+- Added `GET /api/kernel/vpd/dump` to `api/aios_server.py`.
+- Documented the proposed VPD Hex-View JSON schema in `docs/VIRTUAL_PARAMETER_DEVICE.md`.
 
 ### Verified
-- Dependencies installed: `google-api-python-client`, `google-auth-httplib2`, `google-auth-oauthlib`.
-- `api/parameter_cloud_v2.py` compiles and includes sync logic.
+- `cmake --build build --target _synthesus_kernel test_emul -j2` completed successfully.
+- `python3 -m py_compile api/aios_server.py` completed successfully.
+- Python smoke test imported `build/_synthesus_kernel`, mapped a byte payload through `set_parameter_lookup`, and verified `dump_vpd()` register and selected-byte fields.
 
-### Left Off
-- User needs to follow `docs/drive_setup_guide.md` to provide `credentials.json` and perform the initial one-time authorization.
+### Notes
+- FastAPI route import smoke testing could not run in this environment because `fastapi` is not installed.
+- Build still emits the existing unrelated `ContextEntry` ODR warning from `memory/working_memory.hpp` and `core/context_memory.hpp`.
 
-### Recommended Next Steps
-1. Guide the user through the authorization process once they have their `credentials.json`.
-2. Implement automated bootstrap logic that downloads shards from Drive if the local DB is empty.
+## Current Session — 2026-05-23 (KVM Guest Serial Console)
+
+### Summary
+- Added `synthesus::kernel::vmm::SerialConsole` for COM1 (`0x3F8`) I/O port exits with a minimal 16550-compatible register surface.
+- Routed `KVM_EXIT_IO` for COM1 through the serial console while preserving existing diagnostic logging for other I/O ports.
+- Added thread-safe `read_output()` and `write_input()` methods so Python can drain guest serial output and enqueue input.
+- Exposed `SerialConsole`, `EmulEngine.serial_console`, `EmulEngine.read_console_output()`, and `EmulEngine.write_console_input()` through `_synthesus_kernel`.
+- Released the GIL around `EmulEngine.run_abstraction()` so Python can run the VMM in a background thread and interact with the console from another thread.
+- Updated the VMM test payload to emit `OK\n` through COM1 and print drained guest console output after a successful run.
+
+### Verified
+- `cmake --build build --target test_vmm _synthesus_kernel -j2` completed successfully.
+- Python smoke test imported `build/_synthesus_kernel`, instantiated `SerialConsole`, and verified the `EmulEngine` console binding surface.
+- Runtime `./build/test_vmm build/test_payload.bin` could not enter KVM in this environment because `/dev/kvm` permissions are unavailable.
+- Build still emits the existing unrelated `ContextEntry` ODR warning from `memory/working_memory.hpp` and `core/context_memory.hpp`.
+
+## Current Session — 2026-05-23 (EmulEngine Pybind Surface)
+
+### Summary
+- Updated `kernel/pybind_module.cpp` so `_synthesus_kernel.EmulEngine` exposes the expected blueprint bridge methods: `set_blueprint_lookup`, `clear_blueprint_lookup`, `set_blueprint_top_k`, `get_blueprint_top_k`, and `query_blueprints`.
+- Exposed the VPD parameter bridge methods `clear_parameter_lookup`, `map_parameter`, and `mapped_parameter_count` alongside the existing `set_parameter_lookup`.
+- Tightened `set_parameter_lookup` callback conversion so Python callbacks can return `bytes`, `bytearray`, or a sequence of byte values without corrupting binary data.
+- Added `EmulEngine::decrypt_ipc()` as a C++ alias for `decrypt_secure()` and routed the pybind `decrypt_ipc` binding through it.
+
+### Verified
+- `cmake --build build --target _synthesus_kernel -j2` completed successfully.
+- Python smoke test imported `build/_synthesus_kernel` and verified blueprint lookup, parameter mapping/count, `set_secure_key`, and `decrypt_ipc`.
+- Build still emits the existing unrelated `ContextEntry` ODR warning from `memory/working_memory.hpp` and `core/context_memory.hpp`.

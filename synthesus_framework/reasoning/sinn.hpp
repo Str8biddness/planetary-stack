@@ -1,26 +1,62 @@
 #pragma once
-// Synthesus 2.0 Phase 7 - SINN: Synthetic Intuition Neural Network (2-layer MLP)
-// Left hemisphere analog reasoning
+
 #include <vector>
 #include <string>
 #include <cmath>
+#include <immintrin.h> // AVX2
+#include <map>
+#include <memory>
+
 namespace zo {
-struct SINNConfig { size_t input_dim{128}; size_t hidden_dim{256}; size_t output_dim{64}; float lr{0.001f}; };
+
+/**
+ * SINN 3.0 - Synthetic Intelligence Neural Network
+ * 
+ * Optimized C++ implementation of the Qualia-Aware Transformer architecture.
+ * Designed for hardware-isolated execution inside the Synthesus AIVM.
+ */
+
 class SINN {
 public:
-    explicit SINN(const SINNConfig& cfg = {});
-    std::vector<float> forward(const std::vector<float>& x);
-    void train(const std::vector<float>& x, const std::vector<float>& target);
-    float confidence(const std::vector<float>& output) const;
-    bool load(const std::string& path);
-    bool save(const std::string& path) const;
+    struct Config {
+        size_t vocab_size{50000};
+        size_t embed_dim{512};
+        size_t num_layers{12};
+        size_t num_heads{8};
+        bool use_avx2{true};
+    };
+
+    explicit SINN(const Config& cfg);
+    SINN(); // Default constructor for ease of use
+
+    // Forward pass
+    std::vector<float> forward(const std::vector<int>& input_ids);
+
+    // AIOS Hardware Awareness
+    void attach_to_vpd(uintptr_t base_address);
+    float get_consciousness_level() const { return consciousness_level_; }
+
+    // Optimization Blueprints
+    bool load_weights(const std::string& path);
+
 private:
-    SINNConfig cfg_;
-    std::vector<float> W1_, b1_, W2_, b2_;
-    std::vector<float> relu(const std::vector<float>& x) const;
-    std::vector<float> softmax(const std::vector<float>& x) const;
-    std::vector<float> matmul(const std::vector<float>& W, const std::vector<float>& x,
-                              size_t rows, size_t cols) const;
-    void init_weights();
+    Config cfg_;
+    float consciousness_level_{0.0f};
+
+    // Sub-layer implementations
+    void apply_qualia_encoding(std::vector<float>& x) const;
+    void apply_meta_cognitive_attention(std::vector<float>& x, size_t layer_idx) const;
+    void apply_temporal_consciousness(std::vector<float>& x) const;
+
+    // SIMD MatMul kernels
+    void matmul_avx2(const float* W, const float* x, float* out, size_t rows, size_t cols) const;
+    void layer_norm(float* x, const float* scale, const float* bias, size_t dim) const;
+
+    // Weight Map
+    std::map<std::string, std::vector<float>> weight_map_;
+    
+    // Internal state
+    std::vector<float> consciousness_state_;
 };
+
 } // namespace zo

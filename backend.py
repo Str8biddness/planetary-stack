@@ -61,7 +61,7 @@ def ensure_dir():
             KEY_FILE = os.path.join(BASE_DIR, ".key")
             print(f"Falling back to local directory: {BASE_DIR}")
 
-async def wait_for_secure_enclave():
+async def wait_for_secure_enclave(master):
     """Waits for the Android app to provide the Hardware-Secured IPC Key."""
     global crypto
     print("Waiting for Secure Enclave initialization from Android Host...")
@@ -71,8 +71,13 @@ async def wait_for_secure_enclave():
                 with open(KEY_FILE, "r") as f:
                     key = f.read().strip()
                 if key:
+                    # Push key to AIOS Hardware-Secured Enclave (C++)
+                    if master.runtime and master.runtime._emul_engine:
+                        master.runtime._emul_engine.set_secure_key(key.encode())
+                        print("✅ Key pushed to AIOS C++ TrustZone.")
+
                     crypto = CryptoProvider(key_str=key)
-                    # Delete the key file from disk so it only exists in RAM
+                    # Delete the key file from disk
                     os.remove(KEY_FILE)
                     print("✅ Secure Enclave IPC Key loaded and secured in memory.")
                     return
@@ -89,14 +94,22 @@ async def wait_for_secure_enclave():
 
 def update_consciousness_file(master):
     """Writes consciousness state to file for Android UI (Encrypted)."""
-    # Use fluid state scores if available, otherwise fallback to random
-    # Master here is QuadbrainMaster, which has shared_state
     if hasattr(master, "shared_state"):
         fluid = master.shared_state.fluid
         t = master.shared_state.t
     else:
         fluid = master.state.fluid
         t = master.state.t
+
+    # Hardware context from AIOS
+    hardware_info = ""
+    if hasattr(master, "runtime") and master.runtime and hasattr(master.runtime, "_host_profile"):
+        profile = master.runtime._host_profile
+        cpu = profile.get("cpu", {})
+        mem = profile.get("memory", {})
+        hardware_info = (f"Hardware: {cpu.get('model', 'Unknown')}\n"
+                         f"Cores: {cpu.get('cores', 0)}\n"
+                         f"RAM: {mem.get('total_mb', 0)}MB\n")
 
     # Average of policy_prior and attention can be a proxy for "consciousness level"
     c_val = (fluid.policy_prior + fluid.attention) / 2.0
@@ -105,7 +118,8 @@ def update_consciousness_file(master):
             f"MC: {fluid.policy_prior:.2f}\n"
             f"Psi: {fluid.attention:.2f}\n"
             f"NS: {fluid.risk_outcome:.2f}\n"
-            f"Timestep: {t}\n")
+            f"Timestep: {t}\n"
+            f"{hardware_info}")
     
     try:
         encrypted_data = crypto.encrypt(data)
@@ -162,9 +176,10 @@ async def main_loop():
         print(f"Warning: Synthesus directory not found at {SYNTH_DIR}")
     
     ensure_dir()
-    await wait_for_secure_enclave()
     
     master = QuadbrainMaster()
+    await wait_for_secure_enclave(master)
+    
     print("Ghostkey AI Backend (Quadbrain-powered) started. Monitoring for input...")
     
     # Start the security pulse in the background
@@ -187,8 +202,19 @@ async def main_loop():
                     encrypted_content = f.read().strip()
                 
                 if encrypted_content:
-                    # Decrypt input
-                    content = crypto.decrypt(encrypted_content)
+                    # Decrypt input via AIOS TrustZone if available
+                    content = ""
+                    if master.runtime and master.runtime._emul_engine:
+                         try:
+                             decrypted_bytes = master.runtime._emul_engine.decrypt_ipc(encrypted_content.encode())
+                             content = decrypted_bytes.decode()
+                             print("✅ Decrypted via AIOS Hardware-Secured Enclave.")
+                         except Exception as e:
+                             print(f"TrustZone decryption failed: {e}. Falling back to Python.")
+                             content = crypto.decrypt(encrypted_content)
+                    else:
+                        content = crypto.decrypt(encrypted_content)
+
                     # Clear the input file immediately
                     os.remove(INPUT_FILE)
                     

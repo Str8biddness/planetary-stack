@@ -23,6 +23,16 @@ class FluidState:
     risk_outcome: float = 0.1
     attention: float = 0.5
     current_domain: str = "sysops"
+    
+    # Transformer attention fields (from ConsciousLlmAi integration)
+    attention_maps: List[Any] = field(default_factory=list)
+    transformer_output: Optional[Any] = None
+    attention_focus_tokens: List[int] = field(default_factory=list)
+    attention_entropy: float = 0.0
+    pattern_confidence: float = 0.0
+    
+    # AIOS hardware sensory events
+    hardware_events: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self):
         return {
@@ -33,7 +43,10 @@ class FluidState:
             "active_patterns": self.active_patterns,
             "working_memory": self.working_memory,
             "active_hypotheses": self.active_hypotheses,
-            "belief_scores": self.belief_scores
+            "belief_scores": self.belief_scores,
+            "attention_entropy": self.attention_entropy,
+            "pattern_confidence": self.pattern_confidence,
+            "hardware_events": self.hardware_events,
         }
 
 
@@ -49,6 +62,9 @@ class CrystallizedState:
     })
     skills: Dict[str, Any] = field(default_factory=dict)
     
+    # AIOS host profile (hardware awareness)
+    host_profile: Dict[str, Any] = field(default_factory=dict)
+    
     # Legacy fields
     facts: Dict[str, bool] = field(default_factory=dict)
     candidate_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
@@ -60,7 +76,8 @@ class CrystallizedState:
             "semantic_knowledge_refs": self.semantic_knowledge_refs,
             "graph_context": self.graph_context,
             "skills": self.skills,
-            "facts": self.facts
+            "facts": self.facts,
+            "host_profile": self.host_profile,
         }
 
 

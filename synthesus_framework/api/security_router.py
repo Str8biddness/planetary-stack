@@ -9,7 +9,7 @@ Mount this router in production_server.py:
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks  # type: ignore
 from api.security_schemas import (  # type: ignore

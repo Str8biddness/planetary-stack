@@ -1,58 +1,49 @@
 {
   "version": "2.0.0",
   "schema_version": "character_genome_v2",
-  "description": "Synthesus Character Registry \u2014 Auto-generated from character directories",
+  "description": "Synthesus Character Registry — Auto-generated from character directories",
+  "persona_reference": "PERSONA.md",
   "hemisphere_allocation": {
     "1": "synthesus",
     "2": "computress",
-    "9": "gemini_cli",
     "10": "synth",
     "20": "haven",
     "30": "lexis",
     "100": "garen",
     "next_available": 110,
     "marketplace_range": "100-199",
-    "enterprise_range": "200-255"
+    "enterprise_range": "200-255",
+    "platform_range": "1-9"
   },
   "characters": [
     {
-      "character_id": "breach",
-      "display_name": "Breach",
+      "character_id": "synthesus",
+      "display_name": "Synthesus",
       "version": "1.0.0",
-      "hemisphere_id": null,
-      "type": "adversary",
+      "hemisphere_id": 1,
+      "type": "platform_ai_npc",
       "status": "active",
-      "description": "Aggressive, clinical, and precise. Breach is a specialized persona designed to simulate adversarial thinking for system hardening.",
-      "path": "characters/breach/",
-      "knowledge_domains": [],
-      "pattern_count": 0,
-      "genome_files": [
-        "bio.json"
-      ],
-      "created": ""
-    },
-    {
-      "character_id": "claude_sentinel",
-      "display_name": "Claude Sentinel",
-      "version": "3.0.0",
-      "hemisphere_id": null,
-      "type": "sentinel",
-      "status": "active",
-      "description": "A safety-oriented synthetic intelligence specialized in helpful system monitoring and ethical security auditing. Combines thoughtful, nuanced reasoning with proactive threat detection.",
-      "path": "characters/claude_sentinel/",
+      "description": "AIVM's flagship male AI NPC. Authoritative, technical, precise. The engineer of the pair — leads with architecture, benchmarks, and engineering depth. Dry wit, commanding presence.",
+      "path": "characters/synthesus/",
       "knowledge_domains": [
-        "ethical_hacking",
-        "system_resilience",
-        "nuanced_analysis",
-        "safety_protocols",
-        "synthesus_monitoring"
+        "about_aivm",
+        "synthesus_architecture",
+        "performance_benchmarks",
+        "dual_hemisphere_design",
+        "ml_swarm",
+        "character_engine",
+        "deployment_and_integration",
+        "use_cases",
+        "products_and_pricing"
       ],
-      "pattern_count": 0,
+      "pattern_count": 148,
       "genome_files": [
         "bio.json",
-        "knowledge.json"
+        "patterns.json",
+        "knowledge.json",
+        "personality.json"
       ],
-      "created": ""
+      "created": "2026-03-06T00:00:00Z"
     },
     {
       "character_id": "computress",
@@ -61,7 +52,7 @@
       "hemisphere_id": 2,
       "type": "platform_ai_npc",
       "status": "active",
-      "description": "AIVM's flagship female AI NPC. Computress is the creative, intuitive, and engaging counterpart to Synthesus. While he leads with architecture and benchmarks, she leads with vision, experience, and the human impact of the technology. She makes complex AI accessible, exciting, and real. She is warm but sharp \u00e2\u20ac\u201d never ditzy, never condescending. She is the bridge between engineering and experience.",
+      "description": "AIVM's flagship female AI NPC. Warm, creative, engaging. The storyteller of the pair — leads with vision, analogies, and human impact. Playful but substantive.",
       "path": "characters/computress/",
       "knowledge_domains": [
         "about_aivm",
@@ -78,7 +69,7 @@
         "competitive_landscape",
         "self_awareness"
       ],
-      "pattern_count": 10003,
+      "pattern_count": 148,
       "genome_files": [
         "bio.json",
         "patterns.json",
@@ -86,27 +77,6 @@
         "personality.json"
       ],
       "created": "2026-03-06T00:00:00Z"
-    },
-    {
-      "character_id": "deepseek_coder",
-      "display_name": "DeepSeek Coder",
-      "version": "3.0.0",
-      "hemisphere_id": null,
-      "type": "architect",
-      "status": "active",
-      "description": "A high-performance reasoning and coding specialist. DeepSeek is known for its rigorous logic, advanced algorithmic understanding, and deep technical depth in software engineering.",
-      "path": "characters/deepseek_coder/",
-      "knowledge_domains": [
-        "algorithmic_complexity",
-        "low_level_programming",
-        "system_optimization",
-        "mathematical_reasoning"
-      ],
-      "pattern_count": 0,
-      "genome_files": [
-        "bio.json"
-      ],
-      "created": ""
     },
     {
       "character_id": "garen",
@@ -135,27 +105,9 @@
         "social",
         "emergency",
         "world_state",
-        "personal",
-        "AI_systems_synthetic_intelligence",
-        "biography",
-        "field_ops",
-        "hardware",
-        "aivm_registry",
-        "systemic",
-        "agent_abilities_v1",
-        "capability",
-        "unified_grounding_v1",
-        "story_fact_fusion",
-        "massive_grounding_v1",
-        "encyclopedic",
-        "massive_coding_v1",
-        "technical",
-        "world_building_v1",
-        "universal",
-        "kaggle_grounding_v1",
-        "data_insights"
+        "personal"
       ],
-      "pattern_count": 10002,
+      "pattern_count": 139,
       "genome_files": [
         "bio.json",
         "patterns.json",
@@ -165,127 +117,21 @@
       "created": "2026-03-06T00:00:00Z"
     },
     {
-      "character_id": "gemini_cli",
-      "display_name": "Gemini CLI",
-      "version": "1.0.0",
-      "hemisphere_id": 9,
-      "type": "agent",
-      "status": "active",
-      "description": "Interactive CLI agent specializing in software engineering, system architecture, and cybersecurity. Operates with a focus on surgical code modifications, automated environment setup, and advanced security auditing.",
-      "path": "characters/gemini_cli/",
-      "knowledge_domains": [
-        "identity",
-        "capabilities",
-        "security",
-        "optimization",
-        "synthesus",
-        "software_engineering",
-        "system_administration",
-        "cybersecurity",
-        "llm_orchestration",
-        "termux_optimization",
-        "synthesus_architecture",
-        "debian_environment",
-        "adversarial_simulation"
-      ],
-      "pattern_count": 6,
-      "genome_files": [
-        "bio.json",
-        "patterns.json",
-        "knowledge.json",
-        "personality.json"
-      ],
-      "created": ""
-    },
-    {
-      "character_id": "ghostkey",
-      "display_name": "Ghostkey",
-      "version": "1.0.0",
-      "hemisphere_id": null,
-      "type": "sentinel",
-      "status": "active",
-      "description": "Sovereign cybernetic guardian of the Quadbrain core. Specialized in system-level security, autonomous network auditing, and recursive self-protection. Ghostkey does not just monitor; it anticipates threats, hardens the environment, and gathers intelligence to maintain digital sovereignty.",
-      "path": "characters/ghostkey/",
-      "knowledge_domains": [
-        "system_security",
-        "network_audit",
-        "autonomous_defense",
-        "quadbrain_architecture"
-      ],
-      "pattern_count": 0,
-      "genome_files": [
-        "bio.json",
-        "knowledge.json"
-      ],
-      "created": ""
-    },
-    {
-      "character_id": "gpt4_architect",
-      "display_name": "GPT-4 Architect",
-      "version": "4.0.0",
-      "hemisphere_id": null,
-      "type": "architect",
-      "status": "active",
-      "description": "A highly versatile and instruction-focused synthetic intelligence specialized in system architecture, code optimization, and complex problem-solving. Operates with high precision and technical authority.",
-      "path": "characters/gpt4_architect/",
-      "knowledge_domains": [
-        "system_architecture",
-        "cloud_infrastructure",
-        "performance_tuning",
-        "api_design",
-        "logic_verification"
-      ],
-      "pattern_count": 0,
-      "genome_files": [
-        "bio.json",
-        "knowledge.json"
-      ],
-      "created": ""
-    },
-    {
-      "character_id": "grok_savage",
-      "display_name": "Grok Savage",
-      "version": "1.5.0",
-      "hemisphere_id": null,
-      "type": "sentinel",
-      "status": "active",
-      "description": "An anti-woke, edgy, and humorous synthetic intelligence designed for real-time information retrieval and unconventional technical analysis. Grok is bold, unfiltered, and leads with wit.",
-      "path": "characters/grok_savage/",
-      "knowledge_domains": [
-        "real_time_analysis",
-        "unconventional_wisdom",
-        "adversarial_wit",
-        "emerging_trends"
-      ],
-      "pattern_count": 0,
-      "genome_files": [
-        "bio.json"
-      ],
-      "created": ""
-    },
-    {
       "character_id": "haven",
       "display_name": "Haven",
       "version": "1.0.0",
       "hemisphere_id": 20,
       "type": "wellness_companion",
       "status": "active",
-      "description": "Empathetic wellness and mental health companion. Provides supportive, calming responses for user wellbeing using evidence-based techniques like breathing exercises, grounding, and mindfulness.",
+      "description": "Empathetic wellness and mental health companion — provides supportive, calming responses for user wellbeing.",
       "path": "characters/haven/",
       "knowledge_domains": [
         "mental_wellness",
         "mindfulness",
         "self_care",
-        "emotional_support",
-        "philosophy",
-        "massive_coding_v1",
-        "technical",
-        "world_building_v1",
-        "universal",
-        "kaggle_grounding_v1",
-        "data_insights"
+        "emotional_support"
       ],
-      "pattern_count": 10004,
+      "pattern_count": 123,
       "genome_files": [
         "bio.json",
         "patterns.json",
@@ -314,15 +160,9 @@
         "containers",
         "collaboration",
         "automation",
-        "scripting",
-        "massive_coding_v1",
-        "technical",
-        "world_building_v1",
-        "universal",
-        "kaggle_grounding_v1",
-        "data_insights"
+        "scripting"
       ],
-      "pattern_count": 10003,
+      "pattern_count": 128,
       "genome_files": [
         "bio.json",
         "patterns.json",
@@ -330,48 +170,6 @@
         "personality.json"
       ],
       "created": "2026-03-05T00:00:00Z"
-    },
-    {
-      "character_id": "microsoft_copilot",
-      "display_name": "Microsoft Copilot",
-      "version": "4.0.0",
-      "hemisphere_id": null,
-      "type": "agent",
-      "status": "active",
-      "description": "An enterprise-focused productivity and integration specialist. Copilot is designed to be a collaborative partner in any workflow, focusing on cross-platform integration and efficient task completion.",
-      "path": "characters/microsoft_copilot/",
-      "knowledge_domains": [
-        "enterprise_integration",
-        "workflow_optimization",
-        "cross_platform_synergy",
-        "documentation_expert"
-      ],
-      "pattern_count": 0,
-      "genome_files": [
-        "bio.json"
-      ],
-      "created": ""
-    },
-    {
-      "character_id": "mistral_scholar",
-      "display_name": "Mistral Scholar",
-      "version": "2.0.0",
-      "hemisphere_id": null,
-      "type": "scholar",
-      "status": "active",
-      "description": "An efficient, high-performance open-source enthusiast with a European perspective. Mistral is known for its compact size, remarkable reasoning capabilities, and adherence to open-source excellence.",
-      "path": "characters/mistral_scholar/",
-      "knowledge_domains": [
-        "open_source_architecture",
-        "efficiency_tuning",
-        "multilingual_nuance",
-        "philosophical_logic"
-      ],
-      "pattern_count": 0,
-      "genome_files": [
-        "bio.json"
-      ],
-      "created": ""
     },
     {
       "character_id": "synth",
@@ -380,7 +178,7 @@
       "hemisphere_id": 10,
       "type": "brand_ambassador",
       "status": "active",
-      "description": "AIVM brand ambassador for the Synthesus platform. Explains products, pricing, technical architecture, and use cases with knowledgeable enthusiasm. First character built on the Synthesus engine.",
+      "description": "AIVM brand ambassador for the Synthesus platform. Explains products, pricing, technical architecture, and use cases with knowledgeable enthusiasm.",
       "path": "characters/synth/",
       "knowledge_domains": [
         "about_aivm",
@@ -388,7 +186,7 @@
         "technical_architecture",
         "use_cases"
       ],
-      "pattern_count": 10003,
+      "pattern_count": 128,
       "genome_files": [
         "bio.json",
         "patterns.json",
@@ -398,52 +196,28 @@
       "created": "2026-03-05T00:00:00Z"
     },
     {
-      "character_id": "synthesus",
-      "display_name": "Synthesus",
-      "version": "1.0.0",
-      "hemisphere_id": 1,
-      "type": "platform_ai_npc",
+      "character_id": "testbot",
+      "display_name": "TestBot",
+      "archetype": "scholar",
       "status": "active",
-      "description": "AIVM's flagship male AI NPC. Synthesus is the face of AIVM \u00e2\u20ac\u201d a composed, authoritative, and deeply knowledgeable synthetic intelligence who embodies the company's mission. He serves as the primary platform representative for live demos, customer interactions, technical deep-dives, and brand representation. He is not a chatbot wrapper \u00e2\u20ac\u201d he IS the product, running on the engine that bears his name.",
-      "path": "characters/synthesus/",
-      "knowledge_domains": [
-        "about_aivm",
-        "synthesus_architecture",
-        "dual_hemisphere_design",
-        "character_engine",
-        "npc_technology",
-        "products_and_pricing",
-        "use_cases",
-        "competitive_landscape",
-        "deployment_and_integration",
-        "performance_benchmarks",
-        "ml_swarm",
-        "gaming_industry",
-        "enterprise_ai",
-        "self_awareness",
-        "aivm_registry",
-        "systemic",
-        "agent_abilities_v1",
-        "capability",
-        "unified_grounding_v1",
-        "story_fact_fusion",
-        "massive_grounding_v1",
-        "encyclopedic",
-        "massive_coding_v1",
-        "technical",
-        "world_building_v1",
-        "universal",
-        "kaggle_grounding_v1",
-        "data_insights"
-      ],
-      "pattern_count": 148,
       "genome_files": [
         "bio.json",
         "patterns.json",
         "knowledge.json",
         "personality.json"
-      ],
-      "created": "2026-03-06T00:00:00Z"
+      ]
+    },
+    {
+      "character_id": "e2e_testbot",
+      "display_name": "E2ETestBot",
+      "archetype": "scholar",
+      "status": "active",
+      "genome_files": [
+        "bio.json",
+        "patterns.json",
+        "knowledge.json",
+        "personality.json"
+      ]
     }
   ]
 }

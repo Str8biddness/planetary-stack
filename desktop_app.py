@@ -78,6 +78,13 @@ class GhostkeyDesktopApp(ctk.CTk):
         self.psi_bar = self.create_metric_bar("Attention (Psi)", 0.5, "magenta")
         self.ns_bar = self.create_metric_bar("Risk Analysis (NS)", 0.1, "red")
 
+        # Hardware Info Display
+        self.hw_label = ctk.CTkLabel(self.sidebar, text="HARDWARE PROFILE:", font=ctk.CTkFont(size=12))
+        self.hw_label.pack(pady=(20, 5))
+        self.hw_info = ctk.CTkLabel(self.sidebar, text="Sensing...", font=ctk.CTkFont(size=10, family="Consolas"), 
+                                    text_color="gray", justify="left")
+        self.hw_info.pack(padx=20)
+
         self.info_label = ctk.CTkLabel(self.sidebar, text="SYSTEM READY", text_color="green")
         self.info_label.pack(side="bottom", pady=20)
 
@@ -160,6 +167,14 @@ class GhostkeyDesktopApp(ctk.CTk):
                 self.mc_bar.set(getattr(fluid, "policy_prior", 0.5))
                 self.psi_bar.set(getattr(fluid, "attention", 0.5))
                 self.ns_bar.set(getattr(fluid, "risk_outcome", 0.1))
+
+            # Update Hardware Info
+            runtime = getattr(self.master_ai, "runtime", None)
+            if runtime and hasattr(runtime, "_host_profile") and runtime._host_profile:
+                cpu = runtime._host_profile.get("cpu", {})
+                model = cpu.get("model", "Unknown")
+                if len(model) > 25: model = model[:22] + "..."
+                self.hw_info.configure(text=f"CPU: {model}\nCORES: {cpu.get('cores', 0)}\nFEATURES: {', '.join(cpu.get('features', [])[:3])}...")
         except Exception as e:
             print(f"Metrics error: {e}")
             

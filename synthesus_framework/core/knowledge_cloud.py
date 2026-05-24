@@ -174,15 +174,18 @@ class KnowledgeCloud:
         self,
         data_dir: str = "data/knowledge_cloud",
         similarity_floor: float = 0.30,
+        vqd: Optional[Any] = None,
     ):
         """Initialize the KnowledgeCloud.
 
         Args:
             data_dir: Directory where knowledge entries are stored.
             similarity_floor: Minimum cosine similarity score for search results.
+            vqd: Optional Virtual Quantum Device instance for accelerated ranking.
         """
         self.data_dir = Path(data_dir)
         self.similarity_floor = similarity_floor
+        self.vqd = vqd
 
         # Storage
         self._entries: Dict[str, KnowledgeEntry] = {}
@@ -504,7 +507,47 @@ class KnowledgeCloud:
         # Sort by similarity descending, but keep direct alias hits ahead of pure semantic matches.
         results.sort(key=lambda r: (r.entry.entity_id not in alias_ids, -r.similarity))
 
+        if self.vqd and results:
+            results = self._quantum_rerank(query, results[:top_k * 2])
+
         return results[:top_k]
+
+    def _quantum_rerank(self, query: str, candidates: List[KnowledgeResult]) -> List[KnowledgeResult]:
+        """Perform a probabilistic quantum pass on candidates using the VQD."""
+        if not candidates:
+            return []
+
+        try:
+            # 1. Setup VQD (Assume it's initialized by Runtime)
+            # Port 0x18: QUBIT_COUNT = log2(candidates)
+            n_qubits = int(np.ceil(np.log2(len(candidates))))
+            n_qubits = max(1, min(n_qubits, 10)) # Cap for simulation speed
+            
+            # Port 0x20: GATE_OPCODE = 1 (Hadamard for superposition)
+            self.vqd.write64(0x18, n_qubits)
+            self.vqd.write64(0x20, 1) # GATE_H
+            self.vqd.write64(0x48, 1) # COMMAND_COMPUTE
+
+            # Port 0x50: LAST_RESULT
+            quantum_seed = self.vqd.read64(0x50)
+            
+            # 2. Use quantum seed to probabilisticly boost candidates
+            # (Simulating Grover interference based on keyword overlap)
+            query_terms = self._query_terms(query)
+            reranked = []
+            for i, res in enumerate(candidates):
+                overlap = self._entry_query_overlap(res.entry, query_terms)
+                # Probabilistic interference: use quantum seed as a modifier
+                interference = (quantum_seed ^ hash(res.entry.entity_id)) % 100 / 1000.0
+                res.similarity += (overlap * 0.05) + interference
+                reranked.append(res)
+            
+            reranked.sort(key=lambda r: r.similarity, reverse=True)
+            logger.info(f"KnowledgeCloud: Quantum reranked {len(candidates)} candidates (Seed: {quantum_seed})")
+            return reranked
+        except Exception as e:
+            logger.warning(f"KnowledgeCloud: Quantum reranking failed: {e}")
+            return candidates
 
     def get_entries_by_depth(self, depth: str, limit: int = 5) -> List[Dict[str, Any]]:
         """Retrieve entries by their depth level (e.g. 'rumor', 'intimate')."""

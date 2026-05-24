@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(Synthesus VERSION 2.0.0 LANGUAGES CXX)
+project(Synthesus VERSION 3.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -83,8 +83,27 @@ set(CORE_CPP_SOURCES
     core/hemi_reconciler.cpp
 )
 
+set(VMM_SOURCES
+    kernel/vmm/vmm.cpp
+    kernel/vmm/serial_console.cpp
+    kernel/vmm/virtual_parameter_device.cpp
+    kernel/vmm/virtual_quantum_device.cpp
+    kernel/vmm/virtual_gpu_device.cpp
+    kernel/vmm/virtual_network_device.cpp
+    kernel/vmm/virtual_mirror_device.cpp
+    kernel/vmm/virtual_vpu_device.cpp
+    kernel/vmm/virtual_sllm_device.cpp
+)
+
+set(EMUL_SOURCES
+    kernel/emul_engineering/hardware_profiler.cpp
+    kernel/emul_engineering/emul_engine.cpp
+)
+
 set(ALL_CPP_SOURCES
     ${KERNEL_SOURCES}
+    ${VMM_SOURCES}
+    ${EMUL_SOURCES}
     ${REASONING_SOURCES}
     ${MEMORY_SOURCES}
     ${VCU_SOURCES}
@@ -101,9 +120,12 @@ if(BUILD_KERNEL)
     target_include_directories(synthesus_kernel PRIVATE
         ${CMAKE_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/kernel
+        ${CMAKE_SOURCE_DIR}/kernel/vmm
+        ${CMAKE_SOURCE_DIR}/kernel/emul_engineering
         ${CMAKE_SOURCE_DIR}/reasoning
         ${CMAKE_SOURCE_DIR}/memory
         ${CMAKE_SOURCE_DIR}/vcu
+        ${CMAKE_SOURCE_DIR}/core
     )
     target_link_libraries(synthesus_kernel PRIVATE Threads::Threads)
     
@@ -116,6 +138,37 @@ if(BUILD_KERNEL)
         OUTPUT_NAME "zo_kernel"
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
     )
+
+    # --- AIOS VMM Test ---
+    add_executable(test_vmm
+        kernel/vmm/test_vmm.cpp
+        ${VMM_SOURCES}
+    )
+    target_include_directories(test_vmm PRIVATE
+        ${CMAKE_SOURCE_DIR}/kernel/vmm
+    )
+
+    # --- EmulEngineering Test ---
+    add_executable(test_emul
+        kernel/emul_engineering/test_emul.cpp
+        ${EMUL_SOURCES}
+        ${VMM_SOURCES}
+    )
+    target_include_directories(test_emul PRIVATE
+        ${CMAKE_SOURCE_DIR}/kernel/vmm
+        ${CMAKE_SOURCE_DIR}/kernel/emul_engineering
+    )
+
+    # Assemble test payload
+    add_custom_command(
+        OUTPUT ${CMAKE_BINARY_DIR}/test_payload.bin
+        COMMAND as -32 -o ${CMAKE_BINARY_DIR}/test_payload.o ${CMAKE_SOURCE_DIR}/kernel/vmm/test_payload.S
+        COMMAND objcopy -O binary -j .text ${CMAKE_BINARY_DIR}/test_payload.o ${CMAKE_BINARY_DIR}/test_payload.bin
+        DEPENDS ${CMAKE_SOURCE_DIR}/kernel/vmm/test_payload.S
+        COMMENT "Assembling VMM test payload"
+    )
+    add_custom_target(vmm_payload ALL DEPENDS ${CMAKE_BINARY_DIR}/test_payload.bin)
+    add_dependencies(test_vmm vmm_payload)
 endif()
 
 # ── pybind11 Python module ──
@@ -127,9 +180,12 @@ if(BUILD_PYBIND AND pybind11_FOUND)
     target_include_directories(_synthesus_kernel PRIVATE
         ${CMAKE_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/kernel
+        ${CMAKE_SOURCE_DIR}/kernel/vmm
+        ${CMAKE_SOURCE_DIR}/kernel/emul_engineering
         ${CMAKE_SOURCE_DIR}/reasoning
         ${CMAKE_SOURCE_DIR}/memory
         ${CMAKE_SOURCE_DIR}/vcu
+        ${CMAKE_SOURCE_DIR}/core
     )
     target_link_libraries(_synthesus_kernel PRIVATE Threads::Threads)
     
@@ -148,7 +204,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 message(STATUS "")
-message(STATUS "=== Synthesus 2.0 Build Configuration ===")
+message(STATUS "=== Synthesus 3.0 Quadbrain Build Configuration ===")
 message(STATUS "  Build type:    ${CMAKE_BUILD_TYPE}")
 message(STATUS "  C++ standard:  C++${CMAKE_CXX_STANDARD}")
 message(STATUS "  Kernel binary: ${BUILD_KERNEL}")

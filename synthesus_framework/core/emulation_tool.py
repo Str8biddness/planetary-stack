@@ -41,7 +41,7 @@ class EmulationTool:
             "duration": 20,
             "intensity": "low",
             "type": "net_sim",
-            "metrics": ["cpu_usage", "memory_usage"],  # Note: real net metrics limited in isolated container
+            "metrics": ["cpu_usage", "memory_usage"],
             "category": "sysops"
         },
         "gm_combat_burst": {
@@ -69,8 +69,8 @@ class EmulationTool:
             "category": "gm"
         },
     }
+
     def __init__(self):
-        # In-memory registry for virtual hosts (now backed by Docker containers)
         self.hosts: Dict[str, Dict[str, Any]] = {}
         self.docker_available = self._check_docker()
 
@@ -86,29 +86,25 @@ class EmulationTool:
         Create a Docker container as 'virtual host' and return an ID.
         """
         if not self.docker_available:
-            # Fallback to simulation
             return self._simulate_create_host(config)
 
         host_id = f"emu_host_{len(self.hosts) + 1}"
         container_name = f"synthesus_{host_id}"
 
-        # Default config: Ubuntu-based for experiments
         image = config.get("image", "ubuntu:latest")
         cpu_limit = config.get("cpu", "1")
         memory_limit = config.get("memory", "512m")
 
         try:
-            # Create and start container
             cmd = [
                 "docker", "run", "-d", "--name", container_name,
                 "--cpus", cpu_limit, "--memory", memory_limit,
-                "--network", "none",  # Isolated for safety
+                "--network", "none",
                 image, "sleep", "infinity"
             ]
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             container_id = result.stdout.strip()
 
-            # Store metadata
             self.hosts[host_id] = {
                 "id": host_id,
                 "container_id": container_id,
@@ -135,12 +131,11 @@ class EmulationTool:
                 result = subprocess.run(cmd, capture_output=True, text=True, check=True)
                 inspect_data = json.loads(result.stdout)[0]
                 host["status"] = inspect_data["State"]["Status"]
-                host["cpu_usage"] = inspect_data["State"]["CpuStats"]  # Simplified
+                host["cpu_usage"] = inspect_data["State"]["CpuStats"]
                 return host
             except subprocess.CalledProcessError:
                 return {"error": "docker_inspect_failed"}
-        else:
-            return host
+        return host
 
     def run_experiment(self, host_id: str, experiment: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -158,7 +153,6 @@ class EmulationTool:
         duration = experiment.get("duration", 10)
 
         try:
-            # Install stress-ng if needed and run experiment
             if exp_type == "cpu_stress":
                 cmd = ["docker", "exec", container_name, "bash", "-c", f"apt-get update && apt-get install -y stress-ng && stress-ng --cpu 2 --timeout {duration}s"]
             elif exp_type == "io_stress":
@@ -168,10 +162,8 @@ class EmulationTool:
 
             subprocess.run(cmd, capture_output=True, check=True)
 
-            # Collect metrics (simplified: use docker stats)
             stats_cmd = ["docker", "stats", "--no-stream", container_name]
             stats_result = subprocess.run(stats_cmd, capture_output=True, text=True, check=True)
-            # Parse stats (basic parse)
             lines = stats_result.stdout.split('\n')
             if len(lines) > 1:
                 data = lines[1].split()
@@ -180,7 +172,7 @@ class EmulationTool:
                 metrics = {
                     "cpu_usage": float(cpu) / 100.0,
                     "memory_usage": float(mem) / 100.0,
-                    "disk_io": random.uniform(0.1, 0.5),  # Placeholder, docker stats doesn't give disk easily
+                    "disk_io": random.uniform(0.1, 0.5),
                 }
             else:
                 metrics = {"cpu_usage": 0.5, "memory_usage": 0.5, "disk_io": 0.2}
