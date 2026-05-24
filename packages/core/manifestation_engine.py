@@ -128,6 +128,9 @@ class ManifestationEngine:
             ignore=shutil.ignore_patterns("__pycache__", ".git", "build", "data"),
             dirs_exist_ok=True
         )
+        
+        # Ensure 'aivm' and 'packages' are present
+        logger.info("Manifestation: Sycing AIVM packages to /opt/synthesus/framework/packages")
 
     async def _generate_iso(self, volume_id: str) -> Path:
         output_iso = Path.home() / f"{volume_id}_{int(time.time())}.iso"

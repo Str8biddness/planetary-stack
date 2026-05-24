@@ -68,6 +68,7 @@ class SynthRuntime:
         substrate: Optional[UniversalSubstrate] = None,
         left_model: str = "left",
         right_model: str = "right",
+        guest_mode: bool = False,
     ):
         self.data_dir = Path(data_dir) if data_dir else PROJ_ROOT / "data"
         self.characters_dir = Path(characters_dir) if characters_dir else PROJ_ROOT / "characters"
@@ -76,6 +77,7 @@ class SynthRuntime:
 
         self.left_model = left_model
         self.right_model = right_model
+        self.guest_mode = guest_mode
 
         # AIOS Hardware Integration (EmulEngine)
         try:
@@ -95,12 +97,16 @@ class SynthRuntime:
                     logger.warning("VQD initialization failed: %s", q_exc)
                     self._vqd = None
                 
-                # Attach Cloud Ingress (VND) Handler
-                self._scraper = WebScraper()
-                def _handle_vnd_search(query: str):
-                    asyncio.create_task(self._process_vnd_ingress(query))
-                self._emul_engine.set_network_handler(_handle_vnd_search)
-                logger.info("AIOS Cloud Ingress handler attached")
+                # Attach Cloud Ingress (VND) Handler (Disabled in Guest Mode)
+                self._scraper = None
+                if not self.guest_mode:
+                    self._scraper = WebScraper()
+                    def _handle_vnd_search(query: str):
+                        asyncio.create_task(self._process_vnd_ingress(query))
+                    self._emul_engine.set_network_handler(_handle_vnd_search)
+                    logger.info("AIOS Cloud Ingress handler attached")
+                else:
+                    logger.info("AIOS Cloud Ingress DISABLED (Guest Mode)")
 
                 # Attach Mirror Sync (VMD) Handler
                 self._mirror = MirrorSyncBridge()
@@ -110,11 +116,16 @@ class SynthRuntime:
                 self._mirror.set_callback(lambda s, t: self._emul_engine.update_sync_state(s, t))
                 logger.info("AIOS Mirror Sync handler attached")
 
-                # Initialize Manifestation Engine (The Freezer)
-                self._manifestation = ManifestationEngine(
-                    framework_root=Path(__file__).resolve().parent.parent,
-                    iso_root=Path("/home/dakin/customiso")
-                )
+                # Initialize Manifestation Engine (The Freezer) (Disabled in Guest Mode)
+                self._manifestation = None
+                if not self.guest_mode:
+                    self._manifestation = ManifestationEngine(
+                        framework_root=Path(__file__).resolve().parent.parent,
+                        iso_root=Path("/home/dakin/customiso")
+                    )
+                    logger.info("AIOS Manifestation Engine active")
+                else:
+                    logger.info("AIOS Manifestation Engine DISABLED (Guest Mode)")
 
                 # Initialize VPU Swarm Coordinator
                 self._vpu_coordinator = VpuCoordinator(self._emul_engine)
@@ -160,7 +171,8 @@ class SynthRuntime:
         # --- THE SPINE: AIVM Kernel ---
         self._aivm_kernel = AIVMKernel(
             knowledge_cloud=self._knowledge_cloud,
-            memory_store=self._memory_store
+            memory_store=self._memory_store,
+            safe_mode=self.guest_mode # Enforce contract §10 on ISO
         )
 
         self._pattern_engine = PatternEngine(db_path=str(self.data_dir / "patterns.db"))

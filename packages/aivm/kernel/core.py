@@ -26,10 +26,12 @@ class AIVMKernel:
     def __init__(self, 
                  knowledge_cloud: Optional[Any] = None,
                  memory_store: Optional[Any] = None,
-                 enable_scheduler: bool = True):
+                 enable_scheduler: bool = True,
+                 safe_mode: bool = False):
         self._npcs: Dict[str, NPC] = {}
         self._knowledge_cloud = knowledge_cloud
         self._memory_store = memory_store
+        self.safe_mode = safe_mode
         
         self._scheduler: Optional[AIVMScheduler] = None
         if enable_scheduler:
@@ -64,6 +66,10 @@ class AIVMKernel:
         npc.mounted_devices["VND"] = VND()
         npc.mounted_devices["VRD"] = VRD(reasoning_core)
         npc.mounted_devices["VSLLM"] = VSLLM()
+
+        # Enforcement of Safe Mode (§10 of Contract)
+        if self.safe_mode:
+            logger.info(f"Kernel: NPC {identity.id} spawned in SAFE_MODE. Optional devices (VVPU, etc.) are locked.")
 
         self._npcs[identity.id] = npc
         npc.add_audit("spawn", {"version": "0.1", "devices": list(npc.mounted_devices.keys())})
