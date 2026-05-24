@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, Request, Depends, Header
+from fastapi import FastAPI, HTTPException, Request, Depends, Header, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -21,8 +21,10 @@ from pydantic import BaseModel
 PROJ_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJ_ROOT))
 sys.path.insert(0, str(PROJ_ROOT / "packages" / "core"))
+sys.path.insert(0, str(PROJ_ROOT / "packages" / "aivm"))
 
 from synth_runtime import get_runtime
+from aivm.inspector.service import get_inspector
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
@@ -64,6 +66,17 @@ async def verify_auth(x_api_key: Optional[str] = Header(None)):
         if not x_api_key and os.environ.get("ENV") == "development":
             return
         raise HTTPException(status_code=401, detail="Invalid API Key")
+
+@app.websocket("/ws/aivm/inspector")
+async def websocket_inspector(websocket: WebSocket, npc_id: Optional[str] = None):
+    inspector = get_inspector()
+    await inspector.connect(websocket, npc_id)
+    try:
+        while True:
+            # Keep connection alive
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        inspector.disconnect(websocket, npc_id)
 
 @app.get("/api/health")
 async def health():

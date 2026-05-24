@@ -18,6 +18,9 @@ class NPC:
 
     def add_audit(self, step: str, details: Dict[str, Any]):
         from datetime import datetime, timezone
+        from ..inspector.service import get_inspector
+        import asyncio
+        
         entry = AuditEntry(
             timestamp=datetime.now(timezone.utc).isoformat(),
             step=step,
@@ -25,3 +28,13 @@ class NPC:
             npc_id=self.identity.id
         )
         self.audit_stream.append(entry)
+        
+        # Async broadcast to inspector
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(get_inspector().broadcast_event(self.identity.id, step, {
+                **details,
+                "timestamp": entry.timestamp
+            }))
+        except RuntimeError:
+            pass # No loop running
