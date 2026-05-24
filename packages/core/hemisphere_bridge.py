@@ -14,8 +14,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Awaitable, Callable, Dict, Optional
 
-from kernel.bridge import BridgeMode as KernelBridgeMode
-from kernel.bridge import KernelBridge, KernelQuery
+from bridge import BridgeMode as KernelBridgeMode
+from bridge import KernelBridge, KernelQuery
 from cognitive.social_fabric import SocialFabric, FactionRelation
 
 logger = logging.getLogger(__name__)

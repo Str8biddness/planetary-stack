@@ -11,9 +11,9 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from .hemisphere_bridge import HemisphereBridge
-from .pattern_engine import PatternEngine, PatternMatch
-from .els_bridge import ELSBridge
+from hemisphere_bridge import HemisphereBridge
+from pattern_engine import PatternEngine, PatternMatch
+from els_bridge import ELSBridge
 
 
 # ---------------------------------------------------------------------------

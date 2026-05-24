@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional
 import faiss
 import numpy as np
 
-from core.universal_substrate import UniversalSubstrate
+from knowledge.universal_substrate import UniversalSubstrate
 from ml.swarm_embedder import SwarmEmbedder
 
 logger = logging.getLogger(__name__)
