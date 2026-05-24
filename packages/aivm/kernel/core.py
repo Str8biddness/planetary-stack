@@ -12,6 +12,7 @@ from ..devices.vrd import VRD
 from ..devices.stubs import VND, VSLLM
 from ..isolation.guard import FaultGuard
 from ..snapshot.manager import SnapshotManager
+from ..scheduler.core import AIVMScheduler
 
 logger = logging.getLogger("aivm.kernel")
 
@@ -24,10 +25,21 @@ class AIVMKernel:
 
     def __init__(self, 
                  knowledge_cloud: Optional[Any] = None,
-                 memory_store: Optional[Any] = None):
+                 memory_store: Optional[Any] = None,
+                 enable_scheduler: bool = True):
         self._npcs: Dict[str, NPC] = {}
         self._knowledge_cloud = knowledge_cloud
         self._memory_store = memory_store
+        
+        self._scheduler: Optional[AIVMScheduler] = None
+        if enable_scheduler:
+            self._scheduler = AIVMScheduler(self)
+            self._scheduler.start()
+
+    def stop(self):
+        """Shutdown the kernel and its subsystems."""
+        if self._scheduler:
+            self._scheduler.stop()
 
     def spawn_npc(self, 
                   identity: PersonaIdentity, 
@@ -60,6 +72,12 @@ class AIVMKernel:
     def restore_npc(self, snapshot_blob: bytes) -> NPC:
         """Restore an NPC from a deterministic snapshot blob."""
         return SnapshotManager.restore(snapshot_blob, self)
+
+    async def tick_scheduled(self, npc_id: str, input_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Add a tick request to the kernel's scheduler."""
+        if not self._scheduler:
+            return await self.tick(npc_id, input_payload)
+        return await self._scheduler.schedule_tick(npc_id, input_payload)
 
     async def tick(self, npc_id: str, input_payload: Dict[str, Any]) -> Dict[str, Any]:
         """

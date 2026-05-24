@@ -317,8 +317,8 @@ class SynthRuntime:
         if character_id not in self._aivm_kernel._npcs:
             self.load_character(character_id)
 
-        # Execute Canonical 12-step Tick via AIVM Kernel
-        kernel_res = await self._aivm_kernel.tick(character_id, {
+        # Execute Canonical 12-step Tick via AIVM Kernel (Scheduled)
+        kernel_res = await self._aivm_kernel.tick_scheduled(character_id, {
             "user_input": user_input,
             "session_id": session_id,
             "context": context
