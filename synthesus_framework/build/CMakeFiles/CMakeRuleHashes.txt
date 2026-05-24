@@ -1,3 +1,0 @@
-# Hashes of file build rules.
-cb917587fbd14dc6bd369bf934cb9719 CMakeFiles/vmm_payload
-e2dcdcba7b137f4bc11b26f6754ededb test_payload.bin

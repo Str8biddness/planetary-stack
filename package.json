@@ -1,0 +1,14 @@
+{
+  "name": "synthesus-monorepo",
+  "version": "4.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build:kernel": "cd packages/kernel && mkdir -p build && cd build && cmake .. -DBUILD_PYBIND=ON && make -j4",
+    "test:all": "npm run test --workspaces",
+    "start:aios": "python3 packages/api/aios_server.py"
+  }
+}

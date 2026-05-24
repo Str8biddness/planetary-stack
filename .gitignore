@@ -1,3 +1,65 @@
-synthesus_framework/credentials.json
-synthesus_framework/token.json
-synthesus_framework/service_account.json
+# --- Build Artifacts ---
+build/
+bin/
+obj/
+dist/
+*.so
+*.o
+*.a
+*.lib
+*.dll
+*.dylib
+*.bin
+*.out
+.gradle/
+app/build/
+synthesus_framework/build/
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+env/
+venv/
+.pytest_cache/
+.mypy_cache/
+.pyright_cache/
+*.egg-info/
+
+# --- JavaScript / Node ---
+node_modules/
+.npm/
+.eslintcache
+.pnpm-debug.log*
+
+# --- Logs & Scratch ---
+*.log
+traceback.txt
+scratch_*.py
+debug_*.py
+temp_*.py
+*.bak
+*.tmp
+benchmark_results.json
+test_chat.log
+e2e.log
+
+# --- IDE & System ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.gemini/
+.geminiignore
+.env
+.env.*
+!.env.example
+
+# --- Project Specific Artifacts ---
+synthesus_framework/data/
+synthesus_framework/characters/
+!synthesus_framework/characters/registry.json
+!synthesus_framework/characters/template.json
