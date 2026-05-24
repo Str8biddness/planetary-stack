@@ -62,6 +62,11 @@ class ManifestationEngine:
             self._freeze_progress = 80
             await self._manifest_fs()
 
+            # 4.1 Configure Boot (UEFI + PXE)
+            self._last_freeze_status = "configuring_boot"
+            self._freeze_progress = 85
+            await self._configure_boot()
+
             # 5. Build Bootable ISO
             self._last_freeze_status = "generating_iso"
             self._freeze_progress = 90
@@ -131,6 +136,27 @@ class ManifestationEngine:
         
         # Ensure 'aivm' and 'packages' are present
         logger.info("Manifestation: Sycing AIVM packages to /opt/synthesus/framework/packages")
+
+    async def _configure_boot(self):
+        """
+        Configure UEFI and PXE bootloaders for the ISO.
+        """
+        template_dir = self.framework_root / "packages" / "core" / "manifestation" / "templates"
+        
+        # 1. Setup GRUB for UEFI
+        grub_dest = self.manifest_dir / "boot" / "grub"
+        grub_dest.mkdir(parents=True, exist_ok=True)
+        shutil.copy(template_dir / "grub.cfg", grub_dest / "grub.cfg")
+        
+        # 2. Setup iPXE for Network Boot
+        ipxe_dest = self.manifest_dir / "boot"
+        shutil.copy(template_dir / "aios.ipxe", ipxe_dest / "aios.ipxe")
+        
+        # 3. Ensure EFI Directory structure exists
+        efi_boot = self.manifest_dir / "EFI" / "BOOT"
+        efi_boot.mkdir(parents=True, exist_ok=True)
+        
+        logger.info("Manifestation: Boot configuration complete (UEFI PXE IPv4/6)")
 
     async def _generate_iso(self, volume_id: str) -> Path:
         output_iso = Path.home() / f"{volume_id}_{int(time.time())}.iso"
