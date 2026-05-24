@@ -203,6 +203,14 @@ async def dump_vsllm(auth=Depends(verify_auth)):
         raise HTTPException(503, "EmulEngine not initialized")
     return runtime._emul_engine.dump_sllm()
 
+@app.get("/api/kernel/vad/dump")
+async def dump_vad(auth=Depends(verify_auth)):
+    """Return the AIOS VAD register block and accelerator status."""
+    runtime = get_runtime()
+    if not runtime._emul_engine:
+        raise HTTPException(503, "EmulEngine not initialized")
+    return runtime._emul_engine.dump_vad()
+
 @app.post("/api/system/freeze")
 async def freeze_system(auth=Depends(verify_auth)):
     """Trigger the Manifestation Engine to generate a bootable ISO."""

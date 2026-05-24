@@ -17,8 +17,8 @@
 #include "message_bus.hpp"
 #include "memory_allocator.hpp"
 #include "../reasoning/ppbrs.hpp"
-#include "../memory/working_memory.hpp"
-#include "../automation/watchdog.hpp"
+#include "../core/memory/working_memory.hpp"
+#include "watchdog.hpp"
 #include "emul_engineering/emul_engine.hpp"
 #include "vmm/virtual_parameter_device.hpp"
 #include "vmm/virtual_quantum_device.hpp"
@@ -27,6 +27,7 @@
 #include "vmm/virtual_mirror_device.hpp"
 #include "vmm/virtual_vpu_device.hpp"
 #include "vmm/virtual_sllm_device.hpp"
+#include "vmm/virtual_accelerator_device.hpp"
 
 namespace py = pybind11;
 namespace emul = synthesus::kernel::emul_engineering;
@@ -178,6 +179,21 @@ py::dict sllm_dump_to_dict(const vmm::SllmDump& dump) {
     return out;
 }
 
+py::dict vad_dump_to_dict(const vmm::VadDump& dump) {
+    py::list registers;
+    for (const auto& reg : dump.registers) {
+        py::dict item;
+        item["name"] = reg.name; item["value"] = reg.value;
+        item["value_hex"] = hex_u64(reg.value); registers.append(item);
+    }
+    py::dict out;
+    out["device"] = "VirtualAcceleratorDevice";
+    out["status"] = dump.status;
+    out["last_operator"] = dump.last_operator;
+    out["registers"] = registers;
+    return out;
+}
+
 } // namespace
 
 PYBIND11_MODULE(_synthesus_kernel, m) {
@@ -209,6 +225,7 @@ PYBIND11_MODULE(_synthesus_kernel, m) {
         .def("dump_vmd", [](const emul::EmulEngine& e) { return vmd_dump_to_dict(e.dump_vmd()); })
         .def("dump_vvpu", [](const emul::EmulEngine& e) { return vvpu_dump_to_dict(e.dump_vvpu()); })
         .def("dump_sllm", [](const emul::EmulEngine& e) { return sllm_dump_to_dict(e.dump_sllm()); })
+        .def("dump_vad", [](const emul::EmulEngine& e) { return vad_dump_to_dict(e.dump_vad()); })
         .def("read_console_output", &emul::EmulEngine::read_console_output)
         .def("write_console_input", &emul::EmulEngine::write_console_input)
         .def("set_blueprint_lookup", [](emul::EmulEngine& e, py::function l) {

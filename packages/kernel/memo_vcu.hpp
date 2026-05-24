@@ -1,10 +1,10 @@
 #pragma once
 // Synthesus 2.0 Phase 7 - MEMO VCU: 4-tier memory orchestration
 #include "vcu_base.hpp"
-#include "../memory/working_memory.hpp"
-#include "../memory/episodic_memory.hpp"
-#include "../memory/long_term_memory.hpp"
-#include "../memory/kn_database.hpp"
+#include "../core/memory/working_memory.hpp"
+#include "../core/memory/episodic_memory.hpp"
+#include "../core/memory/long_term_memory.hpp"
+#include "../core/memory/kn_database.hpp"
 namespace zo {
 class MemoVCU : public VCUBase {
 public:

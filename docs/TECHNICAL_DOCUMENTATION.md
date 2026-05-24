@@ -13,6 +13,7 @@ Synthesus 4.0 abstracts high-level logic as physical hardware ports. Guest code 
 | **0xF4000000** | **VMD** | **Virtual Mirror Device**: Cluster synchronization and consistency. |
 | **0xF5000000** | **VVPU** | **Virtual VPU**: Nabla-N multi-agent swarm routing. |
 | **0xF6000000** | **VSLLM** | **Virtual SLLM**: Statistical n-gram language generation. |
+| **0xF7000000** | **VAD** | **Virtual Accelerator Device**: Hybrid transformer partitioning fabric. |
 
 ---
 

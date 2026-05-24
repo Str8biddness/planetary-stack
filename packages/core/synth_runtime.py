@@ -25,6 +25,7 @@ from .web_scraper import WebScraper
 from .manifestation_engine import ManifestationEngine
 from .vpu_coordinator import VpuCoordinator
 from .sllm_coordinator import SllmCoordinator
+from .hybrid_transformer_coordinator import HybridTransformerCoordinator
 from kernel.mirror_sync_bridge import MirrorSyncBridge
 
 logger = logging.getLogger(__name__)
@@ -127,6 +128,10 @@ class SynthRuntime:
                 # Initialize SLLM (Synthetic LLM) Coordinator
                 self._sllm_coordinator = SllmCoordinator(self._emul_engine)
                 self._sllm_coordinator.initialize_sllm()
+
+                # Initialize Hybrid Transformer (VAD)
+                self._hybrid_transformer = HybridTransformerCoordinator(self._emul_engine)
+                self._hybrid_transformer.initialize_vad()
 
         except Exception as exc:
             logger.warning("AIOS Hardware Layer unavailable: %s", exc)

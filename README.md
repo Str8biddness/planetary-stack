@@ -20,6 +20,22 @@ Synthesus 4.0 is a hardware-aware architecture that transforms standard machines
 - `docs/`: Technical specifications, roadmaps, and handover protocols.
 - `tests/`: Integrated E2E and cross-package verification.
 
+## 🚀 Key Architectural Pillars
+
+### 1. **AIOS Kernel (The Body)**
+A native C++ environment that provides absolute hardware isolation for reasoning tasks.
+*   **AIVM VMM**: Hardware-accelerated sandboxing.
+*   **VPD / VQD / VGD**: Knowledge ROM, Quantum logic, and GPU tensor acceleration via MMIO.
+
+### 2. **Cloud Ingress & Swarm (The Nervous System)**
+*   **VND / VMD**: Hardware-abstracted secure web ingress and autonomous cluster synchronization.
+*   **VVPU**: ∇ₙ Nabla-N load-aware swarm routing across distributed virtual processing units.
+
+### 3. **Synthetic LLM & Acceleration (The Brain)**
+*   **VSLLM**: Hardware-native statistical language generation at port `0xF6000000`.
+*   **VAD (Virtual Accelerator Device)**: Hybrid transformer fabric for partitioned multimodal compute (`0xF7000000`).
+*   **Quad-Brain Orchestration**: Four dual-hemisphere brains working in perfect symmetry.
+
 ## 🚀 Key Implementation Status
 
 | Component | Status | Description |
@@ -27,6 +43,8 @@ Synthesus 4.0 is a hardware-aware architecture that transforms standard machines
 | **AIVM Kernel** | ✅ OPERATIONAL | pybind11 bridge, hardware profiling, and MMIO device mapping. |
 | **VPD / VQD** | ✅ OPERATIONAL | Parameter-as-hardware and Quantum-probabilistic pass. |
 | **VND / VMD** | ✅ OPERATIONAL | Secure web ingress and cluster-wide state synchronization. |
+| **VVPU / VSLLM** | ✅ OPERATIONAL | Swarm routing and statistical language generation. |
+| **VAD (Hybrid)** | ✅ OPERATIONAL | Partitioned transformer compute fabric (Phase 10). |
 | **Quadbrain V3** | ✅ OPERATIONAL | Four dual-hemisphere brains with integrated consciousness metrics. |
 | **KVM Sandbox** | 🛠 ROADMAP | Hardware-level guest isolation (Design validated). |
 | **The Freezer** | 🛠 ROADMAP | ISO manifestation engine (Design validated). |

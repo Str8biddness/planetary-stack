@@ -56,7 +56,8 @@ EmulEngine::EmulEngine()
       network_device_(std::make_shared<synthesus::kernel::vmm::VirtualNetworkDevice>()),
       mirror_device_(std::make_shared<synthesus::kernel::vmm::VirtualMirrorDevice>()),
       vpu_device_(std::make_shared<synthesus::kernel::vmm::VirtualVpuDevice>()),
-      sllm_device_(std::make_shared<synthesus::kernel::vmm::VirtualSllmDevice>()) {}
+      sllm_device_(std::make_shared<synthesus::kernel::vmm::VirtualSllmDevice>()),
+      accelerator_device_(std::make_shared<synthesus::kernel::vmm::VirtualAcceleratorDevice>()) {}
 
 bool EmulEngine::initialize() {
     HardwareProfiler profiler;
@@ -105,6 +106,7 @@ bool EmulEngine::run_abstraction() {
     vmm_->register_mmio_device(mirror_device_);
     vmm_->register_mmio_device(vpu_device_);
     vmm_->register_mmio_device(sllm_device_);
+    vmm_->register_mmio_device(accelerator_device_);
     if (!vmm_->allocate_memory(0x1000) || !vmm_->setup_vcpu()) return false;
     vmm_->load_payload(generated_payload_);
     return vmm_->run();
@@ -149,6 +151,7 @@ synthesus::kernel::vmm::VndDump EmulEngine::dump_vnd() const { return network_de
 synthesus::kernel::vmm::VmdDump EmulEngine::dump_vmd() const { return mirror_device_->dump(); }
 synthesus::kernel::vmm::VvpuDump EmulEngine::dump_vvpu() const { return vpu_device_->dump(); }
 synthesus::kernel::vmm::SllmDump EmulEngine::dump_sllm() const { return sllm_device_->dump(); }
+synthesus::kernel::vmm::VadDump EmulEngine::dump_vad() const { return accelerator_device_->dump(); }
 
 std::shared_ptr<synthesus::kernel::vmm::SerialConsole> EmulEngine::serial_console() const { return vmm_->serial_console(); }
 std::string EmulEngine::read_console_output() const { return vmm_->serial_console()->read_output(); }

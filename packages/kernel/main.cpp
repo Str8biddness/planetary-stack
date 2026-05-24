@@ -8,12 +8,12 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
-#include "kernel/thread_pool.hpp"
-#include "kernel/message_bus.hpp"
-#include "core/hemi_reconciler.hpp"
-#include "core/ppbrs_router.hpp"
-#include "core/context_memory.hpp"
-#include "automation/watchdog.hpp"
+#include "thread_pool.hpp"
+#include "message_bus.hpp"
+#include "hemi_reconciler.hpp"
+#include "ppbrs_router.hpp"
+#include "context_memory.hpp"
+#include "watchdog.hpp"
 
 std::string json_escape(const std::string& s) {
     std::ostringstream o;

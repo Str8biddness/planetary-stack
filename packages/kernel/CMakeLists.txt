@@ -36,79 +36,73 @@ endif()
 
 # ── Source files ──
 set(KERNEL_SOURCES
-    kernel/thread_pool.cpp
-    kernel/message_bus.cpp
-    kernel/memory_allocator.cpp
+    thread_pool.cpp
+    message_bus.cpp
+    memory_allocator.cpp
+    telemetry.cpp
+    watchdog.cpp
+    ppbrs_router.cpp
+    context_memory.cpp
+    hemi_reconciler.cpp
+    fusion_transformer_block.cpp
 )
 
 set(REASONING_SOURCES
-    reasoning/ppbrs.cpp
-    reasoning/bayesian.cpp
-    reasoning/causal.cpp
-    reasoning/symbolic.cpp
-    reasoning/sinn.cpp
-    reasoning/planner.cpp
-    reasoning/ensemble_synth.cpp
+    ../reasoning/ppbrs.cpp
+    ../reasoning/bayesian.cpp
+    ../reasoning/causal.cpp
+    ../reasoning/symbolic.cpp
+    ../reasoning/sinn.cpp
+    ../reasoning/planner.cpp
+    ../reasoning/ensemble_synth.cpp
 )
 
 set(MEMORY_SOURCES
-    memory/working_memory.cpp
-    memory/episodic_memory.cpp
-    memory/long_term_memory.cpp
-    memory/kn_database.cpp
-    memory/self_perception.cpp
+    ../core/memory/working_memory.cpp
+    ../core/memory/episodic_memory.cpp
+    ../core/memory/long_term_memory.cpp
+    ../core/memory/kn_database.cpp
+    ../core/memory/self_perception.cpp
 )
 
 set(VCU_SOURCES
-    vcu/emotion_vcu.cpp
-    vcu/executive_vcu.cpp
-    vcu/language_vcu.cpp
-    vcu/memo_vcu.cpp
-    vcu/motor_vcu.cpp
-    vcu/perception_vcu.cpp
-    vcu/sensory_vcu.cpp
-    vcu/social_vcu.cpp
-    vcu/ct_vcu.cpp
-    vcu/vpu_router.cpp
-)
-
-set(AUTOMATION_SOURCES
-    automation/watchdog.cpp
-    automation/telemetry.cpp
-)
-
-set(CORE_CPP_SOURCES
-    core/ppbrs_router.cpp
-    core/context_memory.cpp
-    core/hemi_reconciler.cpp
+    emotion_vcu.cpp
+    executive_vcu.cpp
+    language_vcu.cpp
+    memo_vcu.cpp
+    motor_vcu.cpp
+    perception_vcu.cpp
+    sensory_vcu.cpp
+    social_vcu.cpp
+    ct_vcu.cpp
+    vpu_router.cpp
+    hardware_router.cpp
 )
 
 set(VMM_SOURCES
-    kernel/vmm/vmm.cpp
-    kernel/vmm/serial_console.cpp
-    kernel/vmm/virtual_parameter_device.cpp
-    kernel/vmm/virtual_quantum_device.cpp
-    kernel/vmm/virtual_gpu_device.cpp
-    kernel/vmm/virtual_network_device.cpp
-    kernel/vmm/virtual_mirror_device.cpp
-    kernel/vmm/virtual_vpu_device.cpp
-    kernel/vmm/virtual_sllm_device.cpp
+    vmm/vmm.cpp
+    vmm/serial_console.cpp
+    vmm/virtual_parameter_device.cpp
+    vmm/virtual_quantum_device.cpp
+    vmm/virtual_gpu_device.cpp
+    vmm/virtual_network_device.cpp
+    vmm/virtual_mirror_device.cpp
+    vmm/virtual_vpu_device.cpp
+    vmm/virtual_sllm_device.cpp
+    vmm/virtual_accelerator_device.cpp
 )
 
 set(EMUL_SOURCES
-    kernel/emul_engineering/hardware_profiler.cpp
-    kernel/emul_engineering/emul_engine.cpp
+    emul_engineering/hardware_profiler.cpp
+    emul_engineering/emul_engine.cpp
 )
 
 set(ALL_CPP_SOURCES
     ${KERNEL_SOURCES}
     ${VMM_SOURCES}
     ${EMUL_SOURCES}
-    ${REASONING_SOURCES}
-    ${MEMORY_SOURCES}
     ${VCU_SOURCES}
-    ${AUTOMATION_SOURCES}
-    ${CORE_CPP_SOURCES}
+    ${MEMORY_SOURCES}
 )
 
 # ── Standalone kernel binary ──
@@ -116,16 +110,14 @@ if(BUILD_KERNEL)
     add_executable(synthesus_kernel
         main.cpp
         ${ALL_CPP_SOURCES}
+        ../reasoning/ppbrs.cpp
+        ../reasoning/sinn.cpp
     )
     target_include_directories(synthesus_kernel PRIVATE
-        ${CMAKE_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/kernel
-        ${CMAKE_SOURCE_DIR}/kernel/vmm
-        ${CMAKE_SOURCE_DIR}/kernel/emul_engineering
-        ${CMAKE_SOURCE_DIR}/reasoning
-        ${CMAKE_SOURCE_DIR}/memory
-        ${CMAKE_SOURCE_DIR}/vcu
-        ${CMAKE_SOURCE_DIR}/core
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/vmm
+        ${CMAKE_CURRENT_SOURCE_DIR}/emul_engineering
+        ${CMAKE_CURRENT_SOURCE_DIR}/../reasoning
     )
     target_link_libraries(synthesus_kernel PRIVATE Threads::Threads)
     
@@ -141,58 +133,40 @@ if(BUILD_KERNEL)
 
     # --- AIOS VMM Test ---
     add_executable(test_vmm
-        kernel/vmm/test_vmm.cpp
+        vmm/test_vmm.cpp
         ${VMM_SOURCES}
     )
     target_include_directories(test_vmm PRIVATE
-        ${CMAKE_SOURCE_DIR}/kernel/vmm
+        ${CMAKE_CURRENT_SOURCE_DIR}/vmm
     )
 
     # --- EmulEngineering Test ---
     add_executable(test_emul
-        kernel/emul_engineering/test_emul.cpp
+        emul_engineering/test_emul.cpp
         ${EMUL_SOURCES}
         ${VMM_SOURCES}
     )
     target_include_directories(test_emul PRIVATE
-        ${CMAKE_SOURCE_DIR}/kernel/vmm
-        ${CMAKE_SOURCE_DIR}/kernel/emul_engineering
+        ${CMAKE_CURRENT_SOURCE_DIR}/vmm
+        ${CMAKE_CURRENT_SOURCE_DIR}/emul_engineering
     )
-
-    # Assemble test payload
-    add_custom_command(
-        OUTPUT ${CMAKE_BINARY_DIR}/test_payload.bin
-        COMMAND as -32 -o ${CMAKE_BINARY_DIR}/test_payload.o ${CMAKE_SOURCE_DIR}/kernel/vmm/test_payload.S
-        COMMAND objcopy -O binary -j .text ${CMAKE_BINARY_DIR}/test_payload.o ${CMAKE_BINARY_DIR}/test_payload.bin
-        DEPENDS ${CMAKE_SOURCE_DIR}/kernel/vmm/test_payload.S
-        COMMENT "Assembling VMM test payload"
-    )
-    add_custom_target(vmm_payload ALL DEPENDS ${CMAKE_BINARY_DIR}/test_payload.bin)
-    add_dependencies(test_vmm vmm_payload)
 endif()
 
 # ── pybind11 Python module ──
 if(BUILD_PYBIND AND pybind11_FOUND)
     pybind11_add_module(_synthesus_kernel
-        kernel/pybind_module.cpp
+        pybind_module.cpp
         ${ALL_CPP_SOURCES}
+        ../reasoning/ppbrs.cpp
+        ../reasoning/sinn.cpp
     )
     target_include_directories(_synthesus_kernel PRIVATE
-        ${CMAKE_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/kernel
-        ${CMAKE_SOURCE_DIR}/kernel/vmm
-        ${CMAKE_SOURCE_DIR}/kernel/emul_engineering
-        ${CMAKE_SOURCE_DIR}/reasoning
-        ${CMAKE_SOURCE_DIR}/memory
-        ${CMAKE_SOURCE_DIR}/vcu
-        ${CMAKE_SOURCE_DIR}/core
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/vmm
+        ${CMAKE_CURRENT_SOURCE_DIR}/emul_engineering
+        ${CMAKE_CURRENT_SOURCE_DIR}/../reasoning
     )
     target_link_libraries(_synthesus_kernel PRIVATE Threads::Threads)
-    
-    if(ENABLE_ONNX AND onnxruntime_FOUND)
-        target_link_libraries(_synthesus_kernel PRIVATE onnxruntime::onnxruntime)
-        target_compile_definitions(_synthesus_kernel PRIVATE ONNX_ENABLED=1)
-    endif()
     
     # Install to Python site-packages
     install(TARGETS _synthesus_kernel LIBRARY DESTINATION .)
@@ -204,11 +178,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 message(STATUS "")
-message(STATUS "=== Synthesus 3.0 Quadbrain Build Configuration ===")
+message(STATUS "=== Synthesus 4.0 Kernel Build Configuration ===")
 message(STATUS "  Build type:    ${CMAKE_BUILD_TYPE}")
 message(STATUS "  C++ standard:  C++${CMAKE_CXX_STANDARD}")
 message(STATUS "  Kernel binary: ${BUILD_KERNEL}")
 message(STATUS "  pybind11:      ${BUILD_PYBIND} (found: ${pybind11_FOUND})")
-message(STATUS "  ONNX Runtime:  ${ENABLE_ONNX}")
 message(STATUS "=========================================")
 message(STATUS "")

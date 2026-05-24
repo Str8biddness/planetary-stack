@@ -10,6 +10,7 @@
 #include "../vmm/virtual_mirror_device.hpp"
 #include "../vmm/virtual_vpu_device.hpp"
 #include "../vmm/virtual_sllm_device.hpp"
+#include "../vmm/virtual_accelerator_device.hpp"
 #include <string>
 #include <vector>
 #include <memory>
@@ -69,6 +70,7 @@ public:
     synthesus::kernel::vmm::VmdDump dump_vmd() const;
     synthesus::kernel::vmm::VvpuDump dump_vvpu() const;
     synthesus::kernel::vmm::SllmDump dump_sllm() const;
+    synthesus::kernel::vmm::VadDump dump_vad() const;
     
     std::shared_ptr<synthesus::kernel::vmm::SerialConsole> serial_console() const;
     std::string read_console_output() const;
@@ -128,6 +130,7 @@ private:
     std::shared_ptr<synthesus::kernel::vmm::VirtualMirrorDevice> mirror_device_;
     std::shared_ptr<synthesus::kernel::vmm::VirtualVpuDevice> vpu_device_;
     std::shared_ptr<synthesus::kernel::vmm::VirtualSllmDevice> sllm_device_;
+    std::shared_ptr<synthesus::kernel::vmm::VirtualAcceleratorDevice> accelerator_device_;
 
     // Secure Enclave
     std::vector<uint8_t> secure_key_;
