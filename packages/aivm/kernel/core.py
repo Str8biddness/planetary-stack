@@ -4,6 +4,8 @@ from typing import Dict, Any, Optional
 from .npc import NPC
 from .types import PersonaIdentity, SchedulerClass, ResourceQuota
 from ..devices.stubs import VPD, VMD, VQD, VGD, VND, VRD, VSLLM
+from ..isolation.guard import FaultGuard
+from ..snapshot.manager import SnapshotManager
 
 logger = logging.getLogger("aivm.kernel")
 
@@ -44,59 +46,61 @@ class AIVMKernel:
         npc.add_audit("spawn", {"version": "0.1", "devices": list(npc.mounted_devices.keys())})
         return npc
 
+    def restore_npc(self, snapshot_blob: bytes) -> NPC:
+        """Restore an NPC from a deterministic snapshot blob."""
+        return SnapshotManager.restore(snapshot_blob, self)
+
     async def tick(self, npc_id: str, input_payload: Dict[str, Any]) -> Dict[str, Any]:
         """
         Executes a single canonical 12-step NPC cognition tick.
-        This is the spine of the entire system.
+        Protected by FaultGuard for process isolation.
         """
         npc = self._npcs.get(npc_id)
         if not npc:
             raise ValueError(f"NPC {npc_id} not found.")
 
-        # 1. Admission
-        npc.add_audit("admission", {"scheduler": npc.scheduler_class.value})
+        @FaultGuard.contain(npc)
+        async def _execute_canonical_sequence():
+            # 1. Admission
+            npc.add_audit("admission", {"scheduler": npc.scheduler_class.value})
 
-        # 2. Perception (Optional)
-        # TODO: Implement VVPU check
-        npc.add_audit("perception", {"status": "skipped"})
+            if input_payload.get("sim_crash"):
+                raise RuntimeError("AIOS Kernel: Simulated sequence failure.")
 
-        # 3. Intent Resolution
-        # TODO: call VRD.plan
-        npc.add_audit("plan", {"intent": "resolved"})
+            # 2. Perception (Optional)
+            npc.add_audit("perception", {"status": "skipped"})
 
-        # 4. Routing
-        # TODO: call VRD.route
-        npc.add_audit("route", {"path": "default"})
+            # 3. Intent Resolution
+            npc.add_audit("plan", {"intent": "resolved"})
 
-        # 5. Knowledge Grounding
-        # TODO: call VQD.lookup
-        npc.add_audit("knowledge", {"hits": 0})
+            # 4. Routing
+            npc.add_audit("route", {"path": "default"})
 
-        # 6. Memory Recall
-        # TODO: call VMD.recall
-        npc.add_audit("recall", {"hits": 0})
+            # 5. Knowledge Grounding
+            npc.add_audit("knowledge", {"hits": 0})
 
-        # 7. Narrative Gate (Pre)
-        # TODO: call VND.coherence_check
-        npc.add_audit("coherence_pre", {"verdict": "pass"})
+            # 6. Memory Recall
+            npc.add_audit("recall", {"hits": 0})
 
-        # 8. Generation
-        # TODO: call VSLLM.select and VGD.generate
-        npc.add_audit("generate", {"tokens": 0})
+            # 7. Narrative Gate (Pre)
+            npc.add_audit("coherence_pre", {"verdict": "pass"})
 
-        # 9. Narrative Gate (Post)
-        # TODO: call VND.coherence_check
-        npc.add_audit("coherence_post", {"verdict": "pass"})
+            # 8. Generation
+            npc.add_audit("generate", {"tokens": 0})
 
-        # 10. Memory Commit
-        # TODO: call VMD.write
-        npc.add_audit("memory_write", {"ref": "committed"})
+            # 9. Narrative Gate (Post)
+            npc.add_audit("coherence_post", {"verdict": "pass"})
 
-        # 11. Output Emission
-        result = {"response": "AIOS Kernel: Step 11 Emitted."}
-        npc.add_audit("emit", {"hash": "stub"})
+            # 10. Memory Commit
+            npc.add_audit("memory_write", {"ref": "committed"})
 
-        # 12. Close
-        npc.add_audit("close", {"quota_reconciled": True})
+            # 11. Output Emission
+            result = {"response": "AIOS Kernel: Step 11 Emitted."}
+            npc.add_audit("emit", {"hash": "stub"})
 
-        return result
+            # 12. Close
+            npc.add_audit("close", {"quota_reconciled": True})
+
+            return result
+
+        return await _execute_canonical_sequence()

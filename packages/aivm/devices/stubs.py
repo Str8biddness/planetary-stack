@@ -2,6 +2,21 @@ from __future__ import annotations
 from .base import Device
 from typing import List, Any
 
+class VPD(Device):
+    """Virtual Persona Device - §3.1"""
+    
+    def __init__(self, identity: Any):
+        self._identity = identity
+
+    def snapshot(self) -> bytes:
+        return b"vpd_snapshot"
+
+    def restore(self, blob: bytes) -> None:
+        pass
+
+    def fingerprint(self) -> str:
+        return "vpd_v0.1"
+
 class VMD(Device):
     """Virtual Memory Device - §3.2"""
     

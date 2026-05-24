@@ -21,5 +21,5 @@ Transitioning the system to the formal AIVM NPC Runtime.
 1. [DONE] Land Contract v0.1.
 2. [DONE] Implement `packages/aivm/kernel/` core orchestration.
 3. [DONE] Implement `packages/aivm/devices/` interface stubs.
-4. [TODO] Implement `packages/aivm/snapshot/` and `packages/aivm/isolation/` layers.
+4. [DONE] Implement `packages/aivm/snapshot/` and `packages/aivm/isolation/` layers.
 5. [TODO] Migrate existing `packages/core/` NPCs to use the AIVM Kernel.
