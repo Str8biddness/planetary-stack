@@ -1,0 +1,27 @@
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import Dict, List, Any
+from .types import PersonaIdentity, SchedulerClass, ResourceQuota, AuditEntry
+from ..devices.base import Device
+
+@dataclass
+class NPC:
+    """
+    Bounded Synthetic Intelligence Node.
+    Defined by §2 of the AIVM ↔ NPC Contract.
+    """
+    identity: PersonaIdentity
+    scheduler_class: SchedulerClass
+    resource_quota: ResourceQuota
+    mounted_devices: Dict[str, Device] = field(default_factory=dict)
+    audit_stream: List[AuditEntry] = field(default_factory=list)
+
+    def add_audit(self, step: str, details: Dict[str, Any]):
+        from datetime import datetime, timezone
+        entry = AuditEntry(
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            step=step,
+            details=details,
+            npc_id=self.identity.id
+        )
+        self.audit_stream.append(entry)

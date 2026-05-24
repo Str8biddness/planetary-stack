@@ -19,6 +19,7 @@ Every agent session MUST read and adhere to the [AIVM ↔ NPC Contract](../../do
 ## 🚧 Current Mission
 Transitioning the system to the formal AIVM NPC Runtime.
 1. [DONE] Land Contract v0.1.
-2. [TODO] Implement `packages/aivm/kernel/` base orchestration.
-3. [TODO] Implement `packages/aivm/devices/` interface stubs.
-4. [TODO] Audit existing `packages/core/` logic against the contract.
+2. [DONE] Implement `packages/aivm/kernel/` core orchestration.
+3. [DONE] Implement `packages/aivm/devices/` interface stubs.
+4. [TODO] Implement `packages/aivm/snapshot/` and `packages/aivm/isolation/` layers.
+5. [TODO] Migrate existing `packages/core/` NPCs to use the AIVM Kernel.

@@ -1,4 +1,4 @@
-import pytest
+import asyncio
 import sys
 from pathlib import Path
 
@@ -9,23 +9,21 @@ sys.path.insert(0, str(PROJ_ROOT / "packages"))
 from aivm.kernel.core import AIVMKernel
 from aivm.kernel.types import PersonaIdentity, SchedulerClass
 
-@pytest.mark.asyncio
-async def test_canonical_12_step_sequence():
-    """
-    Verifies that the AIVMKernel correctly executes and audits 
-    the 12-step sequence defined in AIVM NPC Contract §5.
-    """
+async def verify_canonical_sequence():
+    print("--- AIVM Kernel Sequence Verification ---")
     kernel = AIVMKernel()
     identity = PersonaIdentity(id="test_npc", name="Test NPC", archetype="villager")
     
-    # Register NPC
+    # 1. Spawn NPC
+    print("[1/3] Spawning NPC...")
     npc = kernel.spawn_npc(identity, scheduler=SchedulerClass.REALTIME_SUPPORTING)
     
-    # Execute Tick
+    # 2. Execute Tick
+    print("[2/3] Executing canonical 12-step tick...")
     await kernel.tick("test_npc", {"input": "hello"})
     
-    # Verify Audit Trace
-    # (Ignoring the 'spawn' event)
+    # 3. Verify Audit Trace
+    print("[3/3] Verifying audit trace...")
     audit_steps = [entry.step for entry in npc.audit_stream if entry.step != "spawn"]
     
     expected_sequence = [
@@ -34,4 +32,15 @@ async def test_canonical_12_step_sequence():
         "memory_write", "emit", "close"
     ]
     
-    assert audit_steps == expected_sequence, f"Trace mismatch! Got: {audit_steps}"
+    if audit_steps == expected_sequence:
+        print("\n✅ SUCCESS: AIVM Kernel correctly enforced the 12-step sequence.")
+        for i, step in enumerate(audit_steps, 1):
+            print(f"  {i}. {step}")
+    else:
+        print("\n❌ FAILURE: Audit trace mismatch.")
+        print(f"Expected: {expected_sequence}")
+        print(f"Actual:   {audit_steps}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    asyncio.run(verify_canonical_sequence())
