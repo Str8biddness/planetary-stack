@@ -1,0 +1,13 @@
+{
+  "character_id": "atlas",
+  "name": "Atlas",
+  "role": "strategic",
+  "archetype": "strategic",
+  "traits": [],
+  "backstory": "",
+  "created_at": "2026-05-24T11:18:52.175908+00:00",
+  "created_by": "synth_runtime",
+  "metadata": {
+    "permission": "agent"
+  }
+}

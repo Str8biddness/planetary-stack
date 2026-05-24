@@ -9,10 +9,12 @@ from ..devices.vmd import VMD
 from ..devices.vqd import VQD
 from ..devices.vgd import VGD
 from ..devices.vrd import VRD
+from ..devices.vtd import VTD
 from ..devices.stubs import VND, VSLLM
 from ..isolation.guard import FaultGuard
 from ..snapshot.manager import SnapshotManager
 from ..scheduler.core import AIVMScheduler
+from .types import PersonaIdentity, SchedulerClass, ResourceQuota, PermissionLevel
 
 logger = logging.getLogger("aivm.kernel")
 
@@ -26,11 +28,15 @@ class AIVMKernel:
     def __init__(self, 
                  knowledge_cloud: Optional[Any] = None,
                  memory_store: Optional[Any] = None,
+                 manifestation_engine: Optional[Any] = None,
+                 scraper: Optional[Any] = None,
                  enable_scheduler: bool = True,
                  safe_mode: bool = False):
         self._npcs: Dict[str, NPC] = {}
         self._knowledge_cloud = knowledge_cloud
         self._memory_store = memory_store
+        self._manifestation = manifestation_engine
+        self._scraper = scraper
         self.safe_mode = safe_mode
         
         self._scheduler: Optional[AIVMScheduler] = None
@@ -47,15 +53,17 @@ class AIVMKernel:
                   identity: PersonaIdentity, 
                   scheduler: SchedulerClass = SchedulerClass.REALTIME_SUPPORTING,
                   quota: Optional[ResourceQuota] = None,
+                  permission: PermissionLevel = PermissionLevel.GUEST,
                   reasoning_core: Optional[Any] = None) -> NPC:
-        """Create and register a new NPC node with the 7 required devices."""
+        """Create and register a new NPC node with the required devices."""
         if identity.id in self._npcs:
             raise ValueError(f"NPC ID {identity.id} already registered.")
             
         npc = NPC(
             identity=identity,
             scheduler_class=scheduler,
-            resource_quota=quota or ResourceQuota()
+            resource_quota=quota or ResourceQuota(),
+            permission_level=permission
         )
         
         # Mount required devices (Wiring to real subsystems)
@@ -67,12 +75,20 @@ class AIVMKernel:
         npc.mounted_devices["VRD"] = VRD(reasoning_core)
         npc.mounted_devices["VSLLM"] = VSLLM()
 
+        # Mount Agentic Tools if authorized
+        if permission in [PermissionLevel.AGENT, PermissionLevel.ROOT]:
+            npc.mounted_devices["VTD"] = VTD(
+                manifestation_engine=self._manifestation,
+                scraper=self._scraper
+            )
+            logger.info(f"Kernel: NPC {identity.id} authorized as AGENT. VTD mounted.")
+
         # Enforcement of Safe Mode (§10 of Contract)
-        if self.safe_mode:
+        if self.safe_mode and permission == PermissionLevel.GUEST:
             logger.info(f"Kernel: NPC {identity.id} spawned in SAFE_MODE. Optional devices (VVPU, etc.) are locked.")
 
         self._npcs[identity.id] = npc
-        npc.add_audit("spawn", {"version": "0.1", "devices": list(npc.mounted_devices.keys())})
+        npc.add_audit("spawn", {"version": "0.1", "permission": permission.value, "devices": list(npc.mounted_devices.keys())})
         return npc
 
     def restore_npc(self, snapshot_blob: bytes) -> NPC:

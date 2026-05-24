@@ -10,6 +10,11 @@ class SchedulerClass(Enum):
     AMBIENT = "ambient"
     OFFLINE = "offline"
 
+class PermissionLevel(Enum):
+    GUEST = "guest"     # Strictly bounded, no tool access
+    AGENT = "agent"     # Capable of tool use and system calls
+    ROOT = "root"       # Full kernel control (Reserved)
+
 @dataclass
 class ResourceQuota:
     memory_bytes: int = 1024 * 1024 * 10  # 10MB default

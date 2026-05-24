@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Any
-from .types import PersonaIdentity, SchedulerClass, ResourceQuota, AuditEntry
+from .types import PersonaIdentity, SchedulerClass, ResourceQuota, AuditEntry, PermissionLevel
 from ..devices.base import Device
 
 @dataclass
@@ -13,6 +13,7 @@ class NPC:
     identity: PersonaIdentity
     scheduler_class: SchedulerClass
     resource_quota: ResourceQuota
+    permission_level: PermissionLevel = PermissionLevel.GUEST
     mounted_devices: Dict[str, Device] = field(default_factory=dict)
     audit_stream: List[AuditEntry] = field(default_factory=list)
 
