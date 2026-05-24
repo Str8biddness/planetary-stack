@@ -68,8 +68,13 @@ from api.schemas import ( # type: ignore
 from api.database import init_db, SessionLocal, APIKey, UsageMetric # type: ignore
 
 # ─── Paths ──────────────────────────────────────────────────────────
-PROJ_ROOT = Path(__file__).resolve().parent.parent
+PROJ_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJ_ROOT))
+sys.path.insert(0, str(PROJ_ROOT / "packages" / "core"))
+sys.path.insert(0, str(PROJ_ROOT / "packages" / "knowledge"))
+sys.path.insert(0, str(PROJ_ROOT / "packages" / "reasoning"))
+sys.path.insert(0, str(PROJ_ROOT / "packages" / "kernel"))
+sys.path.insert(0, str(PROJ_ROOT / "packages" / "api"))
 
 # ─── Logging ─────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
@@ -102,8 +107,8 @@ logger.addHandler(_memory_log_handler)
 # Import core modules
 _synthesus_master_import_error = None
 try:
-    from core.synthesus_master import SynthesusMaster # type: ignore
-    from core.hemisphere_bridge import HemisphereBridge # type: ignore
+    from synthesus_master import SynthesusMaster # type: ignore
+    from hemisphere_bridge import HemisphereBridge # type: ignore
     HAS_SYNTHESUS_MASTER = True
     HAS_HEMISPHERE_BRIDGE = True
 except Exception as e:
@@ -115,7 +120,7 @@ except Exception as e:
 
 _veai_trainer_import_error = None
 try:
-    from core.veai_trainer import VEAITrainer # type: ignore
+    from veai_trainer import VEAITrainer # type: ignore
     HAS_VEAI_TRAINER = True
 except Exception as e:
     VEAITrainer = None # type: ignore
@@ -123,7 +128,7 @@ except Exception as e:
     _veai_trainer_import_error = e
 
 try:
-    from synthetic_core import SymbolicCore # type: ignore
+    from synthetic_core.symbolic_core import SymbolicCore # type: ignore
     HAS_SYMBOLIC_CORE = True
 except Exception as e:
     SymbolicCore = None # type: ignore
@@ -150,7 +155,7 @@ if _amplification_wrapper_import_error is not None:
 # Import Generation Spine with graceful fallback
 _generation_spine_import_error = None
 try:
-    from core.generation.spine import GenerationSpine, get_generation_spine, SpineInput # type: ignore
+    from generation.spine import GenerationSpine, get_generation_spine, SpineInput # type: ignore
     HAS_GENERATION_SPINE = True
 except Exception as e:
     GenerationSpine = None # type: ignore
@@ -165,9 +170,9 @@ if _generation_spine_import_error is not None:
 # Import KAL (Knowledge Abstraction Layer) components
 _kal_import_error = None
 try:
-    from kal.client import KalClient # type: ignore
-    from kal.service import KalService # type: ignore
-    from kal.backends.faiss_backend import FaissKalBackend # type: ignore
+    from client import KalClient # type: ignore
+    from service import KalService # type: ignore
+    from backends.faiss_backend import FaissKalBackend # type: ignore
     HAS_KAL = True
 except Exception as e:
     KalClient = None
@@ -179,7 +184,7 @@ except Exception as e:
 try:
     from cognitive.evolution_engine import CharacterEvolutionEngine # type: ignore
     HAS_EVOLUTION_ENGINE = True
-except Exception:
+except Exception as e:
     CharacterEvolutionEngine = None # type: ignore
     HAS_EVOLUTION_ENGINE = False
     _kal_import_error = e

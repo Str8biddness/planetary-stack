@@ -18,10 +18,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # Add project root to sys.path
-PROJ_ROOT = Path(__file__).resolve().parent.parent
+PROJ_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJ_ROOT))
+sys.path.insert(0, str(PROJ_ROOT / "packages" / "core"))
 
-from core.synth_runtime import get_runtime
+from synth_runtime import get_runtime
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
@@ -42,7 +43,10 @@ app.add_middleware(
 )
 
 # Admin key for IDE access
-ADMIN_KEY = os.environ.get("SYNTHESUS_API_KEY", "sk-synth-dev-key")
+ADMIN_KEY = os.environ.get("SYNTHESUS_API_KEY")
+if not ADMIN_KEY:
+    logger.error("SYNTHESUS_API_KEY not set. API authentication is REQUIRED in production.")
+    # In production, we should probably exit, but for now we'll just log an error
 
 # Request Models
 class RespondRequest(BaseModel):

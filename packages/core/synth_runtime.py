@@ -15,12 +15,23 @@ from typing import Any, Dict, List, Optional
 from .hemisphere_bridge import HemisphereBridge
 from .pattern_engine import PatternEngine
 from .els_bridge import ELSBridge
-from .memory_store import MemoryStore
-from .knowledge_cloud import KnowledgeCloud
-from .universal_substrate import UniversalSubstrate
-from .reasoning_core import ReasoningCore, ReasoningResult
-from kernel.hardware_cloud_bridge import create_bridged_emul_engine
-from kernel.quantum_simulator_bridge import QuantumSimulatorBridge
+# Knowledge package imports
+import sys
+from pathlib import Path
+PROJ_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJ_ROOT / "packages" / "knowledge") not in sys.path:
+    sys.path.insert(0, str(PROJ_ROOT / "packages" / "knowledge"))
+if str(PROJ_ROOT / "packages" / "reasoning") not in sys.path:
+    sys.path.insert(0, str(PROJ_ROOT / "packages" / "reasoning"))
+if str(PROJ_ROOT / "packages" / "kernel") not in sys.path:
+    sys.path.insert(0, str(PROJ_ROOT / "packages" / "kernel"))
+
+from memory_store import MemoryStore
+from knowledge_cloud import KnowledgeCloud
+from universal_substrate import UniversalSubstrate
+from reasoning_core import ReasoningCore, ReasoningResult
+from hardware_cloud_bridge import create_bridged_emul_engine
+from quantum_simulator_bridge import QuantumSimulatorBridge
 from .web_scraper import WebScraper
 from .manifestation_engine import ManifestationEngine
 from .vpu_coordinator import VpuCoordinator

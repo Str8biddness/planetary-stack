@@ -71,28 +71,22 @@ class ScanResult(Base):
 def init_db():
     Base.metadata.create_all(bind=engine)
     
-    # Pre-populate with master key if not exists
+    # Pre-populate with master key if provided via environment
     db = SessionLocal()
-    master_key_str = os.environ.get("SYNTHESUS_API_KEY", "sk-synth-prod-key")
-    if not db.query(APIKey).filter(APIKey.key == master_key_str).first():
-        master_key = APIKey(
-            key=master_key_str,
-            label="Master Admin Key",
-            is_admin=True,
-            status="active"
-        ) # type: ignore
-        db.add(master_key)
+    master_key_str = os.environ.get("SYNTHESUS_API_KEY")
+    if master_key_str:
+        if not db.query(APIKey).filter(APIKey.key == master_key_str).first():
+            master_key = APIKey(
+                key=master_key_str,
+                label="Master Admin Key",
+                is_admin=True,
+                status="active"
+            ) # type: ignore
+            db.add(master_key)
+            logger.info("Master API key initialized from environment.")
+    else:
+        logger.warning("SYNTHESUS_API_KEY not set. No master key initialized in database.")
     
-    # Add a test dev key
-    if not db.query(APIKey).filter(APIKey.key == "sk-test-dev-123").first():
-        dev_key = APIKey(
-            key="sk-test-dev-123",
-            label="Simulation Dev Key",
-            is_admin=False,
-            status="active"
-        ) # type: ignore
-        db.add(dev_key)
-        
     db.commit()
     db.close()
 
