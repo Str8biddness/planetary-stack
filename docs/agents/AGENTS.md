@@ -1,3 +1,26 @@
+# Synthesus 4.1 CHAL Agent Operating Contract
+
+## Current North Star
+
+Synthesus 4.1 CHAL is the active direction above previous 4.0 stabilization work. Read `/home/workspace/SYNTHESUS_DIRECTION.md` and `docs/roadmap/SYNTHESUS_4_1_CHAL_MAXIMUM_DIRECTIVE.md` before making runtime, knowledge, reasoning, generation, or automation changes.
+
+CHAL means **Cognitive Hardware Abstraction Layer**:
+
+- Knowledge Cloud is mounted cognitive hardware.
+- KAL is the memory controller.
+- PPBRS is bounded cognitive firmware, not final wording.
+- dual hemispheres are compute units.
+- cache/memory/parameters are explicit partitions.
+- generation spine owns final non-templated language except safety/policy restrictions.
+
+## Hard Rules For Future Agents
+
+- Remove legacy/template fallback behavior aggressively. Direct user-facing canned response templates are defects unless they implement AI safety, AIVM platform restrictions, abuse prevention, or identity/rights protection.
+- Prefer deleting dead compatibility code over preserving slow legacy paths, but update tests/docs/contracts in the same patch.
+- Every CHAL change must include focused validation and an `AGENT_LOG.md` entry.
+- Scheduled automation agents for Synthesus development must run on OpenAI Codex-class or Google/Gemini CLI/CML models only.
+- Knowledge Cloud expansion must be broad but provenance-clean: source manifests, license notes, rebuild commands, SHA-256 manifests, and validation are mandatory.
+
 # Synthesus Kaggle Integration Agent
 
 ## Mission

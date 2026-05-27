@@ -1,6 +1,8 @@
-# 🧠 Synthesus 4.0 — Sovereign Intelligence Operating System
+# Synthesus 4.1 CHAL — Sovereign Intelligence Operating System
 
-Synthesus 4.0 is a hardware-aware architecture that transforms standard machines into **Sovereign Intelligence Nodes**. It implements the **AIVM (Artificial Intelligence Virtual Machine)** methodology, fusing a high-performance C++ kernel with a multi-brain cognitive framework.
+Synthesus 4.1 is the CHAL line: **Cognitive Hardware Abstraction Layer**. It treats knowledge, parameters, cache, memory, PPBRS, dual hemispheres, and generation as virtual cognitive hardware mounted inside the runtime. It implements the **AIVM (Artificial Intelligence Virtual Machine)** methodology, fusing a high-performance C++ kernel with a multi-brain cognitive framework.
+
+The current development directive is `docs/roadmap/SYNTHESUS_4_1_CHAL_MAXIMUM_DIRECTIVE.md`.
 
 ## 🏗 Real Monorepo Structure
 
@@ -70,7 +72,7 @@ A native C++ environment that provides absolute hardware isolation for reasoning
     ```
 
 ## 🗺 Roadmap
-- **Phase 4.1**: Full KVM guest lifecycle integration.
+- **Phase 4.1**: CHAL mount manager, cognitive scheduler, cache hierarchy, Knowledge Cloud hardware partitions, hemi-sync metacognition, and removal of legacy/template fallback generation.
 - **Phase 4.2**: Direct BCI (Brain-Computer Interface) hardware ingress.
 - **Phase 5.0**: Sovereign Silicon — Transition to custom FPGA-backed VPU cores.
 

@@ -1,6 +1,6 @@
 # Implementation Plan: Fully Offline, Non-Templated Language Generation
 
-Goal: make Synthesus produce language locally, without external LLM API dependencies, and without template-style fallback output as the default behavior.
+Goal: make Synthesus produce language locally, without external LLM API dependencies, and without template-style fallback output as the default behavior. In Synthesus 4.1 CHAL, this is no longer optional cleanup: normal user/NPC language must be generated through the bounded pipeline. Fixed or templated responses are allowed only for AI safety, AIVM platform restrictions, abuse prevention, identity/rights protection, or explicit degraded-state markers.
 
 ## Success Criteria
 
