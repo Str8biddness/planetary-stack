@@ -1006,3 +1006,21 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 - Public mirror was not refreshed because `artifacts/` did not change and `status --local artifacts` reported 10/10 artifacts OK against `https://zo.pub/syntech/synthesus-knowledge`.
 - Runtime source commit: ab27ca23a476177c422e181edc3f5a9eaa46ed74. Knowledge Cloud commit: none; repo stayed clean.
 - Existing untracked `synthesus_framework/` was present before this run and was intentionally not staged.
+
+## Current Session — 2026-05-27 (Knowledge Index Population + Git Hygiene follow-up)
+
+### Summary
+- Pulled both canonical repos and continued runtime population into the canonical `data/` cache with 5,000 Jeopardy entries and 5,000 ConceptNet entries, bringing the local runtime FAISS cache to 50,000 vectors while keeping `data/` ignored as a rebuildable artifact plane.
+- Revalidated the runtime knowledge layer and the standalone Knowledge Cloud bundle. The runtime cache was not copied into `synthesus-knowledge-cloud/artifacts/` because it is an incremental local cache, not a complete cloud release bundle.
+- Refreshed `artifacts/manifest.json` with current `public-base` provenance, updated the Knowledge Cloud changelog, validated the artifact/source planes, completed a file:// smoke sync, and refreshed the public mirror at `https://zo.pub/syntech/synthesus-knowledge`.
+
+### Verified
+- `python -m py_compile packages/knowledge/run_population.py packages/knowledge/kn_populator.py packages/knowledge/cloud_sync.py packages/knowledge/knowledge_cloud.py`
+- `python -m knowledge_integration.run_population --cache-dir /home/workspace/Synthesus_4.0/data --kn-db /home/workspace/Synthesus_4.0/data/knowledge.kndb --faiss /home/workspace/Synthesus_4.0/data/faiss.index --model-dir /home/workspace/Synthesus_4.0/data/models --sample-jeopardy 5000 --sample-conceptnet 5000 --batch-size 2000 --skip-test`
+- `python -m pytest -q tests/test_knowledge_cloud.py tests/test_knowledge_cloud_sync.py tests/test_knowledge_bootstrap_integration.py tests/test_kal.py tests/test_kal_e2e.py` — 72 passed, 9 skipped.
+- Knowledge Cloud validation: `stamp-manifest --profile profiles/public-base.yaml`, `validate --root artifacts`, `validate-sources --root .`, `status --local artifacts`, and `scripts/sync_knowledge_cloud.py --dest /tmp/synthesus-kc-smoke --base-url file://$PWD/artifacts`.
+
+### Notes
+- Public mirror refresh completed with 0 added, 1 changed, 0 deleted, and 10 unchanged files.
+- Knowledge Cloud commit: c2bae81aa81857cf5ce6a4f19bcc819c91b6f671. Runtime source baseline before this log-only commit: ab27ca23a476177c422e181edc3f5a9eaa46ed74.
+- Existing untracked `synthesus_framework/` was present before this run and was intentionally not staged.
