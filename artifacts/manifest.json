@@ -60,9 +60,9 @@
   "build": {
     "package_version": "0.3.0",
     "generated_by": "synthesus-kc build",
-    "profile": "hardware-emulation",
-    "git_commit": "7eae8f14317defc68487e1cf43479d49f30bd406",
-    "git_short_commit": "7eae8f1",
+    "profile": "public-base",
+    "git_commit": "1f5a3bde3cf23a622553df45a0e297c527e6f23b",
+    "git_short_commit": "1f5a3bd",
     "git_branch": "main",
     "git_dirty": false,
     "python_version": "3.12.1",
@@ -105,8 +105,8 @@
     },
     "extra": {
       "embed_dim": 128,
-      "sample_jeopardy": 20000,
-      "sample_conceptnet": 20000,
+      "sample_jeopardy": 87500,
+      "sample_conceptnet": 75000,
       "outputs": {
         "faiss": true,
         "kndb": true,
@@ -114,12 +114,13 @@
         "source_manifest": true
       },
       "sources": [
-        "corpus_hardware_blueprints",
-        "corpus_emulation",
         "jeopardy",
-        "conceptnet"
+        "conceptnet",
+        "world_lore",
+        "synthetic_lore",
+        "character_patterns"
       ]
     }
   },
-  "manifest_revised_at": "2026-05-22T09:58:50.125020+00:00"
+  "manifest_revised_at": "2026-05-27T14:10:16.860117+00:00"
 }

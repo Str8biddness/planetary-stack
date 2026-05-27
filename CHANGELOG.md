@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — 2026-05-27
+
+### Changed
+- Refreshed `artifacts/manifest.json` with current `public-base` provenance after validating the existing artifact bundle and source planes.
+
 ## 0.3.0 — 2026-05-22
 
 Hardware-Aware Bare-Metal AI foundation. Introduced two new public-source corpora and the ingestion pipeline behind them.
