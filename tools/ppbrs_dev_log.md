@@ -325,3 +325,32 @@ tests/test_ppbrs_integration.py  — 15 passed
 ────────────────────────────────────────────
 TOTAL                            — 110 passed
 ```
+
+## Daily Entry: 2026-05-27 (13:07 UTC)
+
+### Benchmark Run
+
+**PPBRS micro-benchmarks** (today vs most recent prior baseline 2026-05-05 00:16:34):
+
+| Component | Prior p50 (ms) | Today p50 (ms) | Δ |
+|---|---|---|---|
+| pattern_matching | 166.4919 | 186.2921 | +11.9% (regression) |
+| rule_evaluation | 0.0437 | 0.0488 | +11.7% (regression) |
+| graph_traversal | 0.1178 | 0.1027 | -12.8% (improved) |
+
+**Full benchmark suite** (overall: 77.50):
+| Domain | Score |
+|---|---|
+| general_knowledge | 80.0 |
+| science_reasoning | 75.0 |
+| math_reasoning | 85.0 |
+| coding_generation | 70.0 |
+| retrieval_faithfulness | 90.0 |
+| cross_domain_synthesis | 65.0 |
+
+### Notes
+- pattern_matching and rule_evaluation regressed ~12% vs prior baseline; graph_traversal improved ~13%.
+- Full suite pytest: 139 passed (test_kal, test_kal_e2e, test_ppbrs, test_ppbrs_extended, test_ppbrs_integration).
+- reasoning/ tests: 16 passed.
+- py_compile passed for hemisphere_bridge.py, quadbrain_master.py, reasoning_core.py.
+- No domain regressed >5% on full suite scores (no prior comparison available for 2026-05-27 baseline).
