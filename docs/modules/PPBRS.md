@@ -160,6 +160,14 @@ The `zo_kernel` binary provides high-throughput pattern matching:
 
 When `zo_kernel` is unavailable, `core/pattern_engine.py` provides a Python fallback using SQLite-backed pattern storage. Performance is lower (~100 QPS) but functionally equivalent.
 
+### Reranker Fallback Boundary (2026-05-27)
+
+`packages/reasoning/reranker.py` now defaults to deterministic lexical reranking instead of attempting an implicit cross-encoder model load. This keeps scheduled reasoning validation bounded and prevents hidden network/model-download stalls. Cross-encoder use remains available through `CrossEncoderReranker(config={"enable_cross_encoder": True})`; when disabled or unavailable, the fallback ranks by normalized query/chunk token overlap and only uses reciprocal-rank scoring when no lexical signal exists.
+
+Legacy import paths are preserved through thin compatibility packages:
+- `ppbrs.*` -> `packages/reasoning/*`
+- `core.reasoning.*` -> `packages/reasoning/*`
+
 ## Integration with Dual-Hemisphere
 
 PPBRS runs primarily in the **Left Hemisphere** of the dual-hemisphere architecture:

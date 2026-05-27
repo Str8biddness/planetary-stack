@@ -142,3 +142,16 @@ The **ML Swarm** (~458 KB total) provides shared classification, sentiment, and 
 | + others | Domain-specific models | ~318 KB |
 
 Total inference: **<1ms** on CPU
+
+## Bounded Generation Pipeline Status (2026-05-27)
+
+The bounded generation pipeline is now explicitly surfaced under `packages/reasoning/generation/`:
+
+| Stage | File | Status |
+|-------|------|--------|
+| Plan | `response_planner.py` | Typed planning context and `ResponsePlanner` shell |
+| Realize | `surface_realizer.py` | Typed realizer shell with literal constraint checks |
+| Critique | `critic.py` | Typed critique shell for accept/rewrite/block decisions |
+| Emit / trace | `response_plan.py`, `spine.py` | Existing response plan types and generation spine |
+
+The new files are intentionally Python orchestration stubs with TODO-marked implementation boundaries. They do not replace the existing `GenerationSpine`; they make the expected `plan -> realize -> critique -> rewrite -> emit` contract inspectable before deeper model-backed behavior is added.

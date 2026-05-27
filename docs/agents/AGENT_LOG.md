@@ -968,3 +968,21 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 - `cmake --build build --target _synthesus_kernel -j2` completed successfully.
 - Python smoke test imported `build/_synthesus_kernel` and verified blueprint lookup, parameter mapping/count, `set_secure_key`, and `decrypt_ipc`.
 - Build still emits the existing unrelated `ContextEntry` ODR warning from `memory/working_memory.hpp` and `core/context_memory.hpp`.
+## Current Session — 2026-05-27 (Reasoning Layer Architect)
+
+### Summary
+- Audited `packages/reasoning/`, `packages/reasoning/generation/`, `packages/kernel/`, and `packages/core/hemisphere_bridge.py` against the Agent 4 scope.
+- Added missing bounded-generation pipeline surfaces: `response_planner.py`, `surface_realizer.py`, and `critic.py`.
+- Added missing C++ kernel router stubs in `packages/kernel/` for planner, bayesian, causal, ensemble synthesis, SINN, and symbolic routing. These stubs are explicit unimplemented boundaries for later Agent 6 profiling/offload work.
+- Implemented a real deterministic lexical fallback in `CrossEncoderReranker.rerank()` and made cross-encoder loading opt-in via `enable_cross_encoder`.
+- Added compatibility import shims for legacy `core`, `core.reasoning`, `core.generation`, `ppbrs`, and `cognitive` public APIs after the 4.0 package move.
+- Updated `CrossDomainSynthesizer` section headers to retain uppercase production headings while including title-case labels for older callers.
+
+### Verified
+- `python3 -m py_compile` passed for all changed Python files.
+- Focused reranker regression tests passed.
+- Requested validation command passed: `129 passed in 0.44s`.
+
+### Notes
+- Existing untracked `synthesus_framework/` was present before this run and was intentionally not staged.
+- The new kernel router files are source-level stubs only; they are not performance claims and do not change the Python hot path.

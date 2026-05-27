@@ -264,6 +264,20 @@ The Reasoning Layer provides advanced logic for complex, multi-entity queries.
 4. **Verifier** — Checks for logical consistency and safety guardrails.
 5. **Synthesizer** — Consolidates findings into a coherent narrative.
 
+### Compatibility Imports (2026-05-27)
+
+Synthesus 4.0 source lives under `packages/`, but existing tests and downstream integrations still import legacy package names. The root compatibility packages preserve those public APIs without moving implementation files:
+
+| Legacy import | Routed implementation |
+|---------------|-----------------------|
+| `core.*` | `packages/core/*` plus `packages/knowledge/*` for historical `core.knowledge_cloud` |
+| `core.reasoning.*` | `packages/reasoning/*` |
+| `core.generation.*` | `packages/reasoning/generation/*` |
+| `ppbrs.*` | `packages/reasoning/*` |
+| `cognitive.*` | `packages/core/cognitive/*` |
+
+This is an API-preservation layer, not a second implementation surface.
+
 ### ML Organs (Triad + Shared)
 
 The reasoning pipeline is augmented by specialized ML organs that handle specific cognitive sub-tasks:

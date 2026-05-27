@@ -91,7 +91,7 @@ class CrossDomainSynthesizer:
 
         for domain in sorted_domains:
             texts = by_domain[domain]
-            sections.append(f"## {domain.upper()}")
+            sections.append(f"## {domain.upper()} ({domain.title()})")
             for t in texts:
                 # Add bullet points, ensuring no double bullets if text already has them
                 clean_t = t.lstrip("- ").strip()
