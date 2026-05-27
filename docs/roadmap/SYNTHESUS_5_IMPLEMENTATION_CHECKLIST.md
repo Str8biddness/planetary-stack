@@ -126,7 +126,7 @@ Legend:
 
 - [ ] Add replayable trace storage for comparison harnesses.
 
-- [ ] Add save/load tests across CHAL memory partitions.
+- [~] Add save/load tests across CHAL memory partitions. Session log: 2026-05-27 Agent 8 AIVM snapshot integrity added default VMD snapshot/restore parity and tamper rejection; broader CHAL partition save/load remains.
 
 ## Phase 8: GPT-4-Class Evaluation Harness
 

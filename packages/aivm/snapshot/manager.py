@@ -17,6 +17,13 @@ class SnapshotManager:
     CONTRACT_VERSION = 1
 
     @staticmethod
+    def _fingerprint_payload(payload: Dict[str, Any]) -> str:
+        unsigned = dict(payload)
+        unsigned.pop("footer", None)
+        json_payload = json.dumps(unsigned, sort_keys=True)
+        return hashlib.sha256(json_payload.encode()).hexdigest()
+
+    @staticmethod
     def capture(npc: NPC) -> bytes:
         """
         Snapshot all mounted devices and kernel state into a sealed blob.
@@ -51,11 +58,8 @@ class SnapshotManager:
         }
 
         # Seal with fingerprint
-        json_payload = json.dumps(payload, sort_keys=True)
-        fingerprint = hashlib.sha256(json_payload.encode()).hexdigest()
-        
         payload["footer"] = {
-            "fingerprint": fingerprint,
+            "fingerprint": SnapshotManager._fingerprint_payload(payload),
             "signature": "AIVM_LLC_ALPHA"
         }
 
@@ -68,6 +72,12 @@ class SnapshotManager:
         """
         data = json.loads(blob.decode())
         header = data["header"]
+        footer = data.get("footer", {})
+        expected_fingerprint = footer.get("fingerprint")
+        actual_fingerprint = SnapshotManager._fingerprint_payload(data)
+
+        if not expected_fingerprint or expected_fingerprint != actual_fingerprint:
+            raise ValueError("Snapshot fingerprint mismatch")
         
         if header["contract_version"] != SnapshotManager.CONTRACT_VERSION:
             raise ValueError(f"Contract version mismatch: {header['contract_version']}")

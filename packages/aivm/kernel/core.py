@@ -114,7 +114,7 @@ class AIVMKernel:
         if not npc:
             raise ValueError(f"NPC {npc_id} not found.")
 
-        user_input = input_payload.get("user_input", "")
+        user_input = input_payload.get("user_input") or input_payload.get("input", "")
 
         @FaultGuard.contain(npc)
         async def _execute_canonical_sequence():

@@ -134,7 +134,7 @@ The contract is real when all of the following pass in CI:
 1. Mount/unmount round-trip.
 2. Per-tick sequence trace matches the 12-step sequence.
 3. Isolation suite (No cross-NPC memory/VQD scope reach).
-4. Snapshot/restore parity.
+4. Snapshot/restore parity, including fingerprint verification before restore.
 5. Quota enforcement.
 6. Style enforcement.
 7. Inspector exposure (< 100ms latency).

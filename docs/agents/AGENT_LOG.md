@@ -1196,3 +1196,31 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Architectural Notes
 - Hypervisor isolation now lives at the AIVM boundary instead of being an ad hoc try/except around bridge calls.
 - Budget exhaustion is now explicit telemetry, which gives future frontend/API trace views a stable field to render.
+
+## Current Session — 2026-05-27 (Agent 8 — AIVM Snapshot Integrity)
+
+### Summary
+- Fixed the default AIVM kernel tick path so missing optional MemoryStore and Knowledge Cloud backends no longer break the canonical 12-step sequence.
+- Added a local fallback event buffer to `VMD` with snapshot/restore participation, preserving bounded memory behavior until a real CHAL memory backend is mounted.
+- Made `VQD` return an empty scoped result set when no knowledge backend is mounted, while still raising clearly for malformed non-search backends.
+- Normalized kernel tick ingress so callers using either `input` or `user_input` feed the same canonical sequence.
+- Added snapshot fingerprint verification before restore so tampered payloads are rejected before devices are spawned.
+- Added focused AIVM tests for canonical tick survival, local VMD snapshot parity, and tamper rejection.
+
+### Synthesus 5 Checklist Items Advanced
+- Phase 7: save/load validation for AIVM-backed CHAL memory behavior moved to in-progress with VMD snapshot/restore parity covered.
+- AIVM/NPC contract acceptance: snapshot/restore parity now includes fingerprint integrity verification.
+
+### Verified
+- `python -m py_compile packages/aivm/kernel/core.py packages/aivm/devices/vmd.py packages/aivm/devices/vqd.py packages/aivm/snapshot/manager.py tests/aivm/test_snapshot_integrity.py tests/aivm/test_tick_sequence.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages python -m pytest -q tests/aivm/test_tick_sequence.py tests/aivm/test_snapshot_integrity.py tests/aivm/verify_kernel.py` — 3 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages python tests/aivm/verify_resilience.py` — snapshot/isolation smoke passed; simulated crash was contained as degraded behavior.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages/kernel/build python -c "import _synthesus_kernel"` — pybind import smoke passed.
+
+### Left Off / Next Steps
+- Extend save/load validation from default VMD fallback into mounted CHAL memory partitions once the mount table boot sequence lands.
+- Add explicit cross-NPC memory/VQD scope isolation tests around real backends, not just fallback behavior.
+
+### Architectural Notes
+- The default AIVM kernel can now demonstrate the canonical tick contract without pretending external hardware backends are present.
+- Snapshot footer integrity is now enforced at restore time, making traceable AIVM state recovery a real guardrail rather than documentation-only.

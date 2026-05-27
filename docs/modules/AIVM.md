@@ -184,6 +184,12 @@ Synthesus 5 hypervisor dispatches can now use `packages/aivm/isolation/guard.py`
 
 The Cognitive Hypervisor wraps hemisphere bridge dispatch with this guard, so timeout and fault cases produce degraded trace records instead of uncaught failures. Hypervisor telemetry now includes `device_isolation`, `budget_exhausted`, and `degraded` fields.
 
+## Snapshot Integrity And Default Device Fallbacks
+
+The AIVM kernel can now complete the canonical 12-step tick without external Knowledge Cloud or MemoryStore backends mounted. `VQD` returns an empty scoped result set when no knowledge backend is present, and `VMD` uses a local in-memory event buffer that participates in snapshot/restore. This keeps default kernel smoke tests bounded while preserving the mount points for real CHAL hardware backends.
+
+`SnapshotManager` seals every snapshot payload with a SHA-256 fingerprint over the unsigned payload. Restore now recomputes that fingerprint before spawning devices and rejects tampered blobs with a `ValueError`, giving AIVM snapshotting an explicit integrity gate instead of treating the footer as advisory metadata.
+
 ## Amplification Loop
 
 ```

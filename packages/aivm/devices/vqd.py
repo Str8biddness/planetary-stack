@@ -14,8 +14,12 @@ class VQD(Device):
         self._scope = scope or ["global"]
 
     def lookup(self, query: str, limit: int = 5) -> List[Any]:
-        # Enforce scope check before lookup
-        # (Simplified: filter by tags in the cloud search if supported)
+        if self._cloud is None:
+            return []
+
+        if not hasattr(self._cloud, "search"):
+            raise TypeError("VQD knowledge cloud backend must expose search(query, top_k=...)")
+
         return self._cloud.search(query, top_k=limit)
 
     def snapshot(self) -> bytes:
