@@ -1,14 +1,14 @@
 # Dual-Hemisphere Architecture
 
-> Synthesus 3.0 — Left + Right Hemisphere Processing
+> Synthesus 4.1 — CHAL compute units plus bounded generation
 
 ## Overview
 
 Synthesus uses a dual-hemisphere processing model inspired by theories of human brain lateralization, now enhanced with **Parallel Hemisphere Execution**:
 
-- **Left Hemisphere**: Fast, pattern-based, analytical processing (PPBRS kernel)
+- **Left Hemisphere**: Fast, pattern-based, analytical processing (PPBRS firmware signals)
 - **Right Hemisphere**: Slower, contextual, creative processing (Cognitive Core + specialized modules)
-- **Reconciliation**: Parallel arbitration and agreement synthesis
+- **Reconciliation**: Parallel arbitration, checkpointed state handoff, and bounded generation-spine realization
 
 ## Architecture Diagram
 
@@ -18,12 +18,12 @@ Synthesus uses a dual-hemisphere processing model inspired by theories of human 
                 ┌──────────┴──────────┐
                 │                     │
          LEFT HEMISPHERE       RIGHT HEMISPHERE
-         Pattern Matching      Cognitive Core (Parallel)
+         PPBRS Firmware        Cognitive Core (Parallel)
                 │                     │
          • Tokenized triggers  • Deductive Reasoning
          • Confidence scoring  • Inductive Reasoning
-         • Fallback cascades   • Abductive Reasoning
-         • <1ms resolution     • Conversation Tracking
+         • CHAL constraints    • Abductive Reasoning
+         • Trace metadata      • Conversation Tracking
                 │              • Emotion State Machine
                 │              • Knowledge Graph
                 │              • Social Fabric
@@ -32,11 +32,10 @@ Synthesus uses a dual-hemisphere processing model inspired by theories of human 
                 │                     │
                 └──────────┬──────────┘
                       RECONCILER
-                (Parallel Arbitration)
+                (Deterministic Arbitration)
                            │
-                   ML SWARM (7+ models)
-                      ~500 KB total
-                       <1ms inference
+                 BOUNDED GENERATION SPINE
+              plan → realize → critique → emit
 ```
 
 ## Parallel Execution
@@ -65,13 +64,16 @@ async def reason(self, query: str):
 
 ## Left Hemisphere — PPBRS Kernel
 
-**File**: `core/hemisphere_bridge.py`
+**File**: `packages/core/hemisphere_bridge.py`
 
-High-speed pattern matching via C++ `zo_kernel` binary:
+High-speed pattern matching via C++ `zo_kernel` binary or Python fallback:
 - 1000+ QPS throughput
 - <1ms per query
 - Tokenized trigger matching
-- Confidence scoring with fallback cascades
+- Confidence scoring with CHAL firmware handoff
+- No normal user-facing template emits
+
+The left hemisphere now normalizes PPBRS output through `packages/reasoning/chal.py`. The signal includes `CognitiveTask`, `ExecutionPlan`, `ModuleMessage`, `Checkpoint`, `TelemetryRecord`, confidence, constraints, and trace metadata. `HemisphereBridge.left()` and high-confidence `AUTO` left decisions surface this firmware through `GenerationSpine` instead of returning PPBRS' old `[module] Handled` or `[fallback]` strings.
 
 ### HemisphereMode Enum
 
@@ -88,11 +90,11 @@ class HemisphereMode(Enum):
 ```python
 @dataclass
 class HemisphereResult:
-    response: str              # Final reconciled response
+    response: str              # Final response after generation-spine realization
     hemisphere_used: str       # "left", "right", or "both"
     raw_confidence: float     # Confidence of winning hemisphere
     agreement_score: float     # Agreement between hemispheres (BOTH mode)
-    left_response: str         # Raw left response (BOTH mode)
+    left_response: str         # Compatibility field; left firmware lives in state/signals
     right_response: str        # Raw right response (BOTH mode)
     latency_ms: float          # Total processing time
 ```
@@ -117,7 +119,7 @@ class HemisphereResult:
 
 ## Reconciliation
 
-When both hemispheres contribute (BOTH mode), the bridge calculates **agreement score** using Jaccard similarity:
+When both hemispheres contribute (BOTH mode), the bridge calculates **agreement score** using Jaccard similarity over surfaced text while preserving structured left firmware in `state_handoff.signals`:
 
 ```python
 def _calculate_agreement(self, left_resp: str, right_resp: str) -> float:
@@ -128,7 +130,7 @@ def _calculate_agreement(self, left_resp: str, right_resp: str) -> float:
     return len(left_tokens & right_tokens) / len(left_tokens | right_tokens)
 ```
 
-If agreement >= threshold (default 0.65), the more confident response is used. Otherwise, left hemisphere is preferred for analytical queries, right for creative ones.
+If agreement >= threshold (default 0.65), the more confident response is used. Otherwise, left hemisphere is preferred for high-confidence analytical routes and right hemisphere is preferred for contextual or low-confidence routes. Left-favored routes still pass through `GenerationSpine` before response emission.
 
 ## ML Swarm Integration
 
@@ -155,3 +157,7 @@ The bounded generation pipeline is now explicitly surfaced under `packages/reaso
 | Emit / trace | `response_plan.py`, `spine.py` | Existing response plan types and generation spine |
 
 The new files are intentionally Python orchestration stubs with TODO-marked implementation boundaries. They do not replace the existing `GenerationSpine`; they make the expected `plan -> realize -> critique -> rewrite -> emit` contract inspectable before deeper model-backed behavior is added.
+
+### CHAL Firmware Realization Update (2026-05-27)
+
+`GenerationSpine` accepts `SpineInput.firmware_signals` and realizes CHAL firmware into bounded text. This creates a narrow bridge from PPBRS/retrieval metadata into final wording without letting PPBRS own the sentence. Current realization is deterministic and inspectable; future work should route the same signal through VGD-backed `ResponsePlanner`, `SurfaceRealizer`, and `ResponseCritic`.

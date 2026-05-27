@@ -44,6 +44,14 @@ from .multi_step_reasoning import (
     HypothesisStatus,
     ReasoningStrategy
 )
+from .chal import (
+    Checkpoint,
+    CognitiveTask,
+    ExecutionPlan,
+    ModuleMessage,
+    TelemetryRecord,
+    build_ppbrs_firmware_signal,
+)
 
 __all__ = [
     'PatternClassifier',
@@ -81,6 +89,12 @@ __all__ = [
     'Hypothesis',
     'HypothesisStatus',
     'ReasoningStrategy',
+    'CognitiveTask',
+    'ExecutionPlan',
+    'ModuleMessage',
+    'Checkpoint',
+    'TelemetryRecord',
+    'build_ppbrs_firmware_signal',
 ]
 
 __version__ = '1.1.0'

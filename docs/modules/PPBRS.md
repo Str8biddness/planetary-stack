@@ -1,26 +1,42 @@
 # PPBRS — Probabilistic Pattern-Based Reasoning System
 
-> Synthesus 3.0 — Pattern-Based Reasoning Core
+> Synthesus 4.1 — Left-hemisphere CHAL cognitive firmware
 
 ## Overview
 
-PPBRS is the symbolic reasoning engine at the heart of Synthesus. It provides multi-step reasoning chains with confidence scoring, pattern classification, and rule-to-action mapping.
+PPBRS is the bounded symbolic reasoning firmware for Synthesus. It provides multi-step reasoning chains with confidence scoring, pattern classification, and rule-to-action mapping, but it does **not** own normal user-facing wording. Its output contract is now a CHAL firmware signal consumed by dual-hemisphere arbitration and the bounded generation spine.
 
 ## Architecture
 
 ```
 Query Input
     │
-    ├──► PPBRS Kernel (C++, zo_kernel) — 1000+ QPS
+    ├──► PPBRS Kernel (C++, zo_kernel) — routing / confidence / constraints
     │         │
     │         ▼
-    │    Pattern Matcher → Causal Engine → Bayesian Update → Planner
+    │    Pattern Matcher → Causal Engine → Bayesian Update → CHAL firmware signal
     │
-    └──► PatternEngine (Python fallback, SQLite-backed)
+    └──► Python fallback router
               │
               ▼
-         Pattern Store
+         CHAL firmware signal → generation spine
 ```
+
+## CHAL Firmware Contract (2026-05-27)
+
+The concrete interface lives in `packages/reasoning/chal.py`:
+
+| Record | Purpose |
+|--------|---------|
+| `CognitiveTask` | Schedulable reasoning workload with query, domain, budgets, constraints, and trace ID |
+| `ExecutionPlan` | Ordered firmware stages such as classify, route, constrain, and handoff to generation |
+| `ModuleMessage` | CHAL fabric payload from PPBRS to the generation spine |
+| `Checkpoint` | Replayable reasoning state for route/confidence decisions |
+| `TelemetryRecord` | Latency, confidence, fallback, and template-leakage metadata |
+
+`build_ppbrs_firmware_signal()` creates the JSON-shaped `synthesus.chal.reasoning_firmware.v1` payload. The fallback PPBRS bridge now returns `KernelResult.response == ""` for normal routing and stores the firmware payload in `KernelResult.metadata["chal_firmware_signal"]` with `user_facing=False`.
+
+Allowed fixed-response exceptions remain safety, abuse prevention, identity/rights protection, and explicit AIVM platform restrictions. Normal pattern matches, retrieval matches, and low-confidence fallbacks must be surfaced through the generation spine or a future VGD-backed realization path.
 
 ## Core Modules
 
@@ -152,13 +168,26 @@ The `zo_kernel` binary provides high-throughput pattern matching:
 // Request (to stdin)
 {"query": "What is the status of the database?", "character_id": "synth"}
 
-// Response (from stdout)
-{"response": "Database is healthy", "confidence": 0.87, "found": true, "pattern_id": "db_health_check"}
+// Firmware response (normal reasoning path)
+{
+  "response": "",
+  "confidence": 0.87,
+  "found": true,
+  "module_used": "db_health_check",
+  "metadata": {
+    "user_facing": false,
+    "chal_firmware_signal": {
+      "schema": "synthesus.chal.reasoning_firmware.v1",
+      "trace_id": "trace-...",
+      "constraints": ["generation_spine_owns_final_wording"]
+    }
+  }
+}
 ```
 
 ### Fallback
 
-When `zo_kernel` is unavailable, `core/pattern_engine.py` provides a Python fallback using SQLite-backed pattern storage. Performance is lower (~100 QPS) but functionally equivalent.
+When `zo_kernel` is unavailable, the Python fallback router in `packages/kernel/bridge.py` emits the same CHAL firmware metadata. It no longer emits legacy strings such as `[fallback] No route matched` or `[module] Handled: ...` as user-facing text.
 
 ### Reranker Fallback Boundary (2026-05-27)
 
@@ -174,5 +203,5 @@ PPBRS runs primarily in the **Left Hemisphere** of the dual-hemisphere architect
 
 | Hemisphere | Processing | Latency Target |
 |------------|------------|----------------|
-| Left (PPBRS) | Pattern matching, fast deduction | <1ms |
+| Left (PPBRS) | Pattern matching, fast deduction, CHAL firmware signals | <1ms |
 | Right (Cognitive) | Emotion, relationships, context | 10-50ms |

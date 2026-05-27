@@ -47,6 +47,7 @@ class SpineInput:
     
     # Optional context for enhancement
     memory_context: Dict[str, Any] = field(default_factory=dict)
+    firmware_signals: List[Dict[str, Any]] = field(default_factory=list)
     rag_context: str = ""
     conversation_history: List[Dict] = field(default_factory=list)
 
@@ -165,6 +166,8 @@ class GenerationSpine:
         if inp.raw_text is not None:
             # Option A: Finalize pre-formed text
             text, trace = self._finalize_text(inp.raw_text, inp, organ_scores)
+        elif inp.firmware_signals:
+            text, trace = self._generate_from_firmware(inp, organ_scores)
         elif inp.response_plan:
             # Option B: Probabilistic generation from plan
             config = map_organs_to_config(organ_scores)
@@ -239,6 +242,38 @@ class GenerationSpine:
         )
         
         return raw_text, trace
+
+    def _generate_from_firmware(self, inp: SpineInput, organ_scores: Dict[str, float]) -> tuple:
+        """Generate bounded surface text from CHAL firmware signals."""
+        signal = inp.firmware_signals[-1]
+        message = signal.get("module_message", {})
+        payload = message.get("payload", {})
+        telemetry = signal.get("telemetry", {})
+        module = payload.get("module_used") or telemetry.get("metadata", {}).get("module_used") or "unrouted"
+        confidence = float(signal.get("confidence", telemetry.get("confidence", inp.source_confidence)))
+        constraints = signal.get("constraints", [])
+
+        if confidence <= 0.0 or module == "fallback":
+            text = (
+                "No confident reasoning route is available yet. "
+                "Use bounded generation with retrieval grounding and keep the response explicit about uncertainty."
+            )
+        else:
+            constraint_text = ", ".join(str(item) for item in constraints[:3])
+            text = (
+                f"The left reasoning pass selected the {module} route at {confidence:.2f} confidence. "
+                f"Generate the final answer under these constraints: {constraint_text}."
+            )
+
+        trace = GenerationTrace(
+            text=text,
+            token_logprobs=[],
+            mean_logprob=confidence,
+            constraints_satisfied=True,
+            decode_attempts=1,
+            config_used=map_organs_to_config(organ_scores),
+        )
+        return text, trace
     
     def _generate_from_context(self, inp: SpineInput, organ_scores: Dict[str, float]) -> tuple:
         """Generate from conversation context when no plan/text provided."""

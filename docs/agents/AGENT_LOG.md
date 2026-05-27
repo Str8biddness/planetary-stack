@@ -1057,3 +1057,22 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Verified
 - Documentation-only direction change; no runtime code behavior changed in this session.
 - Existing untracked `synthesus_framework/` directory remained untouched.
+
+## Current Session — 2026-05-27 (Agent 4 — CHAL Reasoning Firmware)
+
+### Summary
+- Added the concrete CHAL reasoning interface in `packages/reasoning/chal.py`: `CognitiveTask`, `ExecutionPlan`, `ModuleMessage`, `Checkpoint`, `TelemetryRecord`, and `build_ppbrs_firmware_signal()`.
+- Converted fallback PPBRS routing in `packages/kernel/bridge.py` from direct legacy response strings into structured left-hemisphere firmware metadata with `user_facing=False`.
+- Wired `packages/core/hemisphere_bridge.py` so left/high-confidence AUTO routes surface PPBRS firmware through `GenerationSpine` instead of returning `[module] Handled` or `[fallback]` strings.
+- Extended `GenerationSpine` with `SpineInput.firmware_signals` and a deterministic CHAL realization path.
+- Added focused regression tests for firmware signal shape, non-templated generation-spine realization, and dual-hemisphere left arbitration.
+- Updated `docs/modules/PPBRS.md` and `docs/modules/DUAL_HEMISPHERE.md` for the new firmware contract.
+
+### Verified
+- `python -m py_compile packages/reasoning/chal.py packages/reasoning/__init__.py packages/kernel/bridge.py packages/reasoning/generation/spine.py packages/core/hemisphere_bridge.py tests/test_chal_reasoning_firmware.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0:/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning python -m pytest -q tests/test_chal_reasoning_firmware.py tests/test_kernel_bridge.py tests/test_generation_spine_integration.py` — 51 passed, 4 skipped, 3 warnings.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0:/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 110 passed.
+
+### Notes
+- A plain pytest invocation still requires the repo's package paths to be supplied; this run used explicit `PYTHONPATH` for focused validation.
+- Existing untracked `synthesus_framework/` was present before this run and was intentionally not staged.

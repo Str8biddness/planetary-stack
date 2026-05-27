@@ -26,6 +26,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+try:
+    from reasoning.chal import build_ppbrs_firmware_signal
+except ModuleNotFoundError:  # pragma: no cover - repo-root compatibility path
+    from packages.reasoning.chal import build_ppbrs_firmware_signal
+
 logger = logging.getLogger(__name__)
 
 
@@ -222,6 +227,7 @@ class FallbackPPBRS:
 
     def route(self, query: str, context: str = "") -> KernelResult:
         """Route a query through the PPBRS system."""
+        start = time.time()
         self._query_count += 1
         query_lower = query.lower()
         query_words = set(query_lower.split())
@@ -239,16 +245,36 @@ class FallbackPPBRS:
                     best_match = route
 
         if best_match and best_score > 0.3:
-            return KernelResult(
-                response=f"[{best_match['module']}] Handled: {query}",
-                confidence=min(1.0, best_score),
+            confidence = min(1.0, best_score)
+            firmware_signal = build_ppbrs_firmware_signal(
+                query=query,
                 module_used=best_match["module"],
+                confidence=confidence,
+                matched_pattern=best_match["pattern"],
+                rag_context=context,
+                latency_ms=(time.time() - start) * 1000,
+                fallback_used=False,
+            )
+            return KernelResult(
+                response="",
+                confidence=confidence,
+                module_used=best_match["module"],
+                metadata={"chal_firmware_signal": firmware_signal, "user_facing": False},
             )
 
+        firmware_signal = build_ppbrs_firmware_signal(
+            query=query,
+            module_used="fallback",
+            confidence=0.0,
+            rag_context=context,
+            latency_ms=(time.time() - start) * 1000,
+            fallback_used=True,
+        )
         return KernelResult(
-            response=f"[fallback] No route matched: {query}",
+            response="",
             confidence=0.0,
             module_used="fallback",
+            metadata={"chal_firmware_signal": firmware_signal, "user_facing": False},
         )
 
     @property

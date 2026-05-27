@@ -17,6 +17,11 @@ from typing import Any, Awaitable, Callable, Dict, Optional
 from bridge import BridgeMode as KernelBridgeMode
 from bridge import KernelBridge, KernelQuery
 from cognitive.social_fabric import SocialFabric, FactionRelation
+from generation.spine import GenerationSpine, SpineInput
+try:
+    from reasoning.chal import build_ppbrs_firmware_signal
+except ModuleNotFoundError:  # pragma: no cover - repo-root compatibility path
+    from packages.reasoning.chal import build_ppbrs_firmware_signal
 
 logger = logging.getLogger(__name__)
 
@@ -114,8 +119,58 @@ class HemisphereBridge:
         
         self._kernel_proc: Optional[subprocess.Popen] = None
         self._python_bridge = KernelBridge(force_mode=KernelBridgeMode.FALLBACK)
+        self._generation_spine = GenerationSpine(
+            models_dir=str(self.right_config.get("models_dir", "data/models"))
+        )
         self._apply_left_routes()
         self._start_kernel()
+
+    def _ensure_left_firmware_signal(
+        self,
+        result: Dict[str, Any],
+        query: str,
+        character_id: Optional[str],
+        rag_context: str,
+    ) -> Dict[str, Any]:
+        metadata = result.setdefault("metadata", {})
+        signal = metadata.get("chal_firmware_signal") or result.get("chal_firmware_signal")
+        if not signal:
+            signal = build_ppbrs_firmware_signal(
+                query=query,
+                character_id=character_id or "",
+                module_used=str(result.get("module_used", "unknown")),
+                confidence=float(result.get("confidence", 0.0)),
+                source=str(result.get("source", "ppbrs")),
+                rag_context=rag_context,
+                fallback_used=str(result.get("module_used", "")) == "fallback",
+            )
+            metadata["chal_firmware_signal"] = signal
+        result["chal_firmware_signal"] = signal
+        result["user_facing"] = False
+        return signal
+
+    def _surface_from_left_firmware(
+        self,
+        query: str,
+        character_id: Optional[str],
+        rag_context: str,
+        left_result: Optional[Dict[str, Any]],
+    ) -> str:
+        if not left_result:
+            return ""
+        signal = self._ensure_left_firmware_signal(left_result, query, character_id, rag_context)
+        output = self._generation_spine.generate(
+            SpineInput(
+                query=query,
+                character_id=character_id or "synth",
+                domain="general",
+                source_module="ppbrs_firmware",
+                source_confidence=float(left_result.get("confidence", 0.0)),
+                firmware_signals=[signal],
+                rag_context=rag_context,
+            )
+        )
+        return output.final_text
 
     def _apply_left_routes(self) -> None:
         """Seeds initial routes into the Python fallback left bridge."""
@@ -181,12 +236,16 @@ class HemisphereBridge:
             metadata={"hemisphere": "left"},
         )
         result = self._python_bridge.query(kernel_query)
+        metadata = dict(result.metadata or {})
         return {
             "response": result.response,
             "confidence": float(result.confidence),
             "found": result.module_used != "fallback" or bool(result.response),
             "module_used": result.module_used,
             "source": "python_fallback",
+            "metadata": metadata,
+            "chal_firmware_signal": metadata.get("chal_firmware_signal"),
+            "user_facing": bool(metadata.get("user_facing", True)),
         }
 
     def _query_kernel(self, query: str, character_id: Optional[str] = None, rag_context: str = "") -> Dict[str, Any]:
@@ -230,13 +289,16 @@ class HemisphereBridge:
                 return self._query_python_left(query, character_id, rag_context)
 
             result = json.loads(line.strip())
-            return {
+            routed = {
                 "response": str(result.get("response", "")),
                 "confidence": float(result.get("confidence", 0.0)),
                 "found": bool(result.get("found", False)),
                 "module_used": str(result.get("module_used", result.get("hemisphere_id", "kernel"))),
                 "source": "cpp_kernel",
+                "metadata": result.get("metadata", {}) if isinstance(result.get("metadata", {}), dict) else {},
             }
+            self._ensure_left_firmware_signal(routed, query, character_id, rag_context)
+            return routed
         except Exception as exc:
             logger.warning("Kernel query failed (%s); using Python fallback.", exc)
             self._start_kernel()
@@ -610,7 +672,7 @@ class HemisphereBridge:
             {
                 "query": prompt,
                 "character_id": character_id or "",
-                "response": result.get("response", ""),
+                "firmware_signal": self._ensure_left_firmware_signal(result, prompt, character_id, rag_context),
                 "confidence": float(result.get("confidence", 0.0)),
                 "module_used": result.get("module_used", ""),
                 "source": result.get("source", ""),
@@ -629,7 +691,7 @@ class HemisphereBridge:
                 "left_signal_id": signal["signal_id"],
             },
         )
-        return result.get("response", "")
+        return self._surface_from_left_firmware(prompt, character_id, rag_context, result)
 
     def right(self, prompt: str) -> str:
         """Executes a right-hemisphere (intuitive) reasoning pass.
@@ -758,7 +820,7 @@ class HemisphereBridge:
                 {
                     "query": query,
                     "character_id": character_id or "",
-                    "response": left_result.get("response", ""),
+                    "firmware_signal": self._ensure_left_firmware_signal(left_result, query, character_id, rag_context),
                     "confidence": float(left_result.get("confidence", 0.0)),
                     "module_used": left_result.get("module_used", ""),
                     "source": left_result.get("source", ""),
@@ -833,7 +895,7 @@ class HemisphereBridge:
             )
             self._left_wins += 1
             return {
-                "response": left_result.get("response", "") if left_result else "",
+                "response": self._surface_from_left_firmware(query, character_id, rag_context, left_result),
                 "hemisphere_used": "left",
                 "raw_confidence": float(left_result.get("confidence", 0.0)) if left_result else 0.0,
                 "agreement_score": None,
@@ -923,7 +985,7 @@ class HemisphereBridge:
                         metadata={"max_tokens": max_tokens, "agreement_score": agreement, "arbitration": arbitration},
                     )
                     return {
-                        "response": left_result.get("response", ""),
+                        "response": self._surface_from_left_firmware(query, character_id, rag_context, left_result),
                         "hemisphere_used": "left",
                         "raw_confidence": float(left_result.get("confidence", 0.0)),
                         "agreement_score": agreement,
