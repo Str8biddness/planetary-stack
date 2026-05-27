@@ -986,3 +986,23 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Notes
 - Existing untracked `synthesus_framework/` was present before this run and was intentionally not staged.
 - The new kernel router files are source-level stubs only; they are not performance claims and do not change the Python hot path.
+
+## Current Session — 2026-05-27 (Knowledge Index Population + Git Hygiene)
+
+### Summary
+- Restored the 4.0 knowledge population compatibility surface by adding legacy import shims for `knowledge_integration.*`, `ml.*`, and `kal.*` after the package move.
+- Hardened runtime git hygiene by ignoring generated `data/`, model cache, FAISS, KNDB, checkpoints, scorecards, and training outputs.
+- Continued runtime population into the canonical `data/` cache with 20,000 Jeopardy entries and 20,000 ConceptNet entries, producing 40,000 local FAISS vectors and KNDB nodes as ignored build artifacts.
+- Preserved the authoritative Knowledge Cloud bundle: the local runtime output was not mirrored because it is not a complete cloud bundle and would downgrade the existing `artifacts/` plane.
+
+### Verified
+- `python -m py_compile packages/knowledge/run_population.py packages/knowledge/kn_populator.py packages/knowledge/cloud_sync.py packages/knowledge/knowledge_cloud.py`
+- `python -m knowledge_integration.run_population --cache-dir /home/workspace/Synthesus_4.0/data --kn-db /home/workspace/Synthesus_4.0/data/knowledge.kndb --faiss /home/workspace/Synthesus_4.0/data/faiss.index --model-dir /home/workspace/Synthesus_4.0/data/models --sample-jeopardy 20000 --sample-conceptnet 20000 --batch-size 2000 --skip-test`
+- `python -m pytest -q tests/test_knowledge_cloud.py tests/test_knowledge_cloud_sync.py tests/test_knowledge_bootstrap_integration.py tests/test_kal.py tests/test_kal_e2e.py` — 72 passed, 9 skipped.
+- Knowledge Cloud validation: `validate --root artifacts`, `validate-sources --root .`, `status --local artifacts`, and `scripts/sync_knowledge_cloud.py --dest /tmp/synthesus-kc-smoke --base-url file://$PWD/artifacts`.
+
+### Notes
+- `python3 -m pytest` used `/usr/bin/python3`, which lacks pytest in this sandbox; validation was run with `/usr/local/bin/python` instead.
+- Public mirror was not refreshed because `artifacts/` did not change and `status --local artifacts` reported 10/10 artifacts OK against `https://zo.pub/syntech/synthesus-knowledge`.
+- Runtime commit: 5169ec5317ccca039c182a1b8fda900538409f93. Knowledge Cloud commit: none; repo stayed clean.
+- Existing untracked `synthesus_framework/` was present before this run and was intentionally not staged.

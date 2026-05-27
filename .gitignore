@@ -59,6 +59,24 @@ Thumbs.db
 !.env.example
 
 # --- Project Specific Artifacts ---
+data/
+model_cache/
+models/cache/
+checkpoints/
+tools/results/
+benchmarks/results/
+logs/teacher_traces.jsonl
+logs/organ_evaluation_scorecard.json
+logs/organ_evaluation_scorecard.md
+training_logs/
+scorecards/
+*.kndb
+*.kndb-*
+*.kndb.meta.db
+*.faiss
+faiss.index
+faiss_metadata.json
+swarm_embedder.pkl
 synthesus_framework/data/
 synthesus_framework/characters/
 !synthesus_framework/characters/registry.json

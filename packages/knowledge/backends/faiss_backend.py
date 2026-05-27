@@ -46,14 +46,25 @@ class FaissKalBackend(KalBackend):
         # V4: Adaptive thresholding. Lower threshold for targeted namespaces.
         threshold = 0.1 if kal_query.effective_namespaces else 0.4
 
-        # Delegate to the existing async retrieve method
-        rag_result = await self._rag.retrieve(
-            query=kal_query.query,
-            character_id=character_id,
-            namespaces=kal_query.effective_namespaces,
-            top_k=search_k,
-            score_threshold=threshold,
-        )
+        # Delegate to the existing async retrieve method. Older RAGPipeline
+        # implementations do not accept the V4 namespace/threshold keywords,
+        # so preserve compatibility and perform namespace filtering locally.
+        try:
+            rag_result = await self._rag.retrieve(
+                query=kal_query.query,
+                character_id=character_id,
+                namespaces=kal_query.effective_namespaces,
+                top_k=search_k,
+                score_threshold=threshold,
+            )
+        except TypeError as exc:
+            if "unexpected keyword argument" not in str(exc):
+                raise
+            rag_result = await self._rag.retrieve(
+                query=kal_query.query,
+                character_id=character_id,
+                top_k=search_k,
+            )
 
         # Map RAG sources → KalKnowledgeNodes
         items: List[KalKnowledgeNode] = []
