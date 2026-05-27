@@ -6,6 +6,8 @@
 
 namespace synthesus::kernel {
 
+FusionTransformerBlock::FusionTransformerBlock() : FusionTransformerBlock(Config{}) {}
+
 FusionTransformerBlock::FusionTransformerBlock(const Config& cfg) : cfg_(cfg) {
     // Initialize weights with random values (Simulation)
     const size_t d = cfg_.model_dim;
@@ -80,7 +82,7 @@ void FusionTransformerBlock::tiled_attention(const float* Q, const float* K, con
         // Scratchpad caching simulation
         // (Actual implementation would load Q[i_tile], K, V into SRAM)
         
-        for (size_t head = 0; h < head; ++head) {
+        for (size_t head = 0; head < h; ++head) {
             // Compute Attention scores in tiles
             // out = softmax(Q*K.T) * V
         }

@@ -1170,3 +1170,29 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Architectural Notes
 - The hypervisor now exists as code, not just blueprint language.
 - It deliberately delegates execution to `HemisphereBridge` for the first vertical slice, preserving the working CHAL firmware path while creating the Synthesus 5 control layer above it.
+
+## Current Session — 2026-05-27 (Agent 8 — AIVM Hypervisor Isolation)
+
+### Summary
+- Added `AIVMExecutionGuard` and `DeviceExecutionResult` in `packages/aivm/isolation/guard.py` so CHAL/AIVM device calls can be bounded by timeout, fault containment, latency measurement, and trace metadata.
+- Wrapped `CognitiveHypervisor.process_query()` bridge dispatch with the AIVM guard, adding `device_isolation`, `budget_exhausted`, and `degraded` fields to hypervisor telemetry.
+- Added timeout and fault degradation tests for the hypervisor route path.
+- Fixed kernel pybind build readiness by requiring Python before pybind discovery, failing loudly when `BUILD_PYBIND=ON` lacks pybind11, declaring `pybind11` in `requirements.txt`, and repairing the GCC build break in `FusionTransformerBlock`.
+- Fixed a dead transformer head loop in `FusionTransformerBlock::tiled_attention()` while touching the compile failure.
+- Advanced Synthesus 5 Phase 2 checklist items for per-device isolation, budget exhaustion trace records, and timeout degradation tests.
+
+### Verified
+- `python -m py_compile packages/aivm/isolation/guard.py packages/aivm/isolation/__init__.py packages/core/chal/hypervisor.py tests/test_chal_hypervisor.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_hypervisor.py tests/test_chal_reasoning_firmware.py tests/aivm/verify_kernel.py` — 12 passed.
+- `cmake -S packages/kernel -B packages/kernel/build -DBUILD_PYBIND=ON -DPython3_EXECUTABLE=/usr/local/bin/python && cmake --build packages/kernel/build -j2` — built `synthesus_kernel`, `test_vmm`, `test_emul`, and `_synthesus_kernel`.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages/kernel/build python -c "import _synthesus_kernel; ..."` — pybind module imported and exposed kernel/emulation types.
+- `packages/kernel/build/test_emul` reached host profiling but did not initialize because this container lacks KVM access; no hardware execution claim was made.
+
+### Left Off / Next Steps
+- Wire `CognitiveHypervisor` into the public runtime/API entrypoint so guarded Synthesus 5 routing is used outside tests.
+- Add CHAL mount-table boot sequencing and Knowledge Cloud manifest integrity checks.
+- Follow up on the pybind link warning about duplicate `ContextEntry` definitions in `context_memory.hpp` and `working_memory.hpp`.
+
+### Architectural Notes
+- Hypervisor isolation now lives at the AIVM boundary instead of being an ad hoc try/except around bridge calls.
+- Budget exhaustion is now explicit telemetry, which gives future frontend/API trace views a stable field to render.

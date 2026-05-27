@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <cstdint>
 #include <immintrin.h>
 
 namespace synthesus::kernel {
@@ -25,7 +26,8 @@ public:
         bool use_avx2{true};
     };
 
-    explicit FusionTransformerBlock(const Config& cfg = Config());
+    FusionTransformerBlock();
+    explicit FusionTransformerBlock(const Config& cfg);
 
     // Main execution pass (Hardware-native Dataflow)
     std::vector<float> forward(const std::vector<float>& input_tokens);

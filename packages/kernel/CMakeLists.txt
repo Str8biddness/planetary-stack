@@ -15,6 +15,7 @@ option(ENABLE_ONNX  "Enable ONNX Runtime support" OFF)
 find_package(Threads REQUIRED)
 
 if(BUILD_PYBIND)
+    find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
     find_package(pybind11 CONFIG QUIET)
     if(NOT pybind11_FOUND)
         # Try pip-installed pybind11
@@ -27,6 +28,9 @@ if(BUILD_PYBIND)
         if(pybind11_DIR)
             find_package(pybind11 CONFIG PATHS ${pybind11_DIR})
         endif()
+    endif()
+    if(NOT pybind11_FOUND)
+        message(FATAL_ERROR "BUILD_PYBIND=ON requires pybind11. Install the Python package with `python -m pip install pybind11`.")
     endif()
 endif()
 

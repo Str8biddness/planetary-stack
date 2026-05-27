@@ -11,7 +11,12 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Awaitable, Callable, Mapping
+from typing import Any, Callable, Mapping
+
+try:
+    from aivm.isolation.guard import AIVMExecutionGuard, DeviceExecutionResult
+except ModuleNotFoundError:  # pragma: no cover - package-root compatibility path
+    from packages.aivm.isolation.guard import AIVMExecutionGuard, DeviceExecutionResult
 
 
 class HypervisorRoute(str, Enum):
@@ -71,9 +76,14 @@ BridgeFactory = Callable[[], Any]
 class CognitiveHypervisor:
     """Route and dispatch Synthesus 5 cognitive workloads."""
 
-    def __init__(self, bridge_factory: BridgeFactory | None = None):
+    def __init__(
+        self,
+        bridge_factory: BridgeFactory | None = None,
+        execution_guard: AIVMExecutionGuard | None = None,
+    ):
         self._bridge_factory = bridge_factory
         self._bridge: Any | None = None
+        self._execution_guard = execution_guard or AIVMExecutionGuard()
 
     def plan(
         self,
@@ -173,15 +183,23 @@ class CognitiveHypervisor:
             max_tokens=max_tokens,
         )
         bridge = self._get_bridge()
-        bridge_result = bridge.route_query(
-            query,
-            hemisphere=decision.hemisphere_mode,
-            character_context=character_context,
-            rag_context=rag_context,
-            max_tokens=max_tokens,
+        guarded = await self._execution_guard.run(
+            "chal://hypervisor/hemisphere_bridge",
+            lambda: bridge.route_query(
+                query,
+                hemisphere=decision.hemisphere_mode,
+                character_context=character_context,
+                rag_context=rag_context,
+                max_tokens=max_tokens,
+            ),
+            timeout_ms=decision.budget.latency_ms,
+            metadata={
+                "trace_id": decision.trace_id,
+                "route": decision.route.value,
+                "hemisphere_mode": decision.hemisphere_mode,
+            },
         )
-        if isinstance(bridge_result, Awaitable):
-            bridge_result = await bridge_result
+        bridge_result = self._normalize_guarded_bridge_result(guarded)
 
         response = str(bridge_result.get("response", ""))
         telemetry = {
@@ -194,6 +212,9 @@ class CognitiveHypervisor:
             "reasons": list(decision.reasons),
             "constraints": list(decision.constraints),
             "bridge_latency_ms": bridge_result.get("latency_ms", 0.0),
+            "device_isolation": guarded.to_dict(),
+            "budget_exhausted": guarded.status == "timeout",
+            "degraded": not guarded.ok,
         }
 
         bridge_result.setdefault("hypervisor_trace", telemetry)
@@ -203,6 +224,29 @@ class CognitiveHypervisor:
             bridge_result=bridge_result,
             telemetry=telemetry,
         )
+
+    def _normalize_guarded_bridge_result(
+        self,
+        guarded: DeviceExecutionResult,
+    ) -> dict[str, Any]:
+        if guarded.ok and isinstance(guarded.output, dict):
+            result = dict(guarded.output)
+            result.setdefault("latency_ms", guarded.latency_ms)
+            return result
+        if guarded.ok:
+            return {
+                "response": str(guarded.output or ""),
+                "hemisphere_used": "unknown",
+                "latency_ms": guarded.latency_ms,
+                "device_status": guarded.status,
+            }
+        return {
+            "response": "I could not complete that route within the current cognitive budget.",
+            "hemisphere_used": "degraded",
+            "latency_ms": guarded.latency_ms,
+            "device_status": guarded.status,
+            "error": guarded.error,
+        }
 
     def _get_bridge(self) -> Any:
         if self._bridge is None:

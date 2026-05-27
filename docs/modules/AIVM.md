@@ -169,6 +169,21 @@ layer = ModelIsolationLayer()
 # FULL — maximum isolation with separate memory
 ```
 
+## CHAL Device Execution Guard
+
+Synthesus 5 hypervisor dispatches can now use `packages/aivm/isolation/guard.py` for bounded virtual-device execution. `AIVMExecutionGuard.run()` accepts a device id, an async or sync operation, a timeout budget, and trace metadata, then returns a `DeviceExecutionResult` with:
+
+| Field | Purpose |
+|-------|---------|
+| `device_id` | CHAL/AIVM device URI or logical device name |
+| `ok` / `status` | `ok`, `timeout`, or `fault` outcome |
+| `latency_ms` | measured guarded execution latency |
+| `output` | raw device result when successful |
+| `error` | timeout/fault detail for degraded routing |
+| `metadata` | trace id, route, hemisphere mode, or caller-specific context |
+
+The Cognitive Hypervisor wraps hemisphere bridge dispatch with this guard, so timeout and fault cases produce degraded trace records instead of uncaught failures. Hypervisor telemetry now includes `device_isolation`, `budget_exhausted`, and `degraded` fields.
+
 ## Amplification Loop
 
 ```

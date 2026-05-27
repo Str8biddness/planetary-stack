@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from core.chal.hypervisor import CognitiveHypervisor, HypervisorRoute
 
@@ -22,6 +23,23 @@ class StubBridge:
             "hemisphere_used": hemisphere,
             "latency_ms": 1.25,
         }
+
+
+class SlowBridge:
+    async def route_query(self, *args, **kwargs):
+        await asyncio.sleep(0.6)
+        return {"response": "too late", "latency_ms": 600.0}
+
+
+class FaultBridge:
+    async def route_query(self, *args, **kwargs):
+        raise RuntimeError("device bus fault")
+
+
+class BlockingBridge:
+    def route_query(self, *args, **kwargs):
+        time.sleep(0.6)
+        return {"response": "too late", "latency_ms": 600.0}
 
 
 def test_hypervisor_plans_grounded_path_for_knowledge_cloud_workload():
@@ -64,6 +82,8 @@ def test_hypervisor_dispatches_with_trace_and_budget_metadata():
     assert result.telemetry["budget"]["candidate_count"] == 3
     assert "compact_surface_response" in result.telemetry["constraints"]
     assert result.bridge_result["hypervisor_trace"]["trace_id"] == result.decision.trace_id
+    assert result.telemetry["device_isolation"]["status"] == "ok"
+    assert result.telemetry["budget_exhausted"] is False
 
 
 def test_hypervisor_routes_safety_constraints_to_safety_path():
@@ -77,3 +97,40 @@ def test_hypervisor_routes_safety_constraints_to_safety_path():
     assert decision.hemisphere_mode == "both"
     assert decision.budget.critic_passes == 2
     assert "critic_must_validate_before_emit" in decision.constraints
+
+
+def test_hypervisor_degrades_on_device_timeout():
+    hypervisor = CognitiveHypervisor(bridge_factory=lambda: SlowBridge())
+
+    result = asyncio.run(
+        hypervisor.process_query(
+            "simple ping",
+        )
+    )
+
+    assert result.bridge_result["device_status"] == "timeout"
+    assert result.telemetry["device_isolation"]["status"] == "timeout"
+    assert result.telemetry["budget_exhausted"] is True
+    assert result.telemetry["degraded"] is True
+    assert result.response
+
+
+def test_hypervisor_degrades_on_blocking_sync_device_timeout():
+    hypervisor = CognitiveHypervisor(bridge_factory=lambda: BlockingBridge())
+
+    result = asyncio.run(hypervisor.process_query("simple ping"))
+
+    assert result.bridge_result["device_status"] == "timeout"
+    assert result.telemetry["budget_exhausted"] is True
+
+
+def test_hypervisor_degrades_on_device_fault():
+    hypervisor = CognitiveHypervisor(bridge_factory=lambda: FaultBridge())
+
+    result = asyncio.run(hypervisor.process_query("simple ping"))
+
+    assert result.bridge_result["device_status"] == "fault"
+    assert "device bus fault" in result.bridge_result["error"]
+    assert result.telemetry["device_isolation"]["status"] == "fault"
+    assert result.telemetry["budget_exhausted"] is False
+    assert result.telemetry["degraded"] is True

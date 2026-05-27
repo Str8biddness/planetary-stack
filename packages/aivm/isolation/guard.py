@@ -1,11 +1,88 @@
 from __future__ import annotations
+import asyncio
 import logging
 import functools
+import inspect
 import time
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional
 from ..kernel.npc import NPC
 
 logger = logging.getLogger("aivm.isolation")
+
+
+@dataclass(frozen=True)
+class DeviceExecutionResult:
+    """Traceable result for a guarded CHAL/AIVM device dispatch."""
+    device_id: str
+    ok: bool
+    status: str
+    latency_ms: float
+    output: Any = None
+    error: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "device_id": self.device_id,
+            "ok": self.ok,
+            "status": self.status,
+            "latency_ms": self.latency_ms,
+            "error": self.error,
+            "metadata": dict(self.metadata),
+        }
+
+
+class AIVMExecutionGuard:
+    """Bound async/sync virtual device calls with timeout and fault isolation."""
+
+    async def run(
+        self,
+        device_id: str,
+        operation: Callable[[], Any],
+        *,
+        timeout_ms: float,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> DeviceExecutionResult:
+        start = time.perf_counter()
+        try:
+            output = await asyncio.wait_for(
+                self._invoke(operation),
+                timeout=max(timeout_ms, 1.0) / 1000.0,
+            )
+            return DeviceExecutionResult(
+                device_id=device_id,
+                ok=True,
+                status="ok",
+                latency_ms=(time.perf_counter() - start) * 1000,
+                output=output,
+                metadata=metadata or {},
+            )
+        except asyncio.TimeoutError:
+            return DeviceExecutionResult(
+                device_id=device_id,
+                ok=False,
+                status="timeout",
+                latency_ms=(time.perf_counter() - start) * 1000,
+                error=f"{device_id} exceeded {timeout_ms:.1f}ms budget",
+                metadata=metadata or {},
+            )
+        except Exception as exc:
+            logger.warning("Guarded device %s failed: %s", device_id, exc, exc_info=True)
+            return DeviceExecutionResult(
+                device_id=device_id,
+                ok=False,
+                status="fault",
+                latency_ms=(time.perf_counter() - start) * 1000,
+                error=str(exc),
+                metadata=metadata or {},
+            )
+
+    async def _invoke(self, operation: Callable[[], Any]) -> Any:
+        result = await asyncio.to_thread(operation)
+        if inspect.isawaitable(result):
+            return await result
+        return result
 
 class FaultGuard:
     """
