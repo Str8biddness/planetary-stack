@@ -1076,3 +1076,21 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Notes
 - A plain pytest invocation still requires the repo's package paths to be supplied; this run used explicit `PYTHONPATH` for focused validation.
 - Existing untracked `synthesus_framework/` was present before this run and was intentionally not staged.
+
+## Current Session — 2026-05-27 (Agent 5 — CHAL KAL/KN Mount Builder)
+
+### Summary
+- Defined `CHAL` mount and partition interfaces in `packages/core/chal/interfaces.py` to support `ROM`, `PARAMETER_DISK`, `GROUNDING_CORPUS`, and `WRITEBACK_MEMORY`.
+- Upgraded `packages/knowledge/kal_adapter.py` into a fully-fledged `CHALMemoryController` that manages Knowledge Cloud partitions as mounted virtual cognitive hardware instead of legacy template fallbacks.
+- Mapped explicit mounts (`/mnt/rom/lore`, `/mnt/params/architect`, `/mnt/mem/crystallized`, `/mnt/corpus/grounding`) corresponding to the CHAL directive.
+- Added `TelemetryRecord` returns to the knowledge pipeline to provide exact confidence, latency, and cache hit metadata back to cognitive modules.
+- Maintained the legacy `SynthesusAdapter` API wrapper to prevent breaking pre-CHAL reasoning tests.
+
+### Verified
+- `python -m py_compile packages/knowledge/kal_adapter.py packages/core/chal/interfaces.py packages/core/chal/__init__.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages pytest -q /home/workspace/Synthesus_4.0/tests/test_kal.py /home/workspace/Synthesus_4.0/tests/test_kal_e2e.py` — passed backward compatibility tests.
+- Replaced legacy fallback paths in `kal_adapter.py` while ensuring tests for `KalService` and `KalClient` still work.
+
+### Notes
+- No changes required to `synthesus-knowledge-cloud` as this task only updated the KAL controller implementation on the runtime side to consume knowledge via mounts.
+- Existing untracked `synthesus_framework/` was intentionally not staged.
