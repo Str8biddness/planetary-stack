@@ -9,11 +9,23 @@ from .interfaces import (
     Partition,
     TelemetryRecord,
 )
+from .hypervisor import (
+    CognitiveHypervisor,
+    HypervisorBudget,
+    HypervisorDecision,
+    HypervisorResult,
+    HypervisorRoute,
+)
 
 __all__ = [
+    "CognitiveHypervisor",
     "Checkpoint",
     "CognitiveTask",
     "ExecutionPlan",
+    "HypervisorBudget",
+    "HypervisorDecision",
+    "HypervisorResult",
+    "HypervisorRoute",
     "ModuleMessage",
     "Mount",
     "MountType",

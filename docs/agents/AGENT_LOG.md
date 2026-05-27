@@ -1141,3 +1141,32 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Architectural Notes
 - Synthesus 5 is now the top-level target. Synthesus 4.1 remains foundation context, not the active north star.
 - Future agent sessions are incomplete unless they update the Synthesus 5 checklist and agent log with concrete progress, validation, or a precise blocker.
+
+## Current Session — 2026-05-27 (Synthesus 5 Cognitive Hypervisor MVP)
+
+### Summary
+- Began actual Synthesus 5 implementation immediately after the control-plane lock.
+- Added `packages/core/chal/hypervisor.py` with a `CognitiveHypervisor` MVP that owns route selection, budget shaping, bridge dispatch, and hypervisor trace packaging.
+- Added explicit Synthesus 5 route modes: fast path, grounded path, deep reasoning path, Quad Brain path, and safety path.
+- Added budget fields for latency, retrieval depth, candidate count, and critic passes.
+- Exported the hypervisor types from `packages/core/chal/__init__.py`.
+- Added `tests/test_chal_hypervisor.py` covering grounded, Quad Brain, deep reasoning, dispatch telemetry, and safety-path planning.
+
+### Synthesus 5 Checklist Items Advanced
+- Phase 2: `CognitiveHypervisor` scheduler/control layer started and validated.
+- Phase 2: route modes implemented.
+- Phase 2: budget control implemented.
+- Phase 2: trace records started for route decisions.
+
+### Verified
+- `python -m py_compile packages/core/chal/hypervisor.py packages/core/chal/__init__.py tests/test_chal_hypervisor.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_hypervisor.py tests/test_chal_reasoning_firmware.py` — 9 passed.
+
+### Left Off / Next Steps
+- Wire `CognitiveHypervisor` into the public runtime/API entrypoint instead of leaving it as an importable MVP.
+- Add timeout/degraded-state handling around device execution.
+- Extend trace records to include budget exhaustion and per-device isolation results.
+
+### Architectural Notes
+- The hypervisor now exists as code, not just blueprint language.
+- It deliberately delegates execution to `HemisphereBridge` for the first vertical slice, preserving the working CHAL firmware path while creating the Synthesus 5 control layer above it.

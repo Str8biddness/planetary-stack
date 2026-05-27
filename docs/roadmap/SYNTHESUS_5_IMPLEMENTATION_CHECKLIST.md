@@ -24,7 +24,7 @@ Legend:
 - [x] Update handover protocol so every session reads the blueprint and checklist first.
 - [x] Create this implementation checklist as the cross-agent progress ledger.
 - [x] Ensure all scheduled automations are retargeted from Synthesus 4.1 to Synthesus 5 and restricted to Codex-class or Google/Gemini CLI/CML models.
-- [ ] Commit and push Phase 0 control-plane files to GitHub.
+- [x] Commit and push Phase 0 control-plane files to GitHub.
 
 ## Phase 1: CHAL Frame Contract
 
@@ -36,11 +36,11 @@ Legend:
 
 ## Phase 2: Cognitive Hypervisor MVP
 
-- [ ] Implement `CognitiveHypervisor` as the central scheduler/control layer.
-- [ ] Add route modes: fast path, grounded path, deep reasoning path, Quad Brain path, safety path.
-- [ ] Add budget control for latency, retrieval depth, candidate count, and critic passes.
+- [x] Implement `CognitiveHypervisor` as the central scheduler/control layer.
+- [x] Add route modes: fast path, grounded path, deep reasoning path, Quad Brain path, safety path.
+- [x] Add budget control for latency, retrieval depth, candidate count, and critic passes.
 - [ ] Add per-device isolation and timeout handling.
-- [ ] Emit trace records for route decisions and budget exhaustion.
+- [~] Emit trace records for route decisions and budget exhaustion.
 - [ ] Add focused tests for route selection and timeout degradation.
 
 ## Phase 3: Quad Brain MVP
