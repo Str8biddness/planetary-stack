@@ -1004,5 +1004,5 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Notes
 - `python3 -m pytest` used `/usr/bin/python3`, which lacks pytest in this sandbox; validation was run with `/usr/local/bin/python` instead.
 - Public mirror was not refreshed because `artifacts/` did not change and `status --local artifacts` reported 10/10 artifacts OK against `https://zo.pub/syntech/synthesus-knowledge`.
-- Runtime commit: 5169ec5317ccca039c182a1b8fda900538409f93. Knowledge Cloud commit: none; repo stayed clean.
+- Runtime source commit: ab27ca23a476177c422e181edc3f5a9eaa46ed74. Knowledge Cloud commit: none; repo stayed clean.
 - Existing untracked `synthesus_framework/` was present before this run and was intentionally not staged.
