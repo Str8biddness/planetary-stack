@@ -70,6 +70,8 @@ Target files:
 - `ppbrs/reasoning_chain.py`
 - `ppbrs/rule_to_action.py`
 
+Status 2026-05-27: implemented tag indexes for `WeightedRuleEvaluator` and `RuleToActionMapper`. Tagged contexts now evaluate matching tagged rules plus untagged shared rules instead of scoring the full registered rule set.
+
 Implementation order:
 1. Add tag-based and trigger-based indexing for rules.
 2. Pre-filter by context keys and tags before score evaluation.
@@ -84,6 +86,8 @@ Expected effect:
 ### Phase 3 — Graph Traversal and Multi-Step Reasoning
 
 Target file: `ppbrs/multi_step_reasoning.py`
+
+Status 2026-05-27: implemented `ReasoningGraph.forward_adjacency`, `reverse_adjacency`, duplicate-edge suppression, cached topological order, adjacency-backed forward/backward traversal, and adjacency-backed shortest-path expansion.
 
 Implementation order:
 1. Maintain explicit forward and reverse adjacency maps.

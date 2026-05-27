@@ -7,6 +7,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 import re
 
+try:
+    from .chal import build_ppbrs_firmware_signal
+except ImportError:  # pragma: no cover - compatibility for direct module loading
+    from reasoning.chal import build_ppbrs_firmware_signal
+
 
 class ReasoningType(Enum):
     """Types of reasoning for multi-step reasoning chains.
@@ -284,6 +289,8 @@ class WeightedRuleEvaluator:
         """
         self.activation_threshold = activation_threshold
         self.rules: List[Dict[str, Any]] = []
+        self._tag_index: Dict[str, List[int]] = {}
+        self._untagged_rule_ids: List[int] = []
         
     def add_rule(self, condition: Callable[[Dict], bool],
                 consequence: Callable[[Dict], Any],
@@ -297,13 +304,37 @@ class WeightedRuleEvaluator:
             weight: Relative priority weight. Defaults to 1.0.
             tags: Classification tags.
         """
-        self.rules.append({
+        rule = {
             'condition': condition,
             'consequence': consequence,
             'weight': weight,
             'tags': tags or [],
             'activation_count': 0
-        })
+        }
+        rule_id = len(self.rules)
+        self.rules.append(rule)
+        if rule['tags']:
+            for tag in rule['tags']:
+                self._tag_index.setdefault(tag, []).append(rule_id)
+        else:
+            self._untagged_rule_ids.append(rule_id)
+
+    def _candidate_rules(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+        context_tags = set(context.get('tags', []))
+        if not context_tags:
+            return self.rules
+
+        candidate_ids = []
+        for tag in context_tags:
+            candidate_ids.extend(self._tag_index.get(tag, []))
+        candidate_ids.extend(self._untagged_rule_ids)
+        seen = set()
+        ordered_ids = []
+        for rule_id in candidate_ids:
+            if rule_id not in seen:
+                seen.add(rule_id)
+                ordered_ids.append(rule_id)
+        return [self.rules[i] for i in ordered_ids]
     
     def evaluate(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Evaluates all rules against the context and identifies triggered ones.
@@ -316,7 +347,7 @@ class WeightedRuleEvaluator:
         """
         activated = []
         
-        for rule in self.rules:
+        for rule in self._candidate_rules(context):
             try:
                 if rule['condition'](context):
                     rule['activation_count'] += 1
@@ -398,11 +429,20 @@ class ContextAwareReasoningPipeline:
         classification = self.classifier.get_best_match(input_str)
         
         if not classification:
+            firmware_signal = build_ppbrs_firmware_signal(
+                query=input_str,
+                module_used="unrouted",
+                confidence=0.0,
+                source="ppbrs_pipeline",
+                fallback_used=True,
+            )
             return {
                 'status': 'no_match',
                 'input': input_str,
                 'confidence': 0.0,
-                'response': context.get('default_response', 'No matching pattern found.'),
+                'response': '',
+                'user_facing': False,
+                'chal_firmware_signal': firmware_signal,
                 'reasoning': []
             }
         
@@ -416,7 +456,7 @@ class ContextAwareReasoningPipeline:
         
         activated_rules = self.rule_evaluator.evaluate({**context, 'classification': classification})
         
-        response = self._build_response(classification, chain_results, activated_rules, context)
+        template_context = self._build_response(classification, chain_results, activated_rules, context)
         
         return {
             'status': 'success',
@@ -432,9 +472,34 @@ class ContextAwareReasoningPipeline:
                 'fallback_used': r.fallback_used
             } for r in chain_results],
             'rules_activated': len(activated_rules),
-            'response': response,
+            'response': '',
+            'user_facing': False,
+            'chal_firmware_signal': self._build_firmware_signal(
+                input_str,
+                classification,
+                template_context,
+                chain_results,
+            ),
             'reasoning': self._build_pipeline_reasoning(classification, chain_results)
         }
+
+    def _build_firmware_signal(self, input_str, classification, template_context, chain_results):
+        best_chain_confidence = max(
+            (r.final_confidence for r in chain_results),
+            default=classification.confidence,
+        )
+        confidence = min(classification.confidence, best_chain_confidence)
+        signal = build_ppbrs_firmware_signal(
+            query=input_str,
+            module_used=classification.pattern_id,
+            confidence=confidence,
+            source="ppbrs_pipeline",
+            matched_pattern=classification.pattern_id,
+            fallback_used=False,
+        )
+        signal["module_message"]["payload"]["template_context"] = template_context or ""
+        signal["checkpoint"]["state"]["template_context_available"] = bool(template_context)
+        return signal
     
     def _build_response(self, classification, chain_results, activated_rules, context):
         """Constructs the final text response based on pipeline outputs.
@@ -449,10 +514,7 @@ class ContextAwareReasoningPipeline:
             A response string.
         """
         pattern = self.classifier.patterns.get(classification.pattern_id)
-        if not pattern:
-            return context.get('default_response', 'Pattern found but no template.')
-        
-        response = pattern.response_template
+        response = pattern.response_template if pattern else ""
         
         if chain_results:
             best_chain = max(chain_results, key=lambda x: x.final_confidence)
@@ -475,7 +537,6 @@ class ContextAwareReasoningPipeline:
         if chain_result.fallback_used or chain_result.final_confidence < 0.5:
             if '{fallback}' in response:
                 return response.replace('{fallback}', context.get('fallback_hint', ''))
-            return f"{response} (Note: low confidence reasoning used)"
         return response
     
     def _build_pipeline_reasoning(self, classification, chain_results) -> List[str]:

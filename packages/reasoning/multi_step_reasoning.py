@@ -56,6 +56,9 @@ class ReasoningGraph:
     """Graph structure for complex reasoning chains."""
     nodes: Dict[str, ReasoningNode] = field(default_factory=dict)
     edges: List[Tuple[str, str, float]] = field(default_factory=list)  # (from, to, weight)
+    forward_adjacency: Dict[str, List[Tuple[str, float]]] = field(default_factory=dict)
+    reverse_adjacency: Dict[str, List[Tuple[str, float]]] = field(default_factory=dict)
+    _topological_cache: Optional[List[str]] = None
     
     def add_node(self, node: ReasoningNode) -> None:
         """Adds a ReasoningNode to the graph.
@@ -64,6 +67,9 @@ class ReasoningGraph:
             node: The ReasoningNode instance to add.
         """
         self.nodes[node.node_id] = node
+        self.forward_adjacency.setdefault(node.node_id, [])
+        self.reverse_adjacency.setdefault(node.node_id, [])
+        self._topological_cache = None
     
     def add_edge(self, from_id: str, to_id: str, weight: float = 1.0) -> None:
         """Creates a directed edge between two nodes in the graph.
@@ -74,15 +80,25 @@ class ReasoningGraph:
             weight: Relative weight or cost of the edge. Defaults to 1.0.
         """
         if from_id in self.nodes and to_id in self.nodes:
+            if any(src == from_id and dst == to_id for src, dst, _ in self.edges):
+                return
             self.edges.append((from_id, to_id, weight))
-            self.nodes[from_id].consequents.append(to_id)
-            self.nodes[to_id].antecedents.append(from_id)
+            if to_id not in self.nodes[from_id].consequents:
+                self.nodes[from_id].consequents.append(to_id)
+            if from_id not in self.nodes[to_id].antecedents:
+                self.nodes[to_id].antecedents.append(from_id)
+            self.forward_adjacency.setdefault(from_id, []).append((to_id, weight))
+            self.reverse_adjacency.setdefault(to_id, []).append((from_id, weight))
+            self._topological_cache = None
     
     def get_topological_order(self) -> List[str]:
         """Get nodes in topological order."""
+        if self._topological_cache is not None:
+            return list(self._topological_cache)
+
         in_degree = {n: 0 for n in self.nodes}
-        for _, to, _ in self.edges:
-            in_degree[to] += 1
+        for to, incoming in self.reverse_adjacency.items():
+            in_degree[to] += len(incoming)
         
         queue = deque([n for n, d in in_degree.items() if d == 0])
         result = []
@@ -90,12 +106,12 @@ class ReasoningGraph:
         while queue:
             node_id = queue.popleft()
             result.append(node_id)
-            for from_id, to_id, _ in self.edges:
-                if from_id == node_id:
-                    in_degree[to_id] -= 1
-                    if in_degree[to_id] == 0:
-                        queue.append(to_id)
+            for to_id, _ in self.forward_adjacency.get(node_id, []):
+                in_degree[to_id] -= 1
+                if in_degree[to_id] == 0:
+                    queue.append(to_id)
         
+        self._topological_cache = list(result)
         return result
 
 
@@ -207,11 +223,9 @@ class MultiStepReasoningChain:
             visited.add(node_id)
             path.append(node_id)
             
-            node = self.graph.nodes.get(node_id)
-            if node:
-                for consequent in node.consequents:
-                    if consequent not in visited:
-                        queue.append(consequent)
+            for consequent, _ in self.graph.forward_adjacency.get(node_id, []):
+                if consequent not in visited:
+                    queue.append(consequent)
         
         self._current_path = path
         return path
@@ -228,28 +242,20 @@ class MultiStepReasoningChain:
         """
         visited = set()
         path = []
-        
-        def dfs(node_id: str) -> bool:
+
+        def dfs(node_id: str) -> None:
             if node_id in visited or len(path) >= self.max_depth:
-                return False
-            
+                return
+
             visited.add(node_id)
+            for antecedent, _ in reversed(self.graph.reverse_adjacency.get(node_id, [])):
+                dfs(antecedent)
+                if len(path) >= self.max_depth:
+                    return
             path.append(node_id)
-            
-            if node_id == goal_node:
-                return True
-            
-            node = self.graph.nodes.get(node_id)
-            if node:
-                for antecedent in reversed(node.antecedents):
-                    if antecedent not in visited:
-                        if dfs(antecedent):
-                            return True
-            
-            path.pop()
-            return False
-        
-        dfs(goal_node)
+
+        if goal_node in self.graph.nodes:
+            dfs(goal_node)
         return path
     
     def find_shortest_path(self, start: str, end: str) -> Tuple[List[str], float]:
@@ -282,14 +288,12 @@ class MultiStepReasoningChain:
             if node_id == end:
                 break
             
-            node = self.graph.nodes[node_id]
-            for from_id, to_id, weight in self.graph.edges:
-                if from_id == node_id:
-                    new_dist = dist + weight
-                    if new_dist < distances[to_id]:
-                        distances[to_id] = new_dist
-                        previous[to_id] = node_id
-                        heapq.heappush(pq, (new_dist, to_id))
+            for to_id, weight in self.graph.forward_adjacency.get(node_id, []):
+                new_dist = dist + weight
+                if new_dist < distances[to_id]:
+                    distances[to_id] = new_dist
+                    previous[to_id] = node_id
+                    heapq.heappush(pq, (new_dist, to_id))
         
         path = []
         current = end
@@ -329,14 +333,11 @@ class MultiStepReasoningChain:
             return alternatives
         
         last_node = current_path[-1]
-        node = self.graph.nodes.get(last_node)
-        
-        if node:
-            for to_id, _, _ in self.graph.edges:
-                if to_id != last_node and to_id not in current_path:
-                    path, _ = self.find_shortest_path(current_path[0], to_id)
-                    if path and path != current_path:
-                        alternatives.append(path)
+        for to_id, _ in self.graph.forward_adjacency.get(last_node, []):
+            if to_id not in current_path:
+                path, _ = self.find_shortest_path(current_path[0], to_id)
+                if path and path != current_path:
+                    alternatives.append(path)
         
         return alternatives[:3]
 

@@ -354,3 +354,38 @@ TOTAL                            — 110 passed
 - reasoning/ tests: 16 passed.
 - py_compile passed for hemisphere_bridge.py, quadbrain_master.py, reasoning_core.py.
 - No domain regressed >5% on full suite scores (no prior comparison available for 2026-05-27 baseline).
+
+## Daily Entry: 2026-05-27 (21:10 UTC)
+
+### Actions Performed
+
+1. Converted `ContextAwareReasoningPipeline.process()` away from direct normal-path template/fallback surface text. It now returns `response == ""`, `user_facing == False`, and a `chal_firmware_signal`; legacy `response_template` content is kept only as bounded `template_context` metadata.
+2. Added tag-index prefiltering to `WeightedRuleEvaluator` and `RuleToActionMapper`, including untagged shared-rule buckets.
+3. Added explicit `ReasoningGraph.forward_adjacency`, `reverse_adjacency`, duplicate-edge suppression, cached topological order, and adjacency-backed traversal/shortest-path operations.
+4. Added tests proving templates are context metadata, not final surface text, and that rule/graph indexing is exercised.
+
+### Benchmark Run
+
+PPBRS micro-benchmark after this patch:
+
+| Component | p50 (ms) | p95 (ms) | Avg (ms) |
+|---|---:|---:|---:|
+| pattern_matching | 226.9021 | 245.3228 | 230.0025 |
+| rule_evaluation | 0.0143 | 0.0189 | 0.0151 |
+| graph_traversal | 0.0167 | 0.0180 | 0.0173 |
+
+Same-run pre-edit baseline:
+
+| Component | p50 (ms) | p95 (ms) | Avg (ms) |
+|---|---:|---:|---:|
+| pattern_matching | 213.7572 | 232.7274 | 217.4500 |
+| rule_evaluation | 0.0488 | 0.0537 | 0.0493 |
+| graph_traversal | 0.1026 | 0.1085 | 0.1028 |
+
+Rule evaluation and graph traversal improved materially; pattern matching was not structurally changed in this pass and measured slightly slower in this run.
+
+### Verified
+
+- `python -m py_compile packages/reasoning/reasoning_chain.py packages/reasoning/rule_to_action.py packages/reasoning/multi_step_reasoning.py`
+- `python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py tests/test_chal_reasoning_firmware.py` — 117 passed.
+- `python tools/ppbrs_benchmark.py`

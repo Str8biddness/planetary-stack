@@ -1094,3 +1094,20 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Notes
 - No changes required to `synthesus-knowledge-cloud` as this task only updated the KAL controller implementation on the runtime side to consume knowledge via mounts.
 - Existing untracked `synthesus_framework/` was intentionally not staged.
+
+## Current Session — 2026-05-27 (Agent 6 — PPBRS Firmware Dev)
+
+### Summary
+- Removed the remaining normal-path direct template/fallback emit from `ContextAwareReasoningPipeline.process()`. Matches and no-match fallbacks now return empty `response`, `user_facing=False`, and structured `chal_firmware_signal`; legacy templates survive only as bounded `template_context`.
+- Added tag-index prefiltering in `WeightedRuleEvaluator` and `RuleToActionMapper` so tagged contexts skip irrelevant rules while still evaluating untagged shared rules.
+- Added forward/reverse adjacency maps, duplicate-edge suppression, cached topological order, and adjacency-backed traversal/shortest-path operations to `ReasoningGraph` and `MultiStepReasoningChain`.
+- Updated PPBRS docs and tests for the firmware boundary and indexing behavior.
+
+### Verified
+- `python -m py_compile packages/reasoning/reasoning_chain.py packages/reasoning/rule_to_action.py packages/reasoning/multi_step_reasoning.py`
+- `python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py tests/test_chal_reasoning_firmware.py` — 117 passed.
+- `python tools/ppbrs_benchmark.py` — rule p50 0.0143 ms, graph p50 0.0167 ms, pattern p50 226.9021 ms.
+
+### Notes
+- C++ PPBRS offload remains deferred because this pass improved the Python rule/graph hot paths and preserved the Python baseline benchmark trail.
+- Existing unrelated working-tree changes in `README.md`, `docs/agents/AGENTS.md`, `docs/roadmap/SYNTHESUS_5_CHAL_BLUEPRINT.md`, and `synthesus_framework/` were not staged.

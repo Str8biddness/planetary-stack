@@ -110,6 +110,8 @@ class RuleToActionMapper:
         self.default_priority = default_priority
         self.execution_history: List[MappingResult] = []
         self._action_registry: Dict[str, Action] = {}
+        self._tag_index: Dict[str, set] = {}
+        self._untagged_rules: set = set()
         
     def register_rule(self, rule: Rule) -> None:
         """Registers a Rule object with the mapper.
@@ -117,7 +119,45 @@ class RuleToActionMapper:
         Args:
             rule: The Rule instance to register.
         """
+        previous = self.rules.get(rule.rule_id)
+        if previous:
+            self._remove_from_indexes(previous)
+
         self.rules[rule.rule_id] = rule
+        self._add_to_indexes(rule)
+
+    def _add_to_indexes(self, rule: Rule) -> None:
+        if rule.tags:
+            for tag in rule.tags:
+                self._tag_index.setdefault(tag, set()).add(rule.rule_id)
+        else:
+            self._untagged_rules.add(rule.rule_id)
+
+    def _remove_from_indexes(self, rule: Rule) -> None:
+        self._untagged_rules.discard(rule.rule_id)
+        for tag in rule.tags:
+            rule_ids = self._tag_index.get(tag)
+            if rule_ids:
+                rule_ids.discard(rule.rule_id)
+                if not rule_ids:
+                    del self._tag_index[tag]
+
+    def _candidate_rules(self, context: Dict[str, Any]) -> List[Rule]:
+        context_tags = set(context.get('tags', []))
+        if not context_tags:
+            return list(self.rules.values())
+
+        candidate_ids = []
+        for tag in context_tags:
+            candidate_ids.extend(sorted(self._tag_index.get(tag, set())))
+        candidate_ids.extend(sorted(self._untagged_rules))
+        seen = set()
+        ordered_ids = []
+        for rule_id in candidate_ids:
+            if rule_id not in seen:
+                seen.add(rule_id)
+                ordered_ids.append(rule_id)
+        return [self.rules[rule_id] for rule_id in ordered_ids if rule_id in self.rules]
         
     def add_rule(self, rule_id: str, name: str,
                 condition: Callable[[Dict], bool],
@@ -163,7 +203,7 @@ class RuleToActionMapper:
         """
         results = []
         
-        for rule in self.rules.values():
+        for rule in self._candidate_rules(context):
             if not rule.active:
                 continue
             

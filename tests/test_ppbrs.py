@@ -177,6 +177,9 @@ class TestContextAwareReasoningPipeline:
         result = pipeline.process("unknown input xyz123")
         assert result['status'] == 'no_match'
         assert result['confidence'] == 0.0
+        assert result['response'] == ''
+        assert result['user_facing'] is False
+        assert result['chal_firmware_signal']['checkpoint']['state']['fallback_used'] is True
     
     def test_process_with_match(self):
         classifier = PatternClassifier()
@@ -190,6 +193,22 @@ class TestContextAwareReasoningPipeline:
         result = pipeline.process("this is a test")
         assert result['status'] == 'success'
         assert result['classification']['confidence'] > 0
+        assert result['response'] == ''
+        assert result['user_facing'] is False
+        assert result['chal_firmware_signal']['module_message']['payload']['template_context'] == "Matched!"
+        assert result['chal_firmware_signal']['constraints']
+
+    def test_weighted_rules_use_tag_index(self):
+        evaluator = WeightedRuleEvaluator()
+        calls = []
+        evaluator.add_rule(lambda ctx: calls.append("chat") or True, lambda ctx: "chat", tags=["chat"])
+        evaluator.add_rule(lambda ctx: calls.append("ops") or True, lambda ctx: "ops", tags=["ops"])
+        evaluator.add_rule(lambda ctx: calls.append("shared") or True, lambda ctx: "shared")
+
+        activated = evaluator.evaluate({"tags": ["ops"]})
+
+        assert [item["rule"]["tags"] for item in activated] == [["ops"], []]
+        assert calls == ["ops", "shared"]
 
 
 class TestConfidenceScorer:
@@ -261,6 +280,18 @@ class TestRuleToActionMapper:
         mapper.add_rule("r1", "Test", lambda ctx: ctx.get("active", False), [], weight=2.0)
         results = mapper.evaluate_rules({"active": True})
         assert len(results) == 1
+
+    def test_evaluate_rules_prefilters_by_tags(self):
+        mapper = RuleToActionMapper()
+        calls = []
+        mapper.add_rule("chat", "Chat", lambda ctx: calls.append("chat") or True, [], tags=["chat"])
+        mapper.add_rule("ops", "Ops", lambda ctx: calls.append("ops") or True, [], tags=["ops"])
+        mapper.add_rule("shared", "Shared", lambda ctx: calls.append("shared") or True, [])
+
+        results = mapper.evaluate_rules({"tags": ["ops"]})
+
+        assert [rule.rule_id for rule, _ in results] == ["ops", "shared"]
+        assert calls == ["ops", "shared"]
     
     def test_execute_action(self):
         mapper = RuleToActionMapper()

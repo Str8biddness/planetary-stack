@@ -38,7 +38,11 @@ class TestFullPipelineIntegration:
         
         assert result['status'] == 'success'
         assert result['classification']['pattern_id'] == 'greeting'
-        assert result['response'] == 'Hello there!'
+        assert result['response'] == ''
+        assert result['user_facing'] is False
+        assert result['chal_firmware_signal']['module_message']['target'] == 'generation_spine'
+        assert result['chal_firmware_signal']['module_message']['payload']['template_context'] == 'Hello there!'
+        assert 'do_not_emit_ppbrs_template' in result['chal_firmware_signal']['constraints']
     
     def test_confidence_affects_chain_selection(self):
         """Test that confidence levels affect chain evaluation."""
@@ -138,6 +142,11 @@ class TestReasoningGraphIntegration:
         path = chain.forward_chain(["n1"], {})
         assert "n1" in path
         assert len(path) >= 1
+
+        assert graph.forward_adjacency["n1"] == [("n2", 1.0)]
+        assert graph.reverse_adjacency["n3"] == [("n2", 0.8)]
+        assert graph.get_topological_order() == ["n1", "n2", "n3"]
+        assert chain.backward_chain("n3", {}) == ["n1", "n2", "n3"]
     
     def test_optimizer_improves_chain(self):
         """Test that optimizer improves reasoning chains."""

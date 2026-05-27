@@ -38,6 +38,12 @@ The concrete interface lives in `packages/reasoning/chal.py`:
 
 Allowed fixed-response exceptions remain safety, abuse prevention, identity/rights protection, and explicit AIVM platform restrictions. Normal pattern matches, retrieval matches, and low-confidence fallbacks must be surfaced through the generation spine or a future VGD-backed realization path.
 
+### Pipeline Firmware Boundary (2026-05-27)
+
+`ContextAwareReasoningPipeline.process()` now follows the same boundary as the kernel bridge: normal matches and no-match fallbacks return `response == ""`, `user_facing == False`, and a `chal_firmware_signal`. Historical `response_template` values are preserved only as `module_message.payload.template_context` so the generation spine can use them as bounded context without emitting the raw template as final surface text.
+
+`WeightedRuleEvaluator` and `RuleToActionMapper` maintain tag indexes and untagged-rule buckets, so tagged contexts only evaluate relevant tagged rules plus shared untagged rules. `ReasoningGraph` maintains forward/reverse adjacency maps and a cached topological order, and graph traversal uses those structures instead of scanning the full edge list.
+
 ## Core Modules
 
 | Module | File | Classes | Purpose |
@@ -57,6 +63,7 @@ The repository is currently in a validated PPBRS baseline state. Significant opt
 - **Token Indexing**: Reduced candidate volume in `PatternClassifier` by 70% using inverted token indexes.
 - **Adjacency Maps**: Replaced linear edge scans with constant-time adjacency lookups in `multi_step_reasoning`.
 - **Cached Topology**: Pre-computed reasoning graph structures for zero-overhead traversal.
+- **Rule Tag Indexing**: Rule evaluators prefilter by context tags before evaluating conditions.
 
 ## Optimization Upgrade Path
 
