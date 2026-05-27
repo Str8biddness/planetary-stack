@@ -14,9 +14,19 @@ from typing import Dict, Any, List, Optional
 
 import pytest
 
-# Ensure project root is importable
+# Ensure project root and legacy flat package paths are importable.
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+for _path in (
+    ROOT / "packages" / "reasoning",
+    ROOT / "packages" / "kernel",
+    ROOT / "packages" / "knowledge",
+    ROOT / "packages" / "core",
+    ROOT / "packages",
+    ROOT,
+):
+    _value = str(_path)
+    if _value not in sys.path:
+        sys.path.insert(0, _value)
 
 CHARACTERS_DIR = ROOT / "characters"
 

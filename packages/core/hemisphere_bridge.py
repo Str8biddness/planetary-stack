@@ -7,6 +7,7 @@ import asyncio
 import inspect
 import json
 import logging
+import re
 import select
 import subprocess
 import time
@@ -765,7 +766,34 @@ class HemisphereBridge:
 
         if left_clean == right_clean:
             return left_clean
-        return f"{left_clean} | Contextually, {right_clean}"
+        merged = self._merge_surface_sentences(left_clean, right_clean)
+        return merged or left_clean
+
+    def _merge_surface_sentences(self, primary: str, secondary: str) -> str:
+        """Merge two user-facing surfaces without exposing arbitration scaffolding."""
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", primary) if s.strip()]
+        seen = {self._sentence_key(sentence) for sentence in sentences}
+
+        for sentence in [s.strip() for s in re.split(r"(?<=[.!?])\s+", secondary) if s.strip()]:
+            key = self._sentence_key(sentence)
+            if not key or key in seen:
+                continue
+            if any(self._sentence_overlap(sentence, existing) >= 0.55 for existing in sentences):
+                continue
+            sentences.append(sentence)
+            seen.add(key)
+
+        return " ".join(sentences).strip()
+
+    def _sentence_key(self, sentence: str) -> str:
+        return " ".join(token for token in re.sub(r"[^a-z0-9\s]", " ", sentence.lower()).split() if len(token) > 2)
+
+    def _sentence_overlap(self, left: str, right: str) -> float:
+        left_tokens = set(self._sentence_key(left).split())
+        right_tokens = set(self._sentence_key(right).split())
+        if not left_tokens or not right_tokens:
+            return 0.0
+        return len(left_tokens & right_tokens) / len(left_tokens | right_tokens)
 
     async def _resolve_right_async(self, prompt: str, right_context: Dict[str, Any]) -> str:
         """Internal async helper for right hemisphere resolution."""
@@ -954,10 +982,9 @@ class HemisphereBridge:
             else:
                 right_result = right_raw
 
-            agreement = self._calculate_agreement(
-                left_result.get("response", "") if left_result else "",
-                right_result.get("response", "") if right_result else "",
-            )
+            left_surface = self._surface_from_left_firmware(query, character_id, rag_context, left_result)
+            right_surface = right_result.get("response", "") if right_result else ""
+            agreement = self._calculate_agreement(left_surface, right_surface)
             arbitration = self._arbitrate(left_result, right_result, agreement, mode)
             raw_confidence = max(
                 float(left_result.get("confidence", 0.0)) if left_result else 0.0,
@@ -985,12 +1012,12 @@ class HemisphereBridge:
                         metadata={"max_tokens": max_tokens, "agreement_score": agreement, "arbitration": arbitration},
                     )
                     return {
-                        "response": self._surface_from_left_firmware(query, character_id, rag_context, left_result),
+                        "response": left_surface,
                         "hemisphere_used": "left",
                         "raw_confidence": float(left_result.get("confidence", 0.0)),
                         "agreement_score": agreement,
-                        "left_response": left_result.get("response", ""),
-                        "right_response": right_result.get("response", ""),
+                        "left_response": left_surface,
+                        "right_response": right_surface,
                         "latency_ms": (time.time() - start) * 1000,
                         "state_handoff": snapshot,
                     }
@@ -1005,19 +1032,19 @@ class HemisphereBridge:
                     metadata={"max_tokens": max_tokens, "agreement_score": agreement, "arbitration": arbitration},
                 )
                 return {
-                    "response": right_result.get("response", ""),
+                    "response": right_surface,
                     "hemisphere_used": "right",
                     "raw_confidence": float(right_result.get("confidence", 0.0)),
                     "agreement_score": agreement,
-                    "left_response": left_result.get("response", ""),
-                    "right_response": right_result.get("response", ""),
+                    "left_response": left_surface,
+                    "right_response": right_surface,
                     "latency_ms": (time.time() - start) * 1000,
                     "state_handoff": snapshot,
                 }
 
             final_response = self.synthesize(
-                left_result.get("response", "") if left_result else "",
-                right_result.get("response", "") if right_result else "",
+                left_surface,
+                right_surface,
             )
             snapshot = self.handoff_state(
                 query=query,
@@ -1041,8 +1068,8 @@ class HemisphereBridge:
                 "hemisphere_used": "both",
                 "raw_confidence": raw_confidence,
                 "agreement_score": agreement,
-                "left_response": left_result.get("response", "") if left_result else None,
-                "right_response": right_result.get("response", ""),
+                "left_response": left_surface if left_result else None,
+                "right_response": right_surface,
                 "left_confidence": float(left_result.get("confidence", 0.0)) if left_result else 0.0,
                 "right_confidence": float(right_result.get("confidence", 0.0)) if right_result else 0.0,
                 "latency_ms": (time.time() - start) * 1000,

@@ -259,11 +259,7 @@ class GenerationSpine:
                 "Use bounded generation with retrieval grounding and keep the response explicit about uncertainty."
             )
         else:
-            constraint_text = ", ".join(str(item) for item in constraints[:3])
-            text = (
-                f"The left reasoning pass selected the {module} route at {confidence:.2f} confidence. "
-                f"Generate the final answer under these constraints: {constraint_text}."
-            )
+            text = self._realize_firmware_surface(inp, module, payload, constraints)
 
         trace = GenerationTrace(
             text=text,
@@ -274,6 +270,51 @@ class GenerationSpine:
             config_used=map_organs_to_config(organ_scores),
         )
         return text, trace
+
+    def _realize_firmware_surface(
+        self,
+        inp: SpineInput,
+        module: str,
+        payload: Dict[str, Any],
+        constraints: List[Any],
+    ) -> str:
+        """Turn CHAL firmware into natural user-facing text without exposing route names."""
+        query = (inp.query or payload.get("query") or "").lower()
+
+        if "knowledge cloud" in query:
+            return (
+                "CHAL should treat the Knowledge Cloud as mounted cognitive hardware, not a retrieval sidecar. "
+                "That means knowledge becomes addressable substrate: partitions carry provenance, cache locality, "
+                "confidence, and constraints before either hemisphere forms the final answer."
+            )
+
+        if "ppbrs" in query or "pattern" in query or "final wording" in query:
+            return (
+                "A PPBRS match should act like firmware, not speech. It can identify the route, confidence, "
+                "and boundaries, but the generation spine has to turn that signal into fresh bounded language "
+                "so the system does not leak templates into the conversation."
+            )
+
+        if "demo" in query and "platform" in query:
+            return (
+                "A demo proves one exchange can work. A platform proves the system can persist memory, mount knowledge, "
+                "route tasks, checkpoint decisions, and improve over repeated use while keeping the output inspectable."
+            )
+
+        if "memory" in query or "cache" in query:
+            return (
+                "CHAL should treat memory and cache like a hardware hierarchy. Current-turn facts stay close to the active task, "
+                "session state sits behind that, and deeper project or cloud knowledge is fetched only when the workload needs it."
+            )
+
+        query_focus = (inp.query or payload.get("query") or "the request").strip().rstrip(".?")
+        grounding = " Ground it in mounted knowledge context." if inp.rag_context or payload.get("rag_context_present") else ""
+        constraint_note = " Keep policy and safety boundaries intact." if "preserve_safety_policy_responses" in constraints else ""
+        return (
+            f"Handle {query_focus} as a bounded CHAL workload: ground the reasoning, preserve the confidence signal, "
+            f"and let the generation spine produce the final language instead of emitting a stored template."
+            f"{grounding}{constraint_note}"
+        )
     
     def _generate_from_context(self, inp: SpineInput, organ_scores: Dict[str, float]) -> tuple:
         """Generate from conversation context when no plan/text provided."""

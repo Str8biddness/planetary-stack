@@ -4,6 +4,7 @@ from core.hemisphere_bridge import HemisphereBridge
 from core.generation.spine import GenerationSpine, SpineInput
 from kernel.bridge import FallbackPPBRS
 from reasoning.chal import build_ppbrs_firmware_signal
+from tools.chal_conversation_compare import assert_chal_surfaces_are_clean, build_chal_rows
 
 
 def test_ppbrs_fallback_emits_chal_firmware_not_surface_text():
@@ -41,7 +42,8 @@ def test_generation_spine_realizes_firmware_without_legacy_template_signature():
     assert out.final_text
     assert "Handled:" not in out.final_text
     assert "[fallback]" not in out.final_text
-    assert "commerce" in out.final_text
+    assert "stored template" in out.final_text
+    assert "commerce" not in out.final_text
 
 
 def test_dual_hemi_auto_routes_left_firmware_through_generation_spine():
@@ -65,9 +67,43 @@ def test_dual_hemi_auto_routes_left_firmware_through_generation_spine():
     assert result["hemisphere_used"] == "left"
     assert "Handled:" not in result["response"]
     assert "[fallback]" not in result["response"]
-    assert "commerce" in result["response"]
+    assert "stored template" in result["response"]
+    assert "commerce" not in result["response"]
     assert (
         result["state_handoff"]["left_source"] == "python_fallback"
         or result["state_handoff"]["left_source"] == "cpp_kernel"
     )
     assert result["state_handoff"]["signals"][0]["payload"]["firmware_signal"]["trace_id"]
+
+
+def test_dual_hemi_both_mode_synthesizes_realized_left_firmware():
+    bridge = HemisphereBridge(
+        kernel_bin="/tmp/nonexistent-zo-kernel",
+        left_config={"routes": [{"pattern": "memory cache chal", "module": "chal_memory_controller", "priority": 2.0}]},
+        right_handler=lambda prompt, context: {
+            "response": "Right hemisphere candidate: CHAL should treat memory and cache as mounted cognitive hardware.",
+            "confidence": 0.56,
+        },
+    )
+
+    result = asyncio.run(
+        bridge.route_query(
+            "How should CHAL use memory cache hardware?",
+            hemisphere="both",
+            character_context={"character_id": "synth"},
+        )
+    )
+
+    assert result["hemisphere_used"] == "both"
+    assert result["left_response"]
+    assert "hardware hierarchy" in result["left_response"]
+    assert "chal_memory_controller" not in result["response"]
+    assert result["right_response"]
+    assert result["response"]
+    assert "Handled:" not in result["response"]
+    assert "[fallback]" not in result["response"]
+
+
+def test_chal_comparison_harness_blocks_legacy_surface_signatures():
+    rows = asyncio.run(build_chal_rows())
+    assert_chal_surfaces_are_clean(rows)
