@@ -1,5 +1,18 @@
 # AGENTS.md
-# Synthesus 4.0 - Autonomous Agent Handoff
+# Synthesus 5 CHAL - Core Package Agent Handoff
+
+Core-package work is governed first by the repo-root `AGENTS.md`, `README.md`, `docs/roadmap/SYNTHESUS_5_CHAL_BLUEPRINT.md`, and `docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md`.
+
+For `packages/core/`, the active target is the Synthesus 5 control plane:
+
+- Cognitive Hypervisor orchestration.
+- Quad Brain dispatch and serialized arbitration.
+- CHAL memory/cache/parameter interfaces.
+- CGPU render handoff.
+- critic/metacognitive rewrite loop.
+- deletion or quarantine of normal-path template fallback behavior.
+
+Update the Synthesus 5 checklist and `docs/agents/AGENT_LOG.md` before ending any core-package session.
 
 ## 🏛 Architectural Spine: AIVM ↔ NPC Contract
 Every agent session MUST read and adhere to the [AIVM ↔ NPC Contract](../../docs/architecture/AIVM_NPC_CONTRACT.md). This document defines the authoritative runtime contract between NPCs and the AIOS kernel.

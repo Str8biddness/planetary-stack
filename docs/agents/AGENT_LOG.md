@@ -1111,3 +1111,33 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Notes
 - C++ PPBRS offload remains deferred because this pass improved the Python rule/graph hot paths and preserved the Python baseline benchmark trail.
 - Existing unrelated working-tree changes in `README.md`, `docs/agents/AGENTS.md`, `docs/roadmap/SYNTHESUS_5_CHAL_BLUEPRINT.md`, and `synthesus_framework/` were not staged.
+
+## Current Session — 2026-05-27 (Synthesus 5 Control Plane Lock)
+
+### Summary
+- Promoted Synthesus 5 CHAL from forward roadmap into the active repository control plane.
+- Replaced the README with Synthesus 5 positioning, required agent workflow, architecture pillars, and phase roadmap.
+- Added root `AGENTS.md` so every future repo session boots from Synthesus 5 law before package-level guidance.
+- Added `docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md` as the living cross-agent implementation ledger.
+- Updated `docs/agents/AGENTS.md`, `docs/agents/AGENT_HANDOVER_PROTOCOL.md`, `packages/core/AGENTS.md`, and `/home/workspace/SYNTHESUS_DIRECTION.md` so the blueprint and checklist are mandatory for all future development.
+- Retargeted all twelve active Synthesus scheduled automations from 4.1 prompts to Synthesus 5 CHAL prompts and set them to the Codex-class model.
+
+### Synthesus 5 Checklist Items Advanced
+- Phase 0: Synthesus 5 blueprint exists and is promoted into README-level active target.
+- Phase 0: root agent law added.
+- Phase 0: agent operating contract and handover protocol updated.
+- Phase 0: implementation checklist created.
+- Phase 0: scheduled automations retargeted to Synthesus 5.
+
+### Verified
+- Documentation/control-plane change only; no runtime behavior changed.
+- Scheduled automation list was inspected and all active Synthesus automations were edited through Zo automation tools.
+- `git diff --check` should be run before commit.
+
+### Left Off / Next Steps
+- Commit and push the Phase 0 control-plane files.
+- Next implementation session should start Phase 2 by building the `CognitiveHypervisor` MVP, or Phase 8 by upgrading the comparison harness to explicit Synthesus 5 mode.
+
+### Architectural Notes
+- Synthesus 5 is now the top-level target. Synthesus 4.1 remains foundation context, not the active north star.
+- Future agent sessions are incomplete unless they update the Synthesus 5 checklist and agent log with concrete progress, validation, or a precise blocker.

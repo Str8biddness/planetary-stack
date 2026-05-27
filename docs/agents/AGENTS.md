@@ -1,8 +1,36 @@
-# Synthesus 4.1 CHAL Agent Operating Contract
+# Synthesus 5 CHAL Agent Operating Contract
+
+## Non-Negotiable Law
+
+Synthesus 5 CHAL is now the active target above all 4.0 and 4.1 work. Every agent session must treat `docs/roadmap/SYNTHESUS_5_CHAL_BLUEPRINT.md` as binding architecture law and `docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md` as the live implementation ledger.
+
+Before doing development work, read:
+
+1. `README.md`
+2. `AGENTS.md`
+3. `docs/roadmap/SYNTHESUS_5_CHAL_BLUEPRINT.md`
+4. `docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md`
+5. `docs/agents/AGENT_HANDOVER_PROTOCOL.md`
+6. the last three relevant entries in `docs/agents/AGENT_LOG.md`
+
+Every session must complete or advance at least one checklist item and update both the checklist and `AGENT_LOG.md`. A session that only discusses architecture without implementing, creating, deleting, validating, or logging a concrete Synthesus 5 artifact is incomplete.
+
+Synthesus 5 control principles:
+
+- CHAL is the hardware abstraction substrate.
+- The Cognitive Hypervisor is the scheduler/control plane.
+- Quad Brain is the default topology: grounding, executive reasoning, CGPU rendering, critic/metacognition.
+- CGPU renders candidates from validated state and does not own truth.
+- Knowledge Cloud is mounted hardware: ROM, parameter disk, cache seed, provenance plane, and writeback substrate.
+- PPBRS is firmware/signal generation, not normal-path final response generation.
+- Normal user-facing template/fallback output is a defect except for safety, platform restrictions, identity/rights protection, or explicit NPC-script boundaries.
+- Legacy or excessive code that slows Synthesus 5 should be deleted or quarantined when tests/docs/contracts are updated.
 
 ## Current North Star
 
-Synthesus 4.1 CHAL is the active direction above previous 4.0 stabilization work. Read `/home/workspace/SYNTHESUS_DIRECTION.md` and `docs/roadmap/SYNTHESUS_4_1_CHAL_MAXIMUM_DIRECTIVE.md` before making runtime, knowledge, reasoning, generation, or automation changes.
+Synthesus 5 CHAL is the forward architecture target above previous 4.0 stabilization and 4.1 CHAL work. Read `docs/roadmap/SYNTHESUS_5_CHAL_BLUEPRINT.md`, `docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md`, and `docs/roadmap/SYNTHESUS_4_1_CHAL_MAXIMUM_DIRECTIVE.md` before making runtime, knowledge, reasoning, generation, or automation changes.
+
+The practical priority is to ship the Synthesus 5 conversation path first: CognitiveFrame, TraceFrame, PPBRS firmware wrapper, cognitive hypervisor route, Quad Brain orchestrator, CGPU candidate renderer, critic template-leak guard, and legacy-vs-Synthesus-5 comparison harness.
 
 CHAL means **Cognitive Hardware Abstraction Layer**:
 

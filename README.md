@@ -1,80 +1,164 @@
-# Synthesus 4.1 CHAL — Sovereign Intelligence Operating System
+# Synthesus 5 CHAL — Bounded Synthetic Intelligence Runtime
 
-Synthesus 4.1 is the CHAL line: **Cognitive Hardware Abstraction Layer**. It treats knowledge, parameters, cache, memory, PPBRS, dual hemispheres, and generation as virtual cognitive hardware mounted inside the runtime. It implements the **AIVM (Artificial Intelligence Virtual Machine)** methodology, fusing a high-performance C++ kernel with a multi-brain cognitive framework.
+Synthesus 5 is the active development target for this repository.
 
-The current development directive is `docs/roadmap/SYNTHESUS_4_1_CHAL_MAXIMUM_DIRECTIVE.md`.
+The non-negotiable blueprint is:
 
-## 🏗 Real Monorepo Structure
+- `docs/roadmap/SYNTHESUS_5_CHAL_BLUEPRINT.md`
+- `docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md`
+- `docs/agents/AGENTS.md`
+- `docs/agents/AGENT_HANDOVER_PROTOCOL.md`
+- `docs/agents/AGENT_LOG.md`
 
-- `packages/`
-  - `kernel/`: C++ AIVM hardware drivers and pybind11 bridges.
-  - `core/`: SynthRuntime, Quadbrain orchestration, and cross-hemisphere logic.
-  - `knowledge/`: Unified Knowledge Architecture Layer (KAL) and Graph Network (KN).
-  - `reasoning/`: Multi-step reasoning chains and pattern synthesis.
-  - `organs/`: TypeScript-based ML micro-models and training loops.
-  - `api/`: Production-grade REST interfaces for the AIOS.
-  - `frontend/`: React-based hyperspace console.
-- `apps/`
-  - `desktop/`: Native desktop administration and encrypted IPC bridge.
-  - `android/`: Autonomous defense components for mobile.
-  - `ghostkey/`: Sovereign security and encryption tools.
-- `tools/`: Deployment, benchmarking, and manifestation utilities.
-- `docs/`: Technical specifications, roadmaps, and handover protocols.
-- `tests/`: Integrated E2E and cross-package verification.
+Every agent session must read the blueprint and checklist before changing code. Every session must leave behind a concrete implementation, deletion, benchmark, validation result, created artifact, or explicit blocker tied to the checklist. Development that does not move Synthesus 5 forward is out of scope unless it protects safety, correctness, or repository integrity.
 
-## 🚀 Key Architectural Pillars
+## Core Thesis
 
-### 1. **AIOS Kernel (The Body)**
-A native C++ environment that provides absolute hardware isolation for reasoning tasks.
-*   **AIVM VMM**: Hardware-accelerated sandboxing.
-*   **VPD / VQD / VGD**: Knowledge ROM, Quantum logic, and GPU tensor acceleration via MMIO.
+Synthesus 5 is not a generic chatbot wrapper and not a claim that this repo has trained a frontier-scale model. It is a **bounded synthetic intelligence operating architecture**:
 
-### 2. **Cloud Ingress & Swarm (The Nervous System)**
-*   **VND / VMD**: Hardware-abstracted secure web ingress and autonomous cluster synchronization.
-*   **VVPU**: ∇ₙ Nabla-N load-aware swarm routing across distributed virtual processing units.
+```text
+User / NPC / Client
+  -> Cognitive Hypervisor
+  -> CHAL: Cognitive Hardware Abstraction Layer
+  -> Quad Brain Compute Topology
+  -> Knowledge Cloud Hardware + Memory + Parameters + Cache
+  -> CGPU Simulation / Surface Rendering
+  -> Critic / Safety / Metacognition
+  -> Final bounded non-templated response
+```
 
-### 3. **Synthetic LLM & Acceleration (The Brain)**
-*   **VSLLM**: Hardware-native statistical language generation at port `0xF6000000`.
-*   **VAD (Virtual Accelerator Device)**: Hybrid transformer fabric for partitioned multimodal compute (`0xF7000000`).
-*   **Quad-Brain Orchestration**: Four dual-hemisphere brains working in perfect symmetry.
+The target is GPT-4-class visible usefulness through orchestration, memory, grounding, routing, critique, and specialized cognitive modules, not through pretending that Synthesus is a larger base model than it is.
 
-## 🚀 Key Implementation Status
+## Non-Negotiable Architecture
 
-| Component | Status | Description |
-| :--- | :--- | :--- |
-| **AIVM Kernel** | ✅ OPERATIONAL | pybind11 bridge, hardware profiling, and MMIO device mapping. |
-| **VPD / VQD** | ✅ OPERATIONAL | Parameter-as-hardware and Quantum-probabilistic pass. |
-| **VND / VMD** | ✅ OPERATIONAL | Secure web ingress and cluster-wide state synchronization. |
-| **VVPU / VSLLM** | ✅ OPERATIONAL | Swarm routing and statistical language generation. |
-| **VAD (Hybrid)** | ✅ OPERATIONAL | Partitioned transformer compute fabric (Phase 10). |
-| **Quadbrain V3** | ✅ OPERATIONAL | Four dual-hemisphere brains with integrated consciousness metrics. |
-| **KVM Sandbox** | 🛠 ROADMAP | Hardware-level guest isolation (Design validated). |
-| **The Freezer** | 🛠 ROADMAP | ISO manifestation engine (Design validated). |
+### CHAL
 
-## 🛠 Setup & Development
+**CHAL** means **Cognitive Hardware Abstraction Layer**. Knowledge, memory, cache, parameters, PPBRS, model calls, tools, critics, and generation are treated as virtual cognitive devices with explicit request/response frames.
 
-### Requirements
-- **Linux**: Kernel 5.15+ (KVM support), `build-essential`, `cmake`, `genisoimage`.
-- **Python**: 3.11+ (Packages defined in `packages/core/requirements.txt`).
-- **Node.js**: 20+ (Packages defined in `packages/organs/package.json`).
+### Cognitive Hypervisor
 
-### Quick Start
-1.  **Build Kernel**:
-    ```bash
-    cd packages/kernel
-    mkdir build && cd build
-    cmake .. -DBUILD_PYBIND=ON
-    make -j4
-    ```
-2.  **Initialize Intelligence**:
-    ```bash
-    python3 tools/sync_knowledge_cloud.py
-    ```
+The hypervisor schedules, isolates, budgets, routes, synchronizes, and audits cognitive workloads. It does not directly own truth or final language. It coordinates the runtime.
 
-## 🗺 Roadmap
-- **Phase 4.1**: CHAL mount manager, cognitive scheduler, cache hierarchy, Knowledge Cloud hardware partitions, hemi-sync metacognition, and removal of legacy/template fallback generation.
-- **Phase 4.2**: Direct BCI (Brain-Computer Interface) hardware ingress.
-- **Phase 5.0**: Sovereign Silicon — Transition to custom FPGA-backed VPU cores.
+### Quad Brain
+
+Four brains are the default logical topology:
+
+1. **Knowledge / Grounding Brain**: Knowledge Cloud, KAL, KN, provenance, crystallized memory.
+2. **Executive Reasoning Brain**: planning, constraints, budgets, route selection, decomposition.
+3. **CGPU Simulation / Rendering Brain**: language, NPC behavior, persona expression, narrative continuity, candidate rendering.
+4. **Critic / Safety / Metacognitive Brain**: hallucination checks, template-leak detection, safety envelope, rewrite pressure.
+
+More nodes are allowed only as specialized accelerators. The default topology remains four brains plus accelerators, not uncontrolled agent sprawl.
+
+### CGPU
+
+The **Cognitive Graphics Processing Unit** renders validated cognitive state into high-quality natural language, NPC behavior, scenes, persona expression, and dialogue candidates. It does not own facts. It renders from grounded state and is constrained by the hypervisor and critic.
+
+### Knowledge Cloud Hardware
+
+The Knowledge Cloud is mounted cognitive hardware, not an ad hoc retrieval helper:
+
+- ROM plane: curated validated knowledge, doctrine, blueprints.
+- Parameter disk: routing priors, domain packs, persona priors, learned pattern packs.
+- Cache plane: hot retrievals, session summaries, recent reasoning paths.
+- Writable memory plane: episodic memory, crystallized memory, validation scores, learned corrections.
+
+### PPBRS Firmware Boundary
+
+PPBRS is bounded cognitive firmware. It may emit structured signals, constraints, evidence, and candidate frames. It must not emit normal-path final user-facing templates.
+
+Template/canned output is allowed only for:
+
+- AI safety and abuse prevention.
+- AIVM platform restrictions.
+- identity, rights, or consent protection.
+- intentionally scripted NPC scenes where the script boundary is explicit.
+
+## Repository Structure
+
+- `packages/kernel/`: C++ AIVM kernel, virtual devices, pybind11 bridge, VMM and hardware-adjacent acceleration.
+- `packages/aivm/`: AIVM Python plane: devices, scheduler, isolation, snapshot, kernel, inspector.
+- `packages/core/`: SynthRuntime, Quad Brain orchestration, hemisphere bridge, memory state, CHAL interfaces.
+- `packages/knowledge/`: KAL, KN, Knowledge Cloud runtime integration, cloud sync, health checks, partitions.
+- `packages/reasoning/`: PPBRS, planning, query decomposition, verification, reranking, bounded generation spine.
+- `packages/organs/`: TypeScript ML organs, shared backbone, training/evaluation loop.
+- `packages/api/`: API surfaces, gateways, parameter cloud, knowledge cloud routing.
+- `packages/frontend/`: React hyperspace console.
+- `apps/`: desktop, Android, Ghostkey, and related applications.
+- `tools/`: benchmarks, training, ingestion, maintenance, evaluation utilities.
+- `tests/`: integrated Python and TypeScript verification.
+- `docs/`: architecture, modules, agents, roadmap, memory, setup, and API schemas.
+
+## Required Agent Workflow
+
+Start every Synthesus development session by reading:
+
+1. `docs/roadmap/SYNTHESUS_5_CHAL_BLUEPRINT.md`
+2. `docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md`
+3. `docs/agents/AGENTS.md`
+4. `docs/agents/AGENT_HANDOVER_PROTOCOL.md`
+5. the last three relevant entries in `docs/agents/AGENT_LOG.md`
+
+End every session by updating:
+
+1. `docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md`
+2. `docs/agents/AGENT_LOG.md`
+3. any module docs affected by the change
+
+## Build And Validation
+
+Use targeted validation tied to the changed files:
+
+```bash
+python -m py_compile <changed_python_files>
+python -m pytest -q <relevant_tests>
+```
+
+For kernel work:
+
+```bash
+cd packages/kernel
+mkdir -p build
+cd build
+cmake .. -DBUILD_PYBIND=ON
+cmake --build . -j2
+```
+
+For TypeScript organ work:
+
+```bash
+cd packages/organs
+bun test
+```
+
+## Roadmap
+
+- **Phase 0**: freeze Synthesus 5 law into README, agent docs, automation prompts, and implementation checklist.
+- **Phase 1**: CHAL frame contract for tasks, devices, telemetry, checkpoints, and outputs.
+- **Phase 2**: Cognitive Hypervisor MVP with route plans, budgets, isolation, and trace records.
+- **Phase 3**: Quad Brain MVP with grounded specialized dispatch and serialized arbitration.
+- **Phase 4**: CGPU candidate renderer and surface realization path.
+- **Phase 5**: Knowledge Cloud hardware mounts through KAL/CHAL.
+- **Phase 6**: delete or quarantine normal-path legacy template/fallback generation.
+- **Phase 7**: memory/cache hierarchy with writeback, provenance, and replayable traces.
+- **Phase 8**: GPT-4-class comparison/evaluation harness.
+- **Phase 9**: product runtime polish across API, frontend, NPC, and business-bot surfaces.
+- **Phase 10**: hardening, release gates, and reproducible build/test validation.
+
+## Git Hygiene
+
+Generated artifacts stay out of source control:
+
+- `data/`
+- FAISS indexes
+- KNDB binaries
+- generated model caches
+- benchmark results
+- scorecards
+- runtime logs
+
+Commit only intentional source and documentation changes. Do not commit `.github/workflows/` changes unless explicitly requested.
 
 ---
-© 2026 AIVM LLC | Mission Critical Autonomous Intelligence
+
+© 2026 AIVM LLC | Synthesus 5 CHAL
