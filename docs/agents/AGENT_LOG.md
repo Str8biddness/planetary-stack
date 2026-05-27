@@ -1041,5 +1041,6 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### Notes
 - Public mirror remains current at `https://zo.pub/syntech/synthesus-knowledge`; no `zopub sync` was needed this run.
-- Runtime source baseline before this log-only commit: 29d84281d03d3e8e393c62a71ed7dce4222e3c45. Knowledge Cloud commit: c2bae81aa81857cf5ce6a4f19bcc819c91b6f671.
+- Runtime source baseline before this log-only commit: 29d84281d03d3e8e393c62a71ed7dce4222e3c45. Runtime commits produced during this run: c78ab6d539d981f617bc78743129b4408a4193f2, e5e26ea30d05efd2c6a7cd4cf187152d41aa8ca4. Knowledge Cloud commit: c2bae81aa81857cf5ce6a4f19bcc819c91b6f671.
+- Cleanup note: `synthesus_framework/docs/AIVM_NPC_CONTRACT.md` was briefly included from a pre-staged state in c78ab6d, then removed from Git tracking in e5e26ea while preserving the local untracked file.
 - Existing untracked `synthesus_framework/` was present before this run and was intentionally not staged.
