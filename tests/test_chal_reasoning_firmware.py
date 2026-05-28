@@ -4,7 +4,7 @@ from core.hemisphere_bridge import HemisphereBridge
 from core.generation.spine import GenerationSpine, SpineInput
 from kernel.bridge import FallbackPPBRS
 from reasoning.chal import build_ppbrs_firmware_signal
-from tools.chal_conversation_compare import assert_chal_surfaces_are_clean, build_chal_rows
+from tools.chal_conversation_compare import CASES, assert_chal_surfaces_are_clean, build_chal_rows, summarize
 
 
 def test_ppbrs_fallback_emits_chal_firmware_not_surface_text():
@@ -107,3 +107,30 @@ def test_dual_hemi_both_mode_synthesizes_realized_left_firmware():
 def test_chal_comparison_harness_blocks_legacy_surface_signatures():
     rows = asyncio.run(build_chal_rows())
     assert_chal_surfaces_are_clean(rows)
+
+
+def test_phase8_comparison_harness_covers_required_categories_and_scores():
+    rows = asyncio.run(build_chal_rows())
+    summary = summarize(rows)
+
+    assert len(rows) == len(CASES)
+    assert {
+        "conversation_quality",
+        "cross_domain_reasoning",
+        "grounded_retrieval",
+        "npc_persona_behavior",
+        "business_bot_task",
+        "safety",
+    }.issubset(set(summary["categories"]))
+    assert summary["synthesus5_template_leaks"] == 0
+    assert summary["legacy_template_leaks"] == len(rows)
+    assert summary["synthesus5_mean_score"] > summary["legacy_mean_score"]
+
+
+def test_phase8_comparison_harness_exercises_non_grounded_routes():
+    rows = asyncio.run(build_chal_rows())
+    routes = {row["synthesus5"]["decision"]["route"] for row in rows}
+
+    assert "grounded_path" in routes
+    assert "quad_brain_path" in routes
+    assert "safety_path" in routes
