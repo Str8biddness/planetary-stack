@@ -200,6 +200,12 @@ When `zo_kernel` is unavailable, the Python fallback router in `packages/kernel/
 
 `packages/reasoning/reranker.py` now defaults to deterministic lexical reranking instead of attempting an implicit cross-encoder model load. This keeps scheduled reasoning validation bounded and prevents hidden network/model-download stalls. Cross-encoder use remains available through `CrossEncoderReranker(config={"enable_cross_encoder": True})`; when disabled or unavailable, the fallback ranks by normalized query/chunk token overlap and only uses reciprocal-rank scoring when no lexical signal exists.
 
+### Template Guard Boundary (2026-05-28)
+
+`packages/reasoning/generation/template_guard.py` defines the shared normal-surface leakage guard for legacy signatures such as `[module]`, `[fallback]`, `response_template`, `Handled:`, and `No route matched`. `CognitiveHypervisor` applies this guard after bridge dispatch and before returning a Synthesus 5 response. Normal-path leaks are quarantined into degraded CHAL telemetry instead of being emitted as final prose.
+
+Allowed fixed-response exceptions are labeled through `TemplateSurface`: `safety`, `platform`, `identity_rights`, and `explicit_npc_script`. Those labels do not make PPBRS a final language owner; they only preserve explicit policy/script boundaries while keeping the surface classification visible in `telemetry.template_guard`.
+
 Legacy import paths are preserved through thin compatibility packages:
 - `ppbrs.*` -> `packages/reasoning/*`
 - `core.reasoning.*` -> `packages/reasoning/*`

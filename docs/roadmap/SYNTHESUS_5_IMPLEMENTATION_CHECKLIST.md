@@ -118,11 +118,11 @@ Legend:
 
 - [ ]  Delete unused legacy response emitters.
 
-- [ ]  Quarantine safety/platform/explicit NPC-script templates behind labeled interfaces.
+- [~]  Quarantine safety/platform/explicit NPC-script templates behind labeled interfaces. Session log: 2026-05-28 Agent 4 template guard added `TemplateSurface` labels and hypervisor telemetry; remaining work is classifying older character/template emitters outside the Synthesus 5 hypervisor path.
 
-- [ ]  Add regression tests that fail on normal-path template leakage.
+- [x]  Add regression tests that fail on normal-path template leakage. Session log: 2026-05-28 Agent 4 template guard.
 
-- [ ]  Update module docs with the safety/template exception boundary.
+- [x]  Update module docs with the safety/template exception boundary. Session log: 2026-05-28 Agent 4 template guard.
 
 ## Phase 7: Memory And Cache Hierarchy
 

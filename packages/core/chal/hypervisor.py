@@ -18,6 +18,11 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - package-root compatibility path
     from packages.aivm.isolation.guard import AIVMExecutionGuard, DeviceExecutionResult
 
+try:
+    from reasoning.generation.template_guard import TemplateLeakageGuard, TemplateSurface
+except ModuleNotFoundError:  # pragma: no cover - package-root compatibility path
+    from packages.reasoning.generation.template_guard import TemplateLeakageGuard, TemplateSurface
+
 
 class HypervisorRoute(str, Enum):
     FAST_PATH = "fast_path"
@@ -80,10 +85,12 @@ class CognitiveHypervisor:
         self,
         bridge_factory: BridgeFactory | None = None,
         execution_guard: AIVMExecutionGuard | None = None,
+        template_guard: TemplateLeakageGuard | None = None,
     ):
         self._bridge_factory = bridge_factory
         self._bridge: Any | None = None
         self._execution_guard = execution_guard or AIVMExecutionGuard()
+        self._template_guard = template_guard or TemplateLeakageGuard()
 
     def plan(
         self,
@@ -202,6 +209,13 @@ class CognitiveHypervisor:
         bridge_result = self._normalize_guarded_bridge_result(guarded)
 
         response = str(bridge_result.get("response", ""))
+        template_guard_result = self._template_guard.inspect(
+            response,
+            surface=self._template_surface(decision),
+        )
+        response = template_guard_result.text
+        if template_guard_result.rewritten:
+            bridge_result["response"] = response
         telemetry = {
             "schema": "synthesus.chal.hypervisor_trace.v1",
             "trace_id": decision.trace_id,
@@ -215,7 +229,10 @@ class CognitiveHypervisor:
             "device_isolation": guarded.to_dict(),
             "budget_exhausted": guarded.status == "timeout",
             "degraded": not guarded.ok,
+            "template_guard": template_guard_result.to_dict(),
         }
+        if template_guard_result.rewritten:
+            telemetry["degraded"] = True
 
         bridge_result.setdefault("hypervisor_trace", telemetry)
         return HypervisorResult(
@@ -247,6 +264,18 @@ class CognitiveHypervisor:
             "device_status": guarded.status,
             "error": guarded.error,
         }
+
+    def _template_surface(self, decision: HypervisorDecision) -> TemplateSurface:
+        constraints = " ".join(decision.constraints).lower()
+        if decision.route == HypervisorRoute.SAFETY_PATH or "safety" in constraints:
+            return TemplateSurface.SAFETY
+        if "platform" in constraints:
+            return TemplateSurface.PLATFORM
+        if "identity" in constraints or "rights" in constraints:
+            return TemplateSurface.IDENTITY_RIGHTS
+        if "explicit_npc_script" in constraints:
+            return TemplateSurface.EXPLICIT_NPC_SCRIPT
+        return TemplateSurface.NORMAL
 
     def _get_bridge(self) -> Any:
         if self._bridge is None:

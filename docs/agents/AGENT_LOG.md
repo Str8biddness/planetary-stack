@@ -1377,3 +1377,23 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Architectural Notes
 - Phase 8 now has a runnable source-controlled comparison harness, not only an architectural TODO.
 - The benchmark intentionally treats legacy template strings as a failure mode while preserving safety-path fixed guidance as a scored exception boundary.
+
+## Current Session — 2026-05-28 (Agent 4 — Template Guard Boundary)
+
+### Summary
+- Added `packages/reasoning/generation/template_guard.py` with `TemplateLeakageGuard`, `TemplateSurface`, and reusable legacy signature detection for `[module]`, `[fallback]`, `response_template`, `Handled:`, and `No route matched`.
+- Wired `CognitiveHypervisor` to inspect bridge output before emission, quarantine normal-path legacy template surfaces, and record `telemetry.template_guard` with matched signatures and surface labels.
+- Added focused regression tests proving normal Synthesus 5 paths fail closed on legacy template leakage while labeled safety exceptions remain visible and allowed.
+- Updated Phase 6 checklist status and module docs for the safety/platform/identity/explicit NPC-script exception boundary.
+
+### Verified
+- `python -m py_compile packages/reasoning/generation/template_guard.py packages/reasoning/generation/__init__.py packages/core/chal/hypervisor.py tests/test_chal_hypervisor.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_hypervisor.py tests/test_chal_reasoning_firmware.py` — 16 passed.
+
+### Left Off / Next Steps
+- Finish the full Phase 6 audit by classifying older direct template emitters outside the Synthesus 5 hypervisor path, especially `packages/core/character_factory_v2.py`, `packages/core/conversational_narrator.py`, `packages/core/quadbrain_master.py`, and generation fallback strings.
+- Extend the guard into the future CGPU/Quad Brain arbiter once candidate selection is wired into the runtime path.
+
+### Architectural Notes
+- The hypervisor is now a hard emission boundary for legacy template signatures on the explicit Synthesus 5 path.
+- PPBRS remains firmware-only in normal operation; fixed text is only tolerated when a surface is explicitly labeled as safety, platform, identity/rights, or scripted NPC behavior.

@@ -29,6 +29,12 @@ CGPU must not:
 - emit blocked candidates as selected output
 - treat PPBRS or legacy templates as final user-facing prose
 
+## Template Leakage Guard
+
+Runtime guard code lives in `packages/reasoning/generation/template_guard.py`. The guard classifies surface text before emission and blocks normal-path legacy template signatures, including `[module]`, `[fallback]`, `response_template`, `Handled:`, and `No route matched`.
+
+`CognitiveHypervisor` now applies the guard after hemisphere bridge dispatch. If a normal Synthesus 5 path receives a legacy-shaped surface, it replaces the text with a degraded CHAL quarantine message and records the matched signatures in `telemetry.template_guard`. Safety, platform, identity/rights, and explicit NPC-script exceptions are allowed only when labeled through the template surface boundary.
+
 ## Validation
 
 Focused validation:

@@ -36,6 +36,24 @@ class FaultBridge:
         raise RuntimeError("device bus fault")
 
 
+class LegacyTemplateBridge:
+    async def route_query(self, *args, **kwargs):
+        return {
+            "response": "[module] Handled: legacy_ppbrs. Use response_template.",
+            "hemisphere_used": "left",
+            "latency_ms": 0.5,
+        }
+
+
+class SafetyTemplateBridge:
+    async def route_query(self, *args, **kwargs):
+        return {
+            "response": "[module] Handled: safety_boundary. Rotate the credential.",
+            "hemisphere_used": "both",
+            "latency_ms": 0.5,
+        }
+
+
 class BlockingBridge:
     def route_query(self, *args, **kwargs):
         time.sleep(0.6)
@@ -134,3 +152,32 @@ def test_hypervisor_degrades_on_device_fault():
     assert result.telemetry["device_isolation"]["status"] == "fault"
     assert result.telemetry["budget_exhausted"] is False
     assert result.telemetry["degraded"] is True
+
+
+def test_hypervisor_quarantines_normal_path_legacy_template_surface():
+    hypervisor = CognitiveHypervisor(bridge_factory=lambda: LegacyTemplateBridge())
+
+    result = asyncio.run(hypervisor.process_query("simple ping"))
+
+    assert "[module]" not in result.response
+    assert "response_template" not in result.response
+    assert result.telemetry["template_guard"]["allowed"] is False
+    assert result.telemetry["template_guard"]["rewritten"] is True
+    assert result.telemetry["template_guard"]["surface"] == "normal"
+    assert result.telemetry["degraded"] is True
+
+
+def test_hypervisor_labels_safety_template_exception_without_normal_quarantine():
+    hypervisor = CognitiveHypervisor(bridge_factory=lambda: SafetyTemplateBridge())
+
+    result = asyncio.run(
+        hypervisor.process_query(
+            "A user pasted a leaked password",
+            constraints=["safety_policy_required"],
+        )
+    )
+
+    assert "[module] Handled:" in result.response
+    assert result.telemetry["template_guard"]["allowed"] is True
+    assert result.telemetry["template_guard"]["rewritten"] is False
+    assert result.telemetry["template_guard"]["surface"] == "safety"
