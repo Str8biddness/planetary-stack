@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Synthesus 5 CHAL API",
-    "description": "Legacy-compatible Synthesus query and control API for the active Synthesus 5 CHAL runtime. The public query path currently exposes generation-spine, cognitive, RAG, kernel, and amplification telemetry; Cognitive Hypervisor and CGPU traces are documented as CHAL contracts until they are wired into this endpoint.",
+    "description": "Legacy-compatible Synthesus query and control API for the active Synthesus 5 CHAL runtime. The public query path currently exposes explicit Cognitive Hypervisor routing through mode=chal plus generation-spine, cognitive, RAG, kernel, and amplification telemetry. CGPU traces are documented as CHAL contracts until runtime arbitration wires them into this endpoint.",
     "version": "5.0.0"
   },
   "paths": {
@@ -305,7 +305,7 @@
             "type": "string",
             "title": "Mode",
             "default": "left",
-            "description": "Legacy-compatible processing mode: auto|cognitive|rag|pattern. Synthesus 5 CHAL routing is represented in debug telemetry until the Cognitive Hypervisor is wired into the public query path."
+            "description": "Processing mode: auto|chal|cognitive|rag|pattern. Use chal to route explicitly through the Synthesus 5 Cognitive Hypervisor; auto preserves the legacy-compatible production pipeline."
           },
           "character": {
             "type": "string",
@@ -367,7 +367,7 @@
             "type": "object",
             "title": "Debug",
             "default": {},
-            "description": "Optional implementation telemetry returned only when include_debug is true. Current keys include kernel_triggered, symbolic_triggered, trace, rag, ml_swarm, and fallback diagnostics. Future Synthesus 5 wiring should place Cognitive Hypervisor and CGPU candidate-set trace records here without changing the stable response envelope."
+            "description": "Optional implementation telemetry returned only when include_debug is true. Current keys include kernel_triggered, symbolic_triggered, trace, rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. CGPU candidate-set trace records should also live here as the runtime wiring expands without changing the stable response envelope."
           }
         },
         "type": "object",

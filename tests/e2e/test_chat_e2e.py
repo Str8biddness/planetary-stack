@@ -48,8 +48,33 @@ class TestChatE2E:
         }
         resp = client.post("/api/v1/query", json=payload)
         data = resp.json()
-        valid_sources = {"pattern", "rag", "escalated", "fallback", "knowledge_cloud", "generation", "cognitive", "cognitive_engine", "symbolic_core"}
+        valid_sources = {"pattern", "rag", "escalated", "fallback", "knowledge_cloud", "generation", "cognitive", "cognitive_engine", "symbolic_core", "cognitive_hypervisor"}
         assert data.get("source") in valid_sources, f"Unexpected source: {data.get('source')}"
+
+    def test_chal_mode_routes_through_cognitive_hypervisor(self, client):
+        """Explicit CHAL mode should expose Synthesus 5 hypervisor telemetry."""
+        payload = {
+            "query": "Compare CHAL memory and cache architecture",
+            "character": "synthesus",
+            "session_id": "e2e-chat-chal",
+            "mode": "chal",
+            "include_debug": True,
+        }
+        resp = client.post("/api/v1/query", json=payload)
+        assert resp.status_code == 200
+        data = resp.json()
+
+        assert data["source"] == "cognitive_hypervisor"
+        assert data["response"]
+        hv_debug = data["debug"]["cognitive_hypervisor"]
+        assert hv_debug["schema"] == "synthesus.chal.hypervisor_trace.v1"
+        assert hv_debug["route"] in {
+            "fast_path",
+            "grounded_path",
+            "deep_reasoning_path",
+            "quad_brain_path",
+            "safety_path",
+        }
 
     def test_debug_info_when_requested(self, client):
         """include_debug=True should add a debug block to the response."""

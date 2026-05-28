@@ -97,9 +97,9 @@ class QueryRequest(BaseModel):
     mode: str = Field(
         default="auto",
         description=(
-            "Legacy-compatible processing mode: auto|cognitive|rag|pattern. "
-            "Synthesus 5 CHAL routing is represented in debug telemetry until "
-            "the Cognitive Hypervisor is wired into the public query path."
+            "Processing mode: auto|chal|cognitive|rag|pattern. Use chal to "
+            "route explicitly through the Synthesus 5 Cognitive Hypervisor; "
+            "auto preserves the legacy-compatible production pipeline."
         ),
     )
     session_id: Optional[str] = Field(default=None, description="Session ID for multi-turn")
@@ -149,9 +149,9 @@ class QueryResponse(BaseModel):
         description=(
             "Optional implementation telemetry returned only when include_debug "
             "is true. Current keys include kernel_triggered, symbolic_triggered, "
-            "trace, rag, ml_swarm, and fallback diagnostics. Future Synthesus 5 "
-            "wiring should place Cognitive Hypervisor and CGPU candidate-set "
-            "trace records here without changing the stable response envelope."
+            "trace, rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. "
+            "CGPU candidate-set trace records should also live here as the runtime "
+            "wiring expands without changing the stable response envelope."
         ),
     )
 

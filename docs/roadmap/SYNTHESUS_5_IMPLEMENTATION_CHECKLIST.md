@@ -158,7 +158,7 @@ Legend:
 
 ## Phase 9: Product Runtime Polish
 
-- [ ]  Wire Synthesus 5 path into API entrypoints.
+- \[\~\] Wire Synthesus 5 path into API entrypoints. Session log: 2026-05-28 Agent 1 API CHAL mode added explicit `/api/v1/query` `mode="chal"` routing through `CognitiveHypervisor`; default `auto` cutover remains.
 
 - [ ]  Add frontend control/trace view for CHAL route decisions.
 

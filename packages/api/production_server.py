@@ -76,6 +76,15 @@ sys.path.insert(0, str(PROJ_ROOT / "packages" / "reasoning"))
 sys.path.insert(0, str(PROJ_ROOT / "packages" / "kernel"))
 sys.path.insert(0, str(PROJ_ROOT / "packages" / "api"))
 
+_cognitive_hypervisor_import_error = None
+try:
+    from core.chal.hypervisor import CognitiveHypervisor  # type: ignore
+    HAS_COGNITIVE_HYPERVISOR = True
+except Exception as e:
+    CognitiveHypervisor = None  # type: ignore
+    HAS_COGNITIVE_HYPERVISOR = False
+    _cognitive_hypervisor_import_error = e
+
 # ─── Logging ─────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
 logger = logging.getLogger("synthesus.api")
@@ -137,6 +146,9 @@ except Exception as e:
 
 if _synthesus_master_import_error is not None:
     logger.warning(f"SynthesusMaster not available: {_synthesus_master_import_error}")
+
+if _cognitive_hypervisor_import_error is not None:
+    logger.warning(f"CognitiveHypervisor not available: {_cognitive_hypervisor_import_error}")
 
 # Import amplification wrapper with graceful fallback
 _amplification_wrapper_import_error = None
@@ -206,6 +218,9 @@ def _linter_safe_round(val: Any, n: int = 2) -> float:
 def _import_module_direct(name: str, path: str):
     import importlib.util
     import sys
+    if not Path(path).exists():
+        logger.warning(f"Optional module {name} not found at {path}")
+        return None
     spec = importlib.util.spec_from_file_location(name, path)
     if spec is not None:
         if spec.loader is not None:
@@ -217,10 +232,10 @@ def _import_module_direct(name: str, path: str):
     return None
 
 # Dynamically import project modules
-_rag_mod = _import_module_direct("core.rag_pipeline", str(PROJ_ROOT / "core" / "rag_pipeline.py"))
+_rag_mod = _import_module_direct("knowledge.rag_pipeline", str(PROJ_ROOT / "packages" / "knowledge" / "rag_pipeline.py"))
 RAGPipeline = getattr(_rag_mod, "RAGPipeline", None) if _rag_mod else None # type: ignore
 
-_factory_mod = _import_module_direct("character_factory_v2", str(PROJ_ROOT / "character_factory_v2.py"))
+_factory_mod = _import_module_direct("character_factory_v2", str(PROJ_ROOT / "packages" / "core" / "character_factory_v2.py"))
 CharacterFactory = getattr(_factory_mod, "CharacterFactory", None) if _factory_mod else None # type: ignore
 CharacterSpec = getattr(_factory_mod, "CharacterSpec", None) if _factory_mod else None # type: ignore
 
@@ -243,17 +258,17 @@ except (ImportError, Exception) as e:
 
 # ─── ML Swarm Models ─────────────────────────────────────────────────
 try:
-    from ml.intent_classifier import IntentClassifier # type: ignore
-    from ml.sentiment_analyzer import SentimentAnalyzer # type: ignore
-    from ml.emotion_detector import EmotionDetector # type: ignore
-    from ml.behavior_predictor import BehaviorPredictor # type: ignore
+    from reasoning.intent_classifier import IntentClassifier # type: ignore
+    from reasoning.sentiment_analyzer import SentimentAnalyzer # type: ignore
+    from reasoning.emotion_detector import EmotionDetector # type: ignore
+    from reasoning.behavior_predictor import BehaviorPredictor # type: ignore
     from ml.loot_balancer import LootBalancer # type: ignore
     from ml.dialogue_ranker import DialogueRanker # type: ignore
     HAS_ML_SWARM = True
 except (ImportError, Exception) as e:
     logger.warning(f"ML Swarm not available: {e}")
     HAS_ML_SWARM = False
-CHARACTERS_DIR = PROJ_ROOT / "characters"
+CHARACTERS_DIR = PROJ_ROOT / "packages" / "characters"
 DATA_DIR = PROJ_ROOT / "data"
 STATIC_DIR = PROJ_ROOT / "static"
 INDEX_PATH = DATA_DIR / "faiss.index"
@@ -280,9 +295,10 @@ app = FastAPI(
     description=(
         "Legacy-compatible Synthesus query and control API for the active "
         "Synthesus 5 CHAL runtime. The public query path currently exposes "
-        "generation-spine, cognitive, RAG, kernel, and amplification telemetry; "
-        "Cognitive Hypervisor and CGPU traces are documented as CHAL contracts "
-        "until they are wired into this endpoint."
+        "explicit Cognitive Hypervisor routing through mode=chal plus "
+        "generation-spine, cognitive, RAG, kernel, and amplification telemetry. "
+        "CGPU traces are documented as CHAL contracts until runtime arbitration "
+        "wires them into this endpoint."
     ),
     version="5.0.0",
 )
@@ -436,6 +452,7 @@ _dialogue_ranker: Optional[DialogueRanker] = None
 # Synthesus Master and Trainer
 _master_registry: Dict[str, SynthesusMaster] = {}
 _hemisphere_bridge: Optional[HemisphereBridge] = None
+_cognitive_hypervisor: Optional[Any] = None
 _veai_trainer: Optional[VEAITrainer] = None
 _accelerator_registry: Optional[Any] = None
 
@@ -453,6 +470,23 @@ def get_master(char_id: str) -> Optional[SynthesusMaster]:
                 logger.warning(f"Failed to initialize Synthesus Master for {char_id}: {e}")
                 return None
     return _master_registry.get(char_id)
+
+
+def _get_cognitive_hypervisor() -> Optional[Any]:
+    """Get or lazily initialize the Synthesus 5 Cognitive Hypervisor."""
+    global _cognitive_hypervisor
+    if not HAS_COGNITIVE_HYPERVISOR or CognitiveHypervisor is None:
+        return None
+    if _cognitive_hypervisor is None:
+        def _bridge_factory() -> Any:
+            if _hemisphere_bridge is not None:
+                return _hemisphere_bridge
+            if HemisphereBridge is None:
+                raise RuntimeError("HemisphereBridge is unavailable for hypervisor dispatch")
+            return cast(Any, HemisphereBridge)(kernel_bin=str(PROJ_ROOT / "zo_kernel"))
+
+        _cognitive_hypervisor = cast(Any, CognitiveHypervisor)(bridge_factory=_bridge_factory)
+    return _cognitive_hypervisor
 
 # Amplification Plane
 _amplification_plane: Optional[AmplificationPlane] = None
@@ -539,6 +573,7 @@ async def startup():
     global _rag, _intent_classifier, _sentiment_analyzer, _emotion_detector
     global _behavior_predictor, _loot_balancer, _dialogue_ranker
     global _master_registry, _veai_trainer, _accelerator_registry
+    global _cognitive_hypervisor
     global _amplification_plane, _symbolic_core, _generation_spine, _kal_client
     global ENABLE_ACCELERATION_LAYER
     global _substrate
@@ -632,6 +667,10 @@ async def startup():
             _hemisphere_bridge = None
     else:
         _hemisphere_bridge = None
+
+    if HAS_COGNITIVE_HYPERVISOR:
+        _cognitive_hypervisor = _get_cognitive_hypervisor()
+        logger.info("Cognitive Hypervisor ready for explicit CHAL query mode.")
 
     # Initialize VEAI Trainer if bridge/master exist
     if HAS_VEAI_TRAINER and HAS_SYNTHESUS_MASTER:
@@ -1219,7 +1258,7 @@ async def root():
 
 @app.post("/api/v1/query", response_model=QueryResponse)
 async def query_endpoint(req: QueryRequest, auth=Depends(get_auth)):
-    """Main query endpoint — ML Swarm → Cognitive → RAG → Fallback."""
+    """Main query endpoint — CHAL opt-in → ML Swarm → Cognitive → RAG → Fallback."""
     # Update request count
     global _request_count
     _request_count = _request_count + 1
@@ -1249,6 +1288,50 @@ async def query_endpoint(req: QueryRequest, auth=Depends(get_auth)):
         )
 
     _conversations.setdefault(session_id, [])
+
+    if req.mode == "chal":
+        hypervisor = _get_cognitive_hypervisor()
+        if hypervisor is None:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "error": "cognitive_hypervisor_unavailable",
+                    "message": "Synthesus 5 Cognitive Hypervisor is not available in this runtime.",
+                    "session_id": session_id,
+                    "character": char_id,
+                },
+            )
+
+        domain = _detect_domain(char_id, _character_cache.get(char_id))
+        hv_result = await hypervisor.process_query(
+            query_text,
+            character_context={
+                "character_id": char_id,
+                "session_id": session_id,
+                "player_id": req.player_id,
+                "domain": domain,
+            },
+            max_tokens=512,
+        )
+        latency = (time.time() - t0) * 1000
+        _conversations[session_id].append({"role": "user", "content": query_text})
+        _conversations[session_id].append({"role": "assistant", "content": hv_result.response})
+        raw_confidence = hv_result.bridge_result.get("raw_confidence", 0.0)
+        debug_data = None
+        if req.include_debug:
+            debug_data = {
+                "cognitive_hypervisor": hv_result.telemetry,
+                "bridge_result": hv_result.bridge_result,
+            }
+        return QueryResponse(
+            response=hv_result.response,
+            confidence=_linter_safe_round(raw_confidence, 2),
+            character=char_id,
+            source="cognitive_hypervisor",
+            session_id=session_id,
+            latency_ms=_linter_safe_round(latency, 2),
+            debug=debug_data,
+        )
 
     # ── Phase 0: Symbolic Core (First Pass) ──
     # Check C++ Kernel via HemisphereBridge first for high-performance matching

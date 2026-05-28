@@ -1333,3 +1333,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Architectural Notes
 - Knowledge Cloud artifacts are now treated as bootable CHAL hardware planes instead of passive files under `data/`.
 - The manifest is the provenance/integrity source of truth for mount activation; mount trust drops to `0.0` when the local artifact does not match the manifest.
+
+## Current Session — 2026-05-28 (Agent 1 — API CHAL Mode)
+
+### Summary
+- Wired the public `/api/v1/query` endpoint to the Synthesus 5 `CognitiveHypervisor` behind explicit `mode="chal"` routing.
+- Returned stable `QueryResponse` envelopes with `source="cognitive_hypervisor"` and hypervisor trace records under `debug.cognitive_hypervisor` when debug is requested.
+- Preserved default `mode="auto"` legacy behavior while making the Synthesus 5 path runnable and testable through the public API.
+- Repaired production-server import/package path blockers that prevented E2E import and startup: RAG now loads from `packages/knowledge/rag_pipeline.py`, character factory from `packages/core/character_factory_v2.py`, characters from `packages/characters/`, and ML classifiers from `packages/reasoning`.
+- Updated API schema docs and `docs/modules/CGPU.md` to reflect the explicit CHAL mode and current debug telemetry boundary.
+
+### Verified
+- `python -m py_compile packages/api/production_server.py packages/api/schemas.py tests/e2e/test_chat_e2e.py`
+- `python - <<'PY' ... yaml.safe_load/json.load schema validation ... PY` — parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; verified `auto|chal|cognitive|rag|pattern` mode docs and `cognitive_hypervisor` debug docs.
+- `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/api python -m pytest -q tests/test_chal_hypervisor.py tests/e2e/test_chat_e2e.py` — 15 passed, 8 warnings.
+
+### Left Off / Next Steps
+- Cut over selected `auto` traffic to the hypervisor once the Quad Brain/CGPU arbitration path is wired.
+- Add frontend/API trace display for `debug.cognitive_hypervisor`.
+- Follow up on remaining startup warnings outside this patch: Knowledge Cloud embedder constructor mismatch, database logger initialization, and cognitive engine `PatternLM` constructor mismatch.
+
+### Architectural Notes
+- The production API now has a public Synthesus 5 path without forcing the whole legacy-compatible query pipeline through an unfinished runtime cutover.
+- Hypervisor traces use the existing response debug envelope, keeping client compatibility while making route decisions, budgets, device isolation, and degraded states observable.
