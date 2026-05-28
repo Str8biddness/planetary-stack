@@ -2,7 +2,7 @@
 // GM PolicyPrior organ with model support
 
 import { Organ, OrganType, OrganContext } from '../registry';
-import { StateFeatures, ActionFeatures } from '../../amplification/features';
+import { StateFeatures, ActionFeatures } from '../../core/amplification/features';
 import { GmPolicyPriorModel, GmPolicyPriorModelParams } from './GmPolicyPriorModel';
 
 export class GmPolicyPriorOrgan implements Organ<{ stateFeatures: StateFeatures; actionFeaturesList: ActionFeatures[] }, { scores: number[] }> {

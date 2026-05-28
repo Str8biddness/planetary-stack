@@ -2,7 +2,7 @@
 // GM RiskOutcome organ with model support
 
 import { Organ, OrganType, OrganContext } from '../registry';
-import { TrajectoryFeatures } from '../../amplification/features';
+import { TrajectoryFeatures } from '../../core/amplification/features';
 import { GmRiskOutcomeModel, GmRiskOutcomeModelParams } from './GmRiskOutcomeModel';
 
 export class GmRiskOutcomeOrgan implements Organ<TrajectoryFeatures, { risk: number; stability: number; drama: number }> {

@@ -75,17 +75,17 @@ Legend:
 
 ## Phase 4: CGPU Render Accelerator
 
-- [ ] Define `CGPUFrame` input/output contract.
+- [x] Define `CGPUFrame` input/output contract. Session log: 2026-05-28 Agent 9 CGPU frame contract.
 
-- [ ] Generate multiple candidate phrasings from grounded state.
+- [x] Generate multiple candidate phrasings from grounded state. Session log: 2026-05-28 Agent 9 CGPU frame contract.
 
-- [ ] Add persona/NPC behavior rendering mode.
+- [x] Add persona/NPC behavior rendering mode. Session log: 2026-05-28 Agent 9 CGPU frame contract.
 
-- [ ] Add business-bot concise answer rendering mode.
+- [x] Add business-bot concise answer rendering mode. Session log: 2026-05-28 Agent 9 CGPU frame contract.
 
-- [ ] Add critic feedback loop for rewrite.
+- [x] Add critic feedback loop for rewrite. Session log: 2026-05-28 Agent 9 CGPU frame contract.
 
-- [ ] Ensure CGPU candidates never bypass grounding/safety arbitration.
+- [x] Ensure CGPU candidates never bypass grounding/safety arbitration. Session log: 2026-05-28 Agent 9 CGPU frame contract.
 
 ## Phase 5: Knowledge Cloud Hardware Mount
 

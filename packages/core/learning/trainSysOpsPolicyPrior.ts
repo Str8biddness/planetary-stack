@@ -1,9 +1,9 @@
 // learning/trainSysOpsPolicyPrior.ts
 // Training runner for SysOps PolicyPrior organ
 
-import { OrganRegistry, OrganType } from '../organs/registry';
-import { SysOpsPolicyPriorModel as SysPolicyPriorModel } from '../organs/sysops/SysOpsPolicyPriorModel';
-import { SysPolicyPriorOrgan } from '../organs/sysops/SysPolicyPriorOrgan';
+import { OrganRegistry, OrganType } from '../../organs/registry';
+import { SysOpsPolicyPriorModel as SysPolicyPriorModel } from '../../organs/sysops/SysOpsPolicyPriorModel';
+import { SysPolicyPriorOrgan } from '../../organs/sysops/SysPolicyPriorOrgan';
 import { buildSysOpsPolicyPriorDataset as buildSysPolicyPriorDataset } from './sysops/policyPriorData';
 
 export async function trainSysOpsPolicyPrior() {

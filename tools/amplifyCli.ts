@@ -2,7 +2,7 @@
 // CLI entrypoint for Python wrapper to call AmplificationPlane
 // Reads JSON from stdin, writes JSON to stdout
 
-import { amplifyIntake, amplifyPlanning, amplifyOutput, AmplificationContext } from '../amplification/index';
+import { amplifyIntake, amplifyPlanning, amplifyOutput, AmplificationContext } from '../packages/core/amplification/index';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -26,6 +26,7 @@ async function main() {
     sessionId: input.sessionId ?? 'cli-session',
     domain: input.domain ?? 'chat',
     allowedOrgans: input.allowedOrgans,
+    cloudParams: input.cloudParams ?? {},
   };
 
   let result: any;

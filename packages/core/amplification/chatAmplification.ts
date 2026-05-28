@@ -3,7 +3,7 @@
 
 import { AmplificationContext, IntakeAmplificationResult, PlanningAmplificationResult, OutputAmplificationResult } from './index';
 import { MlOrgansHub } from './mlOrgansHub';
-import { OrganType } from '../organs/registry';
+import { OrganType } from '../../organs/registry';
 import { chatStateToStateFeatures, chatActionToActionFeatures, chatHistoryToTrajectoryFeatures, chatMultiFocusToMultiFocusFeatures } from '../domains/chat/featureAdapters';
 import { ChatWorldState, ChatAction, ChatHistory, ChatFocusTarget } from '../domains/chat/types';
 import { StateFeatures, ActionFeatures, TrajectoryFeatures, MultiFocusFeatures } from './features';

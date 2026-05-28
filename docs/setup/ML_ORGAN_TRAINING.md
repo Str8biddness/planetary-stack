@@ -4,22 +4,22 @@ This document is the start-to-finish handoff for the Synthesus ML organ loop.
 
 ## What this pipeline does
 
-1. `bun cli.ts selfImprove`
-2. `scripts/runTrainingSessions.ts` emits planning/output traces for GM, SysOps, and Chat.
+1. `cd packages/organs && npx ts-node cli.ts selfImprove`
+2. `tools/runTrainingSessions.ts` emits planning/output traces for GM, SysOps, and Chat.
 3. `learning/teacherTrace.ts` persists those traces to `logs/teacher_traces.jsonl`.
-4. `scripts/train_triad.py` reads the trace log and trains the triad organs.
-5. `scripts/evaluate_organs.py` evaluates the freshly trained models and writes a scorecard.
+4. `tools/train_triad.py` reads the trace log and trains the triad organs.
+5. `tools/evaluate_organs.py` evaluates the freshly trained models and writes a scorecard.
 6. Trained models are written to `data/models/<domain>_<organ>.pkl`.
 7. The trained models are re-used on the next run.
 
 ## Current contracts
 
 - `learning/teacherTrace.ts` is the shared trace store.
-- `scripts/runTrainingSessions.ts` is the trace generator.
-- `scripts/train_triad.py` is the training entrypoint.
-- `scripts/evaluate_organs.py` is the evaluation entrypoint.
-- `scripts/selfImprove.ts` is the orchestration wrapper.
-- `cli.ts selfImprove` is the top-level command.
+- `tools/runTrainingSessions.ts` is the trace generator.
+- `tools/train_triad.py` is the training entrypoint.
+- `tools/evaluate_organs.py` is the evaluation entrypoint.
+- `tools/selfImprove.ts` is the orchestration wrapper.
+- `packages/organs/cli.ts selfImprove` is the top-level command.
 - `logs/organ_evaluation_scorecard.json` and `logs/organ_evaluation_scorecard.md` are runtime artifacts and are ignored by Git.
 
 ## Fresh start to finish
@@ -41,7 +41,8 @@ python --version
 ### 3. Run the full self-improvement loop
 
 ```bash
-bun cli.ts selfImprove
+cd packages/organs
+npx ts-node cli.ts selfImprove
 ```
 
 This should:
@@ -73,17 +74,17 @@ cat logs/organ_evaluation_scorecard.md
 ### 7. Train one organ directly if needed
 
 ```bash
-python scripts/train_triad.py --domain chat --organ policy_prior
-python scripts/train_triad.py --domain sysops --organ risk_outcome
-python scripts/train_triad.py --domain gm --organ attention
+python tools/train_triad.py --domain chat --organ policy_prior
+python tools/train_triad.py --domain sysops --organ risk_outcome
+python tools/train_triad.py --domain gm --organ attention
 ```
 
 ### 8. Evaluate one domain directly if needed
 
 ```bash
-python scripts/evaluate_organs.py --domain chat
-python scripts/evaluate_organs.py --domain sysops
-python scripts/evaluate_organs.py --domain gm
+python tools/evaluate_organs.py --domain chat
+python tools/evaluate_organs.py --domain sysops
+python tools/evaluate_organs.py --domain gm
 ```
 
 ### 9. Verify the outputs
@@ -112,18 +113,18 @@ Before pushing:
 1. Read this file first.
 2. Read `AGENTS.md` and `AGENT_LOG.md`.
 3. Run `git status` and identify whether only source/docs are dirty or whether generated outputs are also present.
-4. If the pipeline needs to be refreshed, run `bun cli.ts selfImprove`.
-5. If trace quality needs improvement, edit `scripts/runTrainingSessions.ts` to vary actions and outcomes.
-6. Re-run `python scripts/train_triad.py --domain <domain> --organ <organ>` for the affected organs.
+4. If the pipeline needs to be refreshed, run `cd packages/organs && npx ts-node cli.ts selfImprove`.
+5. If trace quality needs improvement, edit `tools/runTrainingSessions.ts` to vary actions and outcomes.
+6. Re-run `python tools/train_triad.py --domain <domain> --organ <organ>` for the affected organs.
 7. Verify the traces, model outputs, and the evaluation scorecard.
 8. Commit and push source changes.
 
 ## Current status
 
 - Trace generation is now diversified across GM, SysOps, and Chat sessions.
-- `scripts/train_triad.py` now reports train/validation metrics instead of only fitting on the full trace set.
-- `scripts/evaluate_organs.py` now produces a runtime scorecard after the full self-improvement loop.
-- `bun cli.ts selfImprove` was rerun successfully after the update.
+- `tools/train_triad.py` now reports train/validation metrics instead of only fitting on the full trace set.
+- `tools/evaluate_organs.py` now produces a runtime scorecard after the full self-improvement loop.
+- `packages/organs/cli.ts selfImprove` runs the updated loop.
 
 ## Updated next step
 

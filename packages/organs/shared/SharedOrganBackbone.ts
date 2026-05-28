@@ -1,5 +1,5 @@
-import { ActionFeatures, MultiFocusFeatures, StateFeatures, TrajectoryFeatures } from '../../amplification/features';
-import { clamp01, toNumber } from '../../utils/normalization';
+import { ActionFeatures, MultiFocusFeatures, StateFeatures, TrajectoryFeatures } from '../../core/amplification/features';
+import { clamp01, toNumber } from '../../core/utils/normalization';
 
 export interface SharedOrganFeatures {
   latentVector: number[];

@@ -1,7 +1,7 @@
 // organs/gm/GmAttentionModel.ts
 // Simple trainable model for GM Attention organ
 
-import { MultiFocusFeatures } from '../../amplification/features';
+import { MultiFocusFeatures } from '../../core/amplification/features';
 
 export interface GmAttentionModelParams {
   weights: number[][];

@@ -2,7 +2,7 @@
 // GM Attention organ with model support
 
 import { Organ, OrganType, OrganContext } from '../registry';
-import { MultiFocusFeatures } from '../../amplification/features';
+import { MultiFocusFeatures } from '../../core/amplification/features';
 import { GmAttentionModel, GmAttentionModelParams } from './GmAttentionModel';
 
 export class GmAttentionOrgan implements Organ<MultiFocusFeatures, { attentionWeights: number[] }> {

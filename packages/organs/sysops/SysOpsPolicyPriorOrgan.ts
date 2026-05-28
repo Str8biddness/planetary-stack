@@ -2,7 +2,7 @@
 // SysOps PolicyPrior organ with model support
 
 import { Organ, OrganType, OrganContext } from '../registry';
-import { StateFeatures, ActionFeatures } from '../../amplification/features';
+import { StateFeatures, ActionFeatures } from '../../core/amplification/features';
 import { SysOpsPolicyPriorModel, SysOpsPolicyPriorModelParams } from './SysOpsPolicyPriorModel';
 
 export class SysOpsPolicyPriorOrgan implements Organ<{ stateFeatures: StateFeatures; actionFeaturesList: ActionFeatures[] }, { scores: number[] }> {

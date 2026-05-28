@@ -2,9 +2,9 @@
 // Training runner for Chat Attention organ
 
 import { buildChatAttentionDataset } from './chat/attentionData';
-import { ChatAttentionModel } from '../organs/chat/ChatAttentionModel';
-import { ChatAttentionOrgan } from '../organs/chat/ChatAttentionOrgan';
-import { OrganRegistry, OrganType } from '../organs/registry';
+import { ChatAttentionModel } from '../../organs/chat/ChatAttentionModel';
+import { ChatAttentionOrgan } from '../../organs/chat/ChatAttentionOrgan';
+import { OrganRegistry, OrganType } from '../../organs/registry';
 import { organMonitor } from './monitoring';
 
 export async function trainChatAttention() {

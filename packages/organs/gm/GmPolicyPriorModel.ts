@@ -1,7 +1,7 @@
 // organs/gm/GmPolicyPriorModel.ts
 // Simple trainable model for GM PolicyPrior organ
 
-import { StateFeatures, ActionFeatures } from '../../amplification/features';
+import { StateFeatures, ActionFeatures } from '../../core/amplification/features';
 
 export interface GmPolicyPriorModelParams {
   weights: number[];

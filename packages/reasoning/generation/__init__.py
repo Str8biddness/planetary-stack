@@ -1,4 +1,13 @@
 # core/generation/__init__.py
+from .cgpu import CGPUCandidate, CGPUFrame, CGPUOutputFrame, CGPURenderer
 from .response_plan import ResponsePlan, GenerationConfig, GenerationTrace
-# decoder will be implemented in Phase 5
-# from .decoder import decode_response
+
+__all__ = [
+    "CGPUCandidate",
+    "CGPUFrame",
+    "CGPUOutputFrame",
+    "CGPURenderer",
+    "GenerationConfig",
+    "GenerationTrace",
+    "ResponsePlan",
+]

@@ -1,9 +1,9 @@
 // learning/trainSysOpsAttention.ts
 // Training runner for SysOps Attention organ
 
-import { OrganRegistry, OrganType } from '../organs/registry';
-import { SysOpsAttentionModel } from '../organs/sysops/SysOpsAttentionModel';
-import { SysAttentionOrgan } from '../organs/sysops/SysAttentionOrgan';
+import { OrganRegistry, OrganType } from '../../organs/registry';
+import { SysOpsAttentionModel } from '../../organs/sysops/SysOpsAttentionModel';
+import { SysAttentionOrgan } from '../../organs/sysops/SysAttentionOrgan';
 import { buildSysOpsAttentionDataset } from './sysops/attentionData';
 
 export async function trainSysOpsAttention() {

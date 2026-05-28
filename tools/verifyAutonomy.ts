@@ -1,7 +1,7 @@
 // scripts/verifyAutonomy.ts
 
-import { enforceAutonomy, ExecutionRecommendation } from '../utils/guardrails';
-import { AUTO_CONFIG, AutonomyLevel, setKillSwitch, GLOBAL_KILL_SWITCH } from '../organs/autonomyConfig';
+import { enforceAutonomy, ExecutionRecommendation } from '../packages/core/utils/guardrails';
+import { AUTO_CONFIG, AutonomyLevel, setKillSwitch, GLOBAL_KILL_SWITCH } from '../packages/organs/autonomyConfig';
 
 async function runTests() {
   console.log('--- Synthesus V3 Autonomy Verification ---\n');

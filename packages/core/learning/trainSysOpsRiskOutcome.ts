@@ -1,9 +1,9 @@
 // learning/trainSysOpsRiskOutcome.ts
 // Training runner for SysOps RiskOutcome organ
 
-import { OrganRegistry, OrganType } from '../organs/registry';
-import { SysOpsRiskOutcomeModel } from '../organs/sysops/SysOpsRiskOutcomeModel';
-import { SysRiskOutcomeOrgan } from '../organs/sysops/SysRiskOutcomeOrgan';
+import { OrganRegistry, OrganType } from '../../organs/registry';
+import { SysOpsRiskOutcomeModel } from '../../organs/sysops/SysOpsRiskOutcomeModel';
+import { SysRiskOutcomeOrgan } from '../../organs/sysops/SysRiskOutcomeOrgan';
 import { buildSysOpsRiskOutcomeDataset } from './sysops/riskOutcomeData';
 
 export async function trainSysOpsRiskOutcome() {

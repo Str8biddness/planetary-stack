@@ -1,16 +1,16 @@
 // scripts/runTrainingSessions.ts
 // Script to run amplified sessions in GM, SysOps, Chat domains and emit diverse training traces
 
-import { SynthesusCoreStub, CoreInput } from '../synthetic_core/index';
-import { SynthesusCoreSysOps } from '../synthetic_core/synthesusCoreSysOps';
-import { SynthesusCoreChat } from '../synthetic_core/synthesusCoreChat';
-import { appendTraceEntry } from '../learning/teacherTrace';
-import { chatStateToStateFeatures, chatActionToActionFeatures, chatHistoryToTrajectoryFeatures, chatMultiFocusToMultiFocusFeatures } from '../domains/chat/featureAdapters';
-import { sysStateToStateFeatures, sysActionToActionFeatures, sysHistoryToTrajectoryFeatures, sysMultiFocusToMultiFocusFeatures } from '../domains/sysops/featureAdapters';
-import { gmStateToStateFeatures, gmActionToActionFeatures, gmHistoryToTrajectoryFeatures, gmMultiFocusToMultiFocusFeatures } from '../domains/gm/featureAdapters';
-import { ChatWorldState, ChatAction, ChatFocusTarget } from '../domains/chat/types';
-import { SysWorldState, SysAction, SysFocusTarget } from '../domains/sysops/types';
-import { GMWorldState, GMAction, GMFocusTarget } from '../domains/gm/types';
+import { SynthesusCoreStub, CoreInput } from '../packages/core/synthetic_core/index';
+import { SynthesusCoreSysOps } from '../packages/core/synthetic_core/synthesusCoreSysOps';
+import { SynthesusCoreChat } from '../packages/core/synthetic_core/synthesusCoreChat';
+import { appendTraceEntry } from '../packages/core/learning/teacherTrace';
+import { chatStateToStateFeatures, chatActionToActionFeatures, chatHistoryToTrajectoryFeatures, chatMultiFocusToMultiFocusFeatures } from '../packages/core/domains/chat/featureAdapters';
+import { sysStateToStateFeatures, sysActionToActionFeatures, sysHistoryToTrajectoryFeatures, sysMultiFocusToMultiFocusFeatures } from '../packages/core/domains/sysops/featureAdapters';
+import { gmStateToStateFeatures, gmActionToActionFeatures, gmHistoryToTrajectoryFeatures, gmMultiFocusToMultiFocusFeatures } from '../packages/core/domains/gm/featureAdapters';
+import { ChatWorldState, ChatAction, ChatFocusTarget } from '../packages/core/domains/chat/types';
+import { SysWorldState, SysAction, SysFocusTarget, SysHistory } from '../packages/core/domains/sysops/types';
+import { GMWorldState, GMAction, GMFocusTarget, GMNpc, GMWorldEvent } from '../packages/core/domains/gm/types';
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
@@ -282,15 +282,18 @@ function logSysOpsTrace(sessionId: string, worldState: SysWorldState, actions: S
   }));
   const multiFocusFeatures = sysMultiFocusToMultiFocusFeatures(focusTargets);
   const chosenAction = actions[chosenIndex] ?? actions[0];
-  const trajectoryFeatures = sysHistoryToTrajectoryFeatures({ events: worldState.incidents.map(incident => ({
+  const incidentEvents: SysHistory['events'] = worldState.incidents.map(incident => ({
     timestamp: incident.startTime,
     type: 'incident',
     details: { severity: incident.severity, status: incident.status, services: incident.services },
-  })).concat(worldState.hosts.slice(0, 1).map(host => ({
+  }));
+  const actionEvents: SysHistory['events'] = worldState.hosts.slice(0, 1).map(host => ({
     timestamp: new Date(),
     type: 'action',
     details: { type: 'restart', target: host.id },
-  }))) });
+  }));
+  const sysEvents: SysHistory['events'] = [...incidentEvents, ...actionEvents];
+  const trajectoryFeatures = sysHistoryToTrajectoryFeatures({ events: sysEvents });
   const policyScores = scoreSysOpsActions(worldState, actions);
   const attentionWeights = normalizeWeights(focusTargets.map(target => target.severity ?? 0.25));
   const quality = clamp01(
@@ -360,7 +363,7 @@ function logSysOpsTrace(sessionId: string, worldState: SysWorldState, actions: S
 
 function buildGMWorldState(sessionIndex: number): GMWorldState {
   const combatActive = sessionIndex % 2 === 0;
-  const npcs = Array.from({ length: 2 + (sessionIndex % 3) }, (_, idx) => ({
+  const npcs: GMNpc[] = Array.from({ length: 2 + (sessionIndex % 3) }, (_, idx) => ({
     id: `npc-${sessionIndex}-${idx}`,
     name: `NPC ${sessionIndex}-${idx}`,
     health: clamp01(0.55 + Math.random() * 0.4 - (combatActive && idx === 0 ? 0.15 : 0)),
@@ -369,7 +372,7 @@ function buildGMWorldState(sessionIndex: number): GMWorldState {
     state: combatActive && idx === 0 ? 'combat' : 'idle',
     tags: combatActive ? ['combat', 'urgent'] : ['dialogue', 'lore'],
   }));
-  const events = [
+  const events: GMWorldEvent[] = [
     {
       timestamp: new Date(Date.now() - 3_600_000),
       type: 'player_action' as const,

@@ -3,7 +3,7 @@
 
 import { AmplificationContext, IntakeAmplificationResult, PlanningAmplificationResult, OutputAmplificationResult } from './index';
 import { MlOrgansHub } from './mlOrgansHub';
-import { OrganType } from '../organs/registry';
+import { OrganType } from '../../organs/registry';
 import { gmStateToStateFeatures, gmActionToActionFeatures, gmHistoryToTrajectoryFeatures, gmMultiFocusToMultiFocusFeatures } from '../domains/gm/featureAdapters';
 import { GMWorldState, GMAction, GMHistory, GMFocusTarget } from '../domains/gm/types';
 import { StateFeatures, ActionFeatures, TrajectoryFeatures, MultiFocusFeatures } from './features';

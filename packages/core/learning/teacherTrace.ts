@@ -67,7 +67,7 @@ export interface TeacherTraceLogger {
   logOutput(entry: OutputTraceEntry): void;
 }
 
-const TRACE_FILE = path.join(process.cwd(), 'logs', 'teacher_traces.jsonl');
+const TRACE_FILE = path.resolve(__dirname, '../../../logs/teacher_traces.jsonl');
 
 function ensureTraceDirectory(): void {
   fs.mkdirSync(path.dirname(TRACE_FILE), { recursive: true });

@@ -2,8 +2,8 @@
 // Heuristic RiskOutcome organ for SysOps domain in Synthesus 3.0
 
 import { Organ, OrganType, OrganContext } from '../registry';
-import { TrajectoryFeatures } from '../../amplification/features';
-import { toNumber } from '../../utils/normalization';
+import { TrajectoryFeatures } from '../../core/amplification/features';
+import { toNumber } from '../../core/utils/normalization';
 
 import { SysOpsRiskOutcomeModel, SysOpsRiskOutcomeModelParams } from './SysOpsRiskOutcomeModel';
 

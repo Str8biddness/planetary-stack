@@ -5,13 +5,13 @@ import { execSync } from 'child_process';
 import path from 'path';
 
 function runPythonTraining(domain: string, organ: string) {
-  const scriptPath = path.join(process.cwd(), 'scripts', 'train_triad.py');
+  const scriptPath = path.resolve(__dirname, '../../tools/train_triad.py');
   console.log(`Executing: python ${scriptPath} --domain ${domain} --organ ${organ}`);
   execSync(`python "${scriptPath}" --domain ${domain} --organ ${organ}`, { stdio: 'inherit' });
 }
 
-import { runTrainingSessions } from './scripts/runTrainingSessions';
-import { setKillSwitch, GLOBAL_KILL_SWITCH, AUTO_CONFIG, AutonomyLevel } from './organs/autonomyConfig';
+import { runTrainingSessions } from '../../tools/runTrainingSessions';
+import { setKillSwitch, GLOBAL_KILL_SWITCH, AUTO_CONFIG, AutonomyLevel } from './autonomyConfig';
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -64,7 +64,7 @@ switch (command) {
     }
     break;
   case 'selfImprove':
-    import('./scripts/selfImprove').then(async ({ selfImprove }) => {
+    import('../../tools/selfImprove').then(async ({ selfImprove }) => {
       await selfImprove();
       console.log('Self-improvement loop exited');
     });

@@ -1,7 +1,7 @@
 // organs/gm/GmRiskOutcomeModel.ts
 // Simple trainable model for GM RiskOutcome organ
 
-import { TrajectoryFeatures } from '../../amplification/features';
+import { TrajectoryFeatures } from '../../core/amplification/features';
 
 export interface GmRiskOutcomeModelParams {
   weights: number[];

@@ -1,7 +1,7 @@
 // organs/chat/ChatRiskOutcomeModel.ts
 // Simple trainable model for Chat RiskOutcome organ
 
-import { TrajectoryFeatures } from '../../amplification/features';
+import { TrajectoryFeatures } from '../../core/amplification/features';
 
 export interface ChatRiskOutcomeModelParams {
   weights: number[];

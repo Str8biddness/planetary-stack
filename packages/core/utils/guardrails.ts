@@ -1,6 +1,6 @@
 // utils/guardrails.ts
 
-import { AutonomyLevel, GLOBAL_KILL_SWITCH, getDomainConfig } from '../organs/autonomyConfig';
+import { AutonomyLevel, GLOBAL_KILL_SWITCH, getDomainConfig } from '../../organs/autonomyConfig';
 
 export enum ExecutionRecommendation {
   EXECUTE = 'execute',

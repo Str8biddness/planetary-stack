@@ -1,8 +1,8 @@
 // organs/chat/ChatPolicyPriorModel.ts
 // Simple trainable model for Chat PolicyPrior organ
 
-import { StateFeatures, ActionFeatures } from '../../amplification/features';
-import { ChatPolicyPriorInput, ChatPolicyPriorTarget } from '../../learning/chat/policyPriorData';
+import { StateFeatures, ActionFeatures } from '../../core/amplification/features';
+import { ChatPolicyPriorInput, ChatPolicyPriorTarget } from '../../core/learning/chat/policyPriorData';
 
 export interface ChatPolicyPriorModelParams {
   weights: number[];

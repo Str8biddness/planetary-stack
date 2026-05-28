@@ -1,7 +1,7 @@
 // organs/chat/ChatAttentionModel.ts
 // Simple trainable model for Chat Attention organ
 
-import { MultiFocusFeatures } from '../../amplification/features';
+import { MultiFocusFeatures } from '../../core/amplification/features';
 
 // Linear model: weights per target, optional bias
 export interface ChatAttentionModelParams {

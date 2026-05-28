@@ -1,7 +1,7 @@
 // organs/sysops/SysOpsRiskOutcomeModel.ts
 // Simple trainable model for SysOps RiskOutcome organ
 
-import { TrajectoryFeatures } from '../../amplification/features';
+import { TrajectoryFeatures } from '../../core/amplification/features';
 
 export interface SysOpsRiskOutcomeModelParams {
   weights: number[];

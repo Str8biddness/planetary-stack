@@ -2,7 +2,7 @@
 // Chat PolicyPrior organ with model support
 
 import { Organ, OrganType, OrganContext } from '../registry';
-import { StateFeatures, ActionFeatures } from '../../amplification/features';
+import { StateFeatures, ActionFeatures } from '../../core/amplification/features';
 import { ChatPolicyPriorModel, ChatPolicyPriorModelParams } from './ChatPolicyPriorModel';
 
 export class ChatPolicyPriorOrgan implements Organ<{ stateFeatures: StateFeatures; actionFeaturesList: ActionFeatures[] }, { scores: number[] }> {

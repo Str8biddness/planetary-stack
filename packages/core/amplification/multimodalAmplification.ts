@@ -3,7 +3,7 @@
 
 import { AmplificationContext, IntakeAmplificationResult, PlanningAmplificationResult, OutputAmplificationResult } from './index';
 import { MlOrgansHub } from './mlOrgansHub';
-import { OrganType } from '../organs/registry';
+import { OrganType } from '../../organs/registry';
 import {
   multimodalStateToStateFeatures,
   multimodalActionToActionFeatures,

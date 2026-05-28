@@ -1,8 +1,8 @@
 // learning/monitoring.ts
 // Minimal monitoring + rollback for organ versions
 
-import { OrganType, OrganRegistry } from '../organs/registry';
-import { getOrganConfig } from '../organs/organConfig';
+import { OrganType, OrganRegistry } from '../../organs/registry';
+import { getOrganConfig } from '../../organs/organConfig';
 
 interface OrganMetrics {
   version: string;

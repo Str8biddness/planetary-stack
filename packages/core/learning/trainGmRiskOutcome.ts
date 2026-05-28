@@ -1,9 +1,9 @@
 // learning/trainGmRiskOutcome.ts
 // Training runner for GM RiskOutcome organ
 
-import { OrganRegistry, OrganType } from '../organs/registry';
-import { GmRiskOutcomeModel } from '../organs/gm/GmRiskOutcomeModel';
-import { GmRiskOutcomeOrgan } from '../organs/gm/GmRiskOutcomeOrgan';
+import { OrganRegistry, OrganType } from '../../organs/registry';
+import { GmRiskOutcomeModel } from '../../organs/gm/GmRiskOutcomeModel';
+import { GmRiskOutcomeOrgan } from '../../organs/gm/GmRiskOutcomeOrgan';
 import { buildGmRiskOutcomeDataset } from './gm/riskOutcomeData';
 import { organMonitor } from './monitoring';
 

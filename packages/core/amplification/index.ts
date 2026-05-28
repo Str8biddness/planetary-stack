@@ -2,7 +2,7 @@
 // Amplification Plane entrypoints and types for Synthesus 3.0
 
 import { CloudParameterManager, CloudParameters } from '../utils/cloudParameters';
-import { registerDefaultOrgans } from '../organs/bootstrap';
+import { registerDefaultOrgans } from '../../organs/bootstrap';
 
 registerDefaultOrgans();
 

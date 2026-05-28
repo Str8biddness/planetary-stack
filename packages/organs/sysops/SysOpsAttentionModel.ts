@@ -1,7 +1,7 @@
 // organs/sysops/SysOpsAttentionModel.ts
 // Simple trainable model for SysOps Attention organ
 
-import { MultiFocusFeatures } from '../../amplification/features';
+import { MultiFocusFeatures } from '../../core/amplification/features';
 
 export interface SysOpsAttentionModelParams {
   weights: number[][];

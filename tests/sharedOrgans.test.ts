@@ -1,14 +1,15 @@
-import { PredictionOrgan } from '../organs/shared/PredictionOrgan';
-import { ForecastOrgan } from '../organs/shared/ForecastOrgan';
-import { SequencePredictionOrgan } from '../organs/shared/SequencePredictionOrgan';
-import { RelationOrgan } from '../organs/shared/RelationOrgan';
-import { StateFeatures } from '../amplification/features';
-import { OrganContext } from '../organs/registry';
+import { PredictionOrgan } from '../packages/organs/shared/PredictionOrgan';
+import { ForecastOrgan } from '../packages/organs/shared/ForecastOrgan';
+import { SequencePredictionOrgan } from '../packages/organs/shared/SequencePredictionOrgan';
+import { RelationOrgan } from '../packages/organs/shared/RelationOrgan';
+import { StateFeatures } from '../packages/core/amplification/features';
+import { OrganContext } from '../packages/organs/registry';
 
 describe('Shared ML Organs', () => {
   const mockContext: OrganContext = {
     userId: 'test_user',
     characterId: 'test_char',
+    sessionId: 'test_session',
     computeBudget: 10,
     timestamp: Date.now(),
   };

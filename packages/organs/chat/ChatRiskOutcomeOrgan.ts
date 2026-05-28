@@ -2,7 +2,7 @@
 // Chat RiskOutcome organ with model support
 
 import { Organ, OrganType, OrganContext } from '../registry';
-import { TrajectoryFeatures } from '../../amplification/features';
+import { TrajectoryFeatures } from '../../core/amplification/features';
 import { ChatRiskOutcomeModel, ChatRiskOutcomeModelParams } from './ChatRiskOutcomeModel';
 
 export class ChatRiskOutcomeOrgan implements Organ<TrajectoryFeatures, { risk: number; stability: number; drama: number }> {

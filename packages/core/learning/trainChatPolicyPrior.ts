@@ -2,9 +2,9 @@
 // Training runner for Chat PolicyPrior organ
 
 import { buildChatPolicyPriorDataset } from './chat/policyPriorData';
-import { ChatPolicyPriorModel } from '../organs/chat/ChatPolicyPriorModel';
-import { ChatPolicyPriorOrgan } from '../organs/chat/ChatPolicyPriorOrgan';
-import { OrganRegistry, OrganType } from '../organs/registry';
+import { ChatPolicyPriorModel } from '../../organs/chat/ChatPolicyPriorModel';
+import { ChatPolicyPriorOrgan } from '../../organs/chat/ChatPolicyPriorOrgan';
+import { OrganRegistry, OrganType } from '../../organs/registry';
 import { organMonitor } from './monitoring';
 
 export async function trainChatPolicyPrior() {

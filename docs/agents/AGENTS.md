@@ -195,18 +195,18 @@ This repo is currently in a validated PPBRS baseline state. Future PPBRS optimiz
 
 ## ML Organ Self-Improvement Handoff (2026-04-28)
 - Source of truth for the current organ loop:
-  - `scripts/runTrainingSessions.ts`
+  - `tools/runTrainingSessions.ts`
   - `learning/teacherTrace.ts`
   - `learning/sysOpsTraceLogger.ts`
-  - `scripts/train_triad.py`
-  - `scripts/evaluate_organs.py`
-  - `scripts/selfImprove.ts`
+  - `tools/train_triad.py`
+  - `tools/evaluate_organs.py`
+  - `tools/selfImprove.ts`
   - `cli.ts`
   - `logs/teacher_traces.jsonl`
-- The loop now runs end-to-end via `bun cli.ts selfImprove`.
-- `selfImprove` now also invokes `scripts/evaluate_organs.py` so every run emits a fresh scorecard.
+- The loop now runs end-to-end via `cd packages/organs && npx ts-node cli.ts selfImprove`.
+- `selfImprove` now also invokes `tools/evaluate_organs.py` so every run emits a fresh scorecard.
 - Trace generation is intentionally routed through `logs/teacher_traces.jsonl` so the Python trainer can consume actual session data.
-- `scripts/train_triad.py` falls back to synthetic data when no trace records exist.
+- `tools/train_triad.py` falls back to synthetic data when no trace records exist.
 - `logs/organ_evaluation_scorecard.json` and `logs/organ_evaluation_scorecard.md` are runtime artifacts and are ignored by Git.
 - Gemini CLI was used as a second-pass reviewer in the terminal to sanity-check the documentation/recovery plan.
 
@@ -214,10 +214,10 @@ This repo is currently in a validated PPBRS baseline state. Future PPBRS optimiz
 1. Read `docs/ML_ORGAN_TRAINING.md`.
 2. Read `AGENTS.md` and `AGENT_LOG.md`.
 3. Run `git status` and separate source/doc edits from generated artifacts.
-4. Run `bun cli.ts selfImprove`.
+4. Run `cd packages/organs && npx ts-node cli.ts selfImprove`.
 5. Inspect `logs/teacher_traces.jsonl`, `logs/organ_evaluation_scorecard.md`, and `data/models/`.
-6. If trace quality is weak, vary actions and outcomes in `scripts/runTrainingSessions.ts`.
-7. Re-run `python scripts/train_triad.py --domain <domain> --organ <organ>` as needed.
+6. If trace quality is weak, vary actions and outcomes in `tools/runTrainingSessions.ts`.
+7. Re-run `python tools/train_triad.py --domain <domain> --organ <organ>` as needed.
 8. Commit and push source/doc changes when ready.
 
 ### Notes
@@ -226,9 +226,9 @@ This repo is currently in a validated PPBRS baseline state. Future PPBRS optimiz
 - Keep generated trace/model/scorecard artifacts out of Git unless explicitly intended.
 
 ### Current status update (2026-04-28)
-- `scripts/runTrainingSessions.ts` now emits more varied traces across GM, SysOps, and Chat rather than repeatedly selecting the same action.
-- `scripts/train_triad.py` now reports train and validation metrics for policy prior, risk outcome, and attention.
-- `scripts/evaluate_organs.py` now generates a trace-driven scorecard after the self-improvement loop.
+- `tools/runTrainingSessions.ts` now emits more varied traces across GM, SysOps, and Chat rather than repeatedly selecting the same action.
+- `tools/train_triad.py` now reports train and validation metrics for policy prior, risk outcome, and attention.
+- `tools/evaluate_organs.py` now generates a trace-driven scorecard after the self-improvement loop.
 - The next improvement lever is broader real-world trace breadth, not basic orchestration.
 
 ## Emergent Resonance & Consciousness Loop (2026-05-05)

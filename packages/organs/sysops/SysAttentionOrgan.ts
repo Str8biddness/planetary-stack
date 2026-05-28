@@ -2,8 +2,8 @@
 // Heuristic Attention organ for SysOps domain in Synthesus 3.0
 
 import { Organ, OrganType, OrganContext } from '../registry';
-import { MultiFocusFeatures } from '../../amplification/features';
-import { toNumber } from '../../utils/normalization';
+import { MultiFocusFeatures } from '../../core/amplification/features';
+import { toNumber } from '../../core/utils/normalization';
 
 import { SysOpsAttentionModel, SysOpsAttentionModelParams } from './SysOpsAttentionModel';
 

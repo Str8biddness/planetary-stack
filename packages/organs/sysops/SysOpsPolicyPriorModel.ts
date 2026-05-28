@@ -1,7 +1,7 @@
 // organs/sysops/SysOpsPolicyPriorModel.ts
 // Simple trainable model for SysOps PolicyPrior organ
 
-import { StateFeatures, ActionFeatures } from '../../amplification/features';
+import { StateFeatures, ActionFeatures } from '../../core/amplification/features';
 
 export interface SysOpsPolicyPriorModelParams {
   weights: number[];

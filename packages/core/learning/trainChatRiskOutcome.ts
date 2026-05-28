@@ -2,9 +2,9 @@
 // Training runner for Chat RiskOutcome organ
 
 import { buildChatRiskOutcomeDataset } from './chat/riskOutcomeData';
-import { ChatRiskOutcomeModel } from '../organs/chat/ChatRiskOutcomeModel';
-import { ChatRiskOutcomeOrgan } from '../organs/chat/ChatRiskOutcomeOrgan';
-import { OrganRegistry, OrganType } from '../organs/registry';
+import { ChatRiskOutcomeModel } from '../../organs/chat/ChatRiskOutcomeModel';
+import { ChatRiskOutcomeOrgan } from '../../organs/chat/ChatRiskOutcomeOrgan';
+import { OrganRegistry, OrganType } from '../../organs/registry';
 import { organMonitor } from './monitoring';
 
 export async function trainChatRiskOutcome() {

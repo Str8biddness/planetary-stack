@@ -1,6 +1,6 @@
 import { Organ, OrganContext, OrganType } from '../registry';
-import { StateFeatures } from '../../amplification/features';
-import { clamp01, toNumber } from '../../utils/normalization';
+import { StateFeatures } from '../../core/amplification/features';
+import { clamp01, toNumber } from '../../core/utils/normalization';
 import { SharedOrganBackbone, SharedOrganFeatures } from './SharedOrganBackbone';
 
 export interface MemoryOrganParams {

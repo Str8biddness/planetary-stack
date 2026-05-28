@@ -2,9 +2,9 @@
 // Training runner for GM PolicyPrior organ
 
 import { buildGmPolicyPriorDataset } from './gm/policyPriorData';
-import { GmPolicyPriorModel } from '../organs/gm/GmPolicyPriorModel';
-import { GmPolicyPriorOrgan } from '../organs/gm/GmPolicyPriorOrgan';
-import { OrganRegistry, OrganType } from '../organs/registry';
+import { GmPolicyPriorModel } from '../../organs/gm/GmPolicyPriorModel';
+import { GmPolicyPriorOrgan } from '../../organs/gm/GmPolicyPriorOrgan';
+import { OrganRegistry, OrganType } from '../../organs/registry';
 import { organMonitor } from './monitoring';
 
 export async function trainGmPolicyPrior() {

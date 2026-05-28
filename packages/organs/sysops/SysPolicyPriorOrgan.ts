@@ -2,8 +2,8 @@
 // Heuristic PolicyPrior organ for SysOps domain in Synthesus 3.0
 
 import { Organ, OrganType, OrganContext } from '../registry';
-import { StateFeatures, ActionFeatures } from '../../amplification/features';
-import { toNumber } from '../../utils/normalization';
+import { StateFeatures, ActionFeatures } from '../../core/amplification/features';
+import { toNumber } from '../../core/utils/normalization';
 
 import { SysOpsPolicyPriorModel, SysOpsPolicyPriorModelParams } from './SysOpsPolicyPriorModel';
 

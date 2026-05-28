@@ -1224,3 +1224,43 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Architectural Notes
 - The default AIVM kernel can now demonstrate the canonical tick contract without pretending external hardware backends are present.
 - Snapshot footer integrity is now enforced at restore time, making traceable AIVM state recovery a real guardrail rather than documentation-only.
+
+## Current Session — 2026-05-28 (Agent 9 — CGPU Frame Contract)
+
+### Summary
+- Added `packages/reasoning/generation/cgpu.py` with `CGPUFrame`, `CGPUCandidate`, `CGPUOutputFrame`, and `CGPURenderer` for the `chal://cgpu/render` device boundary.
+- Added grounded multi-candidate rendering, NPC/persona mode, business-bot concise mode, critic rewrite handling, blocked-candidate selection rules, and trace metadata requiring downstream safety arbitration.
+- Exported the CGPU types through `packages/reasoning/generation/__init__.py`.
+- Added `tests/test_cgpu_renderer.py` for the Phase 4 CGPU render accelerator behavior.
+- Added `docs/modules/CGPU.md` documenting the CGPU boundary, contract, and validation commands.
+- Repaired stale TypeScript monorepo imports across organ/shared-backbone, amplification, learning, tools, and the package CLI so focused organ compilation can resolve current `packages/core` and `packages/organs` paths.
+- Added a bounded `packages/core/multimodal/crossModalAlignment.ts` fallback aligner to satisfy the multimodal amplification import contract.
+- Fixed `teacherTrace.ts` so TS training sessions write to the canonical repo-level `logs/teacher_traces.jsonl`, matching the Python trainer/evaluator.
+- Updated ML organ training docs from legacy `scripts/` paths to current `tools/` and `packages/organs/cli.ts` paths.
+
+### Synthesus 5 Checklist Items Advanced
+- Phase 4: `CGPUFrame` input/output contract implemented and validated.
+- Phase 4: grounded multi-candidate rendering implemented and validated.
+- Phase 4: persona/NPC and business-bot render modes implemented and validated.
+- Phase 4: critic rewrite loop implemented and validated.
+- Phase 4: blocked candidates cannot be selected, and CGPU output carries safety-arbitration trace flags.
+- Agent 9 organ loop: current monorepo import paths and trace-log location repaired for TS training-session generation and Python train/eval consumption.
+
+### Verified
+- `python -m py_compile packages/reasoning/generation/cgpu.py packages/reasoning/generation/__init__.py tests/test_cgpu_renderer.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_cgpu_renderer.py tests/test_generation_spine_integration.py` — 8 passed, 4 skipped.
+- `find packages/organs packages/core/amplification packages/core/utils packages/core/learning packages/core/domains packages/core/synthetic_core packages/core/multimodal tools -name '*.ts' -not -path '*/node_modules/*' > /tmp/synth-ts-files.txt && npx tsc --noEmit --target ES2022 --module commonjs --moduleResolution node --skipLibCheck --esModuleInterop --types node,jest @/tmp/synth-ts-files.txt` — passed.
+- `npx jest /home/workspace/Synthesus_4.0/tests/sharedOrgans.test.ts --runInBand ...` — 5 passed.
+- `cd packages/organs && npx ts-node --compiler-options '{"module":"commonjs","target":"ES2022","moduleResolution":"node","esModuleInterop":true}' cli.ts runTrainingSessions` — generated 72 canonical teacher traces under ignored `logs/teacher_traces.jsonl`.
+- `python tools/train_triad.py --domain chat --organ policy_prior` — trained from traces, train accuracy 100.00%, validation accuracy 50.00%, saved ignored `data/models/chat_policy_prior.pkl`.
+- `python tools/evaluate_organs.py --domain chat` — wrote ignored scorecards and reported chat/policy_prior train 1.0000, validation 0.5000, baseline 0.5000, consistency 100.00%.
+
+### Left Off / Next Steps
+- Wire `CGPURenderer` into `CognitiveHypervisor` / Quad Brain dispatch so Phase 4 is used by runtime paths instead of only direct tests.
+- Feed organ scores from the shared organ backbone into CGPU candidate budgets and selection once the Phase 3 brain outputs are stable.
+- Add Phase 8 comparison prompts that score CGPU candidate naturalness, grounding, latency, and template leakage.
+- The chat risk and attention eval rows were `n/a` because this smoke trained only `chat/policy_prior`; run the full `selfImprove` loop after the runtime wiring pass if broader organ metrics are needed.
+
+### Architectural Notes
+- CGPU is now a bounded renderer over grounded state and `ResponsePlan`, not a fact source.
+- The output frame intentionally keeps selected text separate from candidate diagnostics so the future arbiter can inspect rejected and rewritten candidates without emitting them.

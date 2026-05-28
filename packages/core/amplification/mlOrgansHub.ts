@@ -1,14 +1,14 @@
 // amplification/mlOrgansHub.ts
 // Hub for calling ML organs with budget tracking in Synthesus 3.0
 
-import { OrganRegistry, OrganType } from '../organs/registry';
+import { OrganRegistry, OrganType } from '../../organs/registry';
 import { StateFeatures, ActionFeatures, TrajectoryFeatures, MultiFocusFeatures } from './features';
-import { OrganContext } from '../organs/registry';
-import { PredictionOrganOutput } from '../organs/shared/PredictionOrgan';
-import { ForecastOrganOutput } from '../organs/shared/ForecastOrgan';
-import { SequencePredictionOutput } from '../organs/shared/SequencePredictionOrgan';
-import { RelationOrganOutput } from '../organs/shared/RelationOrgan';
-import { MemoryOrganOutput } from '../organs/shared/MemoryOrgan';
+import { OrganContext } from '../../organs/registry';
+import { PredictionOrganOutput } from '../../organs/shared/PredictionOrgan';
+import { ForecastOrganOutput } from '../../organs/shared/ForecastOrgan';
+import { SequencePredictionOutput } from '../../organs/shared/SequencePredictionOrgan';
+import { RelationOrganOutput } from '../../organs/shared/RelationOrgan';
+import { MemoryOrganOutput } from '../../organs/shared/MemoryOrgan';
 
 export interface AmplificationContext {
   computeBudget: number;

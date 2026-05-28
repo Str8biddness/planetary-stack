@@ -1,16 +1,16 @@
 import { execSync } from 'child_process';
 import path from 'path';
-import { registerDefaultOrgans } from '../organs/bootstrap';
+import { registerDefaultOrgans } from '../packages/organs/bootstrap';
 import { runTrainingSessions } from './runTrainingSessions';
 
 function runPythonTraining(domain: string, organ: string): void {
-  const scriptPath = path.join(process.cwd(), 'scripts', 'train_triad.py');
+  const scriptPath = path.join(__dirname, 'train_triad.py');
   console.log(`Executing: python ${scriptPath} --domain ${domain} --organ ${organ}`);
   execSync(`python "${scriptPath}" --domain ${domain} --organ ${organ}`, { stdio: 'inherit' });
 }
 
 function runPythonEvaluation(): void {
-  const scriptPath = path.join(process.cwd(), 'scripts', 'evaluate_organs.py');
+  const scriptPath = path.join(__dirname, 'evaluate_organs.py');
   console.log(`Executing: python ${scriptPath}`);
   execSync(`python "${scriptPath}"`, { stdio: 'inherit' });
 }

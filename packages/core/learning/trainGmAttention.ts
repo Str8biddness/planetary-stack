@@ -2,9 +2,9 @@
 // Training runner for GM Attention organ
 
 import { buildGmAttentionDataset } from './gm/attentionData';
-import { GmAttentionModel } from '../organs/gm/GmAttentionModel';
-import { GmAttentionOrgan } from '../organs/gm/GmAttentionOrgan';
-import { OrganRegistry, OrganType } from '../organs/registry';
+import { GmAttentionModel } from '../../organs/gm/GmAttentionModel';
+import { GmAttentionOrgan } from '../../organs/gm/GmAttentionOrgan';
+import { OrganRegistry, OrganType } from '../../organs/registry';
 import { organMonitor } from './monitoring';
 
 export async function trainGmAttention() {
