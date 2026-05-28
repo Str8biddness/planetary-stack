@@ -96,17 +96,17 @@ Legend:
 - [ ] 
 
 - \[\~\] Define CHAL mount and partition interfaces for ROM, parameter disk, grounding corpus, and writeback memory.
-- \[\~\] Upgrade KAL into a CHAL memory controller.
+- [x]  Upgrade KAL into a CHAL memory controller. Session log: 2026-05-28 Knowledge Cloud mount table.
 
-- [ ]  Add mount table boot sequence.
+- [x]  Add mount table boot sequence. Session log: 2026-05-28 Knowledge Cloud mount table.
 
-- \[\~\] Add partition integrity checks against Knowledge Cloud manifests. Session log: 2026-05-28 Daily Knowledge Hardware Health Check added runtime health checks and standalone bundle semantic validation for FAISS/metadata/embedder alignment; current artifact bundle is blocked by FAISS/embedder dim mismatch.
+- [x]  Add partition integrity checks against Knowledge Cloud manifests. Session log: 2026-05-28 Knowledge Cloud mount table added runtime manifest SHA-256/size verification; 2026-05-28 Daily Knowledge Hardware Health Check tracked a current standalone artifact FAISS/embedder dim mismatch separately.
 
 - [ ]  Add cache locality and hot-context retrieval.
 
 - [ ]  Add provenance traces to final response metadata.
 
-- [ ]  Add tests for mounted Knowledge Cloud partitions.
+- [x]  Add tests for mounted Knowledge Cloud partitions. Session log: 2026-05-28 Knowledge Cloud mount table.
 
 ## Phase 6: Legacy Template Path Removal
 

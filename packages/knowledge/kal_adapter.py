@@ -8,9 +8,13 @@ Routes queries to the appropriate partition based on locality, trust, and domain
 
 from __future__ import annotations
 
+import importlib.util
 import logging
+import os
 import re
+import sys
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 try:
@@ -31,44 +35,27 @@ except Exception:
 try:
     from core.chal.interfaces import Mount, MountType, Partition, TelemetryRecord
 except ImportError:
-    # Fallback definitions if chal interfaces aren't available yet
-    from dataclasses import dataclass, field
-    from enum import Enum
-    
-    class MountType(str, Enum):
-        ROM = "ROM"
-        PARAMETER_DISK = "PARAMETER_DISK"
-        CACHE_SEED = "CACHE_SEED"
-        GROUNDING_CORPUS = "GROUNDING_CORPUS"
-        SOURCE_PROVENANCE = "SOURCE_PROVENANCE"
-        WRITEBACK_MEMORY = "WRITEBACK_MEMORY"
+    try:
+        from chal.interfaces import Mount, MountType, Partition, TelemetryRecord
+    except ImportError:
+        interfaces_path = Path(__file__).resolve().parents[1] / "core" / "chal" / "interfaces.py"
+        spec = importlib.util.spec_from_file_location("_synthesus_chal_interfaces", interfaces_path)
+        if spec is None or spec.loader is None:
+            raise
+        interfaces = sys.modules.get(spec.name)
+        if interfaces is None:
+            interfaces = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = interfaces
+            spec.loader.exec_module(interfaces)
+        Mount = interfaces.Mount
+        MountType = interfaces.MountType
+        Partition = interfaces.Partition
+        TelemetryRecord = interfaces.TelemetryRecord
 
-    @dataclass
-    class TelemetryRecord:
-        operation_id: str
-        latency_ms: float
-        cache_hit: bool
-        confidence: float
-        source: str
-        metadata: Dict[str, Any] = field(default_factory=dict)
-
-    @dataclass
-    class Partition:
-        partition_id: str
-        namespace: str
-        is_read_only: bool
-        schema_model: Optional[str] = None
-        metadata: Dict[str, Any] = field(default_factory=dict)
-
-    @dataclass
-    class Mount:
-        mount_path: str
-        mount_type: MountType
-        partition: Partition
-        locality: str = "local"
-        trust_level: float = 1.0
-        latency_profile: str = "fast"
-        is_active: bool = True
+try:
+    from knowledge.mount_table import KnowledgeCloudMountTable
+except Exception:
+    KnowledgeCloudMountTable = None
 
 
 logger = logging.getLogger(__name__)
@@ -80,13 +67,21 @@ class CHALMemoryController:
     Replaces legacy template fallback paths with explicit virtual hardware routing.
     """
     
-    def __init__(self):
+    def __init__(self, knowledge_root: Optional[str | Path] = None, strict_mount_integrity: bool = False):
         self._mounts: Dict[str, Mount] = {}
         self._knowledge_cloud = None
         self._runtime = None
+        self._mount_boot_report = None
+        self._knowledge_root = Path(
+            knowledge_root
+            or os.environ.get("SYNTHESUS_KNOWLEDGE_ROOT", "")
+            or Path.cwd() / "data"
+        )
+        self._strict_mount_integrity = strict_mount_integrity
         
         self._init_core_services()
-        self._init_default_mounts()
+        if not self._boot_manifest_mounts():
+            self._init_default_mounts()
 
     def _init_core_services(self) -> None:
         if get_runtime is not None:
@@ -154,6 +149,36 @@ class CHALMemoryController:
             latency_profile="slow"
         ))
 
+    def _boot_manifest_mounts(self) -> bool:
+        """Boot CHAL mounts from a Knowledge Cloud manifest when artifacts exist locally."""
+        if KnowledgeCloudMountTable is None:
+            return False
+        manifest_path = self._knowledge_root / "manifest.json"
+        if not manifest_path.exists():
+            return False
+
+        try:
+            report = KnowledgeCloudMountTable().boot(
+                self._knowledge_root,
+                strict=self._strict_mount_integrity,
+            )
+        except Exception as e:
+            logger.warning(f"CHAL: Knowledge Cloud mount-table boot failed: {e}")
+            if self._strict_mount_integrity:
+                raise
+            return False
+
+        self._mount_boot_report = report
+        for mount_point in report.mounts:
+            self.mount(mount_point)
+        logger.info(
+            "CHAL: Booted %s Knowledge Cloud mounts from %s (integrity_ok=%s)",
+            len(report.mounts),
+            report.manifest_path,
+            report.ok,
+        )
+        return bool(report.mounts)
+
     def mount(self, mount_point: Mount) -> None:
         """Register a new CHAL mount point."""
         self._mounts[mount_point.mount_path] = mount_point
@@ -164,6 +189,10 @@ class CHALMemoryController:
         if not mount_type:
             return list(self._mounts.values())
         return [m for m in self._mounts.values() if m.mount_type == mount_type and m.is_active]
+
+    def get_mount_boot_report(self):
+        """Return the manifest boot report when mounts came from Knowledge Cloud artifacts."""
+        return self._mount_boot_report
 
     def query(self, text: str, trust_available: float = 1.0) -> Tuple[Optional[str], TelemetryRecord]:
         """

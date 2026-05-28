@@ -33,6 +33,7 @@ KnowledgeNetwork (graph storage + keyword search)
 | `kn/semantic_indexer.py` | SemanticIndexer — FAISS-backed vector semantic search |
 | `kn/entity_linker.py` | EntityLinker — text-to-node mention resolution |
 | `kn/graph_connector.py` | GraphConnector — bulk import pipeline |
+| `packages/knowledge/mount_table.py` | Synthesus 5 CHAL mount-table boot and Knowledge Cloud artifact integrity verification |
 | `knowledge_integration/kaggle_loader.py` | KaggleLoader — High-quality fact ingestion from Jeopardy/ConceptNet |
 
 ## Core Components
@@ -124,6 +125,33 @@ Data flows through:
 2. `knowledge_integration/kn_populator.py` — Transform raw data into KN nodes
 3. `knowledge_integration/lore_forge.py` — Generate high-fidelity synthetic lore nodes
 4. Build artifacts stored in `data/` (gitignored)
+
+## Synthesus 5 CHAL Mount Table
+
+The Knowledge Cloud now boots as mounted CHAL hardware when a local artifact `manifest.json` is present. `KnowledgeCloudMountTable` reads the manifest, maps known artifacts into typed mounts, and verifies each file's declared byte size and SHA-256 before activating the mount.
+
+Default mount mappings:
+
+| Artifact | Mount | Type |
+|----------|-------|------|
+| `knowledge_cloud/world_lore.json` | `/mnt/rom/world_lore` | ROM |
+| `knowledge_cloud/evolution.json` | `/mnt/rom/evolution` | ROM |
+| `knowledge_cloud/transitions.json` | `/mnt/params/transitions` | PARAMETER_DISK |
+| `knowledge_cloud/chaining_patterns.json` | `/mnt/params/chaining_patterns` | PARAMETER_DISK |
+| `models/swarm_embedder.pkl` | `/mnt/params/swarm_embedder` | PARAMETER_DISK |
+| `faiss.index` | `/mnt/corpus/faiss` | GROUNDING_CORPUS |
+| `faiss_metadata.json` | `/mnt/provenance/faiss_metadata` | SOURCE_PROVENANCE |
+| `knowledge.kndb` | `/mnt/rom/knowledge_nodes` | ROM |
+| `knowledge.kndb.meta.db` | `/mnt/provenance/kndb_metadata` | SOURCE_PROVENANCE |
+
+`CHALMemoryController` attempts this manifest-backed boot before falling back to legacy default mounts. Failed integrity checks deactivate the affected mount and set trust to `0.0`; strict boot mode raises immediately.
+
+Validation:
+
+```bash
+python -m py_compile packages/knowledge/mount_table.py packages/knowledge/kal_adapter.py tests/test_knowledge_mount_table.py
+PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_knowledge_mount_table.py tests/test_kal.py
+```
 
 ## Usage
 

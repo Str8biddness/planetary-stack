@@ -1311,3 +1311,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Architectural Notes
 - Bundle integrity now covers semantic compatibility, not just byte integrity.
 - The runtime health check treats the Knowledge Cloud as mounted hardware and reports an explicit degraded/blocker state when the mounted artifact plane cannot answer golden queries.
+
+## Current Session — 2026-05-28 (Knowledge Cloud Mount Table)
+
+### Summary
+- Added `packages/knowledge/mount_table.py` so Knowledge Cloud artifact manifests boot into explicit CHAL mounts for ROM, parameter disk, grounding corpus, and provenance planes.
+- Added SHA-256 and byte-size integrity verification before mounts are activated; failed checks now deactivate the affected mount and strict boot mode raises.
+- Updated `CHALMemoryController` to attempt manifest-backed Knowledge Cloud mount-table boot before falling back to the existing default mounts.
+- Added mounted-partition tests covering successful boot, failed integrity deactivation, strict rejection, and KAL controller manifest boot.
+- Updated the Synthesus 5 Phase 5 checklist and `docs/modules/KN.md`.
+
+### Verified
+- `python -m py_compile packages/knowledge/mount_table.py packages/knowledge/kal_adapter.py tests/test_knowledge_mount_table.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_knowledge_mount_table.py tests/test_kal.py` — 33 passed, 3 warnings.
+
+### Left Off / Next Steps
+- Add cache locality and hot-context retrieval over the mounted FAISS/metadata planes.
+- Add provenance traces from active mount metadata into final response/debug metadata once the public Synthesus 5 runtime path is wired.
+- Keep generated Knowledge Cloud artifacts out of commits; this session changed source, tests, and docs only.
+
+### Architectural Notes
+- Knowledge Cloud artifacts are now treated as bootable CHAL hardware planes instead of passive files under `data/`.
+- The manifest is the provenance/integrity source of truth for mount activation; mount trust drops to `0.0` when the local artifact does not match the manifest.
