@@ -1264,3 +1264,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Architectural Notes
 - CGPU is now a bounded renderer over grounded state and `ResponsePlan`, not a fact source.
 - The output frame intentionally keeps selected text separate from candidate diagnostics so the future arbiter can inspect rejected and rewritten candidates without emitting them.
+
+## Current Session — 2026-05-28 (Agent 10 — API Schema Alignment)
+
+### Summary
+- Updated the production API app metadata from stale Synthesus 3.0 positioning to Synthesus 5 CHAL while explicitly preserving the legacy-compatible query surface.
+- Updated `packages/api/schemas.py` descriptions so `QueryRequest.mode`, `QueryResponse.source`, and `QueryResponse.debug` describe the current runtime envelope and where future hypervisor/CGPU telemetry belongs.
+- Added reusable `CGPUFrame` and `CGPUOutputFrame` component schemas to `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`.
+- Updated `docs/modules/CGPU.md` to state that the OpenAPI components document the CHAL device boundary, not a current `/api/v1/query` response payload.
+- Advanced the Phase 4 CGPU checklist with API-schema documentation coverage.
+
+### Verified
+- `python -m py_compile packages/api/production_server.py packages/api/schemas.py`
+- `python - <<'PY' ... yaml.safe_load/json.load schema validation ... PY` — parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed both CGPU component schemas are present.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_cgpu_renderer.py tests/test_generation_spine_integration.py` — 8 passed, 4 skipped.
+
+### Left Off / Next Steps
+- Regenerate OpenAPI directly from `api.production_server.app` once legacy import-path blockers are cleaned up (`knowledge_cloud` lookup without `packages/knowledge` and the stale direct `core/rag_pipeline.py` path).
+- Wire `CGPURenderer` and `CognitiveHypervisor` into `/api/v1/query`, then update `QueryResponse.debug` examples from documented future slots to observed trace payloads.
+
+### Architectural Notes
+- The API contract now separates stable response envelope fields from CHAL device-frame schemas.
+- CGPU schema docs intentionally avoid claiming that candidate sets bypass the hypervisor or final arbiter.

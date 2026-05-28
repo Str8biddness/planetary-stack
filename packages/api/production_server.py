@@ -276,9 +276,15 @@ HISTORY_STORE_PATH = os.environ.get("HISTORY_STORE_PATH", str(DATA_DIR / "experi
 
 # ─── FastAPI App ─────────────────────────────────────────────────────
 app = FastAPI(
-    title="Synthesus 3.0",
-    description="AIVM Dual-Hemisphere Synthetic Intelligence Engine",
-    version="3.0.0",
+    title="Synthesus 5 CHAL API",
+    description=(
+        "Legacy-compatible Synthesus query and control API for the active "
+        "Synthesus 5 CHAL runtime. The public query path currently exposes "
+        "generation-spine, cognitive, RAG, kernel, and amplification telemetry; "
+        "Cognitive Hypervisor and CGPU traces are documented as CHAL contracts "
+        "until they are wired into this endpoint."
+    ),
+    version="5.0.0",
 )
 
 # Configure allowed origins from environment or default to local development

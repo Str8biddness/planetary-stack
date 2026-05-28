@@ -1,8 +1,9 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Synthesus 2.0",
-    "version": "2.0.0"
+    "title": "Synthesus 5 CHAL API",
+    "description": "Legacy-compatible Synthesus query and control API for the active Synthesus 5 CHAL runtime. The public query path currently exposes generation-spine, cognitive, RAG, kernel, and amplification telemetry; Cognitive Hypervisor and CGPU traces are documented as CHAL contracts until they are wired into this endpoint.",
+    "version": "5.0.0"
   },
   "paths": {
     "/": {
@@ -303,7 +304,8 @@
           "mode": {
             "type": "string",
             "title": "Mode",
-            "default": "left"
+            "default": "left",
+            "description": "Legacy-compatible processing mode: auto|cognitive|rag|pattern. Synthesus 5 CHAL routing is represented in debug telemetry until the Cognitive Hypervisor is wired into the public query path."
           },
           "character": {
             "type": "string",
@@ -336,7 +338,8 @@
           "source": {
             "type": "string",
             "title": "Source",
-            "default": "kernel"
+            "default": "kernel",
+            "description": "Runtime source that produced the response, such as zo_kernel, symbolic_core, cognitive, synthesus_master, rag, or fallback."
           },
           "character": {
             "type": "string",
@@ -363,7 +366,8 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Debug",
-            "default": {}
+            "default": {},
+            "description": "Optional implementation telemetry returned only when include_debug is true. Current keys include kernel_triggered, symbolic_triggered, trace, rag, ml_swarm, and fallback diagnostics. Future Synthesus 5 wiring should place Cognitive Hypervisor and CGPU candidate-set trace records here without changing the stable response envelope."
           }
         },
         "type": "object",
@@ -413,6 +417,142 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "CGPUFrame": {
+        "type": "object",
+        "title": "CGPUFrame",
+        "description": "CHAL input frame for the chal://cgpu/render device implemented in packages/reasoning/generation/cgpu.py.",
+        "required": [
+          "frame_id",
+          "trace_id",
+          "query",
+          "plan"
+        ],
+        "properties": {
+          "frame_id": {
+            "type": "string"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "plan": {
+            "additionalProperties": true,
+            "type": "object",
+            "description": "Serialized ResponsePlan with intent, safety level, key points, required phrases, forbidden phrases, and domain/style constraints."
+          },
+          "grounded_state": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "mode": {
+            "type": "string",
+            "default": "general",
+            "description": "Render mode such as general, npc, persona, dialogue, business, or business_bot."
+          },
+          "candidate_count": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          },
+          "critic_passes": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 1
+          },
+          "constraints": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "persona": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "provenance": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        }
+      },
+      "CGPUOutputFrame": {
+        "type": "object",
+        "title": "CGPUOutputFrame",
+        "description": "Candidate-set output from the chal://cgpu/render device. The selected text is still subject to hypervisor or arbiter safety approval.",
+        "required": [
+          "frame_id",
+          "parent_frame_id",
+          "trace_id",
+          "device",
+          "kind",
+          "candidates",
+          "confidence",
+          "cost",
+          "trace"
+        ],
+        "properties": {
+          "frame_id": {
+            "type": "string"
+          },
+          "parent_frame_id": {
+            "type": "string"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "device": {
+            "type": "string",
+            "const": "chal://cgpu/render"
+          },
+          "kind": {
+            "type": "string",
+            "const": "candidate_set"
+          },
+          "candidates": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "selected_candidate_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "selected_text": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "cost": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "trace": {
+            "additionalProperties": true,
+            "type": "object",
+            "description": "Includes mode, constraints, provenance, grounding_required, and safety_arbitration_required."
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        }
       }
     }
   }

@@ -11,6 +11,8 @@ Runtime code lives in `packages/reasoning/generation/cgpu.py`.
 - `CGPUOutputFrame` is the candidate-set output consumed by the hypervisor or future Quad Brain arbiter.
 - `CGPURenderer.render()` emits candidates, critic feedback metadata, provenance, grounding state, and safety-arbitration trace flags.
 
+The reusable schema contract is mirrored in `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json` as `CGPUFrame` and `CGPUOutputFrame`. These schemas document the CHAL device boundary; `/api/v1/query` still uses the legacy-compatible `QueryResponse` envelope and should expose CGPU/hypervisor records under `debug` only after the runtime wiring lands.
+
 ## Boundary
 
 CGPU may:

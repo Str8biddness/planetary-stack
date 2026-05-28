@@ -87,6 +87,8 @@ Legend:
 
 - [x] Ensure CGPU candidates never bypass grounding/safety arbitration. Session log: 2026-05-28 Agent 9 CGPU frame contract.
 
+- [x] Mirror `CGPUFrame` and `CGPUOutputFrame` in OpenAPI/API schema docs without claiming `/api/v1/query` emits them yet. Session log: 2026-05-28 Agent 10 API schema alignment.
+
 ## Phase 5: Knowledge Cloud Hardware Mount
 
 - [~] Define CHAL mount and partition interfaces for ROM, parameter disk, grounding corpus, and writeback memory.

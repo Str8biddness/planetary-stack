@@ -1,4 +1,4 @@
-"""Synthesus 2.0 API Schemas - Pydantic models for request/response validation"""
+"""Synthesus 5 CHAL API schemas for request/response validation."""
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
 import time
@@ -94,7 +94,14 @@ class AdminUsageStatistics(BaseModel):
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000, description="The query text")
     character: str = Field(default="synth", description="Character ID to route to")
-    mode: str = Field(default="auto", description="Processing mode: auto|cognitive|rag|pattern")
+    mode: str = Field(
+        default="auto",
+        description=(
+            "Legacy-compatible processing mode: auto|cognitive|rag|pattern. "
+            "Synthesus 5 CHAL routing is represented in debug telemetry until "
+            "the Cognitive Hypervisor is wired into the public query path."
+        ),
+    )
     session_id: Optional[str] = Field(default=None, description="Session ID for multi-turn")
     player_id: str = Field(default="default", description="Player/user ID for relationship tracking")
     include_sources: bool = Field(default=False, description="Include RAG source citations")
@@ -125,13 +132,28 @@ class QueryResponse(BaseModel):
     response: str
     confidence: float
     character: str
-    source: str  # "rag", "pattern", "cognitive", "fallback"
+    source: str = Field(
+        ...,
+        description=(
+            "Runtime source that produced the response, such as zo_kernel, "
+            "symbolic_core, cognitive, synthesus_master, rag, or fallback."
+        ),
+    )
     session_id: str
     latency_ms: float
     sources: Optional[List[Dict[str, Any]]] = None
     emotion: Optional[str] = None
     relationship: Optional[Dict[str, Any]] = None
-    debug: Optional[Dict[str, Any]] = None
+    debug: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description=(
+            "Optional implementation telemetry returned only when include_debug "
+            "is true. Current keys include kernel_triggered, symbolic_triggered, "
+            "trace, rag, ml_swarm, and fallback diagnostics. Future Synthesus 5 "
+            "wiring should place Cognitive Hypervisor and CGPU candidate-set "
+            "trace records here without changing the stable response envelope."
+        ),
+    )
 
 
 class ChatMessage(BaseModel):
