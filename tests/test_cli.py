@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 from synthesus_knowledge_cloud.__main__ import main
 from synthesus_knowledge_cloud.manifest import build_manifest, write_manifest
@@ -14,6 +15,23 @@ def test_manifest_build_and_validate(tmp_path):
     manifest = build_manifest(data, ["."], kind="test")
     write_manifest(manifest, data / "manifest.json")
     assert main(["validate", "--root", str(data)]) == 0
+
+
+def test_manifest_validate_rejects_faiss_embedder_dim_mismatch(tmp_path, monkeypatch):
+    data = tmp_path / "artifacts"
+    (data / "models").mkdir(parents=True)
+    (data / "faiss.index").write_bytes(b"fake-index")
+    (data / "faiss_metadata.json").write_text("[{}, {}]", encoding="utf-8")
+    (data / "models" / "swarm_embedder.pkl").write_bytes(b"fake-model")
+    manifest = build_manifest(data, ["."], kind="test")
+    write_manifest(manifest, data / "manifest.json")
+
+    fake_faiss = SimpleNamespace(read_index=lambda _path: SimpleNamespace(ntotal=2, d=384))
+    fake_joblib = SimpleNamespace(load=lambda _path: {"dim": 128})
+    monkeypatch.setitem(__import__("sys").modules, "faiss", fake_faiss)
+    monkeypatch.setitem(__import__("sys").modules, "joblib", fake_joblib)
+
+    assert main(["validate", "--root", str(data)]) == 1
 
 
 def test_profiles_load():

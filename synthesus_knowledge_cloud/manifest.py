@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -128,7 +129,55 @@ def validate_manifest(root: str | Path, manifest_name: str = "manifest.json") ->
         digest = sha256_file(path)
         if digest != item["sha256"]:
             failures.append(f"sha256 mismatch {rel}")
+    failures.extend(_validate_runtime_bundle_semantics(root_path))
     return ValidationResult(checked=checked, failures=tuple(failures))
+
+
+def _validate_runtime_bundle_semantics(root: Path) -> list[str]:
+    """Validate artifact relationships that hashes alone cannot prove."""
+    failures: list[str] = []
+    faiss_path = root / "faiss.index"
+    metadata_path = root / "faiss_metadata.json"
+    embedder_path = root / "models" / "swarm_embedder.pkl"
+
+    if faiss_path.exists():
+        try:
+            import faiss
+
+            index = faiss.read_index(str(faiss_path))
+        except Exception as exc:
+            return [f"FAISS index unreadable: {exc}"]
+
+        if metadata_path.exists():
+            try:
+                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                metadata_count = len(metadata) if isinstance(metadata, (list, dict)) else -1
+            except Exception as exc:
+                failures.append(f"faiss_metadata.json unreadable: {exc}")
+            else:
+                if metadata_count != int(index.ntotal):
+                    failures.append(
+                        f"FAISS/metadata count mismatch: faiss={int(index.ntotal)}, metadata={metadata_count}"
+                    )
+
+        if embedder_path.exists():
+            try:
+                joblib = sys.modules.get("joblib")
+                if joblib is None:
+                    import joblib as loaded_joblib
+
+                    joblib = loaded_joblib
+                model = joblib.load(embedder_path)
+                embedder_dim = int(model.get("dim")) if isinstance(model, dict) and "dim" in model else None
+            except Exception as exc:
+                failures.append(f"swarm embedder unreadable: {exc}")
+            else:
+                if embedder_dim is None:
+                    failures.append("swarm embedder missing persisted dim")
+                elif embedder_dim != int(index.d):
+                    failures.append(f"FAISS/embedder dim mismatch: faiss={int(index.d)}, embedder={embedder_dim}")
+
+    return failures
 
 
 def verify_source_manifest(
