@@ -16,6 +16,12 @@ from .hypervisor import (
     HypervisorResult,
     HypervisorRoute,
 )
+from .quad_brain import (
+    QuadBrainArbitration,
+    QuadBrainOrchestrator,
+    QuadBrainOutput,
+    QuadBrainRole,
+)
 
 __all__ = [
     "CognitiveHypervisor",
@@ -30,5 +36,9 @@ __all__ = [
     "Mount",
     "MountType",
     "Partition",
+    "QuadBrainArbitration",
+    "QuadBrainOrchestrator",
+    "QuadBrainOutput",
+    "QuadBrainRole",
     "TelemetryRecord",
 ]

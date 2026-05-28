@@ -1397,3 +1397,24 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Architectural Notes
 - The hypervisor is now a hard emission boundary for legacy template signatures on the explicit Synthesus 5 path.
 - PPBRS remains firmware-only in normal operation; fixed text is only tolerated when a surface is explicitly labeled as safety, platform, identity/rights, or scripted NPC behavior.
+
+## Current Session — 2026-05-28 (Agent 7 — Quad Brain Serialized Arbiter)
+
+### 📝 Summary
+- Added `packages/core/chal/quad_brain.py` with a bounded four-role Quad Brain arbitration contract: Knowledge/Grounding, Executive Reasoning, CGPU Rendering, and Critic/Metacognition.
+- Wired `CognitiveHypervisor` to invoke the Quad Brain arbiter only for `quad_brain_path`, after the guarded hemisphere bridge dispatch and before final template-guard emission.
+- Preserved serialized arbitration and inspectable traces through `telemetry.quad_brain`, `bridge_result.quad_brain_arbitration`, fixed `serial_order`, and a state contract declaring no parallel brain spawning.
+- Updated the Synthesus 5 Phase 3 checklist and module docs for the arbitration/state-contract boundary.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/quad_brain.py packages/core/chal/hypervisor.py packages/core/chal/__init__.py tests/test_chal_hypervisor.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_hypervisor.py tests/test_cgpu_renderer.py tests/test_chal_reasoning_firmware.py` — 22 passed.
+
+### 🚧 Left Off / Next Steps
+- Add the Phase 3 quality-preservation test that compares Quad Brain dispatch against the legacy dual-hemi path on real runtime fixtures.
+- Move the Knowledge/Grounding brain from bridge-result fallback facts toward mounted Knowledge Cloud hot-context/provenance retrieval when the public runtime path has stable retrieval metadata.
+- Surface `telemetry.quad_brain` in the API/frontend trace view after the current debug envelope is accepted by clients.
+
+### 💡 Architectural Notes
+- Quad Brain is now a CHAL-local serialized topology, not a free-running multi-agent swarm.
+- The current state contract is `knowledge -> executive -> cgpu -> critic`; CGPU renders from grounded/executive state and Critic/Metacognition remains the final selectable surface boundary.

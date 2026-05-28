@@ -63,15 +63,15 @@ Legend:
 
 ## Phase 3: Quad Brain MVP
 
-- [ ]  Implement Brain 1: Knowledge / Grounding as a CHAL device consumer.
+- [~]  Implement Brain 1: Knowledge / Grounding as a CHAL device consumer. Session log: 2026-05-28 Agent 7 Quad Brain arbiter added `chal://knowledge/grounding` output frames inside serialized arbitration.
 
-- [ ]  Implement Brain 2: Executive Reasoning as planner/constraint controller.
+- [~]  Implement Brain 2: Executive Reasoning as planner/constraint controller. Session log: 2026-05-28 Agent 7 Quad Brain arbiter added `chal://reasoning/executive` plan frames.
 
-- [ ]  Implement Brain 3: CGPU Simulation / Rendering as candidate generator.
+- [~]  Implement Brain 3: CGPU Simulation / Rendering as candidate generator. Session log: 2026-05-28 Agent 7 Quad Brain arbiter now invokes `CGPURenderer` from the Quad Brain path.
 
-- [ ]  Implement Brain 4: Critic / Safety / Metacognition as evaluator/rewrite trigger.
+- [~]  Implement Brain 4: Critic / Safety / Metacognition as evaluator/rewrite trigger. Session log: 2026-05-28 Agent 7 Quad Brain arbiter added critic/metacognition template-guard arbitration.
 
-- [ ]  Add serialized arbiter that merges four brain outputs into a single response frame.
+- [x]  Add serialized arbiter that merges four brain outputs into a single response frame. Session log: 2026-05-28 Agent 7 Quad Brain arbiter.
 
 - [ ]  Add tests showing four-brain dispatch improves or preserves output quality over legacy dual-hemi path.
 

@@ -35,6 +35,12 @@ Runtime guard code lives in `packages/reasoning/generation/template_guard.py`. T
 
 `CognitiveHypervisor` now applies the guard after hemisphere bridge dispatch. If a normal Synthesus 5 path receives a legacy-shaped surface, it replaces the text with a degraded CHAL quarantine message and records the matched signatures in `telemetry.template_guard`. Safety, platform, identity/rights, and explicit NPC-script exceptions are allowed only when labeled through the template surface boundary.
 
+## Quad Brain Runtime Wiring
+
+`CognitiveHypervisor` now invokes `packages/core/chal/quad_brain.py` for `quad_brain_path`. The serialized arbiter feeds Knowledge/Grounding facts into Executive Reasoning, builds a bounded `ResponsePlan`, calls `CGPURenderer`, then sends the selected candidate through Critic/Metacognition before emission.
+
+The runtime trace is exposed at `telemetry.quad_brain` and mirrored into `bridge_result.quad_brain_arbitration`. It includes the four brain outputs, fixed `serial_order`, CGPU candidate diagnostics, template-guard status, and a state contract that explicitly records serialized arbitration and no parallel brain spawning.
+
 ## Validation
 
 Focused validation:

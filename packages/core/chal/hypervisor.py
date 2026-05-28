@@ -86,11 +86,13 @@ class CognitiveHypervisor:
         bridge_factory: BridgeFactory | None = None,
         execution_guard: AIVMExecutionGuard | None = None,
         template_guard: TemplateLeakageGuard | None = None,
+        quad_brain_orchestrator: Any | None = None,
     ):
         self._bridge_factory = bridge_factory
         self._bridge: Any | None = None
         self._execution_guard = execution_guard or AIVMExecutionGuard()
         self._template_guard = template_guard or TemplateLeakageGuard()
+        self._quad_brain_orchestrator = quad_brain_orchestrator
 
     def plan(
         self,
@@ -209,6 +211,20 @@ class CognitiveHypervisor:
         bridge_result = self._normalize_guarded_bridge_result(guarded)
 
         response = str(bridge_result.get("response", ""))
+        quad_brain_arbitration = None
+        if guarded.ok and decision.route == HypervisorRoute.QUAD_BRAIN_PATH:
+            quad_brain_arbitration = self._get_quad_brain_orchestrator().arbitrate(
+                query=query,
+                decision=decision,
+                bridge_result=bridge_result,
+                rag_context=rag_context,
+                character_context=character_context,
+                constraints=constraints or [],
+                max_tokens=max_tokens,
+                surface=self._template_surface(decision),
+            )
+            bridge_result["quad_brain_arbitration"] = quad_brain_arbitration.to_dict()
+            response = quad_brain_arbitration.selected_response
         template_guard_result = self._template_guard.inspect(
             response,
             surface=self._template_surface(decision),
@@ -230,6 +246,7 @@ class CognitiveHypervisor:
             "budget_exhausted": guarded.status == "timeout",
             "degraded": not guarded.ok,
             "template_guard": template_guard_result.to_dict(),
+            "quad_brain": quad_brain_arbitration.to_dict() if quad_brain_arbitration else None,
         }
         if template_guard_result.rewritten:
             telemetry["degraded"] = True
@@ -241,6 +258,18 @@ class CognitiveHypervisor:
             bridge_result=bridge_result,
             telemetry=telemetry,
         )
+
+    def _get_quad_brain_orchestrator(self) -> Any:
+        if self._quad_brain_orchestrator is None:
+            try:
+                from core.chal.quad_brain import QuadBrainOrchestrator
+            except ModuleNotFoundError:  # pragma: no cover
+                from packages.core.chal.quad_brain import QuadBrainOrchestrator
+
+            self._quad_brain_orchestrator = QuadBrainOrchestrator(
+                template_guard=self._template_guard,
+            )
+        return self._quad_brain_orchestrator
 
     def _normalize_guarded_bridge_result(
         self,

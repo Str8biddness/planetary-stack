@@ -161,3 +161,18 @@ The new files are intentionally Python orchestration stubs with TODO-marked impl
 ### CHAL Firmware Realization Update (2026-05-27)
 
 `GenerationSpine` accepts `SpineInput.firmware_signals` and realizes CHAL firmware into bounded text. This creates a narrow bridge from PPBRS/retrieval metadata into final wording without letting PPBRS own the sentence. Current realization is deterministic and inspectable; future work should route the same signal through VGD-backed `ResponsePlanner`, `SurfaceRealizer`, and `ResponseCritic`.
+
+## Synthesus 5 Quad Brain Arbitration Update (2026-05-28)
+
+`packages/core/chal/quad_brain.py` adds the first CHAL-local serialized Quad Brain arbiter used by `CognitiveHypervisor` when route selection chooses `quad_brain_path`.
+
+The current topology stays bounded to four logical brain outputs:
+
+| Brain | Device label | Current runtime responsibility |
+|-------|--------------|--------------------------------|
+| Knowledge / Grounding | `chal://knowledge/grounding` | Extracts grounding facts from RAG context or the guarded hemisphere bridge result. |
+| Executive Reasoning | `chal://reasoning/executive` | Converts route, constraints, budget, and grounding into a `ResponsePlan`. |
+| CGPU Simulation / Rendering | `chal://cgpu/render` | Renders bounded candidate surfaces with the existing `CGPURenderer`. |
+| Critic / Safety / Metacognition | `chal://critic/metacognition` | Applies template leakage arbitration and selects the response surface. |
+
+The arbiter intentionally runs these brain outputs in a fixed serial order after the guarded bridge pass. It records `state_contract.serialized_arbitration=true` and `state_contract.parallel_brain_spawn=false` in `telemetry.quad_brain` so future API/frontend trace views can distinguish bounded Quad Brain orchestration from uncontrolled multi-agent fan-out.

@@ -2,6 +2,7 @@ import asyncio
 import time
 
 from core.chal.hypervisor import CognitiveHypervisor, HypervisorRoute
+from core.chal.quad_brain import QuadBrainRole
 
 
 class StubBridge:
@@ -80,6 +81,39 @@ def test_hypervisor_plans_quad_brain_path_for_npc_context():
     assert decision.route == HypervisorRoute.QUAD_BRAIN_PATH
     assert decision.hemisphere_mode == "both"
     assert decision.budget.candidate_count >= 4
+
+
+def test_hypervisor_quad_brain_path_serializes_four_brain_arbitration():
+    bridge = StubBridge()
+    hypervisor = CognitiveHypervisor(bridge_factory=lambda: bridge)
+
+    result = asyncio.run(
+        hypervisor.process_query(
+            "Render this dialogue response",
+            character_context={"character_id": "merchant", "stance": "guarded"},
+        )
+    )
+
+    quad_trace = result.telemetry["quad_brain"]
+    roles = [output["role"] for output in quad_trace["outputs"]]
+
+    assert result.decision.route == HypervisorRoute.QUAD_BRAIN_PATH
+    assert bridge.calls == [
+        {
+            "query": "Render this dialogue response",
+            "hemisphere": "both",
+            "character_context": {"character_id": "merchant", "stance": "guarded"},
+            "rag_context": "",
+            "max_tokens": 512,
+        }
+    ]
+    assert roles == [role.value for role in QuadBrainRole]
+    assert quad_trace["serial_order"] == [role.value for role in QuadBrainRole]
+    assert quad_trace["state_contract"]["serialized_arbitration"] is True
+    assert quad_trace["state_contract"]["parallel_brain_spawn"] is False
+    assert quad_trace["selected_source"] == "critic_metacognition"
+    assert "routed through both" in result.response
+    assert result.bridge_result["quad_brain_arbitration"]["trace_id"] == result.decision.trace_id
 
 
 def test_hypervisor_dispatches_with_trace_and_budget_metadata():
