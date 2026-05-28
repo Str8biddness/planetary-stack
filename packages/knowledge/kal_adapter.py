@@ -14,6 +14,8 @@ import os
 import re
 import sys
 import time
+from collections import OrderedDict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -61,17 +63,35 @@ except Exception:
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class HotContextEntry:
+    response: str
+    confidence: float
+    source: str
+    metadata: Dict[str, Any]
+    cached_at_ms: float
+
+
 class CHALMemoryController:
     """
     Mount manager and memory controller for the Cognitive Hardware Abstraction Layer.
     Replaces legacy template fallback paths with explicit virtual hardware routing.
     """
     
-    def __init__(self, knowledge_root: Optional[str | Path] = None, strict_mount_integrity: bool = False):
+    def __init__(
+        self,
+        knowledge_root: Optional[str | Path] = None,
+        strict_mount_integrity: bool = False,
+        hot_context_limit: int = 128,
+    ):
         self._mounts: Dict[str, Mount] = {}
         self._knowledge_cloud = None
         self._runtime = None
         self._mount_boot_report = None
+        self._hot_context: OrderedDict[str, HotContextEntry] = OrderedDict()
+        self._hot_context_limit = max(0, hot_context_limit)
+        self._hot_context_hits = 0
+        self._hot_context_misses = 0
         self._knowledge_root = Path(
             knowledge_root
             or os.environ.get("SYNTHESUS_KNOWLEDGE_ROOT", "")
@@ -194,6 +214,23 @@ class CHALMemoryController:
         """Return the manifest boot report when mounts came from Knowledge Cloud artifacts."""
         return self._mount_boot_report
 
+    def get_hot_context_stats(self) -> Dict[str, Any]:
+        """Return L1 hot-context cache stats for CHAL trace/debug surfaces."""
+        total = self._hot_context_hits + self._hot_context_misses
+        return {
+            "entries": len(self._hot_context),
+            "limit": self._hot_context_limit,
+            "hits": self._hot_context_hits,
+            "misses": self._hot_context_misses,
+            "hit_rate": round(self._hot_context_hits / total, 4) if total else 0.0,
+        }
+
+    def clear_hot_context(self) -> None:
+        """Clear volatile hot-context cache entries without affecting mounted hardware."""
+        self._hot_context.clear()
+        self._hot_context_hits = 0
+        self._hot_context_misses = 0
+
     def query(self, text: str, trust_available: float = 1.0) -> Tuple[Optional[str], TelemetryRecord]:
         """
         Route a query through the mounted cognitive hardware.
@@ -203,6 +240,22 @@ class CHALMemoryController:
         text = (text or "").strip()
         if not text:
             return None, self._telemetry("empty_query", start_time, False, 0.0, "none")
+
+        cache_key = self._hot_context_key(text, trust_available)
+        cached = self._get_hot_context(cache_key)
+        if cached is not None:
+            return cached.response, self._telemetry(
+                "hot_context_hit",
+                start_time,
+                True,
+                cached.confidence,
+                cached.source,
+                {
+                    **cached.metadata,
+                    "hot_context": True,
+                    "cached_at_ms": cached.cached_at_ms,
+                },
+            )
             
         # Strategy: 
         # 1. Try ROM / Lore mounts (Knowledge Cloud)
@@ -218,7 +271,13 @@ class CHALMemoryController:
                     if result and result.get("response"):
                         confidence = result.get("confidence", 0.5)
                         source = f"rom_mount:{rom_mounts[0].partition.partition_id}"
-                        return result["response"], self._telemetry("kc_lookup", start_time, True, confidence, source, result)
+                        metadata = {
+                            **result,
+                            "hot_context": False,
+                            "mounts": self._active_mount_metadata(rom_mounts),
+                        }
+                        self._put_hot_context(cache_key, result["response"], confidence, source, metadata)
+                        return result["response"], self._telemetry("kc_lookup", start_time, False, confidence, source, metadata)
                 except Exception as e:
                     logger.warning(f"CHAL: ROM mount query failed: {e}")
 
@@ -237,6 +296,59 @@ class CHALMemoryController:
             "[SYSTEM: DEGRADED_STATE. Cognitive hardware returned no highly confident resolution for the query.]", 
             self._telemetry("degraded_state", start_time, False, 0.0, "chal_arbiter")
         )
+
+    @staticmethod
+    def _hot_context_key(text: str, trust_available: float) -> str:
+        normalized = re.sub(r"\s+", " ", text.strip().lower())
+        return f"{normalized}|trust:{trust_available:.3f}"
+
+    def _get_hot_context(self, cache_key: str) -> Optional[HotContextEntry]:
+        if self._hot_context_limit <= 0:
+            return None
+        cached = self._hot_context.get(cache_key)
+        if cached is None:
+            self._hot_context_misses += 1
+            return None
+        self._hot_context_hits += 1
+        self._hot_context.move_to_end(cache_key)
+        return cached
+
+    def _put_hot_context(
+        self,
+        cache_key: str,
+        response: str,
+        confidence: float,
+        source: str,
+        metadata: Dict[str, Any],
+    ) -> None:
+        if self._hot_context_limit <= 0:
+            return
+        self._hot_context[cache_key] = HotContextEntry(
+            response=response,
+            confidence=confidence,
+            source=source,
+            metadata=metadata,
+            cached_at_ms=time.time() * 1000.0,
+        )
+        self._hot_context.move_to_end(cache_key)
+        while len(self._hot_context) > self._hot_context_limit:
+            self._hot_context.popitem(last=False)
+
+    @staticmethod
+    def _active_mount_metadata(mounts: List[Mount]) -> List[Dict[str, Any]]:
+        return [
+            {
+                "mount_path": mount.mount_path,
+                "mount_type": mount.mount_type.value,
+                "partition_id": mount.partition.partition_id,
+                "namespace": mount.partition.namespace,
+                "locality": mount.locality,
+                "trust_level": mount.trust_level,
+                "latency_profile": mount.latency_profile,
+            }
+            for mount in mounts
+            if mount.is_active
+        ]
 
     def _telemetry(
         self, op_id: str, start_time: float, hit: bool, conf: float, source: str, meta: Optional[Dict[str, Any]] = None
@@ -270,4 +382,4 @@ class SynthesusAdapter:
     def answer(self, text: str) -> str:
         return self.query(text)
 
-__all__ = ["CHALMemoryController", "SynthesusAdapter"]
+__all__ = ["CHALMemoryController", "HotContextEntry", "SynthesusAdapter"]

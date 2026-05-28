@@ -1356,3 +1356,24 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Architectural Notes
 - The production API now has a public Synthesus 5 path without forcing the whole legacy-compatible query pipeline through an unfinished runtime cutover.
 - Hypervisor traces use the existing response debug envelope, keeping client compatibility while making route decisions, budgets, device isolation, and degraded states observable.
+
+## Current Session — 2026-05-28 (Agent 3 — Phase 8 Evaluation Harness)
+
+### Summary
+- Upgraded `tools/chal_conversation_compare.py` from a narrow Synthesus 4.1 conversation comparison into a Synthesus 5 Phase 8 legacy-vs-CHAL harness.
+- Added deterministic cases for conversation quality, cross-domain reasoning, grounded retrieval, NPC/persona behavior, business-bot task handling, and safety boundary handling.
+- Added axis scoring for usefulness, grounding, naturalness, latency, template leakage, and safety, plus JSON/Markdown benchmark outputs under ignored `tools/results/`.
+- Added regression coverage that verifies category coverage, route diversity across grounded/Quad Brain/safety paths, Synthesus 5 score improvement over legacy templates, and zero Synthesus 5 template leaks.
+- Documented the harness in `docs/modules/EVALUATION_HARNESS.md`.
+
+### Verified
+- `python -m py_compile tools/chal_conversation_compare.py tests/test_chal_reasoning_firmware.py`
+- `python tools/chal_conversation_compare.py --fail-on-leak --write tools/results/synthesus5_chal_comparison_2026-05-28.md --json tools/results/synthesus5_chal_comparison_2026-05-28.json` — completed; summary: 6 cases, legacy mean 0.424, Synthesus 5 mean 0.954, score delta +0.530, Synthesus 5 mean latency 3.832ms, legacy template leaks 6, Synthesus 5 template leaks 0. Generated outputs remained ignored.
+
+### Left Off / Next Steps
+- Add optional model-backed judge mode once an approved provider/runtime path is available, but keep this deterministic harness as the fast regression gate.
+- Add real runtime transcript fixtures after the API `auto` cutover starts routing production traffic through Synthesus 5.
+
+### Architectural Notes
+- Phase 8 now has a runnable source-controlled comparison harness, not only an architectural TODO.
+- The benchmark intentionally treats legacy template strings as a failure mode while preserving safety-path fixed guidance as a scored exception boundary.

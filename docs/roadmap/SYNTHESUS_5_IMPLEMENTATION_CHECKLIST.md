@@ -140,21 +140,21 @@ Legend:
 
 - [ ] 
 
-- \[\~\] Add legacy-vs-CHAL conversation comparison harness.
+- [x]  Add legacy-vs-CHAL conversation comparison harness. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
 
-- [ ]  Add Synthesus 5 vs legacy comparison mode.
+- [x]  Add Synthesus 5 vs legacy comparison mode. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
 
-- [ ]  Add cross-domain reasoning prompts.
+- [x]  Add cross-domain reasoning prompts. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
 
-- [ ]  Add grounded retrieval prompts.
+- [x]  Add grounded retrieval prompts. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
 
-- [ ]  Add NPC/persona behavior prompts.
+- [x]  Add NPC/persona behavior prompts. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
 
-- [ ]  Add business-bot task prompts.
+- [x]  Add business-bot task prompts. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
 
-- [ ]  Add scoring for usefulness, grounding, naturalness, latency, template leakage, and safety.
+- [x]  Add scoring for usefulness, grounding, naturalness, latency, template leakage, and safety. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
 
-- [ ]  Store benchmark summaries in ignored artifacts and commit only harness source/docs.
+- [x]  Store benchmark summaries in ignored artifacts and commit only harness source/docs. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
 
 ## Phase 9: Product Runtime Polish
 

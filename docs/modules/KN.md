@@ -146,6 +146,17 @@ Default mount mappings:
 
 `CHALMemoryController` attempts this manifest-backed boot before falling back to legacy default mounts. Failed integrity checks deactivate the affected mount and set trust to `0.0`; strict boot mode raises immediately.
 
+## Synthesus 5 Hot-Context Cache
+
+`CHALMemoryController` now keeps a bounded L1 hot-context cache in front of mounted Knowledge Cloud ROM lookups. Cache keys normalize query whitespace/case and include the trust budget, so repeated local questions can be served from the CHAL controller without re-entering the KnowledgeCloud backend while still preserving the original mounted-source telemetry.
+
+Telemetry distinguishes first-pass hardware lookup from cache locality:
+
+- First lookup: `operation_id="kc_lookup"`, `cache_hit=False`, `metadata.hot_context=False`, and `metadata.mounts[]` lists the active ROM mount path, partition, namespace, locality, trust level, and latency profile.
+- Repeat lookup: `operation_id="hot_context_hit"`, `cache_hit=True`, and `metadata.hot_context=True`.
+
+The cache is volatile and source-only: it does not write generated artifacts into `data/`, the standalone Knowledge Cloud repo, or the public artifact mirror. Runtime/debug surfaces can inspect it with `get_hot_context_stats()` and clear it with `clear_hot_context()`.
+
 Validation:
 
 ```bash

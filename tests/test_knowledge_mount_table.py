@@ -95,3 +95,80 @@ def test_kal_controller_boots_from_manifest_before_default_mounts(tmp_path: Path
     assert "/mnt/rom/world_lore" in mounts
     assert "/mnt/params/swarm_embedder" in mounts
     assert "/mnt/rom/lore" not in mounts
+
+
+def test_kal_hot_context_serves_repeated_mounted_queries(tmp_path: Path):
+    _write_manifest(
+        tmp_path,
+        [_write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n')],
+    )
+
+    class FakeKnowledgeCloud:
+        def __init__(self):
+            self.calls = 0
+
+        def lookup(self, text: str, trust: float):
+            self.calls += 1
+            return {
+                "response": f"grounded:{text}:{trust:.0f}",
+                "confidence": 0.86,
+                "source": "fake-rom",
+            }
+
+    controller = CHALMemoryController(
+        knowledge_root=tmp_path,
+        strict_mount_integrity=True,
+        hot_context_limit=2,
+    )
+    fake_cloud = FakeKnowledgeCloud()
+    controller._knowledge_cloud = fake_cloud
+    controller._runtime = None
+
+    first_response, first_telemetry = controller.query(" Where is the lore? ")
+    second_response, second_telemetry = controller.query("where   is the lore?")
+    stats = controller.get_hot_context_stats()
+
+    assert first_response == second_response
+    assert fake_cloud.calls == 1
+    assert first_telemetry.operation_id == "kc_lookup"
+    assert first_telemetry.cache_hit is False
+    assert first_telemetry.metadata["hot_context"] is False
+    assert first_telemetry.metadata["mounts"][0]["mount_path"] == "/mnt/rom/world_lore"
+    assert second_telemetry.operation_id == "hot_context_hit"
+    assert second_telemetry.cache_hit is True
+    assert second_telemetry.metadata["hot_context"] is True
+    assert stats["entries"] == 1
+    assert stats["hits"] == 1
+    assert stats["misses"] == 1
+
+
+def test_kal_hot_context_lru_eviction(tmp_path: Path):
+    _write_manifest(
+        tmp_path,
+        [_write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n')],
+    )
+
+    class FakeKnowledgeCloud:
+        def __init__(self):
+            self.calls: list[str] = []
+
+        def lookup(self, text: str, trust: float):
+            self.calls.append(text)
+            return {"response": text.upper(), "confidence": 0.75}
+
+    controller = CHALMemoryController(
+        knowledge_root=tmp_path,
+        strict_mount_integrity=True,
+        hot_context_limit=1,
+    )
+    fake_cloud = FakeKnowledgeCloud()
+    controller._knowledge_cloud = fake_cloud
+    controller._runtime = None
+
+    controller.query("alpha")
+    controller.query("beta")
+    _, telemetry = controller.query("alpha")
+
+    assert fake_cloud.calls == ["alpha", "beta", "alpha"]
+    assert telemetry.operation_id == "kc_lookup"
+    assert controller.get_hot_context_stats()["entries"] == 1
