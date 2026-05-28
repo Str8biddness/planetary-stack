@@ -1,111 +1,241 @@
+"""Fast Knowledge Cloud hardware health check for Synthesus 5."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
 import json
-import time
-import sys
 import logging
+import sqlite3
+import sys
+import tempfile
+import time
 from pathlib import Path
+from typing import Any
+
 import numpy as np
 
-# Add repo root to path
-repo_root = Path("/home/workspace/synthesus_repo")
-sys.path.insert(0, str(repo_root))
-
-from knowledge_integration.manifest_manager import load_manifest, get_file_hash
-from knowledge_integration.kn_populator import KNPopulator, MetadataDB
-from ml.swarm_embedder import SwarmEmbedder
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
-logger = logging.getLogger("health_check")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_ARTIFACT_ROOT = REPO_ROOT.parent / "synthesus-knowledge-cloud" / "artifacts"
 
 GOLDEN_QUERIES = [
     "What is the capital of France?",
     "Who wrote the theory of relativity?",
     "What is the largest planet in our solar system?",
     "Who is the main character in the Great Gatsby?",
-    "What is the chemical symbol for gold?"
+    "What is the chemical symbol for gold?",
 ]
 
 LATENCY_THRESHOLD_MS = 100.0
 
-def run_health_check():
-    manifest = load_manifest()
-    if not manifest:
-        logger.error("No manifest found. Health check failed.")
-        return False
-    
-    data_dir = repo_root / "data"
-    faiss_path = data_dir / "faiss.index"
-    if not faiss_path.exists():
-        faiss_path = data_dir / "knowledge.faiss"
-    kn_path = data_dir / "knowledge.kndb"
-    meta_path = data_dir / "knowledge.kndb.meta.db"
-    
-    errors = []
-    
-    # 1. Check file integrity
-    if get_file_hash(faiss_path) != manifest.get("index_hash"):
-        errors.append("FAISS index hash mismatch")
-    if get_file_hash(kn_path) != manifest.get("kn_db_hash"):
-        errors.append("KNDB hash mismatch")
-    
-    # 2. Verify counts
-    embedder = SwarmEmbedder(model_dir=data_dir / "embedder")
-    pop = KNPopulator(kn_path=kn_path, faiss_path=faiss_path, embedder=embedder)
-    
-    # Trigger lazy load of FAISS index to get accurate stats
-    pop._load_existing_faiss()
-    
-    stats = pop.stats()
-    faiss_size = stats["faiss_size"]
-    meta_count = stats["total"]
-    
-    if faiss_size != meta_count:
-        errors.append(f"Count mismatch: FAISS={faiss_size}, Metadata={meta_count}")
-    
-    if faiss_size != manifest.get("vector_count"):
-        logger.warning(f"Vector count changed since manifest: {manifest.get('vector_count')} -> {faiss_size}")
+logger = logging.getLogger("knowledge_health_check")
 
-    # 3. Benchmark latency and stability
-    latencies = []
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _load_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _manifest_items(manifest: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {item["path"].replace("\\", "/"): item for item in manifest.get("artifacts", [])}
+
+
+def _verify_manifest_hashes(artifact_root: Path) -> list[str]:
+    manifest_path = artifact_root / "manifest.json"
+    if not manifest_path.exists():
+        return [f"missing manifest.json under {artifact_root}"]
+
+    manifest = _load_json(manifest_path)
+    errors: list[str] = []
+    for rel_path, item in _manifest_items(manifest).items():
+        path = artifact_root / rel_path
+        if not path.exists():
+            errors.append(f"missing artifact {rel_path}")
+            continue
+        if path.stat().st_size != int(item["size"]):
+            errors.append(f"size mismatch {rel_path}: expected {item['size']}, got {path.stat().st_size}")
+            continue
+        if _sha256_file(path) != item["sha256"]:
+            errors.append(f"sha256 mismatch {rel_path}")
+    return errors
+
+
+def _metadata_count(artifact_root: Path) -> int:
+    metadata_path = artifact_root / "faiss_metadata.json"
+    if metadata_path.exists():
+        metadata = _load_json(metadata_path)
+        if isinstance(metadata, list):
+            return len(metadata)
+        if isinstance(metadata, dict):
+            return len(metadata)
+
+    sqlite_path = artifact_root / "knowledge.kndb.meta.db"
+    if sqlite_path.exists():
+        with sqlite3.connect(sqlite_path) as conn:
+            return int(conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0])
+    return 0
+
+
+def _load_metadata_records(artifact_root: Path) -> list[dict[str, Any]]:
+    metadata = _load_json(artifact_root / "faiss_metadata.json")
+    if not isinstance(metadata, list):
+        raise ValueError("faiss_metadata.json must be a list for golden-query search")
+    return metadata
+
+
+def _load_embedder(artifact_root: Path):
+    packages_root = REPO_ROOT / "packages"
+    for path in (packages_root, packages_root / "knowledge"):
+        value = str(path)
+        if value not in sys.path:
+            sys.path.insert(0, value)
+
+    from knowledge.swarm_embedder import SwarmEmbedder
+
+    return SwarmEmbedder(model_dir=artifact_root / "models")
+
+
+def _run_golden_queries(artifact_root: Path, top_k: int = 5) -> tuple[list[float], list[str]]:
+    import faiss
+
+    index = faiss.read_index(str(artifact_root / "faiss.index"))
+    metadata = _load_metadata_records(artifact_root)
+    embedder = _load_embedder(artifact_root)
+    errors: list[str] = []
+    latencies: list[float] = []
+
     for query in GOLDEN_QUERIES:
+        start = time.perf_counter()
+        vector = embedder.embed_texts([query]).astype(np.float32)
+        if index.d != vector.shape[1]:
+            errors.append(f"dimension mismatch for {query!r}: index {index.d}, embedder {vector.shape[1]}")
+            continue
+        scores, indices = index.search(vector, top_k)
+        latency_ms = (time.perf_counter() - start) * 1000.0
+        latencies.append(latency_ms)
+        hits = [idx for idx in indices[0] if 0 <= idx < len(metadata)]
+        if not hits:
+            errors.append(f"empty metadata-backed results for golden query: {query}")
+        elif not any(float(score) > 0 for score in scores[0]):
+            errors.append(f"non-positive scores for golden query: {query}")
+    return latencies, errors
+
+
+def _check_kal_mounts() -> tuple[int, list[str]]:
+    packages_root = REPO_ROOT / "packages"
+    for path in (packages_root, packages_root / "knowledge", packages_root / "core"):
+        value = str(path)
+        if value not in sys.path:
+            sys.path.insert(0, value)
+
+    try:
+        from knowledge.kal_adapter import CHALMemoryController
+    except Exception as exc:
+        return 0, [f"KAL import failed: {exc}"]
+
+    try:
+        controller = CHALMemoryController()
+        mounts = controller.get_mounts()
+    except Exception as exc:
+        return 0, [f"KAL mount initialization failed: {exc}"]
+
+    required = {"ROM", "PARAMETER_DISK", "GROUNDING_CORPUS", "WRITEBACK_MEMORY"}
+    observed = {mount.mount_type.value for mount in mounts}
+    missing = sorted(required - observed)
+    errors = [f"missing KAL mount type {item}" for item in missing]
+    return len(mounts), errors
+
+
+def run_health_check(
+    artifact_root: str | Path = DEFAULT_ARTIFACT_ROOT,
+    *,
+    latency_threshold_ms: float = LATENCY_THRESHOLD_MS,
+    report_path: str | Path | None = None,
+) -> dict[str, Any]:
+    artifact_root = Path(artifact_root).resolve()
+    errors: list[str] = []
+
+    start = time.perf_counter()
+    errors.extend(_verify_manifest_hashes(artifact_root))
+
+    faiss_total = 0
+    try:
+        import faiss
+
+        index = faiss.read_index(str(artifact_root / "faiss.index"))
+        faiss_total = int(index.ntotal)
+    except Exception as exc:
+        errors.append(f"FAISS load failed: {exc}")
+
+    metadata_total = 0
+    try:
+        metadata_total = _metadata_count(artifact_root)
+        if faiss_total and metadata_total != faiss_total:
+            errors.append(f"FAISS/metadata count mismatch: faiss={faiss_total}, metadata={metadata_total}")
+    except Exception as exc:
+        errors.append(f"metadata validation failed: {exc}")
+
+    latencies: list[float] = []
+    if faiss_total:
         try:
-            t0 = time.time()
-            results = pop.search_faiss(query, top_k=5)
-            t1 = time.time()
-            latencies.append((t1 - t0) * 1000)
-            
-            if not results:
-                errors.append(f"Empty results for golden query: {query}")
-        except Exception as e:
-            errors.append(f"Search failed for query '{query}': {e}")
-            logger.error(f"Search error: {e}")
-            break
+            latencies, golden_errors = _run_golden_queries(artifact_root)
+            errors.extend(golden_errors)
+        except Exception as exc:
+            errors.append(f"golden query validation failed: {exc}")
 
     avg_latency = sum(latencies) / len(latencies) if latencies else 0.0
-    logger.info(f"Average latency: {avg_latency:.2f}ms")
-    
-    if avg_latency > LATENCY_THRESHOLD_MS:
-        errors.append(f"Latency exceeded threshold: {avg_latency:.2f}ms > {LATENCY_THRESHOLD_MS}ms")
+    if latencies and avg_latency > latency_threshold_ms:
+        errors.append(f"golden query latency exceeded threshold: {avg_latency:.2f}ms > {latency_threshold_ms:.2f}ms")
 
-    # 4. Report
+    mount_count, mount_errors = _check_kal_mounts()
+    errors.extend(mount_errors)
+
     report = {
-        "timestamp": time.time(),
         "status": "PASS" if not errors else "FAIL",
+        "artifact_root": str(artifact_root),
         "errors": errors,
-        "stats": stats,
-        "avg_latency_ms": avg_latency
+        "stats": {
+            "faiss_vectors": faiss_total,
+            "metadata_records": metadata_total,
+            "kal_mounts": mount_count,
+            "avg_golden_query_latency_ms": avg_latency,
+            "duration_ms": (time.perf_counter() - start) * 1000.0,
+        },
     }
-    
-    report_path = repo_root / "data" / "health_report.json"
-    with open(report_path, "w") as f:
-        json.dump(report, f, indent=2)
-    
+
+    output_path = Path(report_path) if report_path else Path(tempfile.gettempdir()) / "synthesus_knowledge_health_report.json"
+    output_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    logger.info("wrote health report to %s", output_path)
     if errors:
-        logger.error(f"Health check FAILED: {errors}")
-        return False
+        logger.error("Knowledge health check failed: %s", errors)
     else:
-        logger.info("Health check PASSED")
-        return True
+        logger.info("Knowledge health check passed")
+    return report
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Run a fast Synthesus Knowledge Cloud hardware health check")
+    parser.add_argument("--artifact-root", default=str(DEFAULT_ARTIFACT_ROOT))
+    parser.add_argument("--latency-threshold-ms", type=float, default=LATENCY_THRESHOLD_MS)
+    parser.add_argument("--report-path", default=None)
+    args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
+    report = run_health_check(
+        args.artifact_root,
+        latency_threshold_ms=args.latency_threshold_ms,
+        report_path=args.report_path,
+    )
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0 if report["status"] == "PASS" else 1
+
 
 if __name__ == "__main__":
-    success = run_health_check()
-    sys.exit(0 if success else 1)
+    raise SystemExit(main())

@@ -1286,3 +1286,28 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### Architectural Notes
 - The API contract now separates stable response envelope fields from CHAL device-frame schemas.
 - CGPU schema docs intentionally avoid claiming that candidate sets bypass the hypervisor or final arbiter.
+
+## Current Session — 2026-05-28 (Daily Knowledge Hardware Health Check)
+
+### Summary
+- Repaired `packages/knowledge/health_check.py` so it no longer points at the frozen `synthesus_repo` layout or legacy `knowledge_integration` imports.
+- The health check now verifies the standalone Knowledge Cloud artifact manifest hashes, FAISS/vector metadata alignment, bundled embedder dimensionality, KAL mount initialization, and golden-query search latency without writing generated reports into the repo by default.
+- Added a standalone Knowledge Cloud validator guard in `synthesus_knowledge_cloud/manifest.py` so `synthesus-kc validate --root artifacts` fails when FAISS, `faiss_metadata.json`, and `models/swarm_embedder.pkl` are not mutually compatible.
+- Found a real current bundle blocker: `artifacts/faiss.index` is 384-dimensional while `artifacts/models/swarm_embedder.pkl` is persisted as 128-dimensional. Hash-only validation previously passed this bundle.
+
+### Verified
+- `python -m py_compile packages/knowledge/health_check.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python packages/knowledge/health_check.py --artifact-root /home/workspace/synthesus-knowledge-cloud/artifacts` — expected FAIL on FAISS/embedder dimension mismatch; manifest hashes, FAISS metadata count, and four KAL mounts were reached.
+- Knowledge Cloud repo: `python -m py_compile synthesus_knowledge_cloud/manifest.py tests/test_cli.py`
+- Knowledge Cloud repo: `python -m pytest -q tests/test_cli.py` — 4 passed.
+- Knowledge Cloud repo: `python scripts/validate_bundle.py --root artifacts` — expected FAIL on `FAISS/embedder dim mismatch: faiss=384, embedder=128`.
+- Knowledge Cloud repo: `python -m synthesus_knowledge_cloud verify-source-manifest --root .` — verified 139 source files.
+- Knowledge Cloud repo: `python scripts/sync_knowledge_cloud.py --dest /tmp/synthesus-kc-health-smoke --base-url file:///home/workspace/synthesus-knowledge-cloud/artifacts` — file:// smoke sync completed.
+
+### Left Off / Next Steps
+- Rebuild or replace the Knowledge Cloud artifact bundle so `faiss.index` and `models/swarm_embedder.pkl` use the same embedding dimension, then rerun `python scripts/validate_bundle.py --root artifacts` and the runtime health check.
+- After the bundle is corrected, refresh the public mirror with `zopub sync synthesus-knowledge artifacts`.
+
+### Architectural Notes
+- Bundle integrity now covers semantic compatibility, not just byte integrity.
+- The runtime health check treats the Knowledge Cloud as mounted hardware and reports an explicit degraded/blocker state when the mounted artifact plane cannot answer golden queries.

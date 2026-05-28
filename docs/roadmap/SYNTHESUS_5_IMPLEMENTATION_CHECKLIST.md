@@ -17,162 +17,170 @@ Legend:
 
 ## Phase 0: Freeze The Target Contract
 
-- [x] Create Synthesus 5 CHAL blueprint with architecture, diagrams, terminology, and start-to-finish implementation plan.
+- [x]  Create Synthesus 5 CHAL blueprint with architecture, diagrams, terminology, and start-to-finish implementation plan.
 
-- [x] Promote Synthesus 5 as the README-level active target.
+- [x]  Promote Synthesus 5 as the README-level active target.
 
-- [x] Add root `AGENTS.md` so agent bootstrapping starts from Synthesus 5 law.
+- [x]  Add root `file AGENTS.md` so agent bootstrapping starts from Synthesus 5 law.
 
-- [x] Update agent operating contract to make the blueprint non-negotiable.
+- [x]  Update agent operating contract to make the blueprint non-negotiable.
 
-- [x] Update handover protocol so every session reads the blueprint and checklist first.
+- [x]  Update handover protocol so every session reads the blueprint and checklist first.
 
-- [x] Create this implementation checklist as the cross-agent progress ledger.
+- [x]  Create this implementation checklist as the cross-agent progress ledger.
 
-- [x] Ensure all scheduled automations are retargeted from Synthesus 4.1 to Synthesus 5 and restricted to Codex-class or Google/Gemini CLI/CML models.
+- [x]  Ensure all scheduled automations are retargeted from Synthesus 4.1 to Synthesus 5 and restricted to Codex-class or Google/Gemini CLI/CML models.
 
-- [x] Commit and push Phase 0 control-plane files to GitHub.
+- [x]  Commit and push Phase 0 control-plane files to GitHub.
 
 ## Phase 1: CHAL Frame Contract
 
-- [~] Define reusable CHAL task, plan, module message, checkpoint, telemetry, and firmware signal objects.
+- [ ] 
 
-- [ ] Consolidate CHAL frame definitions into a stable package boundary shared by `packages/core`, `packages/reasoning`, and `packages/knowledge`.
+- \[\~\] Define reusable CHAL task, plan, module message, checkpoint, telemetry, and firmware signal objects.
 
-- [ ] Add serialization/deserialization tests for CHAL frames.
+- [ ]  Consolidate CHAL frame definitions into a stable package boundary shared by `packages/core`, `packages/reasoning`, and `packages/knowledge`.
 
-- [ ] Add trace IDs and budget fields to every CHAL frame.
+- [ ]  Add serialization/deserialization tests for CHAL frames.
 
-- [ ] Document CHAL frame schemas in `docs/modules/`.
+- [ ]  Add trace IDs and budget fields to every CHAL frame.
+
+- [ ]  Document CHAL frame schemas in `docs/modules/`.
 
 ## Phase 2: Cognitive Hypervisor MVP
 
-- [x] Implement `CognitiveHypervisor` as the central scheduler/control layer.
+- [x]  Implement `CognitiveHypervisor` as the central scheduler/control layer.
 
-- [x] Add route modes: fast path, grounded path, deep reasoning path, Quad Brain path, safety path.
+- [x]  Add route modes: fast path, grounded path, deep reasoning path, Quad Brain path, safety path.
 
-- [x] Add budget control for latency, retrieval depth, candidate count, and critic passes.
+- [x]  Add budget control for latency, retrieval depth, candidate count, and critic passes.
 
-- [x] Add per-device isolation and timeout handling. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation.
+- [x]  Add per-device isolation and timeout handling. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation.
 
-- [x] Emit trace records for route decisions and budget exhaustion. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation.
+- [x]  Emit trace records for route decisions and budget exhaustion. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation.
 
-- [x] Add focused tests for route selection and timeout degradation. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation.
+- [x]  Add focused tests for route selection and timeout degradation. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation.
 
 ## Phase 3: Quad Brain MVP
 
-- [ ] Implement Brain 1: Knowledge / Grounding as a CHAL device consumer.
+- [ ]  Implement Brain 1: Knowledge / Grounding as a CHAL device consumer.
 
-- [ ] Implement Brain 2: Executive Reasoning as planner/constraint controller.
+- [ ]  Implement Brain 2: Executive Reasoning as planner/constraint controller.
 
-- [ ] Implement Brain 3: CGPU Simulation / Rendering as candidate generator.
+- [ ]  Implement Brain 3: CGPU Simulation / Rendering as candidate generator.
 
-- [ ] Implement Brain 4: Critic / Safety / Metacognition as evaluator/rewrite trigger.
+- [ ]  Implement Brain 4: Critic / Safety / Metacognition as evaluator/rewrite trigger.
 
-- [ ] Add serialized arbiter that merges four brain outputs into a single response frame.
+- [ ]  Add serialized arbiter that merges four brain outputs into a single response frame.
 
-- [ ] Add tests showing four-brain dispatch improves or preserves output quality over legacy dual-hemi path.
+- [ ]  Add tests showing four-brain dispatch improves or preserves output quality over legacy dual-hemi path.
 
 ## Phase 4: CGPU Render Accelerator
 
-- [x] Define `CGPUFrame` input/output contract. Session log: 2026-05-28 Agent 9 CGPU frame contract.
+- [x]  Define `CGPUFrame` input/output contract. Session log: 2026-05-28 Agent 9 CGPU frame contract.
 
-- [x] Generate multiple candidate phrasings from grounded state. Session log: 2026-05-28 Agent 9 CGPU frame contract.
+- [x]  Generate multiple candidate phrasings from grounded state. Session log: 2026-05-28 Agent 9 CGPU frame contract.
 
-- [x] Add persona/NPC behavior rendering mode. Session log: 2026-05-28 Agent 9 CGPU frame contract.
+- [x]  Add persona/NPC behavior rendering mode. Session log: 2026-05-28 Agent 9 CGPU frame contract.
 
-- [x] Add business-bot concise answer rendering mode. Session log: 2026-05-28 Agent 9 CGPU frame contract.
+- [x]  Add business-bot concise answer rendering mode. Session log: 2026-05-28 Agent 9 CGPU frame contract.
 
-- [x] Add critic feedback loop for rewrite. Session log: 2026-05-28 Agent 9 CGPU frame contract.
+- [x]  Add critic feedback loop for rewrite. Session log: 2026-05-28 Agent 9 CGPU frame contract.
 
-- [x] Ensure CGPU candidates never bypass grounding/safety arbitration. Session log: 2026-05-28 Agent 9 CGPU frame contract.
+- [x]  Ensure CGPU candidates never bypass grounding/safety arbitration. Session log: 2026-05-28 Agent 9 CGPU frame contract.
 
-- [x] Mirror `CGPUFrame` and `CGPUOutputFrame` in OpenAPI/API schema docs without claiming `/api/v1/query` emits them yet. Session log: 2026-05-28 Agent 10 API schema alignment.
+- [x]  Mirror `CGPUFrame` and `CGPUOutputFrame` in OpenAPI/API schema docs without claiming `/api/v1/query` emits them yet. Session log: 2026-05-28 Agent 10 API schema alignment.
 
 ## Phase 5: Knowledge Cloud Hardware Mount
 
-- [~] Define CHAL mount and partition interfaces for ROM, parameter disk, grounding corpus, and writeback memory.
-- [~] Upgrade KAL into a CHAL memory controller.
+- [ ] 
 
-- [ ] Add mount table boot sequence.
+- \[\~\] Define CHAL mount and partition interfaces for ROM, parameter disk, grounding corpus, and writeback memory.
+- \[\~\] Upgrade KAL into a CHAL memory controller.
 
-- [ ] Add partition integrity checks against Knowledge Cloud manifests.
+- [ ]  Add mount table boot sequence.
 
-- [ ] Add cache locality and hot-context retrieval.
+- \[\~\] Add partition integrity checks against Knowledge Cloud manifests. Session log: 2026-05-28 Daily Knowledge Hardware Health Check added runtime health checks and standalone bundle semantic validation for FAISS/metadata/embedder alignment; current artifact bundle is blocked by FAISS/embedder dim mismatch.
 
-- [ ] Add provenance traces to final response metadata.
+- [ ]  Add cache locality and hot-context retrieval.
 
-- [ ] Add tests for mounted Knowledge Cloud partitions.
+- [ ]  Add provenance traces to final response metadata.
+
+- [ ]  Add tests for mounted Knowledge Cloud partitions.
 
 ## Phase 6: Legacy Template Path Removal
 
-- [~] Convert PPBRS normal-path output into non-user-facing firmware signals.
+- [ ] 
 
-- [ ] Search and classify every direct fallback/template response path.
+- \[\~\] Convert PPBRS normal-path output into non-user-facing firmware signals.
 
-- [ ] Delete unused legacy response emitters.
+- [ ]  Search and classify every direct fallback/template response path.
 
-- [ ] Quarantine safety/platform/explicit NPC-script templates behind labeled interfaces.
+- [ ]  Delete unused legacy response emitters.
 
-- [ ] Add regression tests that fail on normal-path template leakage.
+- [ ]  Quarantine safety/platform/explicit NPC-script templates behind labeled interfaces.
 
-- [ ] Update module docs with the safety/template exception boundary.
+- [ ]  Add regression tests that fail on normal-path template leakage.
+
+- [ ]  Update module docs with the safety/template exception boundary.
 
 ## Phase 7: Memory And Cache Hierarchy
 
-- [ ] Define L1 turn cache, L2 session cache, L3 project/user cache, and L4 Knowledge Cloud cache.
+- [ ]  Define L1 turn cache, L2 session cache, L3 project/user cache, and L4 Knowledge Cloud cache.
 
-- [ ] Add writeback rules from reasoning traces into episodic/crystallized memory.
+- [ ]  Add writeback rules from reasoning traces into episodic/crystallized memory.
 
-- [ ] Add memory provenance and TTL policy.
+- [ ]  Add memory provenance and TTL policy.
 
-- [ ] Add replayable trace storage for comparison harnesses.
+- [ ]  Add replayable trace storage for comparison harnesses.
 
-- [~] Add save/load tests across CHAL memory partitions. Session log: 2026-05-27 Agent 8 AIVM snapshot integrity added default VMD snapshot/restore parity and tamper rejection; broader CHAL partition save/load remains.
+- \[\~\] Add save/load tests across CHAL memory partitions. Session log: 2026-05-27 Agent 8 AIVM snapshot integrity added default VMD snapshot/restore parity and tamper rejection; broader CHAL partition save/load remains.
 
 ## Phase 8: GPT-4-Class Evaluation Harness
 
-- [~] Add legacy-vs-CHAL conversation comparison harness.
+- [ ] 
 
-- [ ] Add Synthesus 5 vs legacy comparison mode.
+- \[\~\] Add legacy-vs-CHAL conversation comparison harness.
 
-- [ ] Add cross-domain reasoning prompts.
+- [ ]  Add Synthesus 5 vs legacy comparison mode.
 
-- [ ] Add grounded retrieval prompts.
+- [ ]  Add cross-domain reasoning prompts.
 
-- [ ] Add NPC/persona behavior prompts.
+- [ ]  Add grounded retrieval prompts.
 
-- [ ] Add business-bot task prompts.
+- [ ]  Add NPC/persona behavior prompts.
 
-- [ ] Add scoring for usefulness, grounding, naturalness, latency, template leakage, and safety.
+- [ ]  Add business-bot task prompts.
 
-- [ ] Store benchmark summaries in ignored artifacts and commit only harness source/docs.
+- [ ]  Add scoring for usefulness, grounding, naturalness, latency, template leakage, and safety.
+
+- [ ]  Store benchmark summaries in ignored artifacts and commit only harness source/docs.
 
 ## Phase 9: Product Runtime Polish
 
-- [ ] Wire Synthesus 5 path into API entrypoints.
+- [ ]  Wire Synthesus 5 path into API entrypoints.
 
-- [ ] Add frontend control/trace view for CHAL route decisions.
+- [ ]  Add frontend control/trace view for CHAL route decisions.
 
-- [ ] Add NPC runtime toggle for Synthesus 5 path.
+- [ ]  Add NPC runtime toggle for Synthesus 5 path.
 
-- [ ] Add business-bot preset path.
+- [ ]  Add business-bot preset path.
 
-- [ ] Add graceful degraded-state messaging without legacy templates.
+- [ ]  Add graceful degraded-state messaging without legacy templates.
 
 ## Phase 10: Hardening And Release
 
-- [ ] Add full focused test suite for Synthesus 5 path.
+- [ ]  Add full focused test suite for Synthesus 5 path.
 
-- [ ] Add smoke command that runs an end-to-end Synthesus 5 conversation.
+- [ ]  Add smoke command that runs an end-to-end Synthesus 5 conversation.
 
-- [ ] Add performance baseline and regression guard.
+- [ ]  Add performance baseline and regression guard.
 
-- [ ] Validate Knowledge Cloud bundle integrity from cold start.
+- [ ]  Validate Knowledge Cloud bundle integrity from cold start.
 
-- [ ] Publish release notes describing Synthesus 5 behavior and limitations.
+- [ ]  Publish release notes describing Synthesus 5 behavior and limitations.
 
-- [ ] Tag a Synthesus 5 release candidate.
+- [ ]  Tag a Synthesus 5 release candidate.
 
 ## Current Priority Queue
 
