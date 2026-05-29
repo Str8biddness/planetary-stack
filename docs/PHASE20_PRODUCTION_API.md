@@ -1,8 +1,10 @@
-# Phase 20: Production API Server + RAG Embedding Pipeline
+# Production API Server + Synthesus 5 CHAL Query Path
 
 ## Overview
-Production-grade FastAPI server integrating FAISS semantic retrieval (78K+ patterns),
-character routing with cognitive engine fallback, API key auth, and rate limiting.
+Production-grade FastAPI server integrating the legacy-compatible character/RAG
+pipeline with the active Synthesus 5 CHAL runtime. The stable public response
+envelope remains `QueryResponse`; clients opt into the current Cognitive
+Hypervisor path with `mode="chal"` on `/api/v1/query`.
 
 ## Architecture
 
@@ -11,19 +13,24 @@ Client Request
     │
     ▼
 ┌─────────────────────┐
-│  Rate Limiter        │  Demo: 10 RPM │ Auth: 60 RPM
+│  Rate Limiter/Auth   │  Demo: 10 RPM │ Auth: 60 RPM
 └─────────┬───────────┘
           │
           ▼
 ┌─────────────────────┐
+│  mode="chal"?        │  yes → Cognitive Hypervisor
+└──────┬──────────────┘
+       │ no
+       ▼
+┌─────────────────────┐
 │  Cognitive Engine    │  Character-specific patterns + emotion + memory
-│  (confidence > 0.7) │  → 0.27ms - 1.5s latency
+│  (confidence > 0.7)  │
 └─────────┬───────────┘
           │ (miss)
           ▼
 ┌─────────────────────┐
-│  FAISS RAG Pipeline  │  78K+ vectors, SwarmEmbedder (TF-IDF + SVD) embeddings
-│  (score ≥ 0.65)     │  → 30-65ms latency
+│  FAISS RAG Pipeline  │  Knowledge Cloud / local vector retrieval
+│  (score ≥ 0.65)      │
 └─────────┬───────────┘
           │ (miss)
           ▼
@@ -32,11 +39,43 @@ Client Request
 └─────────────────────┘
 ```
 
+### Synthesus 5 CHAL Mode
+
+`POST /api/v1/query` accepts `mode="chal"` and routes explicitly through
+`CognitiveHypervisor`. When `include_debug=true`, responses include:
+
+```json
+{
+  "source": "cognitive_hypervisor",
+  "debug": {
+    "cognitive_hypervisor": {
+      "schema": "synthesus.chal.hypervisor_trace.v1",
+      "route": "fast_path | grounded_path | deep_reasoning_path | quad_brain_path | safety_path",
+      "budget": {
+        "latency_ms": 450.0,
+        "retrieval_depth": 1,
+        "candidate_count": 1,
+        "critic_passes": 0
+      },
+      "device_isolation": {},
+      "template_guard": {},
+      "quad_brain": null
+    }
+  }
+}
+```
+
+The typed trace contract is mirrored as `CognitiveHypervisorTrace` in
+`docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`. CGPU
+device-frame schemas are documented separately as `CGPUFrame` and
+`CGPUOutputFrame`; `/api/v1/query` does not emit CGPU candidate sets as top-level
+payloads.
+
 ## Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/v1/query` | POST | Main query (character-routed + RAG) |
+| `/api/v1/query` | POST | Main query; `mode="chal"` routes through Synthesus 5 Cognitive Hypervisor, `auto` preserves the legacy-compatible pipeline |
 | `/api/v1/chat` | POST | Multi-turn conversation |
 | `/api/v1/characters` | GET | List all characters |
 | `/api/v1/characters/{id}` | GET | Character details |
@@ -46,12 +85,16 @@ Client Request
 
 ## Knowledge Base
 
-### Current: 78,022 patterns from 18 datasets
+### Historical Phase 20 baseline: 78,022 patterns from 18 datasets
 - SQuAD (10K), Alpaca (10K), Dolly (10K), SciQ (5K)
 - CommonsenseQA (5K), HellaSwag (5K), BoolQ (5K), Orca DPO (5K)
 - GSM8K (5K), MedMCQA (5K), ARC (3.3K+3K), OpenBookQA (3K)
 - TruthfulQA (800), MathInstruct (10K)
 - Character patterns (864 across 6 characters)
+
+Current Synthesus 5 knowledge behavior is governed by Knowledge Cloud hardware
+mounts, KAL/CHAL interfaces, and the active implementation checklist rather
+than this old embedded-vector count alone.
 
 ### Scaling Path to 1M+
 1. Run `scripts/enrichment_round2.py` with more datasets (OpenOrca, CodeAlpaca, etc.)
@@ -75,18 +118,16 @@ Client Request
 
 ## Running
 ```bash
-# First time: build the FAISS index
-python3 scripts/embedding_pipeline.py
-
 # Start server
-python3 api/production_server.py
+python3 packages/api/production_server.py
 
 # With auth
-SYNTHESUS_API_KEY=your-key python3 api/production_server.py
+SYNTHESUS_API_KEY=your-key python3 packages/api/production_server.py
 ```
 
-## Files Added
-- `api/production_server.py` — Production FastAPI server (480 lines)
-- `scripts/embedding_pipeline.py` — HuggingFace dataset embedding pipeline
-- `scripts/enrichment_round2.py` — Additional dataset loader
-- `docs/PHASE20_PRODUCTION_API.md` — This file
+## Current Contract Files
+- `packages/api/production_server.py` — Production FastAPI server
+- `packages/api/schemas.py` — Request/response models
+- `docs/openapi.yaml` — OpenAPI mirror
+- `docs/openapi.json` — OpenAPI mirror
+- `docs/api_schema.json` — API schema mirror

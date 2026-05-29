@@ -1,11 +1,12 @@
 openapi: 3.1.0
 info:
   title: Synthesus 5 CHAL API
-  description: Legacy-compatible Synthesus query and control API for the active
-    Synthesus 5 CHAL runtime. The public query path currently exposes explicit
-    Cognitive Hypervisor routing through mode=chal plus generation-spine, cognitive,
-    RAG, kernel, and amplification telemetry. CGPU traces are documented as CHAL
-    contracts until runtime arbitration wires them into this endpoint.
+  description: Legacy-compatible Synthesus query and control API for the active Synthesus
+    5 CHAL runtime. The public query path currently exposes explicit Cognitive Hypervisor
+    routing through mode=chal plus generation-spine, cognitive, RAG, kernel, and amplification
+    telemetry. CognitiveHypervisorTrace documents debug.cognitive_hypervisor for CHAL
+    requests; CGPU traces are documented as CHAL contracts until candidate-set payloads
+    are surfaced by this endpoint.
   version: 5.0.0
 paths:
   /parameter-cloud/v2/fetch-batch:
@@ -1204,8 +1205,8 @@ components:
     CGPUOutputFrame:
       type: object
       title: CGPUOutputFrame
-      description: Candidate-set output from the chal://cgpu/render device. The
-        selected text is still subject to hypervisor or arbiter safety approval.
+      description: Candidate-set output from the chal://cgpu/render device. The selected
+        text is still subject to hypervisor or arbiter safety approval.
       required:
       - frame_id
       - parent_frame_id
@@ -1314,7 +1315,8 @@ components:
           type: string
           title: Source
           description: Runtime source that produced the response, such as zo_kernel,
-            symbolic_core, cognitive, synthesus_master, rag, or fallback.
+            symbolic_core, cognitive_hypervisor, cognitive, synthesus_master, rag,
+            or fallback.
         session_id:
           type: string
           title: Session Id
@@ -1348,9 +1350,10 @@ components:
           title: Debug
           description: Optional implementation telemetry returned only when include_debug
             is true. Current keys include kernel_triggered, symbolic_triggered, trace,
-            rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. CGPU candidate-set
-            trace records should also live here as the runtime wiring expands without
-            changing the stable response envelope.
+            rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. For explicit
+            mode=chal calls, cognitive_hypervisor follows the CognitiveHypervisorTrace
+            OpenAPI component. CGPU candidate-set trace records should also live here
+            as the runtime wiring expands without changing the stable response envelope.
       type: object
       required:
       - response
@@ -1386,3 +1389,86 @@ components:
       - msg
       - type
       title: ValidationError
+    CognitiveHypervisorTrace:
+      properties:
+        schema:
+          type: string
+          const: synthesus.chal.hypervisor_trace.v1
+          description: Trace schema identifier emitted by CognitiveHypervisor.
+        trace_id:
+          type: string
+        route:
+          type: string
+          enum:
+          - fast_path
+          - grounded_path
+          - deep_reasoning_path
+          - quad_brain_path
+          - safety_path
+        hemisphere_mode:
+          type: string
+        latency_ms:
+          type: number
+        budget:
+          type: object
+          properties:
+            latency_ms:
+              type: number
+            retrieval_depth:
+              type: integer
+            candidate_count:
+              type: integer
+            critic_passes:
+              type: integer
+          required:
+          - latency_ms
+          - retrieval_depth
+          - candidate_count
+          - critic_passes
+          additionalProperties: true
+        reasons:
+          type: array
+          items:
+            type: string
+        constraints:
+          type: array
+          items:
+            type: string
+        bridge_latency_ms:
+          type: number
+        device_isolation:
+          type: object
+          additionalProperties: true
+          description: AIVM execution guard result for the CHAL device dispatch.
+        budget_exhausted:
+          type: boolean
+        degraded:
+          type: boolean
+        template_guard:
+          type: object
+          additionalProperties: true
+          description: Template leakage guard decision and matched signatures.
+        quad_brain:
+          anyOf:
+          - type: object
+            additionalProperties: true
+          - type: 'null'
+          description: Serialized Quad Brain arbitration trace when route is quad_brain_path;
+            null otherwise.
+      type: object
+      required:
+      - schema
+      - trace_id
+      - route
+      - hemisphere_mode
+      - latency_ms
+      - budget
+      - reasons
+      - constraints
+      - device_isolation
+      - budget_exhausted
+      - degraded
+      - template_guard
+      title: CognitiveHypervisorTrace
+      description: Debug trace emitted under QueryResponse.debug.cognitive_hypervisor
+        for explicit mode=chal requests.

@@ -160,6 +160,8 @@ Legend:
 
 - \[\~\] Wire Synthesus 5 path into API entrypoints. Session log: 2026-05-28 Agent 1 API CHAL mode added explicit `/api/v1/query` `mode="chal"` routing through `CognitiveHypervisor`; default `auto` cutover remains.
 
+- [x]  Document the current `/api/v1/query` `mode="chal"` debug contract as `CognitiveHypervisorTrace` in OpenAPI/schema mirrors. Session log: 2026-05-29 Agent 10 hypervisor trace schema.
+
 - [ ]  Add frontend control/trace view for CHAL route decisions.
 
 - [ ]  Add NPC runtime toggle for Synthesus 5 path.

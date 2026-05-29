@@ -136,7 +136,8 @@ class QueryResponse(BaseModel):
         ...,
         description=(
             "Runtime source that produced the response, such as zo_kernel, "
-            "symbolic_core, cognitive, synthesus_master, rag, or fallback."
+            "symbolic_core, cognitive_hypervisor, cognitive, synthesus_master, "
+            "rag, or fallback."
         ),
     )
     session_id: str
@@ -150,8 +151,10 @@ class QueryResponse(BaseModel):
             "Optional implementation telemetry returned only when include_debug "
             "is true. Current keys include kernel_triggered, symbolic_triggered, "
             "trace, rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. "
-            "CGPU candidate-set trace records should also live here as the runtime "
-            "wiring expands without changing the stable response envelope."
+            "For explicit mode=chal calls, cognitive_hypervisor follows the "
+            "CognitiveHypervisorTrace OpenAPI component. CGPU candidate-set trace "
+            "records should also live here as the runtime wiring expands without "
+            "changing the stable response envelope."
         ),
     )
 

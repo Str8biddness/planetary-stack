@@ -1418,3 +1418,24 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Quad Brain is now a CHAL-local serialized topology, not a free-running multi-agent swarm.
 - The current state contract is `knowledge -> executive -> cgpu -> critic`; CGPU renders from grounded/executive state and Critic/Metacognition remains the final selectable surface boundary.
+
+## Current Session — 2026-05-29 (Agent 10 — Hypervisor Trace Schema)
+
+### 📝 Summary
+- Added a reusable `CognitiveHypervisorTrace` schema to `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json` for `QueryResponse.debug.cognitive_hypervisor` on explicit `/api/v1/query` `mode="chal"` calls.
+- Updated `packages/api/schemas.py` so `QueryResponse.source` names `cognitive_hypervisor` and the debug description maps the current runtime trace to the OpenAPI component.
+- Refreshed `docs/PHASE20_PRODUCTION_API.md` from stale Phase 20/RAG-only positioning to the current Synthesus 5 CHAL opt-in API contract while preserving the historical vector baseline as history.
+- Updated `docs/modules/CGPU.md` and the Phase 9 checklist to keep CGPU and API trace terminology aligned.
+
+### ✅ Verified
+- `python -m py_compile packages/api/schemas.py packages/api/production_server.py`
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed `CognitiveHypervisorTrace`, `CGPUFrame`, and `CGPUOutputFrame` are present and that `QueryResponse.debug` references the typed hypervisor trace contract.
+- `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/api python -m pytest -q tests/e2e/test_chat_e2e.py::TestChatE2E::test_chal_mode_routes_through_cognitive_hypervisor tests/test_chal_hypervisor.py` — 11 passed, 8 warnings.
+
+### 🚧 Left Off / Next Steps
+- Add the frontend/API trace display for `debug.cognitive_hypervisor` without changing the stable `QueryResponse` envelope.
+- When CGPU candidate-set telemetry is surfaced through `/api/v1/query`, add a typed debug component for that observed payload rather than exposing CGPU frames as top-level query responses.
+
+### 💡 Architectural Notes
+- The public API contract now distinguishes the stable query response envelope from typed CHAL debug traces.
+- Historical Phase 20 embedded-vector claims are explicitly labeled as historical baseline so they no longer compete with the Synthesus 5 Knowledge Cloud hardware model.
