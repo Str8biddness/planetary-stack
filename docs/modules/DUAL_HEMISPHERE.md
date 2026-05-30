@@ -176,3 +176,7 @@ The current topology stays bounded to four logical brain outputs:
 | Critic / Safety / Metacognition | `chal://critic/metacognition` | Applies template leakage arbitration and selects the response surface. |
 
 The arbiter intentionally runs these brain outputs in a fixed serial order after the guarded bridge pass. It records `state_contract.serialized_arbitration=true` and `state_contract.parallel_brain_spawn=false` in `telemetry.quad_brain` so future API/frontend trace views can distinguish bounded Quad Brain orchestration from uncontrolled multi-agent fan-out.
+
+### Quad Brain Quality Regression Update (2026-05-30)
+
+`tests/test_chal_hypervisor.py` now compares the raw legacy dual-hemi bridge surface against the full Quad Brain hypervisor path for an NPC/persona dialogue fixture. The regression verifies that Quad Brain preserves the grounded fact, adds persona-appropriate CGPU rendering, keeps serialized arbitration/no-sprawl state contracts in trace metadata, and avoids normal-path template leakage. This closes the Phase 3 checklist item requiring evidence that four-brain dispatch improves or preserves output quality over the legacy dual-hemi surface.

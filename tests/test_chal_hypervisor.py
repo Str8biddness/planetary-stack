@@ -61,6 +61,31 @@ class BlockingBridge:
         return {"response": "too late", "latency_ms": 600.0}
 
 
+class PersonaBridge:
+    async def route_query(self, query, hemisphere="auto", character_context=None, rag_context="", max_tokens=512):
+        return {
+            "response": "The gate is sealed until dawn.",
+            "hemisphere_used": hemisphere,
+            "latency_ms": 1.0,
+            "arbitration": {"agreement_score": 0.7, "winner": "right"},
+        }
+
+
+def _quad_brain_quality_score(text, trace):
+    score = 0
+    if "The gate is sealed until dawn." in text:
+        score += 1
+    if text.startswith("Archivist"):
+        score += 1
+    if trace and trace["state_contract"]["serialized_arbitration"] is True:
+        score += 1
+    if trace and trace["state_contract"]["parallel_brain_spawn"] is False:
+        score += 1
+    if "[module]" not in text and "response_template" not in text:
+        score += 1
+    return score
+
+
 def test_hypervisor_plans_grounded_path_for_knowledge_cloud_workload():
     hypervisor = CognitiveHypervisor()
     decision = hypervisor.plan("Check the Knowledge Cloud manifest integrity")
@@ -114,6 +139,38 @@ def test_hypervisor_quad_brain_path_serializes_four_brain_arbitration():
     assert quad_trace["selected_source"] == "critic_metacognition"
     assert "routed through both" in result.response
     assert result.bridge_result["quad_brain_arbitration"]["trace_id"] == result.decision.trace_id
+
+
+def test_quad_brain_dispatch_preserves_grounding_and_improves_persona_surface_over_dual_hemi():
+    bridge = PersonaBridge()
+    legacy_dual_hemi = asyncio.run(
+        bridge.route_query(
+            "Render Archivist dialogue about the sealed gate",
+            hemisphere="both",
+            character_context={"character_id": "Archivist", "stance": "cautious"},
+        )
+    )
+    hypervisor = CognitiveHypervisor(bridge_factory=lambda: bridge)
+
+    result = asyncio.run(
+        hypervisor.process_query(
+            "Render Archivist dialogue about the sealed gate",
+            character_context={"character_id": "Archivist", "stance": "cautious"},
+        )
+    )
+
+    quad_trace = result.telemetry["quad_brain"]
+    legacy_score = _quad_brain_quality_score(legacy_dual_hemi["response"], None)
+    quad_score = _quad_brain_quality_score(result.response, quad_trace)
+
+    assert result.decision.route == HypervisorRoute.QUAD_BRAIN_PATH
+    assert legacy_dual_hemi["hemisphere_used"] == "both"
+    assert "The gate is sealed until dawn." in result.response
+    assert result.response.startswith("Archivist")
+    assert quad_score > legacy_score
+    assert quad_trace["outputs"][0]["content"]["facts"] == ["The gate is sealed until dawn."]
+    assert quad_trace["outputs"][2]["content"]["selected_text"] == result.response
+    assert result.telemetry["template_guard"]["allowed"] is True
 
 
 def test_hypervisor_dispatches_with_trace_and_budget_metadata():

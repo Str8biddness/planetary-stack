@@ -1481,3 +1481,23 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The current KAL controller already behaves as an L1 hot-context cache in front of mounted Knowledge Cloud ROM lookups, keyed by normalized query text and trust budget.
 - Repeat lookups now preserve source telemetry while avoiding unnecessary KnowledgeCloud backend calls, so the Knowledge Cloud hardware path has observable cache-locality semantics without committing runtime artifacts.
+
+## Current Session — 2026-05-30 (Agent 7 — Quad Brain Quality Regression)
+
+### 📝 Summary
+- Added a Phase 3 regression showing the full Quad Brain hypervisor path improves the raw legacy dual-hemi bridge surface for an NPC/persona dialogue fixture.
+- The test verifies grounded fact preservation, persona CGPU rendering, serialized arbitration trace metadata, no parallel brain spawning, and normal-path template-guard acceptance.
+- Marked the Phase 3 quality-preservation checklist item complete and documented the regression in `docs/modules/DUAL_HEMISPHERE.md`.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/quad_brain.py packages/core/chal/hypervisor.py tests/test_chal_hypervisor.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_hypervisor.py` — 11 passed.
+
+### 🚧 Left Off / Next Steps
+- Move Knowledge/Grounding from bridge-result fallback facts toward mounted Knowledge Cloud hot-context/provenance retrieval.
+- Surface `telemetry.quad_brain` in the API/frontend trace view after the debug envelope is ready for client display.
+- Continue Phase 6 classification of older direct template emitters outside the Synthesus 5 hypervisor path.
+
+### 💡 Architectural Notes
+- Quad Brain quality is now covered by a deterministic regression instead of only topology/trace assertions.
+- The state contract remains serialized: `knowledge -> executive -> cgpu -> critic`, with no uncontrolled multi-agent fan-out.

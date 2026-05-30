@@ -73,7 +73,7 @@ Legend:
 
 - [x]  Add serialized arbiter that merges four brain outputs into a single response frame. Session log: 2026-05-28 Agent 7 Quad Brain arbiter.
 
-- [ ]  Add tests showing four-brain dispatch improves or preserves output quality over legacy dual-hemi path.
+- [x]  Add tests showing four-brain dispatch improves or preserves output quality over legacy dual-hemi path. Session log: 2026-05-30 Agent 7 Quad Brain quality-preservation regression.
 
 ## Phase 4: CGPU Render Accelerator
 
