@@ -1462,3 +1462,22 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - PPBRS firmware signals are now replayable typed envelopes rather than loose JSON dictionaries.
 - Trace-ID consistency is enforced at the firmware boundary, which supports later replay/debug tooling without letting stale nested frame fragments masquerade as a coherent CHAL handoff.
+
+## Current Session — 2026-05-30 (Knowledge Hardware Hot-Context Validation)
+
+### 📝 Summary
+- Validated the committed Phase 5 Knowledge Cloud hot-context cache and cache-locality behavior from `AUTO: knowledge: add CHAL hot-context cache`.
+- Marked the Phase 5 checklist item `Add cache locality and hot-context retrieval` complete because the controller, docs, and tests are present and the targeted validation passes.
+- Left pre-existing unrelated working-tree changes in `README.md`, `AGENTS.md`, and `synthesus_framework/` untouched and uncommitted.
+
+### ✅ Verified
+- `python -m py_compile packages/knowledge/mount_table.py packages/knowledge/kal_adapter.py tests/test_knowledge_mount_table.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_knowledge_mount_table.py tests/test_kal.py` — 35 passed, 3 warnings.
+
+### 🚧 Left Off / Next Steps
+- Add provenance traces from active Knowledge Cloud mount metadata into final response/debug metadata.
+- Keep the standalone artifact FAISS/embedder dimension mismatch as a separate Knowledge Cloud bundle blocker until the artifact bundle is rebuilt.
+
+### 💡 Architectural Notes
+- The current KAL controller already behaves as an L1 hot-context cache in front of mounted Knowledge Cloud ROM lookups, keyed by normalized query text and trust budget.
+- Repeat lookups now preserve source telemetry while avoiding unnecessary KnowledgeCloud backend calls, so the Knowledge Cloud hardware path has observable cache-locality semantics without committing runtime artifacts.

@@ -102,7 +102,7 @@ Legend:
 
 - [x]  Add partition integrity checks against Knowledge Cloud manifests. Session log: 2026-05-28 Knowledge Cloud mount table added runtime manifest SHA-256/size verification; 2026-05-28 Daily Knowledge Hardware Health Check tracked a current standalone artifact FAISS/embedder dim mismatch separately.
 
-- [ ]  Add cache locality and hot-context retrieval.
+- [x]  Add cache locality and hot-context retrieval. Session log: 2026-05-30 Knowledge Hardware Hot-Context Validation.
 
 - [ ]  Add provenance traces to final response metadata.
 
