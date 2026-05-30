@@ -1439,3 +1439,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The public API contract now distinguishes the stable query response envelope from typed CHAL debug traces.
 - Historical Phase 20 embedded-vector claims are explicitly labeled as historical baseline so they no longer compete with the Synthesus 5 Knowledge Cloud hardware model.
+
+## Current Session — 2026-05-30 (Agent 6 — PPBRS CHAL Serialization)
+
+### 📝 Summary
+- Added explicit `from_dict()` deserialization for PPBRS CHAL frame records: `CognitiveTask`, `ExecutionPlan`, `ModuleMessage`, `Checkpoint`, and `TelemetryRecord`.
+- Added `PPBRSFirmwareSignal` as the parsed `synthesus.chal.reasoning_firmware.v1` envelope, including schema validation and nested trace-ID consistency checks.
+- Added JSON round-trip tests so CHAL frame serialization/deserialization fails on drift instead of treating firmware payloads as unvalidated dictionaries.
+- Updated `docs/modules/PPBRS.md`, `tools/ppbrs_dev_log.md`, and the Phase 1 checklist for the validated frame-serialization work.
+
+### ✅ Verified
+- `python -m py_compile packages/reasoning/chal.py packages/reasoning/__init__.py tests/test_chal_reasoning_firmware.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_reasoning_firmware.py` — 9 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py tests/test_chal_reasoning_firmware.py` — 121 passed.
+- `python tools/ppbrs_benchmark.py` — pattern p50 206.9138ms, rule p50 0.0145ms, graph p50 0.0157ms.
+
+### 🚧 Left Off / Next Steps
+- Consolidate the duplicate CHAL dataclass surfaces between `packages/reasoning/chal.py` and `packages/core/chal/interfaces.py` into one stable package boundary shared by core, reasoning, and knowledge.
+- Add budget fields to checkpoint/message telemetry where the broader CHAL contract requires them, then mark the remaining Phase 1 trace/budget checklist item.
+- Continue the Phase 6 audit of older direct template emitters outside the hypervisor path.
+
+### 💡 Architectural Notes
+- PPBRS firmware signals are now replayable typed envelopes rather than loose JSON dictionaries.
+- Trace-ID consistency is enforced at the firmware boundary, which supports later replay/debug tooling without letting stale nested frame fragments masquerade as a coherent CHAL handoff.

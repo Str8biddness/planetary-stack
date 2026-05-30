@@ -33,8 +33,11 @@ The concrete interface lives in `packages/reasoning/chal.py`:
 | `ModuleMessage` | CHAL fabric payload from PPBRS to the generation spine |
 | `Checkpoint` | Replayable reasoning state for route/confidence decisions |
 | `TelemetryRecord` | Latency, confidence, fallback, and template-leakage metadata |
+| `PPBRSFirmwareSignal` | Parsed `synthesus.chal.reasoning_firmware.v1` envelope tying the task, plan, message, checkpoint, telemetry, confidence, constraints, and trace ID together |
 
 `build_ppbrs_firmware_signal()` creates the JSON-shaped `synthesus.chal.reasoning_firmware.v1` payload. The fallback PPBRS bridge now returns `KernelResult.response == ""` for normal routing and stores the firmware payload in `KernelResult.metadata["chal_firmware_signal"]` with `user_facing=False`.
+
+Each CHAL reasoning record now supports explicit `to_dict()` / `from_dict()` round trips, and `PPBRSFirmwareSignal.from_dict()` validates schema identity plus trace-ID consistency across all nested records. This keeps firmware signals replayable and prevents a drifted task, plan, message, checkpoint, or telemetry record from being accepted as a coherent PPBRS handoff.
 
 Allowed fixed-response exceptions remain safety, abuse prevention, identity/rights protection, and explicit AIVM platform restrictions. Normal pattern matches, retrieval matches, and low-confidence fallbacks must be surfaced through the generation spine or a future VGD-backed realization path.
 

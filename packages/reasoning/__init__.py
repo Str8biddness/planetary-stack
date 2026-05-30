@@ -49,6 +49,7 @@ from .chal import (
     CognitiveTask,
     ExecutionPlan,
     ModuleMessage,
+    PPBRSFirmwareSignal,
     TelemetryRecord,
     build_ppbrs_firmware_signal,
 )
@@ -92,6 +93,7 @@ __all__ = [
     'CognitiveTask',
     'ExecutionPlan',
     'ModuleMessage',
+    'PPBRSFirmwareSignal',
     'Checkpoint',
     'TelemetryRecord',
     'build_ppbrs_firmware_signal',

@@ -9,12 +9,27 @@ from __future__ import annotations
 
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from typing import Any
 
 
 def _trace_id(prefix: str) -> str:
     return f"{prefix}-{uuid.uuid4().hex[:12]}"
+
+
+def _require_mapping(data: dict[str, Any], record_name: str) -> dict[str, Any]:
+    if not isinstance(data, dict):
+        raise TypeError(f"{record_name} payload must be a mapping")
+    return data
+
+
+def _coerce_dataclass(cls: type, data: dict[str, Any]) -> Any:
+    payload = _require_mapping(data, cls.__name__)
+    allowed = {item.name for item in fields(cls)}
+    unknown = sorted(set(payload) - allowed)
+    if unknown:
+        raise ValueError(f"{cls.__name__} payload has unknown fields: {', '.join(unknown)}")
+    return cls(**{name: payload[name] for name in allowed if name in payload})
 
 
 @dataclass(frozen=True)
@@ -57,6 +72,10 @@ class CognitiveTask:
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "CognitiveTask":
+        return _coerce_dataclass(cls, data)
+
 
 @dataclass(frozen=True)
 class ExecutionPlan:
@@ -72,6 +91,10 @@ class ExecutionPlan:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ExecutionPlan":
+        return _coerce_dataclass(cls, data)
 
 
 @dataclass(frozen=True)
@@ -91,6 +114,10 @@ class ModuleMessage:
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ModuleMessage":
+        return _coerce_dataclass(cls, data)
+
 
 @dataclass(frozen=True)
 class Checkpoint:
@@ -104,6 +131,10 @@ class Checkpoint:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Checkpoint":
+        return _coerce_dataclass(cls, data)
 
 
 @dataclass(frozen=True)
@@ -122,6 +153,69 @@ class TelemetryRecord:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "TelemetryRecord":
+        return _coerce_dataclass(cls, data)
+
+
+@dataclass(frozen=True)
+class PPBRSFirmwareSignal:
+    """Parsed CHAL firmware signal emitted by PPBRS."""
+
+    task: CognitiveTask
+    execution_plan: ExecutionPlan
+    module_message: ModuleMessage
+    checkpoint: Checkpoint
+    telemetry: TelemetryRecord
+    confidence: float
+    constraints: list[str]
+    trace_id: str
+    schema: str = "synthesus.chal.reasoning_firmware.v1"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema": self.schema,
+            "task": self.task.to_dict(),
+            "execution_plan": self.execution_plan.to_dict(),
+            "module_message": self.module_message.to_dict(),
+            "checkpoint": self.checkpoint.to_dict(),
+            "telemetry": self.telemetry.to_dict(),
+            "confidence": self.confidence,
+            "constraints": list(self.constraints),
+            "trace_id": self.trace_id,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "PPBRSFirmwareSignal":
+        payload = _require_mapping(data, cls.__name__)
+        schema = payload.get("schema")
+        if schema != "synthesus.chal.reasoning_firmware.v1":
+            raise ValueError(f"unsupported PPBRS firmware schema: {schema!r}")
+
+        task = CognitiveTask.from_dict(payload["task"])
+        trace_id = str(payload["trace_id"])
+        nested_trace_ids = {
+            task.trace_id,
+            str(payload["execution_plan"].get("trace_id")),
+            str(payload["module_message"].get("trace_id")),
+            str(payload["checkpoint"].get("trace_id")),
+            str(payload["telemetry"].get("trace_id")),
+        }
+        if nested_trace_ids != {trace_id}:
+            raise ValueError("PPBRS firmware signal trace IDs must match")
+
+        return cls(
+            schema=schema,
+            task=task,
+            execution_plan=ExecutionPlan.from_dict(payload["execution_plan"]),
+            module_message=ModuleMessage.from_dict(payload["module_message"]),
+            checkpoint=Checkpoint.from_dict(payload["checkpoint"]),
+            telemetry=TelemetryRecord.from_dict(payload["telemetry"]),
+            confidence=max(0.0, min(1.0, float(payload["confidence"]))),
+            constraints=list(payload.get("constraints", [])),
+            trace_id=trace_id,
+        )
 
 
 def build_ppbrs_firmware_signal(
@@ -197,14 +291,13 @@ def build_ppbrs_firmware_signal(
         metadata={"module_used": module_used, "matched_pattern": matched_pattern},
     )
 
-    return {
-        "schema": "synthesus.chal.reasoning_firmware.v1",
-        "task": task.to_dict(),
-        "execution_plan": plan.to_dict(),
-        "module_message": message.to_dict(),
-        "checkpoint": checkpoint.to_dict(),
-        "telemetry": telemetry.to_dict(),
-        "confidence": max(0.0, min(1.0, confidence)),
-        "constraints": list(constraints),
-        "trace_id": task.trace_id,
-    }
+    return PPBRSFirmwareSignal(
+        task=task,
+        execution_plan=plan,
+        module_message=message,
+        checkpoint=checkpoint,
+        telemetry=telemetry,
+        confidence=max(0.0, min(1.0, confidence)),
+        constraints=list(constraints),
+        trace_id=task.trace_id,
+    ).to_dict()

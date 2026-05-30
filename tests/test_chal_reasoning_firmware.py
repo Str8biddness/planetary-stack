@@ -1,10 +1,107 @@
 import asyncio
+import copy
+import json
 
 from core.hemisphere_bridge import HemisphereBridge
 from core.generation.spine import GenerationSpine, SpineInput
 from kernel.bridge import FallbackPPBRS
-from reasoning.chal import build_ppbrs_firmware_signal
+from reasoning.chal import (
+    Checkpoint,
+    CognitiveTask,
+    ExecutionPlan,
+    ModuleMessage,
+    PPBRSFirmwareSignal,
+    TelemetryRecord,
+    build_ppbrs_firmware_signal,
+)
 from tools.chal_conversation_compare import CASES, assert_chal_surfaces_are_clean, build_chal_rows, summarize
+
+
+def test_chal_frame_records_roundtrip_through_json():
+    task = CognitiveTask.from_query(
+        "How should PPBRS expose firmware state?",
+        character_id="synth",
+        domain="reasoning",
+        budgets={"latency_ms": 25.0},
+        constraints=["do_not_emit_ppbrs_template"],
+        trace_id="trace-roundtrip",
+    )
+    plan = ExecutionPlan(
+        plan_id="plan-roundtrip",
+        task_id=task.task_id,
+        stages=["classify", "handoff_to_generation"],
+        route="ppbrs",
+        budgets=task.budgets,
+        constraints=task.constraints,
+        trace_id=task.trace_id,
+    )
+    message = ModuleMessage(
+        message_id="msg-roundtrip",
+        trace_id=task.trace_id,
+        source="ppbrs",
+        target="generation_spine",
+        kind="left_hemisphere_firmware_signal",
+        payload={"template_context": "internal only"},
+        confidence=0.81,
+        constraints=task.constraints,
+    )
+    checkpoint = Checkpoint(
+        checkpoint_id="ckpt-roundtrip",
+        trace_id=task.trace_id,
+        stage="ppbrs_route",
+        state={"route": plan.route},
+    )
+    telemetry = TelemetryRecord(
+        trace_id=task.trace_id,
+        component="ppbrs",
+        latency_ms=1.5,
+        confidence=0.81,
+        metadata={"route": plan.route},
+    )
+
+    encoded = json.dumps(
+        {
+            "task": task.to_dict(),
+            "plan": plan.to_dict(),
+            "message": message.to_dict(),
+            "checkpoint": checkpoint.to_dict(),
+            "telemetry": telemetry.to_dict(),
+        },
+        sort_keys=True,
+    )
+    decoded = json.loads(encoded)
+
+    assert CognitiveTask.from_dict(decoded["task"]) == task
+    assert ExecutionPlan.from_dict(decoded["plan"]) == plan
+    assert ModuleMessage.from_dict(decoded["message"]) == message
+    assert Checkpoint.from_dict(decoded["checkpoint"]) == checkpoint
+    assert TelemetryRecord.from_dict(decoded["telemetry"]) == telemetry
+
+
+def test_ppbrs_firmware_signal_roundtrip_validates_trace_ids():
+    signal = build_ppbrs_firmware_signal(
+        query="Route this through PPBRS",
+        module_used="reasoning",
+        confidence=1.7,
+        matched_pattern="route ppbrs",
+    )
+
+    parsed = PPBRSFirmwareSignal.from_dict(json.loads(json.dumps(signal)))
+
+    assert parsed.confidence == 1.0
+    assert parsed.to_dict() == signal
+    assert parsed.trace_id == parsed.task.trace_id
+    assert parsed.module_message.target == "generation_spine"
+
+    drifted = copy.deepcopy(signal)
+    drifted["module_message"]["trace_id"] = "trace-drifted"
+
+    try:
+        PPBRSFirmwareSignal.from_dict(drifted)
+    except ValueError as exc:
+        assert "trace IDs must match" in str(exc)
+    else:
+        raise AssertionError("trace-id drift must fail CHAL firmware deserialization")
 
 
 def test_ppbrs_fallback_emits_chal_firmware_not_surface_text():

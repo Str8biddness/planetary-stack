@@ -389,3 +389,29 @@ Rule evaluation and graph traversal improved materially; pattern matching was no
 - `python -m py_compile packages/reasoning/reasoning_chain.py packages/reasoning/rule_to_action.py packages/reasoning/multi_step_reasoning.py`
 - `python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py tests/test_chal_reasoning_firmware.py` — 117 passed.
 - `python tools/ppbrs_benchmark.py`
+
+## Daily Entry: 2026-05-30 (21:09 UTC)
+
+### Actions Performed
+
+1. Added explicit CHAL reasoning frame deserialization for `CognitiveTask`, `ExecutionPlan`, `ModuleMessage`, `Checkpoint`, and `TelemetryRecord`.
+2. Added `PPBRSFirmwareSignal` as the parsed firmware envelope for `synthesus.chal.reasoning_firmware.v1`.
+3. Added JSON round-trip regression coverage for frame records and trace-ID drift rejection for nested firmware-signal payloads.
+4. Updated the PPBRS module docs and Synthesus 5 checklist for Phase 1 frame serialization coverage.
+
+### Benchmark Run
+
+PPBRS micro-benchmark after the serialization patch:
+
+| Component | p50 (ms) | p95 (ms) | Avg (ms) |
+|---|---:|---:|---:|
+| pattern_matching | 206.9138 | 223.3647 | 209.6803 |
+| rule_evaluation | 0.0145 | 0.0180 | 0.0155 |
+| graph_traversal | 0.0157 | 0.0195 | 0.0165 |
+
+### Verified
+
+- `python -m py_compile packages/reasoning/chal.py packages/reasoning/__init__.py tests/test_chal_reasoning_firmware.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_reasoning_firmware.py` — 9 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py tests/test_chal_reasoning_firmware.py` — 121 passed.
+- `python tools/ppbrs_benchmark.py`
