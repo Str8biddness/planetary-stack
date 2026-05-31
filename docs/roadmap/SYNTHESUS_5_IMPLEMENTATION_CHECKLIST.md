@@ -106,7 +106,7 @@ Legend:
 
 - [x]  Add cache locality and hot-context retrieval. Session log: 2026-05-30 Knowledge Hardware Hot-Context Validation.
 
-- [ ]  Add provenance traces to final response metadata.
+- [x]  Add provenance traces to final response metadata. Session log: 2026-05-31 Knowledge Hardware Provenance Trace.
 
 - [x]  Add tests for mounted Knowledge Cloud partitions. Session log: 2026-05-28 Knowledge Cloud mount table.
 

@@ -71,6 +71,39 @@ class PersonaBridge:
         }
 
 
+class FakeKnowledgeController:
+    def query(self, text):
+        from core.chal.interfaces import TelemetryRecord
+
+        return (
+            f"mounted fact for {text}",
+            TelemetryRecord(
+                operation_id="kc_lookup",
+                latency_ms=2.5,
+                cache_hit=False,
+                confidence=0.91,
+                source="rom_mount:kc_knowledge_cloud_world_lore_json",
+                metadata={
+                    "hot_context": False,
+                    "mounts": [
+                        {
+                            "mount_path": "/mnt/rom/world_lore",
+                            "mount_type": "ROM",
+                            "partition_id": "kc_knowledge_cloud_world_lore_json",
+                            "namespace": "game_lore",
+                            "artifact": {
+                                "relative_path": "knowledge_cloud/world_lore.json",
+                                "actual_sha256": "abc123",
+                                "actual_size": 128,
+                                "integrity_ok": True,
+                            },
+                        }
+                    ],
+                },
+            ),
+        )
+
+
 def _quad_brain_quality_score(text, trace):
     score = 0
     if "The gate is sealed until dawn." in text:
@@ -193,6 +226,27 @@ def test_hypervisor_dispatches_with_trace_and_budget_metadata():
     assert result.bridge_result["hypervisor_trace"]["trace_id"] == result.decision.trace_id
     assert result.telemetry["device_isolation"]["status"] == "ok"
     assert result.telemetry["budget_exhausted"] is False
+
+
+def test_grounded_hypervisor_trace_includes_knowledge_mount_provenance():
+    bridge = StubBridge()
+    hypervisor = CognitiveHypervisor(
+        bridge_factory=lambda: bridge,
+        knowledge_controller=FakeKnowledgeController(),
+    )
+
+    result = asyncio.run(hypervisor.process_query("Check the Knowledge Cloud manifest"))
+
+    provenance = result.telemetry["knowledge_provenance"]
+    assert result.decision.route == HypervisorRoute.GROUNDED_PATH
+    assert bridge.calls[0]["rag_context"] == "mounted fact for Check the Knowledge Cloud manifest"
+    assert provenance["schema"] == "synthesus.chal.knowledge_provenance.v1"
+    assert provenance["trace_id"] == result.decision.trace_id
+    assert provenance["operation_id"] == "kc_lookup"
+    assert provenance["mounted_context_used"] is True
+    assert provenance["source"] == "rom_mount:kc_knowledge_cloud_world_lore_json"
+    assert provenance["mounts"][0]["mount_path"] == "/mnt/rom/world_lore"
+    assert provenance["mounts"][0]["artifact"]["integrity_ok"] is True
 
 
 def test_hypervisor_routes_safety_constraints_to_safety_path():

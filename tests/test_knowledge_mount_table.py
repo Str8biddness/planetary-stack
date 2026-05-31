@@ -134,6 +134,8 @@ def test_kal_hot_context_serves_repeated_mounted_queries(tmp_path: Path):
     assert first_telemetry.cache_hit is False
     assert first_telemetry.metadata["hot_context"] is False
     assert first_telemetry.metadata["mounts"][0]["mount_path"] == "/mnt/rom/world_lore"
+    assert first_telemetry.metadata["mounts"][0]["artifact"]["relative_path"] == "knowledge_cloud/world_lore.json"
+    assert first_telemetry.metadata["mounts"][0]["artifact"]["integrity_ok"] is True
     assert second_telemetry.operation_id == "hot_context_hit"
     assert second_telemetry.cache_hit is True
     assert second_telemetry.metadata["hot_context"] is True

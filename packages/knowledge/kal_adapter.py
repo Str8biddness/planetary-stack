@@ -336,8 +336,21 @@ class CHALMemoryController:
 
     @staticmethod
     def _active_mount_metadata(mounts: List[Mount]) -> List[Dict[str, Any]]:
-        return [
-            {
+        active_mounts = []
+        for mount in mounts:
+            if not mount.is_active:
+                continue
+            artifact = {
+                key: mount.partition.metadata.get(key)
+                for key in (
+                    "relative_path",
+                    "actual_size",
+                    "actual_sha256",
+                    "integrity_ok",
+                )
+                if key in mount.partition.metadata
+            }
+            metadata = {
                 "mount_path": mount.mount_path,
                 "mount_type": mount.mount_type.value,
                 "partition_id": mount.partition.partition_id,
@@ -346,9 +359,10 @@ class CHALMemoryController:
                 "trust_level": mount.trust_level,
                 "latency_profile": mount.latency_profile,
             }
-            for mount in mounts
-            if mount.is_active
-        ]
+            if artifact:
+                metadata["artifact"] = artifact
+            active_mounts.append(metadata)
+        return active_mounts
 
     def _telemetry(
         self, op_id: str, start_time: float, hit: bool, conf: float, source: str, meta: Optional[Dict[str, Any]] = None

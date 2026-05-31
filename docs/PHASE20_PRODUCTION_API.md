@@ -59,6 +59,14 @@ Client Request
       },
       "device_isolation": {},
       "template_guard": {},
+      "knowledge_provenance": {
+        "schema": "synthesus.chal.knowledge_provenance.v1",
+        "source": "rom_mount:kc_knowledge_cloud_world_lore_json",
+        "context_used": true,
+        "mounted_context_used": true,
+        "cache_hit": false,
+        "mounts": []
+      },
       "quad_brain": null
     }
   }
@@ -67,6 +75,9 @@ Client Request
 
 The typed trace contract is mirrored as `CognitiveHypervisorTrace` in
 `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`.
+`CognitiveHypervisorTrace.knowledge_provenance` records mounted Knowledge Cloud
+provenance for grounded CHAL routes, including KAL operation, source mount,
+cache state, and artifact integrity metadata when available.
 `CognitiveHypervisorTrace.quad_brain` references `QuadBrainArbitration` when the
 route is `quad_brain_path`, matching the runtime `telemetry.quad_brain` payload.
 CGPU device-frame schemas are documented separately as `CGPUFrame` and

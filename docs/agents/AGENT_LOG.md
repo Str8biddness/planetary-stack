@@ -1587,3 +1587,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The focused suite is an operator-facing gate for the explicit CHAL path, not a full repository test replacement.
 - The suite intentionally composes existing smoke/regression surfaces so release readiness checks stay close to observed runtime contracts.
+
+## Current Session — 2026-05-31 (Knowledge Hardware Provenance Trace)
+
+### 📝 Summary
+- Added grounded Knowledge Cloud provenance telemetry to `CognitiveHypervisor` under `telemetry.knowledge_provenance` for explicit Synthesus 5 `mode="chal"` debug responses.
+- Routed grounded CHAL workloads through `CHALMemoryController` before the guarded bridge when no external RAG context is supplied, using mounted KAL context only when mount-backed telemetry is available.
+- Extended KAL mount telemetry to preserve manifest artifact provenance (`relative_path`, `actual_size`, `actual_sha256`, `integrity_ok`) on active mounts.
+- Mirrored the debug contract in OpenAPI/schema docs and marked the Phase 5 final-response provenance checklist item complete.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/hypervisor.py packages/knowledge/kal_adapter.py tests/test_chal_hypervisor.py tests/test_knowledge_mount_table.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_hypervisor.py tests/test_knowledge_mount_table.py tests/test_kal.py` — 47 passed, 3 warnings.
+- Parsed `docs/openapi.json` and `docs/api_schema.json`; confirmed `CognitiveHypervisorTrace.properties.knowledge_provenance` is present.
+
+### 🚧 Left Off / Next Steps
+- Add a cold-start Knowledge Cloud bundle integrity validation gate for Phase 10.
+- Consider typing `KnowledgeProvenanceTrace` as its own reusable OpenAPI component if clients start consuming individual provenance fields directly.
+- Keep pre-existing unrelated working-tree changes in `AGENTS.md`, `README.md`, and untracked `synthesus_framework/` separated from this source/docs commit.
+
+### 💡 Architectural Notes
+- Knowledge Cloud hardware provenance now flows from manifest-backed KAL mounts into the public CHAL debug envelope without changing the stable `QueryResponse` surface.
+- Runtime fallback text is not treated as mounted provenance; only KAL telemetry with active mount metadata is allowed to seed bridge RAG context as mounted hardware.

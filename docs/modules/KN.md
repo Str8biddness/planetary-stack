@@ -155,6 +155,14 @@ Telemetry distinguishes first-pass hardware lookup from cache locality:
 - First lookup: `operation_id="kc_lookup"`, `cache_hit=False`, `metadata.hot_context=False`, and `metadata.mounts[]` lists the active ROM mount path, partition, namespace, locality, trust level, and latency profile.
 - Repeat lookup: `operation_id="hot_context_hit"`, `cache_hit=True`, and `metadata.hot_context=True`.
 
+Mounted lookup telemetry now also preserves artifact provenance on each active
+mount when the mount came from a manifest-backed Knowledge Cloud artifact:
+`relative_path`, `actual_size`, `actual_sha256`, and `integrity_ok`. The
+Synthesus 5 hypervisor copies this KAL telemetry into
+`debug.cognitive_hypervisor.knowledge_provenance` for grounded `mode="chal"`
+responses, so final response metadata can show which mounted hardware supplied
+context without changing the stable `QueryResponse` envelope.
+
 The cache is volatile and source-only: it does not write generated artifacts into `data/`, the standalone Knowledge Cloud repo, or the public artifact mirror. Runtime/debug surfaces can inspect it with `get_hot_context_stats()` and clear it with `clear_hot_context()`.
 
 Validation:

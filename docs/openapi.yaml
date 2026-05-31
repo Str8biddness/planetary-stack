@@ -1552,6 +1552,14 @@ components:
           type: object
           additionalProperties: true
           description: Template leakage guard decision and matched signatures.
+        knowledge_provenance:
+          anyOf:
+          - type: object
+            additionalProperties: true
+          - type: 'null'
+          description: Mounted Knowledge Cloud provenance trace for grounded CHAL routes,
+            including KAL operation, source mount, cache state, and artifact integrity
+            metadata; null when no grounded hardware lookup was attempted.
         quad_brain:
           anyOf:
           - $ref: '#/components/schemas/QuadBrainArbitration'

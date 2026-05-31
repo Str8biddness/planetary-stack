@@ -87,12 +87,14 @@ class CognitiveHypervisor:
         execution_guard: AIVMExecutionGuard | None = None,
         template_guard: TemplateLeakageGuard | None = None,
         quad_brain_orchestrator: Any | None = None,
+        knowledge_controller: Any | None = None,
     ):
         self._bridge_factory = bridge_factory
         self._bridge: Any | None = None
         self._execution_guard = execution_guard or AIVMExecutionGuard()
         self._template_guard = template_guard or TemplateLeakageGuard()
         self._quad_brain_orchestrator = quad_brain_orchestrator
+        self._knowledge_controller = knowledge_controller
 
     def plan(
         self,
@@ -191,6 +193,14 @@ class CognitiveHypervisor:
             constraints=constraints,
             max_tokens=max_tokens,
         )
+        effective_rag_context = rag_context
+        knowledge_provenance = None
+        if decision.route == HypervisorRoute.GROUNDED_PATH:
+            effective_rag_context, knowledge_provenance = self._resolve_grounding_context(
+                query=query,
+                trace_id=decision.trace_id,
+                rag_context=rag_context,
+            )
         bridge = self._get_bridge()
         guarded = await self._execution_guard.run(
             "chal://hypervisor/hemisphere_bridge",
@@ -198,7 +208,7 @@ class CognitiveHypervisor:
                 query,
                 hemisphere=decision.hemisphere_mode,
                 character_context=character_context,
-                rag_context=rag_context,
+                rag_context=effective_rag_context,
                 max_tokens=max_tokens,
             ),
             timeout_ms=decision.budget.latency_ms,
@@ -217,7 +227,7 @@ class CognitiveHypervisor:
                 query=query,
                 decision=decision,
                 bridge_result=bridge_result,
-                rag_context=rag_context,
+                rag_context=effective_rag_context,
                 character_context=character_context,
                 constraints=constraints or [],
                 max_tokens=max_tokens,
@@ -247,6 +257,7 @@ class CognitiveHypervisor:
             "degraded": not guarded.ok,
             "template_guard": template_guard_result.to_dict(),
             "quad_brain": quad_brain_arbitration.to_dict() if quad_brain_arbitration else None,
+            "knowledge_provenance": knowledge_provenance,
         }
         if template_guard_result.rewritten:
             telemetry["degraded"] = True
@@ -270,6 +281,72 @@ class CognitiveHypervisor:
                 template_guard=self._template_guard,
             )
         return self._quad_brain_orchestrator
+
+    def _get_knowledge_controller(self) -> Any:
+        if self._knowledge_controller is None:
+            try:
+                from knowledge.kal_adapter import CHALMemoryController
+            except ModuleNotFoundError:  # pragma: no cover
+                from packages.knowledge.kal_adapter import CHALMemoryController
+
+            self._knowledge_controller = CHALMemoryController()
+        return self._knowledge_controller
+
+    def _resolve_grounding_context(
+        self,
+        *,
+        query: str,
+        trace_id: str,
+        rag_context: str,
+    ) -> tuple[str, dict[str, Any]]:
+        if rag_context.strip():
+            return rag_context, {
+                "schema": "synthesus.chal.knowledge_provenance.v1",
+                "trace_id": trace_id,
+                "source": "provided_rag_context",
+                "context_used": True,
+                "mounted_context_used": False,
+                "cache_hit": False,
+                "confidence": 1.0,
+                "latency_ms": 0.0,
+                "mounts": [],
+                "hot_context": False,
+            }
+
+        try:
+            context, telemetry = self._get_knowledge_controller().query(query)
+        except Exception as exc:
+            return "", {
+                "schema": "synthesus.chal.knowledge_provenance.v1",
+                "trace_id": trace_id,
+                "source": "knowledge_controller_unavailable",
+                "context_used": False,
+                "mounted_context_used": False,
+                "cache_hit": False,
+                "confidence": 0.0,
+                "latency_ms": 0.0,
+                "mounts": [],
+                "hot_context": False,
+                "error": str(exc),
+            }
+
+        metadata = dict(getattr(telemetry, "metadata", {}) or {})
+        mounts = list(metadata.get("mounts", []))
+        context_used = bool(context) and getattr(telemetry, "confidence", 0.0) > 0.0
+        mounted_context_used = context_used and bool(mounts)
+        return (context or "") if mounted_context_used else "", {
+            "schema": "synthesus.chal.knowledge_provenance.v1",
+            "trace_id": trace_id,
+            "operation_id": getattr(telemetry, "operation_id", ""),
+            "source": getattr(telemetry, "source", ""),
+            "context_used": context_used,
+            "mounted_context_used": mounted_context_used,
+            "cache_hit": bool(getattr(telemetry, "cache_hit", False)),
+            "confidence": getattr(telemetry, "confidence", 0.0),
+            "latency_ms": getattr(telemetry, "latency_ms", 0.0),
+            "mounts": mounts,
+            "hot_context": bool(metadata.get("hot_context", False)),
+        }
 
     def _normalize_guarded_bridge_result(
         self,
