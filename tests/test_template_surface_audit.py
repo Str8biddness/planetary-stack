@@ -1,0 +1,31 @@
+from tools.audit_template_surfaces import CLASSIFICATIONS, audit
+
+
+def test_template_surface_audit_has_no_unclassified_package_hits():
+    result = audit()
+    assert result["signature_count"] > 0
+    assert result["unclassified"] == []
+
+
+def test_template_surface_audit_keeps_legacy_api_emitters_labeled():
+    legacy_required = {
+        "packages/api/fastapi_server.py",
+        "packages/api/production_server.py",
+        "packages/reasoning/generation/spine.py",
+    }
+
+    for path in legacy_required:
+        classification = CLASSIFICATIONS[path]
+        assert classification.status == "legacy_quarantine_required"
+        assert classification.boundary
+
+
+def test_template_surface_audit_labels_allowed_exceptions():
+    allowed = [
+        item
+        for item in CLASSIFICATIONS.values()
+        if item.status == "allowed_labeled_exception"
+    ]
+
+    assert allowed
+    assert {item.boundary for item in allowed} <= {"explicit_npc_script", "platform"}

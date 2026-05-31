@@ -116,7 +116,7 @@ Legend:
 
 - \[\~\] Convert PPBRS normal-path output into non-user-facing firmware signals.
 
-- [ ]  Search and classify every direct fallback/template response path.
+- [x]  Search and classify every direct fallback/template response path. Session log: 2026-05-31 Agent 6 template surface audit.
 
 - [ ]  Delete unused legacy response emitters.
 

@@ -415,3 +415,28 @@ PPBRS micro-benchmark after the serialization patch:
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_reasoning_firmware.py` — 9 passed.
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py tests/test_chal_reasoning_firmware.py` — 121 passed.
 - `python tools/ppbrs_benchmark.py`
+
+## Daily Entry: 2026-05-31 (Agent 6 — Template Surface Audit)
+
+### Actions Performed
+
+1. Added `tools/audit_template_surfaces.py` to scan package-level Python source for literal legacy template/fallback signatures.
+2. Classified every current matched package path as firmware context, guard definition, non-user-facing internal data, allowed labeled exception, or legacy quarantine required.
+3. Added `tests/test_template_surface_audit.py` so new unclassified template/fallback surfaces fail regression testing.
+4. Documented the Phase 6 audit in `docs/roadmap/SYNTHESUS_5_TEMPLATE_PATH_AUDIT.md`.
+
+### Audit Result
+
+| Metric | Count |
+|---|---:|
+| Literal signatures | 89 |
+| Classified package paths | 17 |
+| Unclassified hits | 0 |
+| Legacy quarantine paths | 7 |
+
+### Verified
+
+- `python tools/audit_template_surfaces.py --fail-on-unclassified`
+- `python -m pytest -q tests/test_template_surface_audit.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py tests/test_chal_reasoning_firmware.py tests/test_template_surface_audit.py` — 126 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py` — pattern p50 210.5716ms, rule p50 0.0144ms, graph p50 0.0157ms.

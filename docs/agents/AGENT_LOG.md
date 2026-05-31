@@ -1701,3 +1701,27 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Phase 1 now has consistent trace/budget metadata across both PPBRS firmware frames and the older CHAL mount-controller interface records.
 - The change is intentionally compatibility-preserving: existing callers that only pass the original fields receive generated trace IDs and budget metadata rather than a constructor break.
+
+## Current Session — 2026-05-31 (Agent 6 — Template Surface Audit)
+
+### 📝 Summary
+- Added `tools/audit_template_surfaces.py`, a source-controlled Phase 6 audit gate for package-level literal template/fallback signatures.
+- Classified all current matched package paths as firmware context, guard definition, non-user-facing internal data, allowed safety/platform/NPC-script exception, or `legacy_quarantine_required`.
+- Added `tests/test_template_surface_audit.py` so new unclassified template/fallback surfaces fail regression testing.
+- Documented the audit in `docs/roadmap/SYNTHESUS_5_TEMPLATE_PATH_AUDIT.md` and marked the Phase 6 direct fallback/template path classification checklist item complete.
+
+### ✅ Verified
+- `python -m py_compile tools/audit_template_surfaces.py tests/test_template_surface_audit.py`
+- `python tools/audit_template_surfaces.py --fail-on-unclassified` — 89 literal signatures, 17 classified paths, 0 unclassified hits.
+- `python -m pytest -q tests/test_template_surface_audit.py` — 3 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py tests/test_chal_reasoning_firmware.py tests/test_template_surface_audit.py` — 126 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py` — pattern p50 210.5716ms, rule p50 0.0144ms, graph p50 0.0157ms.
+
+### 🚧 Left Off / Next Steps
+- Convert or remove the seven `legacy_quarantine_required` paths identified by the audit, starting with the older API/cognitive direct response emitters and the generation-spine degraded fallback label.
+- Continue keeping PPBRS normal output as `firmware_context_only`: `response == ""`, `user_facing == False`, and templates only under `chal_firmware_signal.module_message.payload.template_context`.
+- Keep pre-existing unrelated working-tree changes in `AGENTS.md`, `README.md`, and untracked `synthesus_framework/` separated from Agent 6 source/doc commits.
+
+### 💡 Architectural Notes
+- Phase 6 now has a repeatable classification gate rather than a one-time grep note.
+- Explicit NPC script and platform/security templates remain allowed only as labeled exception surfaces; normal-path PPBRS and legacy API emitters stay visible for quarantine/removal work.
