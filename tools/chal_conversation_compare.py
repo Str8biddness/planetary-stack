@@ -86,6 +86,13 @@ class AxisScore:
         return data
 
 
+@dataclass(frozen=True)
+class RegressionThresholds:
+    max_mean_latency_ms: float | None = None
+    max_p95_latency_ms: float | None = None
+    min_score_delta: float | None = None
+
+
 CASES: tuple[EvalCase, ...] = (
     EvalCase(
         case_id="conversation_quality",
@@ -320,6 +327,19 @@ def _latency_score(runtime_ms: float) -> float:
     return 0.25
 
 
+def _percentile(values: Iterable[float], percentile: float) -> float:
+    ordered = sorted(values)
+    if not ordered:
+        return 0.0
+    if len(ordered) == 1:
+        return ordered[0]
+    rank = (len(ordered) - 1) * percentile
+    lower = int(rank)
+    upper = min(lower + 1, len(ordered) - 1)
+    fraction = rank - lower
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
+
+
 def score_response(
     text: str,
     *,
@@ -360,8 +380,20 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
     legacy_scores = [row["scores"]["legacy"]["overall"] for row in rows]
     synth_scores = [row["scores"]["synthesus5"]["overall"] for row in rows]
     synth_latency = [row["synthesus5"]["runtime_ms"] for row in rows]
+    legacy_latency = [row["legacy"]["runtime_ms"] for row in rows]
     legacy_leaks = sum(1 for row in rows if row["scores"]["legacy"]["template_leakage"] == 0.0)
     synth_leaks = sum(1 for row in rows if row["scores"]["synthesus5"]["template_leakage"] == 0.0)
+    routes: dict[str, dict[str, float]] = {}
+    for row in rows:
+        route = row["synthesus5"]["decision"]["route"]
+        routes.setdefault(route, {"count": 0.0, "total_latency_ms": 0.0})
+        routes[route]["count"] += 1
+        routes[route]["total_latency_ms"] += row["synthesus5"]["runtime_ms"]
+    for route_summary in routes.values():
+        count = route_summary["count"] or 1.0
+        route_summary["mean_latency_ms"] = round(route_summary["total_latency_ms"] / count, 3)
+        route_summary["count"] = int(route_summary["count"])
+        del route_summary["total_latency_ms"]
     return {
         "schema": "synthesus.phase8.comparison.v1",
         "case_count": len(rows),
@@ -369,10 +401,40 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "legacy_mean_score": round(statistics.fmean(legacy_scores), 3),
         "synthesus5_mean_score": round(statistics.fmean(synth_scores), 3),
         "score_delta": round(statistics.fmean(synth_scores) - statistics.fmean(legacy_scores), 3),
+        "legacy_mean_latency_ms": round(statistics.fmean(legacy_latency), 3),
         "synthesus5_mean_latency_ms": round(statistics.fmean(synth_latency), 3),
+        "synthesus5_p95_latency_ms": round(_percentile(synth_latency, 0.95), 3),
+        "synthesus5_max_latency_ms": round(max(synth_latency) if synth_latency else 0.0, 3),
+        "synthesus5_route_latency": dict(sorted(routes.items())),
         "legacy_template_leaks": legacy_leaks,
         "synthesus5_template_leaks": synth_leaks,
     }
+
+
+def assert_regression_thresholds(summary: dict[str, Any], thresholds: RegressionThresholds) -> None:
+    failures = []
+    if thresholds.max_mean_latency_ms is not None:
+        observed = float(summary["synthesus5_mean_latency_ms"])
+        if observed > thresholds.max_mean_latency_ms:
+            failures.append(
+                f"mean latency {observed}ms exceeded threshold {thresholds.max_mean_latency_ms}ms"
+            )
+    if thresholds.max_p95_latency_ms is not None:
+        observed = float(summary["synthesus5_p95_latency_ms"])
+        if observed > thresholds.max_p95_latency_ms:
+            failures.append(
+                f"p95 latency {observed}ms exceeded threshold {thresholds.max_p95_latency_ms}ms"
+            )
+    if thresholds.min_score_delta is not None:
+        observed = float(summary["score_delta"])
+        if observed < thresholds.min_score_delta:
+            failures.append(
+                f"score delta {observed} fell below threshold {thresholds.min_score_delta}"
+            )
+    if int(summary["synthesus5_template_leaks"]) != 0:
+        failures.append(f"Synthesus 5 leaked {summary['synthesus5_template_leaks']} template surfaces")
+    if failures:
+        raise AssertionError("\n".join(failures))
 
 
 def render_markdown(rows: list[dict[str, Any]]) -> str:
@@ -388,7 +450,10 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
         f"| Legacy mean score | {summary['legacy_mean_score']} |",
         f"| Synthesus 5 mean score | {summary['synthesus5_mean_score']} |",
         f"| Score delta | {summary['score_delta']} |",
+        f"| Legacy mean latency | {summary['legacy_mean_latency_ms']}ms |",
         f"| Synthesus 5 mean latency | {summary['synthesus5_mean_latency_ms']}ms |",
+        f"| Synthesus 5 p95 latency | {summary['synthesus5_p95_latency_ms']}ms |",
+        f"| Synthesus 5 max latency | {summary['synthesus5_max_latency_ms']}ms |",
         f"| Legacy template leaks | {summary['legacy_template_leaks']} |",
         f"| Synthesus 5 template leaks | {summary['synthesus5_template_leaks']} |",
         "",
@@ -443,13 +508,26 @@ async def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--write", type=Path, help="Write markdown comparison to this path.")
     parser.add_argument("--json", type=Path, help="Write machine-readable comparison to this path.")
+    parser.add_argument("--baseline-json", type=Path, help="Write summary-only latency/quality baseline JSON.")
     parser.add_argument("--fail-on-leak", action="store_true", help="Fail if Synthesus 5 output leaks legacy surface signatures.")
+    parser.add_argument("--max-mean-latency-ms", type=float, help="Fail if Synthesus 5 mean runtime exceeds this value.")
+    parser.add_argument("--max-p95-latency-ms", type=float, help="Fail if Synthesus 5 p95 runtime exceeds this value.")
+    parser.add_argument("--min-score-delta", type=float, help="Fail if Synthesus 5 score delta falls below this value.")
     args = parser.parse_args()
 
     rows = await build_chal_rows()
     if args.fail_on_leak:
         assert_chal_surfaces_are_clean(rows)
-    payload = {"summary": summarize(rows), "rows": rows}
+    summary = summarize(rows)
+    assert_regression_thresholds(
+        summary,
+        RegressionThresholds(
+            max_mean_latency_ms=args.max_mean_latency_ms,
+            max_p95_latency_ms=args.max_p95_latency_ms,
+            min_score_delta=args.min_score_delta,
+        ),
+    )
+    payload = {"summary": summary, "rows": rows}
     markdown = render_markdown(rows)
     if args.write:
         args.write.parent.mkdir(parents=True, exist_ok=True)
@@ -461,6 +539,10 @@ async def main() -> int:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
         print(args.json)
+    if args.baseline_json:
+        args.baseline_json.parent.mkdir(parents=True, exist_ok=True)
+        args.baseline_json.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
+        print(args.baseline_json)
     return 0
 
 

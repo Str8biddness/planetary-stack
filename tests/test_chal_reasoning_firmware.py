@@ -14,7 +14,14 @@ from reasoning.chal import (
     TelemetryRecord,
     build_ppbrs_firmware_signal,
 )
-from tools.chal_conversation_compare import CASES, assert_chal_surfaces_are_clean, build_chal_rows, summarize
+from tools.chal_conversation_compare import (
+    CASES,
+    RegressionThresholds,
+    assert_chal_surfaces_are_clean,
+    assert_regression_thresholds,
+    build_chal_rows,
+    summarize,
+)
 
 
 def test_chal_frame_records_roundtrip_through_json():
@@ -222,6 +229,9 @@ def test_phase8_comparison_harness_covers_required_categories_and_scores():
     assert summary["synthesus5_template_leaks"] == 0
     assert summary["legacy_template_leaks"] == len(rows)
     assert summary["synthesus5_mean_score"] > summary["legacy_mean_score"]
+    assert summary["synthesus5_p95_latency_ms"] >= summary["synthesus5_mean_latency_ms"]
+    assert summary["synthesus5_max_latency_ms"] >= summary["synthesus5_p95_latency_ms"]
+    assert "grounded_path" in summary["synthesus5_route_latency"]
 
 
 def test_phase8_comparison_harness_exercises_non_grounded_routes():
@@ -231,3 +241,27 @@ def test_phase8_comparison_harness_exercises_non_grounded_routes():
     assert "grounded_path" in routes
     assert "quad_brain_path" in routes
     assert "safety_path" in routes
+
+
+def test_phase8_comparison_harness_enforces_latency_regression_thresholds():
+    rows = asyncio.run(build_chal_rows())
+    summary = summarize(rows)
+
+    assert_regression_thresholds(
+        summary,
+        RegressionThresholds(
+            max_mean_latency_ms=1000.0,
+            max_p95_latency_ms=1500.0,
+            min_score_delta=0.1,
+        ),
+    )
+
+    try:
+        assert_regression_thresholds(
+            summary,
+            RegressionThresholds(max_mean_latency_ms=0.0),
+        )
+    except AssertionError as exc:
+        assert "mean latency" in str(exc)
+    else:
+        raise AssertionError("latency regression threshold must fail when set below observed runtime")

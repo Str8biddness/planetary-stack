@@ -36,6 +36,7 @@ STEPS = (
             "-m",
             "py_compile",
             "tools/synthesus5_chal_smoke.py",
+            "tools/chal_conversation_compare.py",
             "tools/synthesus5_focused_suite.py",
             "packages/api/production_server.py",
             "packages/core/chal/hypervisor.py",
@@ -64,6 +65,22 @@ STEPS = (
     SuiteStep(
         label="firmware-and-comparison-regressions",
         command=(sys.executable, "-m", "pytest", "-q", "tests/test_chal_reasoning_firmware.py"),
+    ),
+    SuiteStep(
+        label="phase8-latency-regression-guard",
+        command=(
+            sys.executable,
+            "tools/chal_conversation_compare.py",
+            "--fail-on-leak",
+            "--max-mean-latency-ms",
+            "1000",
+            "--max-p95-latency-ms",
+            "1500",
+            "--min-score-delta",
+            "0.1",
+            "--baseline-json",
+            "tools/results/synthesus5_phase8_latency_baseline_latest.json",
+        ),
     ),
 )
 

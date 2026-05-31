@@ -109,10 +109,11 @@ SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_focused_suite.py
 ```
 
 The suite compiles the CHAL release-path modules, runs the public CHAL API smoke
-command, verifies the hypervisor/API E2E regressions, and runs the PPBRS
-firmware plus Phase 8 comparison-harness checks. It sets the same local
-`PYTHONPATH`, disables Knowledge Cloud network sync by default, and fails on the
-first broken release-readiness step.
+command, verifies the hypervisor/API E2E regressions, runs the PPBRS firmware
+plus Phase 8 comparison-harness checks, and enforces the Phase 8 latency
+regression guard. It sets the same local `PYTHONPATH`, disables Knowledge Cloud
+network sync by default, writes latency baselines under ignored `tools/results/`,
+and fails on the first broken release-readiness step.
 
 ## Endpoints
 

@@ -1609,3 +1609,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Knowledge Cloud hardware provenance now flows from manifest-backed KAL mounts into the public CHAL debug envelope without changing the stable `QueryResponse` surface.
 - Runtime fallback text is not treated as mounted provenance; only KAL telemetry with active mount metadata is allowed to seed bridge RAG context as mounted hardware.
+
+## Current Session — 2026-05-31 (Agent 3 — Phase 8 Latency Regression Guard)
+
+### 📝 Summary
+- Extended `tools/chal_conversation_compare.py` with summary-only latency baseline output, mean/p95/max Synthesus 5 runtime metrics, per-route latency summaries, and regression thresholds for mean latency, p95 latency, score delta, and template leakage.
+- Added regression coverage in `tests/test_chal_reasoning_firmware.py` and wired the focused release suite to run the Phase 8 latency guard while writing generated baselines under ignored `tools/results/`.
+- Marked the Phase 8 latency guard and Phase 10 performance baseline/regression guard checklist items complete.
+
+### ✅ Verified
+- `python -m py_compile tools/chal_conversation_compare.py tools/synthesus5_focused_suite.py tests/test_chal_reasoning_firmware.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge python tools/chal_conversation_compare.py --fail-on-leak --max-mean-latency-ms 1000 --max-p95-latency-ms 1500 --min-score-delta 0.1 --baseline-json tools/results/synthesus5_phase8_latency_baseline_latest.json --json tools/results/synthesus5_phase8_latency_latest.json --write tools/results/synthesus5_phase8_latency_latest.md` — passed; 6 cases, Synthesus 5 mean score 0.954, score delta 0.530, mean latency 3.334ms, p95 latency 6.068ms, max latency 6.694ms, 0 Synthesus 5 template leaks.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_chal_reasoning_firmware.py` — 10 passed.
+- `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_focused_suite.py` — passed compile, CHAL API smoke, hypervisor/API regressions, firmware/comparison regressions, and Phase 8 latency regression guard.
+
+### 🚧 Left Off / Next Steps
+- Add a cold-start Knowledge Cloud bundle integrity validation gate for Phase 10 after the in-flight provenance trace work lands.
+- Consider replacing fixed latency ceilings with a checked-in source-only baseline fixture once the runtime path stabilizes across machines.
+- Continue Phase 6 classification of older direct template emitters outside the Synthesus 5 hypervisor path.
+
+### 💡 Architectural Notes
+- Phase 8 benchmark claims are now backed by a failing command, not just generated comparison reports.
+- The generated baseline remains an ignored artifact; source control carries the harness, thresholds, tests, docs, checklist, and log only.

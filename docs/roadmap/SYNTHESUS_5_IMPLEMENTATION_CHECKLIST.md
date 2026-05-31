@@ -156,6 +156,8 @@ Legend:
 
 - [x]  Add scoring for usefulness, grounding, naturalness, latency, template leakage, and safety. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
 
+- [x]  Add a runnable latency baseline and regression guard for the legacy-vs-Synthesus-5 harness. Session log: 2026-05-31 Agent 3 Phase 8 latency regression guard.
+
 - [x]  Store benchmark summaries in ignored artifacts and commit only harness source/docs. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
 
 ## Phase 9: Product Runtime Polish
@@ -178,7 +180,7 @@ Legend:
 
 - [x]  Add smoke command that runs an end-to-end Synthesus 5 conversation. Session log: 2026-05-31 Agent 1 CHAL API smoke command.
 
-- [ ]  Add performance baseline and regression guard.
+- [x]  Add performance baseline and regression guard. Session log: 2026-05-31 Agent 3 Phase 8 latency regression guard.
 
 - [ ]  Validate Knowledge Cloud bundle integrity from cold start.
 
