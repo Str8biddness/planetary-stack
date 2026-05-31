@@ -56,6 +56,7 @@ class TraceRecord:
     chosen_index: int
     quality: float
     outcome: dict[str, Any]
+    replay: dict[str, Any]
 
 
 @dataclass
@@ -70,6 +71,7 @@ class OrganScorecard:
     baseline_metric: float | None
     metric_name: str
     scientific_consistency: float
+    replay_coverage: float
     consistency_warnings: list[str]
     notes: list[str]
 
@@ -216,6 +218,7 @@ def _load_trace_records() -> list[TraceRecord]:
                     chosen_index=chosen,
                     quality=quality,
                     outcome=outcome,
+                    replay=obj.get("replay") if isinstance(obj.get("replay"), dict) else {},
                 )
             )
 
@@ -313,6 +316,23 @@ def _consistency_check(records: Iterable[TraceRecord]) -> tuple[float, list[str]
     return (consistent / total) if total else 0.0, warnings[:10]
 
 
+def _replay_coverage(records: Iterable[TraceRecord]) -> float:
+    total = 0
+    replayable = 0
+    for rec in records:
+        total += 1
+        replay = rec.replay
+        if (
+            replay.get("generator")
+            and isinstance(replay.get("seed"), int)
+            and replay.get("scenarioId")
+            and isinstance(replay.get("step"), int)
+            and replay.get("simulatedTime")
+        ):
+            replayable += 1
+    return (replayable / total) if total else 0.0
+
+
 def _load_model(domain: str, organ: str):
     if joblib is None:
         raise RuntimeError("joblib is required to load trained models")
@@ -327,6 +347,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
     model, model_path = _load_model(domain, organ)
     metric_name = _metric_name(organ)
     sci_consistency, warnings = _consistency_check(records)
+    replay_coverage = _replay_coverage(records)
     notes: list[str] = []
 
     if len(records) == 0:
@@ -341,6 +362,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
             baseline_metric=None,
             metric_name=metric_name,
             scientific_consistency=sci_consistency,
+            replay_coverage=replay_coverage,
             consistency_warnings=warnings,
             notes=["No matching traces found."],
         )
@@ -358,6 +380,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
             baseline_metric=None,
             metric_name=metric_name,
             scientific_consistency=sci_consistency,
+            replay_coverage=replay_coverage,
             consistency_warnings=warnings,
             notes=notes,
         )
@@ -389,6 +412,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
             baseline_metric=baseline,
             metric_name=metric_name,
             scientific_consistency=sci_consistency,
+            replay_coverage=replay_coverage,
             consistency_warnings=warnings,
             notes=notes,
         )
@@ -416,6 +440,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
             baseline_metric=baseline,
             metric_name=metric_name,
             scientific_consistency=sci_consistency,
+            replay_coverage=replay_coverage,
             consistency_warnings=warnings,
             notes=notes,
         )
@@ -441,6 +466,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
         baseline_metric=baseline,
         metric_name=metric_name,
         scientific_consistency=sci_consistency,
+        replay_coverage=replay_coverage,
         consistency_warnings=warnings,
         notes=notes,
     )
@@ -456,12 +482,12 @@ def render_markdown(scorecards: list[OrganScorecard]) -> str:
         "",
         "Fictional narrative traces are acceptable input as long as scientific/math fields are numeric, bounded, and internally consistent.",
         "",
-        "| Domain | Organ | Traces | Metric | Train | Validation | Baseline | Consistency |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| Domain | Organ | Traces | Metric | Train | Validation | Baseline | Consistency | Replay |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for s in scorecards:
         lines.append(
-            f"| {s.domain} | {s.organ} | {s.trace_count} | {s.metric_name} | {_format_metric(s.train_metric)} | {_format_metric(s.validation_metric)} | {_format_metric(s.baseline_metric)} | {s.scientific_consistency:.2%} |"
+            f"| {s.domain} | {s.organ} | {s.trace_count} | {s.metric_name} | {_format_metric(s.train_metric)} | {_format_metric(s.validation_metric)} | {_format_metric(s.baseline_metric)} | {s.scientific_consistency:.2%} | {s.replay_coverage:.2%} |"
         )
     lines.append("")
     for s in scorecards:
@@ -469,6 +495,7 @@ def render_markdown(scorecards: list[OrganScorecard]) -> str:
         lines.append(f"- Model: `{s.model_path}`")
         lines.append(f"- Model exists: {'yes' if s.model_exists else 'no'}")
         lines.append(f"- Scientific consistency: {s.scientific_consistency:.2%}")
+        lines.append(f"- Replay metadata coverage: {s.replay_coverage:.2%}")
         if s.consistency_warnings:
             lines.append("- Warnings:")
             for warning in s.consistency_warnings:
@@ -516,7 +543,7 @@ def main() -> int:
     logger.info(f"Wrote {REPORT_MD}")
     for s in scorecards:
         logger.info(
-            f"{s.domain}/{s.organ}: train={_format_metric(s.train_metric)} validation={_format_metric(s.validation_metric)} baseline={_format_metric(s.baseline_metric)} consistency={s.scientific_consistency:.2%}"
+            f"{s.domain}/{s.organ}: train={_format_metric(s.train_metric)} validation={_format_metric(s.validation_metric)} baseline={_format_metric(s.baseline_metric)} consistency={s.scientific_consistency:.2%} replay={s.replay_coverage:.2%}"
         )
     return 0
 

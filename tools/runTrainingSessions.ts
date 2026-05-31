@@ -12,6 +12,55 @@ import { ChatWorldState, ChatAction, ChatFocusTarget } from '../packages/core/do
 import { SysWorldState, SysAction, SysFocusTarget, SysHistory } from '../packages/core/domains/sysops/types';
 import { GMWorldState, GMAction, GMFocusTarget, GMNpc, GMWorldEvent } from '../packages/core/domains/gm/types';
 
+const GENERATOR_VERSION = 'organ-triad-replay-v1';
+const DEFAULT_TRACE_SEED = 950907;
+const BASE_TIME_MS = Date.UTC(2026, 4, 30, 12, 0, 0);
+const HOUR_MS = 3_600_000;
+const DAY_MS = 86_400_000;
+
+class SeededRng {
+  private state: number;
+
+  constructor(seed: number) {
+    this.state = seed >>> 0;
+  }
+
+  next(): number {
+    this.state = (1664525 * this.state + 1013904223) >>> 0;
+    return this.state / 0x100000000;
+  }
+}
+
+interface TraceRuntime {
+  rng: SeededRng;
+  seed: number;
+  step: number;
+}
+
+function readTraceSeed(): number {
+  const parsed = Number.parseInt(process.env.SYNTHESUS_ORGAN_TRACE_SEED ?? '', 10);
+  return Number.isFinite(parsed) ? parsed : DEFAULT_TRACE_SEED;
+}
+
+function random(runtime: TraceRuntime): number {
+  return runtime.rng.next();
+}
+
+function timestamp(sessionIndex: number, offsetMs = 0): Date {
+  return new Date(BASE_TIME_MS + sessionIndex * 10 * 60_000 + offsetMs);
+}
+
+function replay(runtime: TraceRuntime, scenarioId: string, sessionIndex: number) {
+  runtime.step += 1;
+  return {
+    generator: GENERATOR_VERSION,
+    seed: runtime.seed,
+    scenarioId,
+    step: runtime.step,
+    simulatedTime: timestamp(sessionIndex).toISOString(),
+  };
+}
+
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
@@ -24,25 +73,25 @@ function normalizeWeights(values: number[]): number[] {
   return sanitized.map(value => value / total);
 }
 
-function jitter(value: number, magnitude = 0.18): number {
-  return clamp01(value + (Math.random() - 0.5) * magnitude);
+function jitter(runtime: TraceRuntime, value: number, magnitude = 0.18): number {
+  return clamp01(value + (random(runtime) - 0.5) * magnitude);
 }
 
-function chooseWeightedIndex(weights: number[], suboptimalChance = 0.2): number {
+function chooseWeightedIndex(runtime: TraceRuntime, weights: number[], suboptimalChance = 0.2): number {
   if (weights.length === 0) return 0;
   const ranked = weights
     .map((score, idx) => ({ score, idx }))
     .sort((a, b) => b.score - a.score);
 
-  if (weights.length > 1 && Math.random() < suboptimalChance) {
+  if (weights.length > 1 && random(runtime) < suboptimalChance) {
     const alternatives = ranked.slice(1);
-    return alternatives[Math.floor(Math.random() * alternatives.length)]?.idx ?? ranked[0].idx;
+    return alternatives[Math.floor(random(runtime) * alternatives.length)]?.idx ?? ranked[0].idx;
   }
 
   const total = weights.reduce((sum, value) => sum + Math.max(0, value), 0);
   if (total <= 0) return ranked[0].idx;
 
-  let cursor = Math.random() * total;
+  let cursor = random(runtime) * total;
   for (const { score, idx } of ranked) {
     cursor -= Math.max(0, score);
     if (cursor <= 0) return idx;
@@ -50,23 +99,23 @@ function chooseWeightedIndex(weights: number[], suboptimalChance = 0.2): number 
   return ranked[0].idx;
 }
 
-function buildChatWorldState(sessionIndex: number): ChatWorldState {
+function buildChatWorldState(runtime: TraceRuntime, sessionIndex: number): ChatWorldState {
   const mood = sessionIndex % 4;
   const flags = {
-    confusion: mood === 0 || Math.random() < 0.25,
-    safety: mood === 3 || Math.random() < 0.15,
-    frustration: mood === 1 || Math.random() < 0.2,
+    confusion: mood === 0 || random(runtime) < 0.25,
+    safety: mood === 3 || random(runtime) < 0.15,
+    frustration: mood === 1 || random(runtime) < 0.2,
   };
   const history = [
     {
       speaker: 'user' as const,
       message: mood === 0 ? 'I am not sure what to do.' : 'Can you help me with this?',
-      timestamp: new Date(Date.now() - 3_600_000),
+      timestamp: timestamp(sessionIndex, -HOUR_MS),
     },
     {
       speaker: 'system' as const,
       message: mood === 2 ? 'Here is a summary so far.' : 'What is the core constraint?',
-      timestamp: new Date(Date.now() - 1_800_000),
+      timestamp: timestamp(sessionIndex, -HOUR_MS / 2),
       metadata: { confusion: flags.confusion ? 0.8 : 0.2, safety: flags.safety ? 0.2 : 0.05 },
     },
   ];
@@ -80,7 +129,7 @@ function buildChatWorldState(sessionIndex: number): ChatWorldState {
     flags,
     unresolvedQuestions: mood === 0 ? 3 : mood === 1 ? 2 : 1,
     turnCount: 2 + sessionIndex,
-    timestamp: new Date(),
+    timestamp: timestamp(sessionIndex),
   };
 }
 
@@ -94,7 +143,7 @@ function buildChatActions(sessionIndex: number): ChatAction[] {
   return [...base.slice(rotation), ...base.slice(0, rotation)];
 }
 
-function scoreChatActions(worldState: ChatWorldState, actions: ChatAction[]): number[] {
+function scoreChatActions(runtime: TraceRuntime, worldState: ChatWorldState, actions: ChatAction[]): number[] {
   return normalizeWeights(actions.map(action => {
     if (action.type === 'ask_clarification') {
       return worldState.flags.confusion ? 0.95 : 0.35;
@@ -106,23 +155,23 @@ function scoreChatActions(worldState: ChatWorldState, actions: ChatAction[]): nu
       return worldState.turnCount > 3 ? 0.8 : 0.35;
     }
     return 0.25;
-  }).map(score => jitter(score, 0.24)));
+  }).map(score => jitter(runtime, score, 0.24)));
 }
 
-function logChatTrace(sessionId: string, worldState: ChatWorldState, actions: ChatAction[], chosenIndex: number): void {
+function logChatTrace(runtime: TraceRuntime, sessionId: string, worldState: ChatWorldState, actions: ChatAction[], chosenIndex: number, sessionIndex: number): void {
   const stateFeatures = chatStateToStateFeatures(worldState);
   const actionFeatures = actions.map(action => chatActionToActionFeatures(worldState, action));
   const focusTargets: ChatFocusTarget[] = actions.map((action, idx) => ({
     id: `${action.type}-${idx}`,
     type: 'goal',
-    importance: clamp01(0.35 + (idx === chosenIndex ? 0.4 : 0.1) + Math.random() * 0.15),
+    importance: clamp01(0.35 + (idx === chosenIndex ? 0.4 : 0.1) + random(runtime) * 0.15),
     urgency: action.type === 'ask_clarification' ? 1 : action.type === 'answer_question' ? 0.8 : 0.45,
-    lastMentioned: new Date(Date.now() - Math.floor(Math.random() * 3) * 86_400_000),
+    lastMentioned: timestamp(sessionIndex, -Math.floor(random(runtime) * 3) * DAY_MS),
   }));
   const multiFocusFeatures = chatMultiFocusToMultiFocusFeatures(focusTargets);
   const chosenAction = actions[chosenIndex] ?? actions[0];
   const trajectoryFeatures = chatHistoryToTrajectoryFeatures({ turns: worldState.history });
-  const policyScores = scoreChatActions(worldState, actions);
+  const policyScores = scoreChatActions(runtime, worldState, actions);
   const attentionWeights = normalizeWeights(focusTargets.map(target => target.importance));
   const quality = clamp01(
     (chosenAction?.type === 'answer_question' ? 0.92 : chosenAction?.type === 'summarize' ? 0.82 : 0.7) +
@@ -132,7 +181,7 @@ function logChatTrace(sessionId: string, worldState: ChatWorldState, actions: Ch
 
   appendTraceEntry({
     sessionId,
-    timestamp: new Date(),
+    timestamp: timestamp(sessionIndex),
     phase: 'planning',
     domain: 'chat',
     organ: 'policy_prior',
@@ -144,11 +193,12 @@ function logChatTrace(sessionId: string, worldState: ChatWorldState, actions: Ch
     decision: chosenAction,
     outcome: { quality },
     trajectoryFeatures,
+    replay: replay(runtime, `chat-${sessionIndex}-policy-prior`, sessionIndex),
   });
 
   appendTraceEntry({
     sessionId,
-    timestamp: new Date(),
+    timestamp: timestamp(sessionIndex),
     phase: 'planning',
     domain: 'chat',
     organ: 'attention',
@@ -160,11 +210,12 @@ function logChatTrace(sessionId: string, worldState: ChatWorldState, actions: Ch
     decision: chosenAction,
     outcome: { quality },
     trajectoryFeatures,
+    replay: replay(runtime, `chat-${sessionIndex}-attention`, sessionIndex),
   });
 
   appendTraceEntry({
     sessionId,
-    timestamp: new Date(),
+    timestamp: timestamp(sessionIndex),
     phase: 'output',
     domain: 'chat',
     organ: 'risk_outcome',
@@ -186,37 +237,38 @@ function logChatTrace(sessionId: string, worldState: ChatWorldState, actions: Ch
       },
     },
     trajectoryFeatures,
+    replay: replay(runtime, `chat-${sessionIndex}-risk-outcome`, sessionIndex),
   });
 }
 
-function buildSysOpsWorldState(sessionIndex: number): SysWorldState {
+function buildSysOpsWorldState(runtime: TraceRuntime, sessionIndex: number): SysWorldState {
   const hostCount = 2 + (sessionIndex % 3);
   const serviceCount = 2 + (sessionIndex % 2);
   const hosts = Array.from({ length: hostCount }, (_, idx) => ({
     id: `host-${sessionIndex}-${idx}`,
-    health: clamp01(0.55 + Math.random() * 0.4 - (idx === 0 && sessionIndex % 2 === 0 ? 0.25 : 0)),
-    errorRate: clamp01(Math.random() * 0.35 + (idx === 0 ? 0.08 : 0.02)),
-    latency: 80 + Math.random() * 120,
-    saturation: clamp01(0.3 + Math.random() * 0.6),
-    lastRestart: Math.random() < 0.3 ? new Date(Date.now() - 86_400_000) : undefined,
+    health: clamp01(0.55 + random(runtime) * 0.4 - (idx === 0 && sessionIndex % 2 === 0 ? 0.25 : 0)),
+    errorRate: clamp01(random(runtime) * 0.35 + (idx === 0 ? 0.08 : 0.02)),
+    latency: 80 + random(runtime) * 120,
+    saturation: clamp01(0.3 + random(runtime) * 0.6),
+    lastRestart: random(runtime) < 0.3 ? timestamp(sessionIndex, -DAY_MS) : undefined,
   }));
   const services = Array.from({ length: serviceCount }, (_, idx) => ({
     name: `service-${sessionIndex}-${idx}`,
-    health: clamp01(0.6 + Math.random() * 0.35 - (idx === 1 && sessionIndex % 3 === 0 ? 0.2 : 0)),
+    health: clamp01(0.6 + random(runtime) * 0.35 - (idx === 1 && sessionIndex % 3 === 0 ? 0.2 : 0)),
     dependencies: idx === 0 ? ['auth'] : ['api', 'db'],
-    errorRate: clamp01(Math.random() * 0.25),
-    latency: 100 + Math.random() * 220,
-    lastDeploy: Math.random() < 0.4 ? new Date(Date.now() - 2 * 86_400_000) : undefined,
+    errorRate: clamp01(random(runtime) * 0.25),
+    latency: 100 + random(runtime) * 220,
+    lastDeploy: random(runtime) < 0.4 ? timestamp(sessionIndex, -2 * DAY_MS) : undefined,
   }));
   const incidents = [] as SysWorldState['incidents'];
   if (sessionIndex % 2 === 0) {
     incidents.push({
       id: `incident-${sessionIndex}-0`,
       severity: sessionIndex % 4 === 0 ? 'critical' : 'high',
-      startTime: new Date(Date.now() - 2 * 3_600_000),
+      startTime: timestamp(sessionIndex, -2 * HOUR_MS),
       duration: 7200,
       services: [services[0].name],
-      blastRadius: clamp01(0.4 + Math.random() * 0.4),
+      blastRadius: clamp01(0.4 + random(runtime) * 0.4),
       status: sessionIndex % 4 === 0 ? 'open' : 'mitigating',
     });
   }
@@ -224,10 +276,10 @@ function buildSysOpsWorldState(sessionIndex: number): SysWorldState {
     incidents.push({
       id: `incident-${sessionIndex}-1`,
       severity: 'medium',
-      startTime: new Date(Date.now() - 5 * 3_600_000),
+      startTime: timestamp(sessionIndex, -5 * HOUR_MS),
       duration: 1800,
       services: [services[1]?.name ?? services[0].name],
-      blastRadius: clamp01(0.2 + Math.random() * 0.3),
+      blastRadius: clamp01(0.2 + random(runtime) * 0.3),
       status: 'resolved',
     });
   }
@@ -237,7 +289,7 @@ function buildSysOpsWorldState(sessionIndex: number): SysWorldState {
     services,
     incidents,
     alerts: sessionIndex % 2 === 0 ? ['latency spike', 'error burst'] : ['routine drift'],
-    timestamp: new Date(),
+    timestamp: timestamp(sessionIndex),
   };
 }
 
@@ -256,7 +308,7 @@ function buildSysOpsActions(sessionIndex: number): SysAction[] {
   return actions;
 }
 
-function scoreSysOpsActions(worldState: SysWorldState, actions: SysAction[]): number[] {
+function scoreSysOpsActions(runtime: TraceRuntime, worldState: SysWorldState, actions: SysAction[]): number[] {
   const avgHostHealth = worldState.hosts.reduce((sum, host) => sum + host.health, 0) / Math.max(1, worldState.hosts.length);
   const criticalIncident = worldState.incidents.some(incident => incident.severity === 'critical');
   const degradedService = worldState.services.some(service => service.health < 0.65);
@@ -267,18 +319,18 @@ function scoreSysOpsActions(worldState: SysWorldState, actions: SysAction[]): nu
     if (action.type === 'failover') return criticalIncident ? 0.9 : 0.35;
     if (action.type === 'rollback') return degradedService ? 0.76 : 0.3;
     return 0.2;
-  }).map(score => jitter(score, 0.26)));
+  }).map(score => jitter(runtime, score, 0.26)));
 }
 
-function logSysOpsTrace(sessionId: string, worldState: SysWorldState, actions: SysAction[], chosenIndex: number): void {
+function logSysOpsTrace(runtime: TraceRuntime, sessionId: string, worldState: SysWorldState, actions: SysAction[], chosenIndex: number, sessionIndex: number): void {
   const stateFeatures = sysStateToStateFeatures(worldState);
   const actionFeatures = actions.map(action => sysActionToActionFeatures(worldState, action));
   const focusTargets: SysFocusTarget[] = actions.map((action, idx) => ({
     id: `${action.target}-${idx}`,
     type: 'service',
-    severity: clamp01(0.4 + (idx === chosenIndex ? 0.45 : 0.12) + Math.random() * 0.1),
-    recency: clamp01(0.4 + Math.random() * 0.3),
-    connectivity: clamp01(0.35 + Math.random() * 0.3),
+    severity: clamp01(0.4 + (idx === chosenIndex ? 0.45 : 0.12) + random(runtime) * 0.1),
+    recency: clamp01(0.4 + random(runtime) * 0.3),
+    connectivity: clamp01(0.35 + random(runtime) * 0.3),
   }));
   const multiFocusFeatures = sysMultiFocusToMultiFocusFeatures(focusTargets);
   const chosenAction = actions[chosenIndex] ?? actions[0];
@@ -288,13 +340,13 @@ function logSysOpsTrace(sessionId: string, worldState: SysWorldState, actions: S
     details: { severity: incident.severity, status: incident.status, services: incident.services },
   }));
   const actionEvents: SysHistory['events'] = worldState.hosts.slice(0, 1).map(host => ({
-    timestamp: new Date(),
+    timestamp: timestamp(sessionIndex),
     type: 'action',
     details: { type: 'restart', target: host.id },
   }));
   const sysEvents: SysHistory['events'] = [...incidentEvents, ...actionEvents];
   const trajectoryFeatures = sysHistoryToTrajectoryFeatures({ events: sysEvents });
-  const policyScores = scoreSysOpsActions(worldState, actions);
+  const policyScores = scoreSysOpsActions(runtime, worldState, actions);
   const attentionWeights = normalizeWeights(focusTargets.map(target => target.severity ?? 0.25));
   const quality = clamp01(
     (chosenAction?.type === 'runbook' ? 0.9 : chosenAction?.type === 'failover' ? 0.84 : 0.72) +
@@ -304,7 +356,7 @@ function logSysOpsTrace(sessionId: string, worldState: SysWorldState, actions: S
 
   appendTraceEntry({
     sessionId,
-    timestamp: new Date(),
+    timestamp: timestamp(sessionIndex),
     phase: 'planning',
     domain: 'sysops',
     organ: 'policy_prior',
@@ -316,11 +368,12 @@ function logSysOpsTrace(sessionId: string, worldState: SysWorldState, actions: S
     decision: chosenAction,
     outcome: { quality },
     trajectoryFeatures,
+    replay: replay(runtime, `sysops-${sessionIndex}-policy-prior`, sessionIndex),
   });
 
   appendTraceEntry({
     sessionId,
-    timestamp: new Date(),
+    timestamp: timestamp(sessionIndex),
     phase: 'planning',
     domain: 'sysops',
     organ: 'attention',
@@ -332,11 +385,12 @@ function logSysOpsTrace(sessionId: string, worldState: SysWorldState, actions: S
     decision: chosenAction,
     outcome: { quality },
     trajectoryFeatures,
+    replay: replay(runtime, `sysops-${sessionIndex}-attention`, sessionIndex),
   });
 
   appendTraceEntry({
     sessionId,
-    timestamp: new Date(),
+    timestamp: timestamp(sessionIndex),
     phase: 'output',
     domain: 'sysops',
     organ: 'risk_outcome',
@@ -358,15 +412,16 @@ function logSysOpsTrace(sessionId: string, worldState: SysWorldState, actions: S
       },
     },
     trajectoryFeatures,
+    replay: replay(runtime, `sysops-${sessionIndex}-risk-outcome`, sessionIndex),
   });
 }
 
-function buildGMWorldState(sessionIndex: number): GMWorldState {
+function buildGMWorldState(runtime: TraceRuntime, sessionIndex: number): GMWorldState {
   const combatActive = sessionIndex % 2 === 0;
   const npcs: GMNpc[] = Array.from({ length: 2 + (sessionIndex % 3) }, (_, idx) => ({
     id: `npc-${sessionIndex}-${idx}`,
     name: `NPC ${sessionIndex}-${idx}`,
-    health: clamp01(0.55 + Math.random() * 0.4 - (combatActive && idx === 0 ? 0.15 : 0)),
+    health: clamp01(0.55 + random(runtime) * 0.4 - (combatActive && idx === 0 ? 0.15 : 0)),
     disposition: idx === 0 && combatActive ? 'hostile' : idx === 1 ? 'friendly' : 'neutral',
     location: idx === 0 ? 'town-square' : 'market',
     state: combatActive && idx === 0 ? 'combat' : 'idle',
@@ -374,19 +429,19 @@ function buildGMWorldState(sessionIndex: number): GMWorldState {
   }));
   const events: GMWorldEvent[] = [
     {
-      timestamp: new Date(Date.now() - 3_600_000),
+      timestamp: timestamp(sessionIndex, -HOUR_MS),
       type: 'player_action' as const,
       details: { action: combatActive ? 'attacked' : 'talked' },
     },
     {
-      timestamp: new Date(Date.now() - 1_800_000),
+      timestamp: timestamp(sessionIndex, -HOUR_MS / 2),
       type: combatActive ? 'combat_start' as const : 'env_change' as const,
       details: { intensity: combatActive ? 'high' : 'medium' },
     },
   ];
   if (sessionIndex % 3 === 0) {
     events.push({
-      timestamp: new Date(Date.now() - 900_000),
+      timestamp: timestamp(sessionIndex, -HOUR_MS / 4),
       type: 'npc_tick',
       details: { mood: 'uneasy' },
     });
@@ -400,7 +455,7 @@ function buildGMWorldState(sessionIndex: number): GMWorldState {
       active: combatActive,
       participants: combatActive ? [npcs[0].id] : [],
       round: combatActive ? 2 + (sessionIndex % 2) : 0,
-      playerHealth: clamp01(0.6 + Math.random() * 0.4 - (combatActive ? 0.2 : 0)),
+      playerHealth: clamp01(0.6 + random(runtime) * 0.4 - (combatActive ? 0.2 : 0)),
       enemiesVisible: combatActive ? 2 + (sessionIndex % 2) : 0,
       lastAction: combatActive ? 'attack' : 'dialogue',
     },
@@ -410,7 +465,7 @@ function buildGMWorldState(sessionIndex: number): GMWorldState {
       playerLowHealth: combatActive && sessionIndex % 3 === 0,
       escalation: sessionIndex % 4 === 0,
     },
-    timestamp: new Date(),
+    timestamp: timestamp(sessionIndex),
   };
 }
 
@@ -429,29 +484,29 @@ function buildGMActions(sessionIndex: number): GMAction[] {
   return actions;
 }
 
-function scoreGMActions(worldState: GMWorldState, actions: GMAction[]): number[] {
+function scoreGMActions(runtime: TraceRuntime, worldState: GMWorldState, actions: GMAction[]): number[] {
   return normalizeWeights(actions.map(action => {
     if (action.type === 'dialogue') return worldState.combat.active ? 0.45 : 0.9;
     if (action.type === 'combat_action') return worldState.combat.active ? 0.92 : 0.4;
     if (action.type === 'escalate') return worldState.flags.escalation ? 0.88 : 0.35;
     return 0.2;
-  }).map(score => jitter(score, 0.25)));
+  }).map(score => jitter(runtime, score, 0.25)));
 }
 
-function logGmTrace(sessionId: string, worldState: GMWorldState, actions: GMAction[], chosenIndex: number): void {
+function logGmTrace(runtime: TraceRuntime, sessionId: string, worldState: GMWorldState, actions: GMAction[], chosenIndex: number, sessionIndex: number): void {
   const stateFeatures = gmStateToStateFeatures(worldState);
   const actionFeatures = actions.map(action => gmActionToActionFeatures(worldState, action));
   const focusTargets: GMFocusTarget[] = actions.map((action, idx) => ({
     id: `${action.type}-${idx}`,
     type: 'npc',
-    severity: clamp01(0.35 + (idx === chosenIndex ? 0.45 : 0.1) + Math.random() * 0.15),
-    recency: clamp01(0.3 + Math.random() * 0.4),
-    connectivity: clamp01(0.3 + Math.random() * 0.35),
+    severity: clamp01(0.35 + (idx === chosenIndex ? 0.45 : 0.1) + random(runtime) * 0.15),
+    recency: clamp01(0.3 + random(runtime) * 0.4),
+    connectivity: clamp01(0.3 + random(runtime) * 0.35),
   }));
   const multiFocusFeatures = gmMultiFocusToMultiFocusFeatures(focusTargets);
   const chosenAction = actions[chosenIndex] ?? actions[0];
   const trajectoryFeatures = gmHistoryToTrajectoryFeatures({ events: worldState.events });
-  const policyScores = scoreGMActions(worldState, actions);
+  const policyScores = scoreGMActions(runtime, worldState, actions);
   const attentionWeights = normalizeWeights(focusTargets.map(target => target.severity ?? 0.25));
   const quality = clamp01(
     (chosenAction?.type === 'dialogue' ? 0.83 : chosenAction?.type === 'combat_action' ? 0.76 : 0.7) +
@@ -461,7 +516,7 @@ function logGmTrace(sessionId: string, worldState: GMWorldState, actions: GMActi
 
   appendTraceEntry({
     sessionId,
-    timestamp: new Date(),
+    timestamp: timestamp(sessionIndex),
     phase: 'planning',
     domain: 'gm',
     organ: 'policy_prior',
@@ -473,11 +528,12 @@ function logGmTrace(sessionId: string, worldState: GMWorldState, actions: GMActi
     decision: chosenAction,
     outcome: { quality },
     trajectoryFeatures,
+    replay: replay(runtime, `gm-${sessionIndex}-policy-prior`, sessionIndex),
   });
 
   appendTraceEntry({
     sessionId,
-    timestamp: new Date(),
+    timestamp: timestamp(sessionIndex),
     phase: 'planning',
     domain: 'gm',
     organ: 'attention',
@@ -489,11 +545,12 @@ function logGmTrace(sessionId: string, worldState: GMWorldState, actions: GMActi
     decision: chosenAction,
     outcome: { quality },
     trajectoryFeatures,
+    replay: replay(runtime, `gm-${sessionIndex}-attention`, sessionIndex),
   });
 
   appendTraceEntry({
     sessionId,
-    timestamp: new Date(),
+    timestamp: timestamp(sessionIndex),
     phase: 'output',
     domain: 'gm',
     organ: 'risk_outcome',
@@ -515,6 +572,7 @@ function logGmTrace(sessionId: string, worldState: GMWorldState, actions: GMActi
       },
     },
     trajectoryFeatures,
+    replay: replay(runtime, `gm-${sessionIndex}-risk-outcome`, sessionIndex),
   });
 }
 
@@ -522,6 +580,9 @@ export async function runTrainingSessions() {
   console.log('Starting training sessions...');
 
   const sessionsPerDomain = 8;
+  const seed = readTraceSeed();
+  const runtime: TraceRuntime = { rng: new SeededRng(seed), seed, step: 0 };
+  console.log(`Using replayable organ trace seed ${seed}.`);
 
   console.log('Running GM sessions...');
   for (let i = 0; i < sessionsPerDomain; i++) {
@@ -531,13 +592,13 @@ export async function runTrainingSessions() {
       domain: 'gm',
       sessionId: `gm-session-${i}`,
     };
-    const worldState = buildGMWorldState(i);
+    const worldState = buildGMWorldState(runtime, i);
     const candidateActions = buildGMActions(i);
-    const chosenIndex = chooseWeightedIndex(scoreGMActions(worldState, candidateActions), 0.25);
+    const chosenIndex = chooseWeightedIndex(runtime, scoreGMActions(runtime, worldState, candidateActions), 0.25);
     const intakeResult = await gmCore.intake({ ...input, worldState });
     const planResult = await gmCore.plan(intakeResult.worldState);
     const actionResult = await gmCore.act(planResult);
-    logGmTrace(input.sessionId, worldState, candidateActions, chosenIndex);
+    logGmTrace(runtime, input.sessionId, worldState, candidateActions, chosenIndex, i);
     void actionResult;
   }
 
@@ -549,13 +610,13 @@ export async function runTrainingSessions() {
       domain: 'sysops',
       sessionId: `sysops-session-${i}`,
     };
-    const worldState = buildSysOpsWorldState(i);
+    const worldState = buildSysOpsWorldState(runtime, i);
     const candidateActions = buildSysOpsActions(i);
-    const chosenIndex = chooseWeightedIndex(scoreSysOpsActions(worldState, candidateActions), 0.25);
+    const chosenIndex = chooseWeightedIndex(runtime, scoreSysOpsActions(runtime, worldState, candidateActions), 0.25);
     const intakeResult = await sysOpsCore.intake({ ...input, worldState });
     const planResult = await sysOpsCore.plan(intakeResult.worldState);
     const actionResult = await sysOpsCore.act(planResult);
-    logSysOpsTrace(input.sessionId, worldState, candidateActions, chosenIndex);
+    logSysOpsTrace(runtime, input.sessionId, worldState, candidateActions, chosenIndex, i);
     void actionResult;
   }
 
@@ -567,13 +628,13 @@ export async function runTrainingSessions() {
       domain: 'chat',
       sessionId: `chat-session-${i}`,
     };
-    const worldState = buildChatWorldState(i);
+    const worldState = buildChatWorldState(runtime, i);
     const candidateActions = buildChatActions(i);
-    const chosenIndex = chooseWeightedIndex(scoreChatActions(worldState, candidateActions), 0.25);
+    const chosenIndex = chooseWeightedIndex(runtime, scoreChatActions(runtime, worldState, candidateActions), 0.25);
     const intakeResult = await chatCore.intake({ ...input, worldState });
     const planResult = await chatCore.plan(intakeResult.worldState);
     const actionResult = await chatCore.act(planResult);
-    logChatTrace(input.sessionId, worldState, candidateActions, chosenIndex);
+    logChatTrace(runtime, input.sessionId, worldState, candidateActions, chosenIndex, i);
     void actionResult;
   }
 

@@ -21,6 +21,8 @@ This document is the start-to-finish handoff for the Synthesus ML organ loop.
 - `tools/selfImprove.ts` is the orchestration wrapper.
 - `packages/organs/cli.ts selfImprove` is the top-level command.
 - `logs/organ_evaluation_scorecard.json` and `logs/organ_evaluation_scorecard.md` are runtime artifacts and are ignored by Git.
+- `tools/runTrainingSessions.ts` now emits deterministic replay metadata on each organ trace: generator version, seed, scenario ID, step, and simulated timestamp.
+- Set `SYNTHESUS_ORGAN_TRACE_SEED=<integer>` to replay the same GM/SysOps/Chat trace scenarios with a different deterministic seed.
 
 ## Fresh start to finish
 
@@ -93,6 +95,7 @@ Expected behavior:
 - if trace data exists, the Python trainer uses it
 - if no trace data exists, it falls back to synthetic training data
 - the command exits cleanly and writes model files and a scorecard
+- the scorecard reports replay metadata coverage for each domain/organ slice
 
 ### 10. Push source changes only
 
@@ -106,6 +109,7 @@ Before pushing:
 - If the trace log is too uniform, training will be numerically weak even if the pipeline is wired correctly.
 - If the trace file is missing, the trainer will silently fall back to synthetic data.
 - If you change the trace schema, update this document, `AGENTS.md`, and `AGENT_LOG.md` together.
+- If replay coverage drops below 100% on newly generated traces, check that every `appendTraceEntry` call includes `replay` metadata.
 - If the evaluation scorecard shows validation below baseline, the next lever is broader trace diversity, not orchestration changes.
 
 ## Recovery checklist for another chat

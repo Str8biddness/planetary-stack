@@ -231,6 +231,12 @@ This repo is currently in a validated PPBRS baseline state. Future PPBRS optimiz
 - `tools/evaluate_organs.py` now generates a trace-driven scorecard after the self-improvement loop.
 - The next improvement lever is broader real-world trace breadth, not basic orchestration.
 
+### Replayability update (2026-05-30)
+- `tools/runTrainingSessions.ts` emits deterministic traces by default with `TraceReplayMetadata` on every generated organ trace.
+- Use `SYNTHESUS_ORGAN_TRACE_SEED=<integer>` to replay or vary deterministic GM/SysOps/Chat training scenarios.
+- `tools/evaluate_organs.py` reports replay metadata coverage in the runtime scorecard; newly generated trace slices should stay at 100%.
+- Runtime artifacts remain ignored: commit the generator/evaluator source and docs, not `logs/teacher_traces.jsonl`, `logs/organ_evaluation_scorecard.*`, or `data/models/`.
+
 ## Emergent Resonance & Consciousness Loop (2026-05-05)
 
 ... (rest of the section) ...

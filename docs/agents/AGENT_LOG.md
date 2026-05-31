@@ -1501,3 +1501,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Quad Brain quality is now covered by a deterministic regression instead of only topology/trace assertions.
 - The state contract remains serialized: `knowledge -> executive -> cgpu -> critic`, with no uncontrolled multi-agent fan-out.
+
+## Current Session — 2026-05-30 (Agent 9 — Replayable Organ Traces)
+
+### 📝 Summary
+- Added deterministic replay metadata to the organ training trace contract through `TraceReplayMetadata` and replay fields on teacher trace entries.
+- Converted `tools/runTrainingSessions.ts` from wall-clock/random traces to seeded deterministic GM/SysOps/Chat scenario generation with `SYNTHESUS_ORGAN_TRACE_SEED` override support.
+- Updated `tools/evaluate_organs.py` so organ scorecards report replay metadata coverage alongside scientific consistency.
+- Updated the Phase 7 checklist and ML organ handoff docs; generated traces, scorecards, and models remain ignored runtime artifacts.
+
+### ✅ Verified
+- `python -m py_compile tools/evaluate_organs.py tools/train_triad.py`
+- `npx tsc --noEmit --skipLibCheck --esModuleInterop --module commonjs --target ES2020 tools/runTrainingSessions.ts packages/core/learning/teacherTrace.ts`
+- `SYNTHESUS_ORGAN_TRACE_SEED=950907 npx ts-node --compiler-options '{"module":"commonjs","esModuleInterop":true}' -e "import { runTrainingSessions } from './tools/runTrainingSessions'; runTrainingSessions().then(() => console.log('replay smoke complete'))"`
+- `python tools/evaluate_organs.py --domain chat` — chat trace slices reported 100% scientific consistency and 100% replay metadata coverage.
+
+### 🚧 Left Off / Next Steps
+- Extend replayable trace storage from organ-training traces into real Synthesus 5 runtime conversation traces and the Phase 8 comparison harness.
+- Add model-backed or fixture-backed evaluator checks that fail when newly generated trace slices drop below 100% replay coverage.
+- Keep pre-existing unrelated working-tree changes in `AGENTS.md`, `README.md`, and untracked `synthesus_framework/` separated from Agent 9 source/doc commits.
+
+### 💡 Architectural Notes
+- Organs remain CHAL accelerators under the training loop; deterministic replay metadata makes their generated training slices auditable without treating them as independent uncontrolled brains.
+- Replay metadata is intentionally lightweight: generator version, seed, scenario ID, step, and simulated timestamp are enough to reconstruct the seeded synthetic scenario path while keeping runtime logs out of Git.

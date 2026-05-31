@@ -7,6 +7,14 @@ import { StateFeatures, ActionFeatures, TrajectoryFeatures, MultiFocusFeatures }
 
 export type TracePhase = 'intake' | 'planning' | 'output';
 
+export interface TraceReplayMetadata {
+  generator: string;
+  seed: number;
+  scenarioId: string;
+  step: number;
+  simulatedTime: string;
+}
+
 export interface IntakeTraceEntry {
   sessionId: string;
   timestamp: Date;
@@ -17,6 +25,7 @@ export interface IntakeTraceEntry {
   organOutputs?: Record<string, any>;
   decision?: any;
   outcome?: any;
+  replay?: TraceReplayMetadata;
 }
 
 export interface PlanningTraceEntry {
@@ -36,6 +45,7 @@ export interface PlanningTraceEntry {
     [key: string]: any;
   };
   trajectoryFeatures?: TrajectoryFeatures;
+  replay?: TraceReplayMetadata;
 }
 
 export interface OutputTraceEntry {
@@ -59,6 +69,7 @@ export interface OutputTraceEntry {
   multiFocusFeatures?: MultiFocusFeatures;
   attentionWeights?: number[];
   chosenActionIndex?: number;
+  replay?: TraceReplayMetadata;
 }
 
 export interface TeacherTraceLogger {
