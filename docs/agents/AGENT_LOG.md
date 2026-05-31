@@ -1546,6 +1546,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 - Quad Brain arbitration is now a documented API debug contract, not just an internal telemetry blob.
 - The public API still exposes a legacy-compatible response envelope; typed Synthesus 5 internals live under `debug.cognitive_hypervisor` when callers opt into debug traces.
 
+## Current Session — 2026-05-31 (Agent 7 — Quad Brain State Contract)
+
+### 📝 Summary
+- Added `QuadBrainStateTransition` records to the serialized Quad Brain arbiter so each of the four fixed brain outputs exposes its input and output state refs.
+- Mirrored each role's state transition into its own output trace and added `required_roles` plus `final_output_ref=critic.selected_response` to `QuadBrainArbitration.state_contract`.
+- Updated Dual Hemisphere and CGPU docs, then marked the four Phase 3 specialized brain checklist items complete because each now has a runnable CHAL device output, serialized arbitration slot, and trace-verified state contract.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/quad_brain.py packages/core/chal/__init__.py tests/test_chal_hypervisor.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_chal_hypervisor.py` — 13 passed.
+
+### 🚧 Left Off / Next Steps
+- Mirror the expanded Quad Brain `state_contract.state_transitions` shape into OpenAPI/API schema docs if external clients begin validating those nested fields strictly.
+- Continue Phase 6 conversion/removal of the seven `legacy_quarantine_required` template surfaces from the template audit.
+
+### 💡 Architectural Notes
+- The Quad Brain path remains a bounded four-role topology with `parallel_brain_spawn=false`; this change only makes the existing serialized state handoff inspectable and testable.
+- CGPU remains an intermediate render device: it emits candidates and a selected candidate for the critic, while `critic.selected_response` is the documented final output ref.
+
 ## Current Session — 2026-05-31 (Agent 1 — CHAL API Smoke Command)
 
 ### 📝 Summary

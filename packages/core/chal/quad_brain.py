@@ -36,6 +36,22 @@ class QuadBrainRole(str, Enum):
 
 
 @dataclass(frozen=True)
+class QuadBrainStateTransition:
+    role: QuadBrainRole
+    input_refs: list[str]
+    output_refs: list[str]
+    device: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "role": self.role.value,
+            "input_refs": list(self.input_refs),
+            "output_refs": list(self.output_refs),
+            "device": self.device,
+        }
+
+
+@dataclass(frozen=True)
 class QuadBrainOutput:
     role: QuadBrainRole
     device: str
@@ -98,12 +114,14 @@ class QuadBrainOrchestrator:
     ) -> QuadBrainArbitration:
         start = time.time()
         serial_order = [role.value for role in QuadBrainRole]
+        transitions = self._state_transitions()
 
         knowledge = self._knowledge_grounding(
             query=query,
             decision=decision,
             bridge_result=bridge_result,
             rag_context=rag_context,
+            transition=transitions[QuadBrainRole.KNOWLEDGE_GROUNDING],
         )
         executive = self._executive_reasoning(
             query=query,
@@ -113,6 +131,7 @@ class QuadBrainOrchestrator:
             character_context=character_context,
             constraints=constraints or [],
             max_tokens=max_tokens,
+            transition=transitions[QuadBrainRole.EXECUTIVE_REASONING],
         )
         cgpu = self._cgpu_rendering(
             query=query,
@@ -120,8 +139,13 @@ class QuadBrainOrchestrator:
             executive=executive,
             knowledge=knowledge,
             character_context=character_context,
+            transition=transitions[QuadBrainRole.CGPU_RENDERING],
         )
-        critic = self._critic_metacognition(cgpu=cgpu, surface=surface)
+        critic = self._critic_metacognition(
+            cgpu=cgpu,
+            surface=surface,
+            transition=transitions[QuadBrainRole.CRITIC_METACOGNITION],
+        )
 
         selected_response = str(critic.content.get("selected_response") or "")
         selected_source = "critic_metacognition"
@@ -142,6 +166,12 @@ class QuadBrainOrchestrator:
                 "template_leakage_allowed": surface is not TemplateSurface.NORMAL,
                 "bridge_trace_id": bridge_result.get("hypervisor_trace", {}).get("trace_id"),
                 "route": decision.route.value,
+                "required_roles": serial_order,
+                "state_transitions": [
+                    transitions[role].to_dict()
+                    for role in QuadBrainRole
+                ],
+                "final_output_ref": "critic.selected_response",
             },
             latency_ms=(time.time() - start) * 1000,
         )
@@ -153,6 +183,7 @@ class QuadBrainOrchestrator:
         decision: HypervisorDecision,
         bridge_result: Mapping[str, Any],
         rag_context: str,
+        transition: QuadBrainStateTransition,
     ) -> QuadBrainOutput:
         facts = self._facts_from_context(rag_context)
         if not facts:
@@ -175,7 +206,11 @@ class QuadBrainOrchestrator:
                 ),
             },
             confidence=0.78 if facts else 0.35,
-            trace={"trace_id": decision.trace_id, "source": "rag_context_or_bridge_result"},
+            trace={
+                "trace_id": decision.trace_id,
+                "source": "rag_context_or_bridge_result",
+                "state_transition": transition.to_dict(),
+            },
             warnings=[] if facts else ["no_grounding_facts_available"],
         )
 
@@ -189,6 +224,7 @@ class QuadBrainOrchestrator:
         character_context: Mapping[str, Any] | None,
         constraints: list[str],
         max_tokens: int,
+        transition: QuadBrainStateTransition,
     ) -> QuadBrainOutput:
         facts = [str(fact) for fact in knowledge.content.get("facts", []) if str(fact).strip()]
         style = "concise" if max_tokens <= 256 else "balanced"
@@ -217,7 +253,11 @@ class QuadBrainOrchestrator:
                 "bridge_hemisphere_used": bridge_result.get("hemisphere_used"),
             },
             confidence=0.82,
-            trace={"trace_id": decision.trace_id, "candidate_budget": decision.budget.candidate_count},
+            trace={
+                "trace_id": decision.trace_id,
+                "candidate_budget": decision.budget.candidate_count,
+                "state_transition": transition.to_dict(),
+            },
         )
 
     def _cgpu_rendering(
@@ -228,6 +268,7 @@ class QuadBrainOrchestrator:
         executive: QuadBrainOutput,
         knowledge: QuadBrainOutput,
         character_context: Mapping[str, Any] | None,
+        transition: QuadBrainStateTransition,
     ) -> QuadBrainOutput:
         plan = ResponsePlan(**executive.content["plan"])
         facts = [str(fact) for fact in knowledge.content.get("facts", []) if str(fact).strip()]
@@ -249,7 +290,7 @@ class QuadBrainOrchestrator:
             device=output.device,
             content=output.to_dict(),
             confidence=output.confidence,
-            trace=output.trace,
+            trace={**output.trace, "state_transition": transition.to_dict()},
             warnings=list(output.warnings),
         )
 
@@ -258,6 +299,7 @@ class QuadBrainOrchestrator:
         *,
         cgpu: QuadBrainOutput,
         surface: TemplateSurface,
+        transition: QuadBrainStateTransition,
     ) -> QuadBrainOutput:
         selected = str(cgpu.content.get("selected_text") or "")
         guard_result = self._template_guard.inspect(selected, surface=surface)
@@ -277,9 +319,38 @@ class QuadBrainOrchestrator:
             trace={
                 "trace_id": cgpu.content.get("trace_id") or f"critic-{uuid.uuid4().hex[:12]}",
                 "safety_arbitration_required": True,
+                "state_transition": transition.to_dict(),
             },
             warnings=warnings,
         )
+
+    def _state_transitions(self) -> dict[QuadBrainRole, QuadBrainStateTransition]:
+        return {
+            QuadBrainRole.KNOWLEDGE_GROUNDING: QuadBrainStateTransition(
+                role=QuadBrainRole.KNOWLEDGE_GROUNDING,
+                device="chal://knowledge/grounding",
+                input_refs=["query", "rag_context", "hemisphere_bridge.response"],
+                output_refs=["knowledge.facts", "knowledge.provenance"],
+            ),
+            QuadBrainRole.EXECUTIVE_REASONING: QuadBrainStateTransition(
+                role=QuadBrainRole.EXECUTIVE_REASONING,
+                device="chal://reasoning/executive",
+                input_refs=["hypervisor.decision", "knowledge.facts", "constraints"],
+                output_refs=["executive.response_plan", "executive.constraints"],
+            ),
+            QuadBrainRole.CGPU_RENDERING: QuadBrainStateTransition(
+                role=QuadBrainRole.CGPU_RENDERING,
+                device="chal://cgpu/render",
+                input_refs=["executive.response_plan", "knowledge.facts", "character_context"],
+                output_refs=["cgpu.candidates", "cgpu.selected_candidate"],
+            ),
+            QuadBrainRole.CRITIC_METACOGNITION: QuadBrainStateTransition(
+                role=QuadBrainRole.CRITIC_METACOGNITION,
+                device="chal://critic/metacognition",
+                input_refs=["cgpu.selected_candidate", "template_surface"],
+                output_refs=["critic.selected_response", "critic.template_guard"],
+            ),
+        }
 
     def _intent_for_route(self, route: HypervisorRoute) -> str:
         if route == HypervisorRoute.SAFETY_PATH:

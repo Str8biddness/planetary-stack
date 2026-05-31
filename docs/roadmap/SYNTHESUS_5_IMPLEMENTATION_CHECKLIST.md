@@ -63,13 +63,13 @@ Legend:
 
 ## Phase 3: Quad Brain MVP
 
-- [~]  Implement Brain 1: Knowledge / Grounding as a CHAL device consumer. Session log: 2026-05-28 Agent 7 Quad Brain arbiter added `chal://knowledge/grounding` output frames inside serialized arbitration.
+- [x]  Implement Brain 1: Knowledge / Grounding as a CHAL device consumer. Session log: 2026-05-28 Agent 7 Quad Brain arbiter added `chal://knowledge/grounding` output frames inside serialized arbitration; 2026-05-31 Agent 7 added per-role Quad Brain state transitions that expose Knowledge/Grounding inputs and outputs in trace metadata.
 
-- [~]  Implement Brain 2: Executive Reasoning as planner/constraint controller. Session log: 2026-05-28 Agent 7 Quad Brain arbiter added `chal://reasoning/executive` plan frames.
+- [x]  Implement Brain 2: Executive Reasoning as planner/constraint controller. Session log: 2026-05-28 Agent 7 Quad Brain arbiter added `chal://reasoning/executive` plan frames; 2026-05-31 Agent 7 added trace-verified `executive.response_plan` and constraint state outputs.
 
-- [~]  Implement Brain 3: CGPU Simulation / Rendering as candidate generator. Session log: 2026-05-28 Agent 7 Quad Brain arbiter now invokes `CGPURenderer` from the Quad Brain path.
+- [x]  Implement Brain 3: CGPU Simulation / Rendering as candidate generator. Session log: 2026-05-28 Agent 7 Quad Brain arbiter now invokes `CGPURenderer` from the Quad Brain path; 2026-05-31 Agent 7 added trace-verified `cgpu.candidates` and `cgpu.selected_candidate` state outputs.
 
-- [~]  Implement Brain 4: Critic / Safety / Metacognition as evaluator/rewrite trigger. Session log: 2026-05-28 Agent 7 Quad Brain arbiter added critic/metacognition template-guard arbitration.
+- [x]  Implement Brain 4: Critic / Safety / Metacognition as evaluator/rewrite trigger. Session log: 2026-05-28 Agent 7 Quad Brain arbiter added critic/metacognition template-guard arbitration; 2026-05-31 Agent 7 added trace-verified `critic.selected_response` and `critic.template_guard` final-output contract.
 
 - [x]  Add serialized arbiter that merges four brain outputs into a single response frame. Session log: 2026-05-28 Agent 7 Quad Brain arbiter.
 

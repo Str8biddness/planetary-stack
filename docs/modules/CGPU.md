@@ -41,6 +41,8 @@ Runtime guard code lives in `packages/reasoning/generation/template_guard.py`. T
 
 The runtime trace is exposed at `telemetry.quad_brain` and mirrored into `bridge_result.quad_brain_arbitration`. It includes the four brain outputs, fixed `serial_order`, CGPU candidate diagnostics, template-guard status, and a state contract that explicitly records serialized arbitration and no parallel brain spawning.
 
+The Quad Brain state contract now includes a per-role state-transition chain. CGPU consumes `executive.response_plan`, `knowledge.facts`, and `character_context`, then emits `cgpu.candidates` and `cgpu.selected_candidate` for the critic. This keeps CGPU render output inspectable as an intermediate device frame, not a direct final response path.
+
 ## Validation
 
 Focused validation:

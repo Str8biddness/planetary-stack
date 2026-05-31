@@ -169,9 +169,36 @@ def test_hypervisor_quad_brain_path_serializes_four_brain_arbitration():
     assert quad_trace["serial_order"] == [role.value for role in QuadBrainRole]
     assert quad_trace["state_contract"]["serialized_arbitration"] is True
     assert quad_trace["state_contract"]["parallel_brain_spawn"] is False
+    assert quad_trace["state_contract"]["required_roles"] == [role.value for role in QuadBrainRole]
+    assert quad_trace["state_contract"]["final_output_ref"] == "critic.selected_response"
     assert quad_trace["selected_source"] == "critic_metacognition"
     assert "routed through both" in result.response
     assert result.bridge_result["quad_brain_arbitration"]["trace_id"] == result.decision.trace_id
+
+
+def test_quad_brain_trace_records_serial_state_transitions():
+    bridge = PersonaBridge()
+    hypervisor = CognitiveHypervisor(bridge_factory=lambda: bridge)
+
+    result = asyncio.run(
+        hypervisor.process_query(
+            "Render Archivist dialogue about the sealed gate",
+            character_context={"character_id": "Archivist", "stance": "cautious"},
+        )
+    )
+
+    quad_trace = result.telemetry["quad_brain"]
+    transitions = quad_trace["state_contract"]["state_transitions"]
+
+    assert [transition["role"] for transition in transitions] == [role.value for role in QuadBrainRole]
+    assert transitions[0]["input_refs"] == ["query", "rag_context", "hemisphere_bridge.response"]
+    assert transitions[0]["output_refs"] == ["knowledge.facts", "knowledge.provenance"]
+    assert transitions[1]["input_refs"] == ["hypervisor.decision", "knowledge.facts", "constraints"]
+    assert transitions[2]["device"] == "chal://cgpu/render"
+    assert transitions[3]["output_refs"] == ["critic.selected_response", "critic.template_guard"]
+
+    for output, transition in zip(quad_trace["outputs"], transitions):
+        assert output["trace"]["state_transition"] == transition
 
 
 def test_quad_brain_dispatch_preserves_grounding_and_improves_persona_surface_over_dual_hemi():

@@ -180,3 +180,16 @@ The arbiter intentionally runs these brain outputs in a fixed serial order after
 ### Quad Brain Quality Regression Update (2026-05-30)
 
 `tests/test_chal_hypervisor.py` now compares the raw legacy dual-hemi bridge surface against the full Quad Brain hypervisor path for an NPC/persona dialogue fixture. The regression verifies that Quad Brain preserves the grounded fact, adds persona-appropriate CGPU rendering, keeps serialized arbitration/no-sprawl state contracts in trace metadata, and avoids normal-path template leakage. This closes the Phase 3 checklist item requiring evidence that four-brain dispatch improves or preserves output quality over the legacy dual-hemi surface.
+
+### Quad Brain State-Contract Update (2026-05-31)
+
+`QuadBrainArbitration.state_contract.state_transitions` now records the inspectable state chain for all four brains in the fixed arbitration order. Each output trace mirrors its own transition record:
+
+| Brain | Inputs | Outputs |
+|-------|--------|---------|
+| Knowledge / Grounding | `query`, `rag_context`, `hemisphere_bridge.response` | `knowledge.facts`, `knowledge.provenance` |
+| Executive Reasoning | `hypervisor.decision`, `knowledge.facts`, `constraints` | `executive.response_plan`, `executive.constraints` |
+| CGPU Simulation / Rendering | `executive.response_plan`, `knowledge.facts`, `character_context` | `cgpu.candidates`, `cgpu.selected_candidate` |
+| Critic / Safety / Metacognition | `cgpu.selected_candidate`, `template_surface` | `critic.selected_response`, `critic.template_guard` |
+
+The contract also exposes `required_roles` and `final_output_ref=critic.selected_response`, so trace consumers can verify that normal Quad Brain responses pass through grounding, executive planning, CGPU rendering, and critic arbitration before emission.

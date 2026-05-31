@@ -34,6 +34,7 @@ from .quad_brain import (
     QuadBrainOrchestrator,
     QuadBrainOutput,
     QuadBrainRole,
+    QuadBrainStateTransition,
 )
 
 __all__ = [
@@ -57,6 +58,7 @@ __all__ = [
     "QuadBrainOrchestrator",
     "QuadBrainOutput",
     "QuadBrainRole",
+    "QuadBrainStateTransition",
     "TelemetryRecord",
     "CognitiveFrameCheckpoint",
     "CognitiveFrameExecutionPlan",
