@@ -73,6 +73,21 @@ CGPU device-frame schemas are documented separately as `CGPUFrame` and
 `CGPUOutputFrame`; `/api/v1/query` does not emit CGPU candidate sets as top-level
 payloads.
 
+### Synthesus 5 Smoke Command
+
+Run the focused CHAL API smoke check from the repository root:
+
+```bash
+SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_chal_smoke.py
+```
+
+The command uses the FastAPI app in-process and sends three public
+`/api/v1/query` calls with `mode="chal"` and `include_debug=true`. It fails if
+the CHAL response source is missing, hypervisor trace schema is absent, the
+expected grounded/Quad Brain/safety route is not selected, the request degrades
+or exhausts budget, Quad Brain serial-order telemetry is malformed, or a legacy
+template signature leaks into final text.
+
 ## Endpoints
 
 | Endpoint | Method | Description |

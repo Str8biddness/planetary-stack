@@ -1545,3 +1545,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Quad Brain arbitration is now a documented API debug contract, not just an internal telemetry blob.
 - The public API still exposes a legacy-compatible response envelope; typed Synthesus 5 internals live under `debug.cognitive_hypervisor` when callers opt into debug traces.
+
+## Current Session — 2026-05-31 (Agent 1 — CHAL API Smoke Command)
+
+### 📝 Summary
+- Added `tools/synthesus5_chal_smoke.py`, an operator-friendly smoke command for the public `/api/v1/query` Synthesus 5 CHAL path.
+- The smoke runs three in-process FastAPI turns with `mode="chal"` and `include_debug=true`, covering grounded Knowledge Cloud hardware routing, Quad Brain NPC/CGPU arbitration, and safety-path routing.
+- The command fails on missing `cognitive_hypervisor` source, missing trace schema, wrong route, degraded/budget-exhausted execution, malformed Quad Brain serial order, empty responses, or legacy template-signature leakage.
+- Updated `docs/PHASE20_PRODUCTION_API.md` and marked the Phase 10 smoke-command checklist item complete.
+
+### ✅ Verified
+- `python -m py_compile tools/synthesus5_chal_smoke.py packages/api/production_server.py packages/core/chal/hypervisor.py tests/e2e/test_chat_e2e.py`
+- `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/api python tools/synthesus5_chal_smoke.py` — passed; grounded, Quad Brain, and safety turns all returned `source="cognitive_hypervisor"` with no template leaks.
+- `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/api python -m pytest -q tests/e2e/test_chat_e2e.py::TestChatE2E::test_chal_mode_routes_through_cognitive_hypervisor tests/test_chal_hypervisor.py` — 12 passed, 8 warnings.
+
+### 🚧 Left Off / Next Steps
+- Add a broader focused Synthesus 5 test-suite command that combines the smoke command, `tests/test_chal_hypervisor.py`, and the API CHAL E2E assertion.
+- Add provenance traces from Knowledge Cloud mount metadata into the public CHAL debug envelope.
+- Keep pre-existing unrelated working-tree changes in `AGENTS.md`, `README.md`, and untracked `synthesus_framework/` separated from Agent 1 source/doc commits.
+
+### 💡 Architectural Notes
+- The smoke command validates the public API contract rather than exact bridge wording, which keeps it useful while the current Python fallback bridge still owns raw surface text.
+- Synthesus 5 CHAL release readiness now has a single command that proves the opt-in API route can execute grounded, Quad Brain, and safety workloads end to end.

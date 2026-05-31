@@ -176,7 +176,7 @@ Legend:
 
 - [ ]  Add full focused test suite for Synthesus 5 path.
 
-- [ ]  Add smoke command that runs an end-to-end Synthesus 5 conversation.
+- [x]  Add smoke command that runs an end-to-end Synthesus 5 conversation. Session log: 2026-05-31 Agent 1 CHAL API smoke command.
 
 - [ ]  Add performance baseline and regression guard.
 
