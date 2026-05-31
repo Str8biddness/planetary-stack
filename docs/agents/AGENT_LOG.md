@@ -1725,3 +1725,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Phase 6 now has a repeatable classification gate rather than a one-time grep note.
 - Explicit NPC script and platform/security templates remain allowed only as labeled exception surfaces; normal-path PPBRS and legacy API emitters stay visible for quarantine/removal work.
+
+## Current Session — 2026-05-31 (Knowledge Hardware Complete Mount Interface)
+
+### 📝 Summary
+- Completed the Phase 5 Knowledge Cloud CHAL mount interface by mapping the remaining public bundle hardware artifacts into the runtime mount table.
+- Added `knowledge_cloud/learned_transitions.json` as `/mnt/params/learned_transitions` with the `learned_transition_priors` namespace.
+- Added `knowledge.meta.db` as `/mnt/provenance/knowledge_metadata` so the second metadata sidecar is integrity-checked and surfaced alongside `knowledge.kndb.meta.db`.
+- Updated the Phase 5 checklist and KN module documentation to require the full ten-mount cold-start hardware surface.
+
+### ✅ Verified
+- `python -m py_compile packages/knowledge/mount_table.py tests/test_knowledge_mount_table.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_knowledge_mount_table.py` — 9 passed, 3 warnings.
+- `python tools/validate_knowledge_cold_start.py --root /home/workspace/synthesus-knowledge-cloud/artifacts` — passed; 10 active mounts and 10 checked artifacts.
+- `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_focused_suite.py` — passed, including the updated cold-start integrity gate.
+
+### 🚧 Left Off / Next Steps
+- Continue Phase 6 conversion/removal of the seven `legacy_quarantine_required` template surfaces from `tools/audit_template_surfaces.py`.
+- Consider a writeback transaction API on top of the existing `WRITEBACK_MEMORY` mount type before allowing any runtime process to mutate Knowledge Cloud sidecars directly.
+
+### 💡 Architectural Notes
+- The public Knowledge Cloud artifact bundle now cold-boots as a complete CHAL hardware surface: ROM, parameter disk, grounding corpus, provenance plane, and existing writeback-memory interface support.
+- Manifest-backed metadata sidecars remain provenance mounts rather than writable mounts, preserving artifact hash integrity during runtime use.

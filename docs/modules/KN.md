@@ -138,11 +138,13 @@ Default mount mappings:
 | `knowledge_cloud/evolution.json` | `/mnt/rom/evolution` | ROM |
 | `knowledge_cloud/transitions.json` | `/mnt/params/transitions` | PARAMETER_DISK |
 | `knowledge_cloud/chaining_patterns.json` | `/mnt/params/chaining_patterns` | PARAMETER_DISK |
+| `knowledge_cloud/learned_transitions.json` | `/mnt/params/learned_transitions` | PARAMETER_DISK |
 | `models/swarm_embedder.pkl` | `/mnt/params/swarm_embedder` | PARAMETER_DISK |
 | `faiss.index` | `/mnt/corpus/faiss` | GROUNDING_CORPUS |
 | `faiss_metadata.json` | `/mnt/provenance/faiss_metadata` | SOURCE_PROVENANCE |
 | `knowledge.kndb` | `/mnt/rom/knowledge_nodes` | ROM |
 | `knowledge.kndb.meta.db` | `/mnt/provenance/kndb_metadata` | SOURCE_PROVENANCE |
+| `knowledge.meta.db` | `/mnt/provenance/knowledge_metadata` | SOURCE_PROVENANCE |
 
 `CHALMemoryController` attempts this manifest-backed boot before falling back to legacy default mounts. Failed integrity checks deactivate the affected mount and set trust to `0.0`; strict boot mode raises immediately.
 
@@ -173,11 +175,13 @@ The command boots the Knowledge Cloud artifact manifest through `KnowledgeCloudM
 - `/mnt/rom/world_lore`
 - `/mnt/params/transitions`
 - `/mnt/params/chaining_patterns`
+- `/mnt/params/learned_transitions`
 - `/mnt/params/swarm_embedder`
 - `/mnt/corpus/faiss`
 - `/mnt/provenance/faiss_metadata`
 - `/mnt/rom/knowledge_nodes`
 - `/mnt/provenance/kndb_metadata`
+- `/mnt/provenance/knowledge_metadata`
 
 By default, the command uses `SYNTHESUS_KNOWLEDGE_ROOT` when set, then the companion `synthesus-knowledge-cloud/artifacts` checkout when present, and finally the runtime `data/` directory. It is also part of `tools/synthesus5_focused_suite.py`, so the source-only Synthesus 5 release gate now fails if the mounted Knowledge Cloud bundle cannot cold boot.
 

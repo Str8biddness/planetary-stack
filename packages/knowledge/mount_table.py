@@ -59,6 +59,13 @@ DEFAULT_MOUNT_SPECS: dict[str, tuple[str, MountType, str, bool, str]] = {
         True,
         "local",
     ),
+    "knowledge_cloud/learned_transitions.json": (
+        "/mnt/params/learned_transitions",
+        MountType.PARAMETER_DISK,
+        "learned_transition_priors",
+        True,
+        "local",
+    ),
     "models/swarm_embedder.pkl": (
         "/mnt/params/swarm_embedder",
         MountType.PARAMETER_DISK,
@@ -94,17 +101,26 @@ DEFAULT_MOUNT_SPECS: dict[str, tuple[str, MountType, str, bool, str]] = {
         True,
         "local",
     ),
+    "knowledge.meta.db": (
+        "/mnt/provenance/knowledge_metadata",
+        MountType.SOURCE_PROVENANCE,
+        "source_provenance",
+        True,
+        "local",
+    ),
 }
 
 COLD_START_REQUIRED_MOUNTS: tuple[str, ...] = (
     "/mnt/rom/world_lore",
     "/mnt/params/transitions",
     "/mnt/params/chaining_patterns",
+    "/mnt/params/learned_transitions",
     "/mnt/params/swarm_embedder",
     "/mnt/corpus/faiss",
     "/mnt/provenance/faiss_metadata",
     "/mnt/rom/knowledge_nodes",
     "/mnt/provenance/kndb_metadata",
+    "/mnt/provenance/knowledge_metadata",
 )
 
 

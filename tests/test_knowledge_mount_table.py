@@ -145,18 +145,25 @@ def test_mount_table_validates_cold_start_required_mounts(tmp_path: Path):
         _write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n'),
         _write_artifact(tmp_path, "knowledge_cloud/transitions.json", b'{"edges": []}\n'),
         _write_artifact(tmp_path, "knowledge_cloud/chaining_patterns.json", b'{"patterns": []}\n'),
+        _write_artifact(tmp_path, "knowledge_cloud/learned_transitions.json", b'{"learned_transitions": {}}\n'),
         _write_artifact(tmp_path, "models/swarm_embedder.pkl", b"model-bytes"),
         _write_artifact(tmp_path, "faiss.index", b"index-bytes"),
         _write_artifact(tmp_path, "faiss_metadata.json", b'{"sources": []}\n'),
         _write_artifact(tmp_path, "knowledge.kndb", b"kndb-bytes"),
         _write_artifact(tmp_path, "knowledge.kndb.meta.db", b"metadata-bytes"),
+        _write_artifact(tmp_path, "knowledge.meta.db", b"knowledge-metadata-bytes"),
     ]
     _write_manifest(tmp_path, artifacts)
 
     report = KnowledgeCloudMountTable().validate_cold_start_bundle(tmp_path)
+    mounts = {mount.mount_path: mount for mount in report.mounts}
 
     assert report.ok is True
     assert report.missing_active_mounts(COLD_START_REQUIRED_MOUNTS) == ()
+    assert mounts["/mnt/params/learned_transitions"].mount_type == MountType.PARAMETER_DISK
+    assert mounts["/mnt/provenance/knowledge_metadata"].mount_type == MountType.SOURCE_PROVENANCE
+    assert mounts["/mnt/params/learned_transitions"].partition.metadata["relative_path"] == "knowledge_cloud/learned_transitions.json"
+    assert mounts["/mnt/provenance/knowledge_metadata"].partition.metadata["relative_path"] == "knowledge.meta.db"
 
 
 def test_mount_table_cold_start_rejects_missing_required_mount(tmp_path: Path):

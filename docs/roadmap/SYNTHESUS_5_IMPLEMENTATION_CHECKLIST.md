@@ -97,7 +97,7 @@ Legend:
 
 - [ ] 
 
-- \[\~\] Define CHAL mount and partition interfaces for ROM, parameter disk, grounding corpus, and writeback memory.
+- [x]  Define CHAL mount and partition interfaces for ROM, parameter disk, grounding corpus, provenance, and writeback memory. Session log: 2026-05-31 Knowledge Hardware Complete Mount Interface.
 - [x]  Upgrade KAL into a CHAL memory controller. Session log: 2026-05-28 Knowledge Cloud mount table.
 
 - [x]  Add mount table boot sequence. Session log: 2026-05-28 Knowledge Cloud mount table.
