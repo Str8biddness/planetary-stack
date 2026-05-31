@@ -1567,3 +1567,23 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The smoke command validates the public API contract rather than exact bridge wording, which keeps it useful while the current Python fallback bridge still owns raw surface text.
 - Synthesus 5 CHAL release readiness now has a single command that proves the opt-in API route can execute grounded, Quad Brain, and safety workloads end to end.
+
+## Current Session — 2026-05-31 (Agent 1 — Focused Release Suite)
+
+### 📝 Summary
+- Added `tools/synthesus5_focused_suite.py` as the Phase 10 focused release-readiness gate for the explicit Synthesus 5 CHAL path.
+- The suite compiles the release-path Python modules, runs the CHAL API smoke command, verifies hypervisor/API E2E regressions, and runs the PPBRS firmware plus Phase 8 comparison-harness checks with the correct local `PYTHONPATH` and `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off`.
+- Documented the command in `docs/PHASE20_PRODUCTION_API.md` and marked the Phase 10 focused test-suite checklist item complete.
+
+### ✅ Verified
+- `python -m py_compile tools/synthesus5_focused_suite.py tools/synthesus5_chal_smoke.py packages/api/production_server.py packages/core/chal/hypervisor.py packages/core/chal/quad_brain.py packages/reasoning/chal.py tests/test_chal_hypervisor.py tests/test_chal_reasoning_firmware.py tests/e2e/test_chat_e2e.py` — passed.
+- `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_focused_suite.py` — passed: compile release path, CHAL API smoke, `tests/test_chal_hypervisor.py`, `tests/e2e/test_chat_e2e.py::TestChatE2E::test_chal_mode_routes_through_cognitive_hypervisor`, and `tests/test_chal_reasoning_firmware.py`.
+
+### 🚧 Left Off / Next Steps
+- Add provenance traces from Knowledge Cloud mount metadata into the public CHAL debug envelope.
+- Add a performance baseline and regression guard for the explicit Synthesus 5 CHAL path.
+- Keep pre-existing unrelated working-tree changes in `AGENTS.md`, `README.md`, and untracked `synthesus_framework/` separated from Agent 1 source/doc commits.
+
+### 💡 Architectural Notes
+- The focused suite is an operator-facing gate for the explicit CHAL path, not a full repository test replacement.
+- The suite intentionally composes existing smoke/regression surfaces so release readiness checks stay close to observed runtime contracts.

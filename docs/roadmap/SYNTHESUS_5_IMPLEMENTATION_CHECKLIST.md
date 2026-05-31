@@ -174,7 +174,7 @@ Legend:
 
 ## Phase 10: Hardening And Release
 
-- [ ]  Add full focused test suite for Synthesus 5 path.
+- [x]  Add full focused test suite for Synthesus 5 path. Session log: 2026-05-31 Agent 1 focused release suite.
 
 - [x]  Add smoke command that runs an end-to-end Synthesus 5 conversation. Session log: 2026-05-31 Agent 1 CHAL API smoke command.
 
