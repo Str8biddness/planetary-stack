@@ -66,8 +66,10 @@ Client Request
 ```
 
 The typed trace contract is mirrored as `CognitiveHypervisorTrace` in
-`docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`. CGPU
-device-frame schemas are documented separately as `CGPUFrame` and
+`docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`.
+`CognitiveHypervisorTrace.quad_brain` references `QuadBrainArbitration` when the
+route is `quad_brain_path`, matching the runtime `telemetry.quad_brain` payload.
+CGPU device-frame schemas are documented separately as `CGPUFrame` and
 `CGPUOutputFrame`; `/api/v1/query` does not emit CGPU candidate sets as top-level
 payloads.
 

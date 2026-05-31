@@ -152,9 +152,10 @@ class QueryResponse(BaseModel):
             "is true. Current keys include kernel_triggered, symbolic_triggered, "
             "trace, rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. "
             "For explicit mode=chal calls, cognitive_hypervisor follows the "
-            "CognitiveHypervisorTrace OpenAPI component. CGPU candidate-set trace "
-            "records should also live here as the runtime wiring expands without "
-            "changing the stable response envelope."
+            "CognitiveHypervisorTrace OpenAPI component, including typed "
+            "QuadBrainArbitration records when route=quad_brain_path. CGPU "
+            "candidate-set trace records should also live here as the runtime "
+            "wiring expands without changing the stable response envelope."
         ),
     )
 

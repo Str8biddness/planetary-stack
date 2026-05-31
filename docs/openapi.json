@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Synthesus 5 CHAL API",
-    "description": "Legacy-compatible Synthesus query and control API for the active Synthesus 5 CHAL runtime. The public query path currently exposes explicit Cognitive Hypervisor routing through mode=chal plus generation-spine, cognitive, RAG, kernel, and amplification telemetry. CognitiveHypervisorTrace documents debug.cognitive_hypervisor for CHAL requests; CGPU traces are documented as CHAL contracts until candidate-set payloads are surfaced by this endpoint.",
+    "description": "Legacy-compatible Synthesus query and control API for the active Synthesus 5 CHAL runtime. The public query path currently exposes explicit Cognitive Hypervisor routing through mode=chal plus generation-spine, cognitive, RAG, kernel, and amplification telemetry. CognitiveHypervisorTrace documents debug.cognitive_hypervisor for CHAL requests, including QuadBrainArbitration when route=quad_brain_path; CGPU traces are documented as CHAL contracts until candidate-set payloads are surfaced by this endpoint.",
     "version": "5.0.0"
   },
   "paths": {
@@ -274,6 +274,143 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "QuadBrainArbitration": {
+        "type": "object",
+        "title": "QuadBrainArbitration",
+        "description": "Serialized four-brain arbitration emitted inside CognitiveHypervisorTrace.quad_brain when the Synthesus 5 hypervisor selects route=quad_brain_path.",
+        "required": [
+          "schema",
+          "trace_id",
+          "selected_response",
+          "selected_source",
+          "outputs",
+          "serial_order",
+          "state_contract",
+          "latency_ms"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "synthesus.chal.quad_brain_arbitration.v1",
+            "description": "Trace schema identifier emitted by QuadBrainArbitration."
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "selected_response": {
+            "type": "string",
+            "description": "Response selected by critic/metacognition or the bridge fallback."
+          },
+          "selected_source": {
+            "type": "string",
+            "enum": [
+              "critic_metacognition",
+              "hemisphere_bridge_fallback"
+            ]
+          },
+          "outputs": {
+            "type": "array",
+            "description": "Serialized outputs for knowledge, executive, CGPU, and critic roles in fixed arbitration order.",
+            "items": {
+              "type": "object",
+              "required": [
+                "role",
+                "device",
+                "content",
+                "confidence"
+              ],
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "knowledge_grounding",
+                    "executive_reasoning",
+                    "cgpu_rendering",
+                    "critic_metacognition"
+                  ]
+                },
+                "device": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "confidence": {
+                  "type": "number"
+                },
+                "trace": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "warnings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "serial_order": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "knowledge_grounding",
+                "executive_reasoning",
+                "cgpu_rendering",
+                "critic_metacognition"
+              ]
+            }
+          },
+          "state_contract": {
+            "type": "object",
+            "required": [
+              "topology",
+              "parallel_brain_spawn",
+              "serialized_arbitration",
+              "template_leakage_allowed",
+              "route"
+            ],
+            "properties": {
+              "topology": {
+                "type": "string",
+                "const": "knowledge->executive->cgpu->critic"
+              },
+              "parallel_brain_spawn": {
+                "type": "boolean",
+                "const": false
+              },
+              "serialized_arbitration": {
+                "type": "boolean",
+                "const": true
+              },
+              "template_leakage_allowed": {
+                "type": "boolean"
+              },
+              "bridge_trace_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "route": {
+                "type": "string",
+                "const": "quad_brain_path"
+              }
+            },
+            "additionalProperties": true
+          },
+          "latency_ms": {
+            "type": "number"
+          }
+        }
+      },
       "QueryRequest": {
         "properties": {
           "query": {
@@ -367,7 +504,7 @@
             "type": "object",
             "title": "Debug",
             "default": {},
-            "description": "Optional implementation telemetry returned only when include_debug is true. Current keys include kernel_triggered, symbolic_triggered, trace, rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. For explicit mode=chal calls, cognitive_hypervisor follows the CognitiveHypervisorTrace OpenAPI component. CGPU candidate-set trace records should also live here as the runtime wiring expands without changing the stable response envelope."
+            "description": "Optional implementation telemetry returned only when include_debug is true. Current keys include kernel_triggered, symbolic_triggered, trace, rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. For explicit mode=chal calls, cognitive_hypervisor follows the CognitiveHypervisorTrace OpenAPI component, including typed QuadBrainArbitration records when route=quad_brain_path. CGPU candidate-set trace records should also live here as the runtime wiring expands without changing the stable response envelope."
           }
         },
         "type": "object",
@@ -638,8 +775,7 @@
           "quad_brain": {
             "anyOf": [
               {
-                "type": "object",
-                "additionalProperties": true
+                "$ref": "#/components/schemas/QuadBrainArbitration"
               },
               {
                 "type": "null"

@@ -1524,3 +1524,24 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Organs remain CHAL accelerators under the training loop; deterministic replay metadata makes their generated training slices auditable without treating them as independent uncontrolled brains.
 - Replay metadata is intentionally lightweight: generator version, seed, scenario ID, step, and simulated timestamp are enough to reconstruct the seeded synthetic scenario path while keeping runtime logs out of Git.
+
+## Current Session — 2026-05-31 (Agent 10 — Quad Brain Trace Schema)
+
+### 📝 Summary
+- Added a typed `QuadBrainArbitration` component to `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json` for the observed `CognitiveHypervisorTrace.quad_brain` payload emitted on `route="quad_brain_path"`.
+- Updated `QueryResponse.debug` descriptions and production API/CGPU docs so the public `/api/v1/query` envelope stays stable while Quad Brain arbitration telemetry is explicitly typed under `debug.cognitive_hypervisor`.
+- Updated the Phase 3 checklist with the API-schema mirror for serialized Quad Brain arbitration telemetry.
+
+### ✅ Verified
+- `python -m py_compile packages/api/schemas.py packages/core/chal/quad_brain.py packages/core/chal/hypervisor.py tests/test_chal_hypervisor.py`
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed `QuadBrainArbitration` exists, `CognitiveHypervisorTrace.quad_brain` references it, and the route/role/schema constants match runtime output.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_hypervisor.py` — 11 passed.
+
+### 🚧 Left Off / Next Steps
+- Add frontend trace display for `debug.cognitive_hypervisor.quad_brain` without changing the stable `QueryResponse` envelope.
+- When standalone CGPU candidate-set telemetry is surfaced outside Quad Brain arbitration, add a dedicated typed debug component for that observed payload.
+- Keep pre-existing unrelated working-tree changes in `AGENTS.md`, `README.md`, and untracked `synthesus_framework/` separated from Agent 10 docs/API commits.
+
+### 💡 Architectural Notes
+- Quad Brain arbitration is now a documented API debug contract, not just an internal telemetry blob.
+- The public API still exposes a legacy-compatible response envelope; typed Synthesus 5 internals live under `debug.cognitive_hypervisor` when callers opt into debug traces.
