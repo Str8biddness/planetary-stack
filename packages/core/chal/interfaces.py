@@ -5,9 +5,14 @@ Defines the core virtual hardware contracts for Synthesus 4.1.
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
+
+
+def make_trace_id(prefix: str) -> str:
+    return f"{prefix}-{uuid.uuid4().hex[:12]}"
 
 
 class MountType(str, Enum):
@@ -29,6 +34,8 @@ class TelemetryRecord:
     confidence: float
     source: str
     metadata: Dict[str, Any] = field(default_factory=dict)
+    trace_id: str = field(default_factory=lambda: make_trace_id("telemetry"))
+    budgets: Dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -66,6 +73,7 @@ class ModuleMessage:
     payload: Dict[str, Any]
     trace_id: str
     timestamp: float
+    budgets: Dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -76,6 +84,7 @@ class Checkpoint:
     fluid_state_hash: str
     active_mounts: List[str]
     timestamp: float
+    budgets: Dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -86,6 +95,13 @@ class CognitiveTask:
     budget_ms: int
     deadline: float
     payload: Dict[str, Any]
+    trace_id: str = field(default_factory=lambda: make_trace_id("task"))
+    budgets: Dict[str, float] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        self.budgets = dict(self.budgets)
+        if "latency_ms" not in self.budgets:
+            self.budgets["latency_ms"] = float(self.budget_ms)
 
 
 @dataclass
@@ -94,3 +110,16 @@ class ExecutionPlan:
     plan_id: str
     tasks: List[CognitiveTask]
     fallback_strategy: str
+    trace_id: str = field(default_factory=lambda: make_trace_id("plan"))
+    budgets: Dict[str, float] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        self.budgets = dict(self.budgets)
+        if self.budgets:
+            return
+        self.budgets.update(
+            {
+                "latency_ms": float(sum(task.budgets.get("latency_ms", task.budget_ms) for task in self.tasks)),
+                "task_count": float(len(self.tasks)),
+            }
+        )

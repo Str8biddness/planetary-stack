@@ -146,6 +146,20 @@ Default mount mappings:
 
 `CHALMemoryController` attempts this manifest-backed boot before falling back to legacy default mounts. Failed integrity checks deactivate the affected mount and set trust to `0.0`; strict boot mode raises immediately.
 
+### Core CHAL Interface Metadata
+
+The legacy mount-controller records in `packages/core/chal/interfaces.py` now carry the same minimum scheduling metadata expected by the Synthesus 5 frame contract:
+
+| Record | Trace field | Budget field |
+|--------|-------------|--------------|
+| `TelemetryRecord` | `trace_id` | `budgets` |
+| `ModuleMessage` | `trace_id` | `budgets` |
+| `Checkpoint` | `trace_id` | `budgets` |
+| `CognitiveTask` | `trace_id` | `budgets` seeded from `budget_ms` |
+| `ExecutionPlan` | `trace_id` | aggregate `budgets` from child tasks |
+
+`CHALMemoryController` emits telemetry with explicit latency budgets for mounted lookups, cache hits, degraded states, and runtime fallback. This keeps Knowledge Cloud hardware traces compatible with PPBRS firmware, hypervisor, and future replay/debug consumers without changing mount paths or public query response envelopes.
+
 ### Cold-Start Bundle Gate
 
 Phase 10 release readiness now has an explicit cold-start integrity gate:

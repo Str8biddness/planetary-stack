@@ -1676,3 +1676,28 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Cold-start Knowledge Cloud validation is now a CHAL mount readiness check, not just a raw artifact hash scan.
 - The release gate stays source-only: generated FAISS, KNDB, cache, and result artifacts remain outside the runtime repo commit.
+
+## Current Session — 2026-05-31 (Agent 6 — CHAL Interface Trace/Budget Metadata)
+
+### 📝 Summary
+- Added trace IDs and budget dictionaries to the remaining legacy CHAL interface records in `packages/core/chal/interfaces.py`: `TelemetryRecord`, `ModuleMessage`, `Checkpoint`, `CognitiveTask`, and `ExecutionPlan`.
+- Seeded `CognitiveTask.budgets["latency_ms"]` from `budget_ms` and aggregate `ExecutionPlan.budgets` from child tasks so older mount-controller records now satisfy the Phase 1 CHAL frame contract without changing existing constructor call sites.
+- Updated `CHALMemoryController` telemetry so mounted Knowledge Cloud lookups, hot-context cache hits, degraded states, and runtime fallback carry explicit latency budgets.
+- Documented the remaining core/KAL interface metadata in `docs/modules/KN.md` and marked the Phase 1 trace/budget plus module-schema checklist items complete.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/interfaces.py packages/knowledge/kal_adapter.py tests/test_knowledge_mount_table.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_knowledge_mount_table.py` — 9 passed, 3 warnings.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py tests/test_chal_reasoning_firmware.py` — 123 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_hypervisor.py tests/test_knowledge_mount_table.py tests/test_kal.py` — 50 passed, 3 warnings.
+- `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_focused_suite.py` — passed.
+- `git diff --check` — passed.
+
+### 🚧 Left Off / Next Steps
+- Continue Phase 6 classification of older direct template emitters outside the Synthesus 5 hypervisor path.
+- Consider folding `core.chal.interfaces` mount-controller records into the canonical `core.chal.frames` serialization boundary once Knowledge Cloud mount schemas need JSON round-trip guarantees.
+- Keep pre-existing unrelated working-tree changes in `AGENTS.md`, `README.md`, and untracked `synthesus_framework/` separated from Agent 6 source/doc commits.
+
+### 💡 Architectural Notes
+- Phase 1 now has consistent trace/budget metadata across both PPBRS firmware frames and the older CHAL mount-controller interface records.
+- The change is intentionally compatibility-preserving: existing callers that only pass the original fields receive generated trace IDs and budget metadata rather than a constructor break.

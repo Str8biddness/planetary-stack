@@ -43,9 +43,9 @@ Legend:
 
 - [x]  Add serialization/deserialization tests for CHAL frames. Session log: 2026-05-30 Agent 6 PPBRS CHAL serialization.
 
-- [ ]  Add trace IDs and budget fields to every CHAL frame.
+- [x]  Add trace IDs and budget fields to every CHAL frame. Session log: 2026-05-31 Agent 6 CHAL interface trace/budget metadata.
 
-- [~]  Document CHAL frame schemas in `docs/modules/`. Session log: 2026-05-30 Agent 6 documented the PPBRS firmware-signal frame schema and round-trip validation; 2026-05-31 Agent 4 moved firmware frames to the shared `core.chal.frames` package boundary; broader knowledge/core mount schemas remain.
+- [x]  Document CHAL frame schemas in `docs/modules/`. Session log: 2026-05-30 Agent 6 documented the PPBRS firmware-signal frame schema and round-trip validation; 2026-05-31 Agent 4 moved firmware frames to the shared `core.chal.frames` package boundary; 2026-05-31 Agent 6 documented the remaining core/KAL interface trace and budget metadata.
 
 ## Phase 2: Cognitive Hypervisor MVP
 

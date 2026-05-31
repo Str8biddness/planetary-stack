@@ -368,13 +368,15 @@ class CHALMemoryController:
         self, op_id: str, start_time: float, hit: bool, conf: float, source: str, meta: Optional[Dict[str, Any]] = None
     ) -> TelemetryRecord:
         latency = (time.time() - start_time) * 1000.0
+        budgets = {"latency_ms": 5.0 if op_id in {"kc_lookup", "hot_context_hit"} else 50.0}
         return TelemetryRecord(
             operation_id=op_id,
             latency_ms=latency,
             cache_hit=hit,
             confidence=conf,
             source=source,
-            metadata=meta or {}
+            metadata=meta or {},
+            budgets=budgets,
         )
 
 
