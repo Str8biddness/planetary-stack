@@ -1631,3 +1631,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Phase 8 benchmark claims are now backed by a failing command, not just generated comparison reports.
 - The generated baseline remains an ignored artifact; source control carries the harness, thresholds, tests, docs, checklist, and log only.
+
+## Current Session — 2026-05-31 (Agent 4 — Canonical CHAL Frame Boundary)
+
+### 📝 Summary
+- Moved the PPBRS CHAL firmware frame dataclasses and `build_ppbrs_firmware_signal()` into the canonical shared boundary at `packages/core/chal/frames.py`.
+- Converted `packages/reasoning/chal.py` into a compatibility import layer so legacy reasoning/PPBRS imports resolve to the same canonical frame classes instead of maintaining a duplicate implementation.
+- Exported firmware-frame aliases from `core.chal` without replacing the existing Knowledge Cloud mount telemetry records in `core.chal.interfaces`.
+- Added regression coverage proving `reasoning.chal` imports share object identity with `core.chal.frames` and marked the Phase 1 frame-boundary checklist item complete.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/frames.py packages/core/chal/__init__.py packages/reasoning/chal.py tests/test_chal_reasoning_firmware.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_reasoning_firmware.py` — 11 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py tests/test_chal_reasoning_firmware.py` — 123 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_hypervisor.py tests/test_knowledge_mount_table.py tests/test_kal.py` — 47 passed, 3 warnings.
+
+### 🚧 Left Off / Next Steps
+- Add trace IDs and budget fields to every remaining non-firmware CHAL frame, especially the mount/controller records still living in `core.chal.interfaces`.
+- Continue Phase 6 classification of older direct template emitters outside the Synthesus 5 hypervisor path.
+- Keep pre-existing unrelated working-tree changes in `AGENTS.md`, `README.md`, and untracked `synthesus_framework/` separated from Agent 4 source/doc commits.
+
+### 💡 Architectural Notes
+- PPBRS firmware signals now have one source of truth under core CHAL, which is the right boundary for core, reasoning, and knowledge to depend on.
+- The Knowledge Cloud mount telemetry record remains intentionally separate for now because it models controller operations rather than firmware handoff frames.

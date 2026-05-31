@@ -24,7 +24,7 @@ Query Input
 
 ## CHAL Firmware Contract (2026-05-27)
 
-The concrete interface lives in `packages/reasoning/chal.py`:
+The concrete interface lives in `packages/core/chal/frames.py`. `packages/reasoning/chal.py` is now a compatibility import layer so older PPBRS call sites continue to resolve the same classes while the stable CHAL package boundary stays under core.
 
 | Record | Purpose |
 |--------|---------|
@@ -38,6 +38,8 @@ The concrete interface lives in `packages/reasoning/chal.py`:
 `build_ppbrs_firmware_signal()` creates the JSON-shaped `synthesus.chal.reasoning_firmware.v1` payload. The fallback PPBRS bridge now returns `KernelResult.response == ""` for normal routing and stores the firmware payload in `KernelResult.metadata["chal_firmware_signal"]` with `user_facing=False`.
 
 Each CHAL reasoning record now supports explicit `to_dict()` / `from_dict()` round trips, and `PPBRSFirmwareSignal.from_dict()` validates schema identity plus trace-ID consistency across all nested records. This keeps firmware signals replayable and prevents a drifted task, plan, message, checkpoint, or telemetry record from being accepted as a coherent PPBRS handoff.
+
+The canonical frame names are `CognitiveFrameTask`, `CognitiveFrameExecutionPlan`, `CognitiveFrameMessage`, `CognitiveFrameCheckpoint`, and `CognitiveFrameTelemetry`. Legacy names (`CognitiveTask`, `ExecutionPlan`, `ModuleMessage`, `Checkpoint`, `TelemetryRecord`) remain aliases for reasoning firmware compatibility. Knowledge Cloud mount telemetry in `core.chal.interfaces` remains a separate mount-controller record until the broader mount schema is folded into the same package boundary.
 
 Allowed fixed-response exceptions remain safety, abuse prevention, identity/rights protection, and explicit AIVM platform restrictions. Normal pattern matches, retrieval matches, and low-confidence fallbacks must be surfaced through the generation spine or a future VGD-backed realization path.
 

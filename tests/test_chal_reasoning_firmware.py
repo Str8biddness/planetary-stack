@@ -14,6 +14,7 @@ from reasoning.chal import (
     TelemetryRecord,
     build_ppbrs_firmware_signal,
 )
+from core.chal import frames as canonical_frames
 from tools.chal_conversation_compare import (
     CASES,
     RegressionThresholds,
@@ -83,6 +84,16 @@ def test_chal_frame_records_roundtrip_through_json():
     assert ModuleMessage.from_dict(decoded["message"]) == message
     assert Checkpoint.from_dict(decoded["checkpoint"]) == checkpoint
     assert TelemetryRecord.from_dict(decoded["telemetry"]) == telemetry
+
+
+def test_reasoning_chal_imports_share_canonical_core_frame_boundary():
+    assert CognitiveTask is canonical_frames.CognitiveFrameTask
+    assert ExecutionPlan is canonical_frames.CognitiveFrameExecutionPlan
+    assert ModuleMessage is canonical_frames.CognitiveFrameMessage
+    assert Checkpoint is canonical_frames.CognitiveFrameCheckpoint
+    assert TelemetryRecord is canonical_frames.CognitiveFrameTelemetry
+    assert PPBRSFirmwareSignal is canonical_frames.PPBRSFirmwareSignal
+    assert build_ppbrs_firmware_signal is canonical_frames.build_ppbrs_firmware_signal
 
 
 def test_ppbrs_firmware_signal_roundtrip_validates_trace_ids():

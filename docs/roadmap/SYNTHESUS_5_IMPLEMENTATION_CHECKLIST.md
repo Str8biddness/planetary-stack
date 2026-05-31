@@ -39,13 +39,13 @@ Legend:
 
 - [x]  Define reusable CHAL task, plan, module message, checkpoint, telemetry, and firmware signal objects. Session log: 2026-05-30 Agent 6 PPBRS CHAL serialization.
 
-- [ ]  Consolidate CHAL frame definitions into a stable package boundary shared by `packages/core`, `packages/reasoning`, and `packages/knowledge`.
+- [x]  Consolidate CHAL frame definitions into a stable package boundary shared by `packages/core`, `packages/reasoning`, and `packages/knowledge`. Session log: 2026-05-31 Agent 4 canonical `core.chal.frames` boundary.
 
 - [x]  Add serialization/deserialization tests for CHAL frames. Session log: 2026-05-30 Agent 6 PPBRS CHAL serialization.
 
 - [ ]  Add trace IDs and budget fields to every CHAL frame.
 
-- [~]  Document CHAL frame schemas in `docs/modules/`. Session log: 2026-05-30 Agent 6 documented the PPBRS firmware-signal frame schema and round-trip validation; broader shared CHAL/core/knowledge schema docs remain.
+- [~]  Document CHAL frame schemas in `docs/modules/`. Session log: 2026-05-30 Agent 6 documented the PPBRS firmware-signal frame schema and round-trip validation; 2026-05-31 Agent 4 moved firmware frames to the shared `core.chal.frames` package boundary; broader knowledge/core mount schemas remain.
 
 ## Phase 2: Cognitive Hypervisor MVP
 

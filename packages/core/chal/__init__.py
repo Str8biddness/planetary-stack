@@ -9,6 +9,19 @@ from .interfaces import (
     Partition,
     TelemetryRecord,
 )
+from .frames import (
+    Checkpoint as FirmwareCheckpoint,
+    CognitiveFrameCheckpoint,
+    CognitiveFrameExecutionPlan,
+    CognitiveFrameMessage,
+    CognitiveFrameTask,
+    CognitiveFrameTelemetry,
+    ExecutionPlan as FirmwareExecutionPlan,
+    ModuleMessage as FirmwareModuleMessage,
+    PPBRSFirmwareSignal,
+    TelemetryRecord as FirmwareTelemetryRecord,
+    build_ppbrs_firmware_signal,
+)
 from .hypervisor import (
     CognitiveHypervisor,
     HypervisorBudget,
@@ -28,6 +41,10 @@ __all__ = [
     "Checkpoint",
     "CognitiveTask",
     "ExecutionPlan",
+    "FirmwareCheckpoint",
+    "FirmwareExecutionPlan",
+    "FirmwareModuleMessage",
+    "FirmwareTelemetryRecord",
     "HypervisorBudget",
     "HypervisorDecision",
     "HypervisorResult",
@@ -41,4 +58,11 @@ __all__ = [
     "QuadBrainOutput",
     "QuadBrainRole",
     "TelemetryRecord",
+    "CognitiveFrameCheckpoint",
+    "CognitiveFrameExecutionPlan",
+    "CognitiveFrameMessage",
+    "CognitiveFrameTask",
+    "CognitiveFrameTelemetry",
+    "PPBRSFirmwareSignal",
+    "build_ppbrs_firmware_signal",
 ]
