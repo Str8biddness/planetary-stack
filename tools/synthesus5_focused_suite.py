@@ -38,6 +38,7 @@ STEPS = (
             "tools/synthesus5_chal_smoke.py",
             "tools/chal_conversation_compare.py",
             "tools/synthesus5_focused_suite.py",
+            "tools/validate_knowledge_cold_start.py",
             "packages/api/production_server.py",
             "packages/core/chal/hypervisor.py",
             "packages/core/chal/quad_brain.py",
@@ -81,6 +82,10 @@ STEPS = (
             "--baseline-json",
             "tools/results/synthesus5_phase8_latency_baseline_latest.json",
         ),
+    ),
+    SuiteStep(
+        label="knowledge-cloud-cold-start-integrity",
+        command=(sys.executable, "tools/validate_knowledge_cold_start.py"),
     ),
 )
 

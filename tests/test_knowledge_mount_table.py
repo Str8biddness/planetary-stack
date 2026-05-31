@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "packages"))
 
 from knowledge.kal_adapter import CHALMemoryController
-from knowledge.mount_table import KnowledgeCloudMountTable, MountType
+from knowledge.mount_table import COLD_START_REQUIRED_MOUNTS, KnowledgeCloudMountTable, MountType
 
 
 def _write_artifact(root: Path, relative_path: str, content: bytes) -> dict:
@@ -77,6 +77,36 @@ def test_mount_table_strict_mode_rejects_failed_integrity(tmp_path: Path):
 
     with pytest.raises(ValueError):
         KnowledgeCloudMountTable().boot(tmp_path, strict=True)
+
+
+def test_mount_table_validates_cold_start_required_mounts(tmp_path: Path):
+    artifacts = [
+        _write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n'),
+        _write_artifact(tmp_path, "knowledge_cloud/transitions.json", b'{"edges": []}\n'),
+        _write_artifact(tmp_path, "knowledge_cloud/chaining_patterns.json", b'{"patterns": []}\n'),
+        _write_artifact(tmp_path, "models/swarm_embedder.pkl", b"model-bytes"),
+        _write_artifact(tmp_path, "faiss.index", b"index-bytes"),
+        _write_artifact(tmp_path, "faiss_metadata.json", b'{"sources": []}\n'),
+        _write_artifact(tmp_path, "knowledge.kndb", b"kndb-bytes"),
+        _write_artifact(tmp_path, "knowledge.kndb.meta.db", b"metadata-bytes"),
+    ]
+    _write_manifest(tmp_path, artifacts)
+
+    report = KnowledgeCloudMountTable().validate_cold_start_bundle(tmp_path)
+
+    assert report.ok is True
+    assert report.missing_active_mounts(COLD_START_REQUIRED_MOUNTS) == ()
+
+
+def test_mount_table_cold_start_rejects_missing_required_mount(tmp_path: Path):
+    artifacts = [
+        _write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n'),
+        _write_artifact(tmp_path, "knowledge_cloud/transitions.json", b'{"edges": []}\n'),
+    ]
+    _write_manifest(tmp_path, artifacts)
+
+    with pytest.raises(ValueError, match="/mnt/params/chaining_patterns"):
+        KnowledgeCloudMountTable().validate_cold_start_bundle(tmp_path)
 
 
 def test_kal_controller_boots_from_manifest_before_default_mounts(tmp_path: Path):

@@ -96,6 +96,17 @@ DEFAULT_MOUNT_SPECS: dict[str, tuple[str, MountType, str, bool, str]] = {
     ),
 }
 
+COLD_START_REQUIRED_MOUNTS: tuple[str, ...] = (
+    "/mnt/rom/world_lore",
+    "/mnt/params/transitions",
+    "/mnt/params/chaining_patterns",
+    "/mnt/params/swarm_embedder",
+    "/mnt/corpus/faiss",
+    "/mnt/provenance/faiss_metadata",
+    "/mnt/rom/knowledge_nodes",
+    "/mnt/provenance/kndb_metadata",
+)
+
 
 @dataclass(frozen=True)
 class MountIntegrityReport:
@@ -138,6 +149,30 @@ class MountTableBootReport:
     @property
     def ok(self) -> bool:
         return all(report.ok for report in self.integrity)
+
+    @property
+    def active_mount_paths(self) -> tuple[str, ...]:
+        return tuple(mount.mount_path for mount in self.mounts if mount.is_active)
+
+    def missing_active_mounts(self, required_mounts: tuple[str, ...]) -> tuple[str, ...]:
+        active = set(self.active_mount_paths)
+        return tuple(mount_path for mount_path in required_mounts if mount_path not in active)
+
+    def assert_cold_start_ready(
+        self,
+        required_mounts: tuple[str, ...] = COLD_START_REQUIRED_MOUNTS,
+    ) -> None:
+        if not self.ok:
+            failed = ", ".join(
+                report.relative_path for report in self.integrity if not report.ok
+            )
+            raise ValueError(f"Knowledge Cloud bundle integrity failed: {failed}")
+        missing = self.missing_active_mounts(required_mounts)
+        if missing:
+            raise ValueError(
+                "Knowledge Cloud cold-start bundle missing required active mounts: "
+                + ", ".join(missing)
+            )
 
 
 class KnowledgeCloudMountTable:
@@ -196,6 +231,17 @@ class KnowledgeCloudMountTable:
             integrity=tuple(reports),
         )
 
+    def validate_cold_start_bundle(
+        self,
+        root_dir: str | Path,
+        manifest_name: str = "manifest.json",
+        *,
+        required_mounts: tuple[str, ...] = COLD_START_REQUIRED_MOUNTS,
+    ) -> MountTableBootReport:
+        report = self.boot(root_dir, manifest_name=manifest_name, strict=True)
+        report.assert_cold_start_ready(required_mounts)
+        return report
+
     def _verify_artifact(
         self,
         root: Path,
@@ -248,6 +294,7 @@ class KnowledgeCloudMountTable:
 
 
 __all__ = [
+    "COLD_START_REQUIRED_MOUNTS",
     "DEFAULT_MOUNT_SPECS",
     "KnowledgeCloudMountTable",
     "MountIntegrityReport",

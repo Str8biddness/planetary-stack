@@ -182,7 +182,7 @@ Legend:
 
 - [x]  Add performance baseline and regression guard. Session log: 2026-05-31 Agent 3 Phase 8 latency regression guard.
 
-- [ ]  Validate Knowledge Cloud bundle integrity from cold start.
+- [x]  Validate Knowledge Cloud bundle integrity from cold start. Session log: 2026-05-31 Agent 5 Knowledge Cloud cold-start integrity gate.
 
 - [ ]  Publish release notes describing Synthesus 5 behavior and limitations.
 

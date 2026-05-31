@@ -146,6 +146,27 @@ Default mount mappings:
 
 `CHALMemoryController` attempts this manifest-backed boot before falling back to legacy default mounts. Failed integrity checks deactivate the affected mount and set trust to `0.0`; strict boot mode raises immediately.
 
+### Cold-Start Bundle Gate
+
+Phase 10 release readiness now has an explicit cold-start integrity gate:
+
+```bash
+python tools/validate_knowledge_cold_start.py --root /home/workspace/synthesus-knowledge-cloud/artifacts
+```
+
+The command boots the Knowledge Cloud artifact manifest through `KnowledgeCloudMountTable` with strict SHA-256 and byte-size validation, then requires these active CHAL mounts before passing:
+
+- `/mnt/rom/world_lore`
+- `/mnt/params/transitions`
+- `/mnt/params/chaining_patterns`
+- `/mnt/params/swarm_embedder`
+- `/mnt/corpus/faiss`
+- `/mnt/provenance/faiss_metadata`
+- `/mnt/rom/knowledge_nodes`
+- `/mnt/provenance/kndb_metadata`
+
+By default, the command uses `SYNTHESUS_KNOWLEDGE_ROOT` when set, then the companion `synthesus-knowledge-cloud/artifacts` checkout when present, and finally the runtime `data/` directory. It is also part of `tools/synthesus5_focused_suite.py`, so the source-only Synthesus 5 release gate now fails if the mounted Knowledge Cloud bundle cannot cold boot.
+
 ## Synthesus 5 Hot-Context Cache
 
 `CHALMemoryController` now keeps a bounded L1 hot-context cache in front of mounted Knowledge Cloud ROM lookups. Cache keys normalize query whitespace/case and include the trust budget, so repeated local questions can be served from the CHAL controller without re-entering the KnowledgeCloud backend while still preserving the original mounted-source telemetry.

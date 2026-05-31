@@ -1654,3 +1654,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - PPBRS firmware signals now have one source of truth under core CHAL, which is the right boundary for core, reasoning, and knowledge to depend on.
 - The Knowledge Cloud mount telemetry record remains intentionally separate for now because it models controller operations rather than firmware handoff frames.
+
+## Current Session — 2026-05-31 (Agent 5 — Knowledge Cloud Cold-Start Integrity Gate)
+
+### 📝 Summary
+- Added `COLD_START_REQUIRED_MOUNTS`, active-mount reporting, and cold-start readiness assertions to `packages/knowledge/mount_table.py`.
+- Added `tools/validate_knowledge_cold_start.py`, which strict-boots a Knowledge Cloud artifact manifest, verifies SHA-256/size integrity, and fails unless required ROM, parameter, corpus, and provenance mounts are active.
+- Wired the cold-start integrity gate into `tools/synthesus5_focused_suite.py` and documented the operator command in `docs/modules/KN.md`.
+- Marked the Phase 10 Knowledge Cloud cold-start bundle integrity checklist item complete.
+
+### ✅ Verified
+- `python -m py_compile packages/knowledge/mount_table.py tools/validate_knowledge_cold_start.py tests/test_knowledge_mount_table.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_knowledge_mount_table.py` — 8 passed, 3 warnings.
+- `python tools/validate_knowledge_cold_start.py --root /home/workspace/synthesus-knowledge-cloud/artifacts` — passed; 8 required active mounts and 8 checked artifacts.
+- `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_focused_suite.py` — passed compile, CHAL API smoke, hypervisor/API regressions, firmware/comparison regressions, Phase 8 latency regression guard, and Knowledge Cloud cold-start integrity.
+
+### 🚧 Left Off / Next Steps
+- Consider mapping `knowledge.meta.db` and `knowledge_cloud/learned_transitions.json` into explicit CHAL provenance/parameter mounts if clients need them surfaced through KAL.
+- Continue Phase 6 classification of older direct template emitters outside the Synthesus 5 hypervisor path.
+
+### 💡 Architectural Notes
+- Cold-start Knowledge Cloud validation is now a CHAL mount readiness check, not just a raw artifact hash scan.
+- The release gate stays source-only: generated FAISS, KNDB, cache, and result artifacts remain outside the runtime repo commit.
