@@ -43,13 +43,16 @@ class SnapshotManager:
 
         # Device Blobs
         device_blobs = {}
+        device_fingerprints = {}
         for name, device in npc.mounted_devices.items():
             device_blobs[name] = device.snapshot().hex() # Hex encode for JSON compatibility
+            device_fingerprints[name] = device.fingerprint()
 
         # Payload
         payload = {
             "header": header,
             "devices": device_blobs,
+            "device_fingerprints": device_fingerprints,
             "identity": {
                 "name": npc.identity.name,
                 "archetype": npc.identity.archetype,
@@ -107,6 +110,14 @@ class SnapshotManager:
         for name, device_hex in data["devices"].items():
             if name in npc.mounted_devices:
                 npc.mounted_devices[name].restore(bytes.fromhex(device_hex))
+
+        expected_fingerprints = data.get("device_fingerprints", {})
+        for name, expected in expected_fingerprints.items():
+            device = npc.mounted_devices.get(name)
+            if device is None:
+                raise ValueError(f"Snapshot missing restored device: {name}")
+            if device.fingerprint() != expected:
+                raise ValueError(f"Snapshot device fingerprint mismatch: {name}")
 
         npc.add_audit("restore", {"fingerprint": data["footer"]["fingerprint"]})
         return npc

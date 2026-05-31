@@ -190,6 +190,26 @@ The AIVM kernel can now complete the canonical 12-step tick without external Kno
 
 `SnapshotManager` seals every snapshot payload with a SHA-256 fingerprint over the unsigned payload. Restore now recomputes that fingerprint before spawning devices and rejects tampered blobs with a `ValueError`, giving AIVM snapshotting an explicit integrity gate instead of treating the footer as advisory metadata.
 
+Snapshots also carry a per-device fingerprint manifest. Restore replays each mounted device blob and verifies that the restored `VPD`, `VMD`, `VQD`, generation, reasoning, narrative, and model-selection devices match the captured fingerprints before the NPC is admitted back into the kernel. This guards against validly resealed outer snapshots that contain forged device-state blobs.
+
+## VPD Pybind Inspection Surface
+
+The native `_synthesus_kernel.EmulEngine.dump_vpd()` pybind surface exposes the Virtual Parameter Device as an inspectable parameter-hardware partition. The JSON-ready dump includes:
+
+| Field | Purpose |
+|-------|---------|
+| `parameter_count` | Number of mapped parameter records |
+| `data_window_offset` | MMIO data-window offset for selected parameter bytes |
+| `selected_parameter.available` | Whether the selected parameter slot is valid |
+| `selected_parameter.index` | Selected parameter slot |
+| `selected_parameter.key` | Mapped Knowledge/Parameter Cloud key |
+| `selected_parameter.version` | Parameter record version |
+| `selected_parameter.size` | Full selected-parameter byte length |
+| `selected_parameter.data_offset` / `data_length` | Active byte-window controls |
+| `selected_parameter.bytes` | Current selected byte window as integer bytes |
+
+This surface is a smoke-testable bridge between Synthesus 5 parameter-disk mounts and the C++ VMM device layer. It is inspection metadata only; it does not claim hardware acceleration unless the native module is built and the pybind smoke passes.
+
 ## Amplification Loop
 
 ```

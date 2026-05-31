@@ -82,9 +82,18 @@ py::dict vpd_dump_to_dict(const vmm::VpdDump& dump) {
     py::dict out;
     out["device"] = "VirtualParameterDevice";
     out["base_address_hex"] = hex_u64(dump.base_address);
+    out["size"] = dump.size;
+    out["data_window_offset"] = dump.data_window_offset;
+    out["parameter_count"] = dump.parameter_count;
     out["registers"] = registers;
     out["selected_parameter"] = py::dict();
+    out["selected_parameter"]["available"] = dump.selected_parameter.available;
+    out["selected_parameter"]["index"] = dump.selected_parameter.index;
     out["selected_parameter"]["key"] = dump.selected_parameter.key;
+    out["selected_parameter"]["version"] = dump.selected_parameter.version;
+    out["selected_parameter"]["size"] = dump.selected_parameter.size;
+    out["selected_parameter"]["data_offset"] = dump.selected_parameter.data_offset;
+    out["selected_parameter"]["data_length"] = dump.selected_parameter.data_length;
     out["selected_parameter"]["bytes"] = bytes_to_list(dump.selected_parameter.bytes);
     return out;
 }

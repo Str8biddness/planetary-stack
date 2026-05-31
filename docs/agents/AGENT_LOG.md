@@ -1766,3 +1766,27 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The public Knowledge Cloud artifact bundle now cold-boots as a complete CHAL hardware surface: ROM, parameter disk, grounding corpus, provenance plane, and existing writeback-memory interface support.
 - Manifest-backed metadata sidecars remain provenance mounts rather than writable mounts, preserving artifact hash integrity during runtime use.
+
+## Current Session — 2026-05-31 (Agent 8 — AIVM Snapshot And VPD Pybind Traceability)
+
+### 📝 Summary
+- Added a sealed per-device fingerprint manifest to AIVM snapshots so restore validates each mounted virtual device after replaying its device blob.
+- Added regression coverage for VPD/VMD/VQD fingerprint preservation and a validly resealed device-payload forgery that must now fail restore.
+- Expanded the native VPD pybind dump with parameter count, MMIO data-window metadata, selected parameter availability, version, size, offset, and byte-window controls.
+- Added a native pybind smoke test for mapped parameter-disk bytes and documented the VPD inspection surface in the AIVM module docs.
+- Advanced the Phase 7 CHAL partition save/load checklist entry without marking it complete because broader CHAL partition save/load coverage still remains.
+
+### ✅ Verified
+- `python -m py_compile packages/aivm/snapshot/manager.py tests/aivm/test_snapshot_integrity.py tests/test_kernel_pybind_vpd.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages python -m pytest -q tests/aivm/test_snapshot_integrity.py` — 4 passed.
+- `cmake --build build --target _synthesus_kernel -j2` from `packages/kernel` — passed; build still emits the pre-existing `ContextEntry` ODR warning noted in earlier kernel logs.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/kernel/build python -m pytest -q tests/test_kernel_pybind_vpd.py tests/aivm/test_tick_sequence.py tests/test_kernel_bridge.py` — 47 passed.
+- `git diff --check` — passed.
+
+### 🚧 Left Off / Next Steps
+- Extend save/load coverage from AIVM device fingerprints into higher-level CHAL memory/cache partition persistence.
+- Continue keeping pre-existing unrelated working-tree changes in `AGENTS.md`, `README.md`, and untracked `synthesus_framework/` separated from Agent 8 source/doc commits.
+
+### 💡 Architectural Notes
+- The snapshot footer still seals the whole payload, while the new device fingerprint manifest verifies restored device state after replay. This gives traceability at both envelope and mounted-device levels.
+- The VPD pybind dump remains an inspection surface only. Hardware claims require a successful native build and smoke test.
