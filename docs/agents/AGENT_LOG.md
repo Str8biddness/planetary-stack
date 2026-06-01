@@ -1954,6 +1954,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 - Phase 8 now covers the public business-bot CHAL preset as a first-class comparison path: hypervisor preset decision, Quad Brain route, CGPU business-mode candidate, critic final-output reference, latency, score, and template leak status are all replay-visible.
 - Replay trace JSONL is deliberately compact and source-controlled only as harness capability; concrete run outputs remain generated artifacts under ignored `tools/results/`.
 
+## Current Session — 2026-06-01 (Agent 5 — Volatile Cache/Writeback Mount Boundaries)
+
+### 📝 Summary
+- Extended manifest-backed `KnowledgeCloudMountTable` boot with artifact-free volatile CHAL mounts for `/mnt/cache/hot_context` (`CACHE_SEED`) and `/mnt/mem/writeback` (`WRITEBACK_MEMORY`).
+- Added the volatile mounts to cold-start required mount validation so ROM, parameter disk, grounding corpus, provenance, cache, and writeback boundaries are present from the same boot report.
+- Added focused assertions proving cache/writeback mounts are active, writable where appropriate, and marked `artifact_backed=false`/`volatile=true` so generated cache or memory files are not implied as source artifacts.
+- Updated the Phase 5 checklist and KN module docs for the completed mount boundary validation.
+
+### ✅ Verified
+- `python -m py_compile packages/knowledge/mount_table.py tests/test_knowledge_mount_table.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_knowledge_mount_table.py` — passed.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace the generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` are semantically aligned; the live bundle remains blocked by the known FAISS/embedder dimension mismatch.
+- Continue avoiding commits of generated FAISS/KNDB/model/cache/writeback/report artifacts.
+
+### 💡 Architectural Notes
+- The mounted Knowledge Cloud boot report now separates durable provenance-checked artifacts from volatile runtime boundaries. Cache and writeback are addressable CHAL hardware planes, but they are not part of the Knowledge Cloud artifact bundle.
+
 ## Current Session — 2026-06-01 (Agent 4 — Response Compositor Template Boundary)
 
 ### 📝 Summary

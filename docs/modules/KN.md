@@ -145,8 +145,12 @@ Default mount mappings:
 | `knowledge.kndb` | `/mnt/rom/knowledge_nodes` | ROM |
 | `knowledge.kndb.meta.db` | `/mnt/provenance/kndb_metadata` | SOURCE_PROVENANCE |
 | `knowledge.meta.db` | `/mnt/provenance/knowledge_metadata` | SOURCE_PROVENANCE |
+| volatile hot-context cache | `/mnt/cache/hot_context` | CACHE_SEED |
+| volatile memory writeback | `/mnt/mem/writeback` | WRITEBACK_MEMORY |
 
 `CHALMemoryController` attempts this manifest-backed boot before falling back to legacy default mounts. Failed integrity checks deactivate the affected mount and set trust to `0.0`; strict boot mode raises immediately.
+
+The cache and writeback mounts are CHAL boundaries rather than generated Knowledge Cloud files. They are always marked `volatile=true` and `artifact_backed=false`, so cold-start validation can verify the ROM/parameter/corpus/provenance partitions without encouraging agents to commit runtime cache or memory artifacts.
 
 ### Core CHAL Interface Metadata
 
@@ -182,6 +186,8 @@ The command boots the Knowledge Cloud artifact manifest through `KnowledgeCloudM
 - `/mnt/rom/knowledge_nodes`
 - `/mnt/provenance/kndb_metadata`
 - `/mnt/provenance/knowledge_metadata`
+- `/mnt/cache/hot_context`
+- `/mnt/mem/writeback`
 
 The tool also validates retrieval-semantic compatibility across the mounted FAISS corpus, FAISS metadata, and persisted swarm embedder. A bundle is not cold-start ready if `faiss.index` and `models/swarm_embedder.pkl` disagree on vector dimension, or if `faiss_metadata.json` does not contain the same record count as the FAISS index. This catches hash-valid but retrieval-incompatible mounted hardware before the runtime reaches golden-query health checks.
 

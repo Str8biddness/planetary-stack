@@ -123,6 +123,10 @@ def test_mount_table_boots_manifest_artifacts_as_chal_mounts(tmp_path: Path):
     assert mounts["/mnt/corpus/faiss"].mount_type == MountType.GROUNDING_CORPUS
     assert mounts["/mnt/provenance/faiss_metadata"].mount_type == MountType.SOURCE_PROVENANCE
     assert mounts["/mnt/rom/world_lore"].partition.metadata["integrity_ok"] is True
+    assert mounts["/mnt/cache/hot_context"].mount_type == MountType.CACHE_SEED
+    assert mounts["/mnt/mem/writeback"].mount_type == MountType.WRITEBACK_MEMORY
+    assert mounts["/mnt/cache/hot_context"].partition.metadata["artifact_backed"] is False
+    assert mounts["/mnt/mem/writeback"].partition.is_read_only is False
 
 
 def test_legacy_chal_interface_frames_carry_trace_and_budget_metadata():
@@ -221,6 +225,8 @@ def test_mount_table_validates_cold_start_required_mounts(tmp_path: Path):
     assert mounts["/mnt/provenance/knowledge_metadata"].mount_type == MountType.SOURCE_PROVENANCE
     assert mounts["/mnt/params/learned_transitions"].partition.metadata["relative_path"] == "knowledge_cloud/learned_transitions.json"
     assert mounts["/mnt/provenance/knowledge_metadata"].partition.metadata["relative_path"] == "knowledge.meta.db"
+    assert mounts["/mnt/cache/hot_context"].partition.metadata["volatile"] is True
+    assert mounts["/mnt/mem/writeback"].partition.metadata["volatile"] is True
 
 
 def test_mount_table_cold_start_rejects_missing_required_mount(tmp_path: Path):
@@ -280,6 +286,8 @@ def test_kal_controller_boots_from_manifest_before_default_mounts(tmp_path: Path
     assert report.ok is True
     assert "/mnt/rom/world_lore" in mounts
     assert "/mnt/params/swarm_embedder" in mounts
+    assert "/mnt/cache/hot_context" in mounts
+    assert "/mnt/mem/writeback" in mounts
     assert "/mnt/rom/lore" not in mounts
 
 

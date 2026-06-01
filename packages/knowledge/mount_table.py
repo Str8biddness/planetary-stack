@@ -110,6 +110,25 @@ DEFAULT_MOUNT_SPECS: dict[str, tuple[str, MountType, str, bool, str]] = {
     ),
 }
 
+VOLATILE_MOUNT_SPECS: tuple[tuple[str, MountType, str, bool, str, str], ...] = (
+    (
+        "/mnt/cache/hot_context",
+        MountType.CACHE_SEED,
+        "hot_context_cache",
+        False,
+        "local",
+        "volatile L1 hot-context cache; never source-controlled",
+    ),
+    (
+        "/mnt/mem/writeback",
+        MountType.WRITEBACK_MEMORY,
+        "memory_writeback",
+        False,
+        "local",
+        "volatile episodic/crystallized writeback boundary; never source-controlled",
+    ),
+)
+
 COLD_START_REQUIRED_MOUNTS: tuple[str, ...] = (
     "/mnt/rom/world_lore",
     "/mnt/params/transitions",
@@ -121,6 +140,8 @@ COLD_START_REQUIRED_MOUNTS: tuple[str, ...] = (
     "/mnt/rom/knowledge_nodes",
     "/mnt/provenance/kndb_metadata",
     "/mnt/provenance/knowledge_metadata",
+    "/mnt/cache/hot_context",
+    "/mnt/mem/writeback",
 )
 
 
@@ -270,6 +291,8 @@ class KnowledgeCloudMountTable:
                 )
             )
 
+        mounts.extend(self._volatile_mounts())
+
         return MountTableBootReport(
             manifest_path=str(manifest_path),
             manifest_version=str(manifest.get("version")) if manifest.get("version") is not None else None,
@@ -399,6 +422,34 @@ class KnowledgeCloudMountTable:
         return "kc_" + relative_path.replace("/", "_").replace(".", "_")
 
     @staticmethod
+    def _volatile_mounts() -> list[Mount]:
+        mounts: list[Mount] = []
+        for mount_path, mount_type, namespace, read_only, locality, description in VOLATILE_MOUNT_SPECS:
+            mounts.append(
+                Mount(
+                    mount_path=mount_path,
+                    mount_type=mount_type,
+                    partition=Partition(
+                        partition_id="kc_" + mount_path.strip("/").replace("/", "_"),
+                        namespace=namespace,
+                        is_read_only=read_only,
+                        metadata={
+                            "relative_path": None,
+                            "integrity_ok": True,
+                            "volatile": True,
+                            "artifact_backed": False,
+                            "description": description,
+                        },
+                    ),
+                    locality=locality,
+                    trust_level=1.0,
+                    latency_profile="fast",
+                    is_active=True,
+                )
+            )
+        return mounts
+
+    @staticmethod
     def _sha256_file(path: Path) -> str:
         digest = hashlib.sha256()
         with path.open("rb") as fh:
@@ -414,4 +465,5 @@ __all__ = [
     "MountIntegrityReport",
     "MountTableBootReport",
     "RetrievalSemanticReport",
+    "VOLATILE_MOUNT_SPECS",
 ]
