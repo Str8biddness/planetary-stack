@@ -141,6 +141,29 @@ def test_hypervisor_plans_quad_brain_path_for_npc_context():
     assert decision.budget.candidate_count >= 4
 
 
+def test_business_bot_preset_routes_to_concise_quad_brain_cgpu_surface():
+    bridge = StubBridge()
+    hypervisor = CognitiveHypervisor(bridge_factory=lambda: bridge)
+
+    result = asyncio.run(
+        hypervisor.process_query(
+            "Tell the operator the next step",
+            runtime_preset="business_bot",
+        )
+    )
+
+    quad_trace = result.telemetry["quad_brain"]
+    cgpu_output = quad_trace["outputs"][2]
+
+    assert result.decision.route == HypervisorRoute.QUAD_BRAIN_PATH
+    assert result.decision.hemisphere_mode == "auto"
+    assert result.telemetry["runtime_preset"] == "business_bot"
+    assert "business_bot_preset" in result.telemetry["reasons"]
+    assert cgpu_output["content"]["trace"]["mode"] == "business_bot"
+    assert result.response.startswith(("Direct answer:", "Recommended next step:"))
+    assert "response_template" not in result.response
+
+
 def test_hypervisor_quad_brain_path_serializes_four_brain_arbitration():
     bridge = StubBridge()
     hypervisor = CognitiveHypervisor(bridge_factory=lambda: bridge)

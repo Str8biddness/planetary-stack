@@ -103,10 +103,14 @@ class CognitiveHypervisor:
         rag_context: str = "",
         character_context: Mapping[str, Any] | None = None,
         constraints: list[str] | None = None,
+        runtime_preset: str | None = None,
         max_tokens: int = 512,
     ) -> HypervisorDecision:
         normalized = query.lower()
         active_constraints = list(constraints or [])
+        preset = self._normalize_runtime_preset(runtime_preset)
+        if preset:
+            active_constraints.append(f"runtime_preset:{preset}")
         reasons: list[str] = []
 
         if self._is_safety_workload(normalized, active_constraints):
@@ -120,6 +124,23 @@ class CognitiveHypervisor:
             )
             reasons.append("safety_or_platform_constraint")
             active_constraints.append("critic_must_validate_before_emit")
+        elif preset == "business_bot":
+            route = HypervisorRoute.QUAD_BRAIN_PATH
+            hemisphere_mode = "auto"
+            budget = HypervisorBudget(
+                latency_ms=800.0,
+                retrieval_depth=2,
+                candidate_count=2,
+                critic_passes=1,
+            )
+            reasons.append("business_bot_preset")
+            active_constraints.extend(
+                [
+                    "business_bot_concise_action_surface",
+                    "compact_surface_response",
+                    "serialize_arbitration_after_parallel_dispatch",
+                ]
+            )
         elif rag_context.strip() or self._needs_grounding(normalized):
             route = HypervisorRoute.GROUNDED_PATH
             hemisphere_mode = "auto"
@@ -183,14 +204,17 @@ class CognitiveHypervisor:
         rag_context: str = "",
         character_context: dict[str, Any] | None = None,
         constraints: list[str] | None = None,
+        runtime_preset: str | None = None,
         max_tokens: int = 512,
     ) -> HypervisorResult:
         start = time.time()
+        preset = self._normalize_runtime_preset(runtime_preset)
         decision = self.plan(
             query,
             rag_context=rag_context,
             character_context=character_context,
             constraints=constraints,
+            runtime_preset=preset,
             max_tokens=max_tokens,
         )
         effective_rag_context = rag_context
@@ -230,6 +254,7 @@ class CognitiveHypervisor:
                 rag_context=effective_rag_context,
                 character_context=character_context,
                 constraints=constraints or [],
+                runtime_preset=preset,
                 max_tokens=max_tokens,
                 surface=self._template_surface(decision),
             )
@@ -251,6 +276,7 @@ class CognitiveHypervisor:
             "budget": decision.budget.to_dict(),
             "reasons": list(decision.reasons),
             "constraints": list(decision.constraints),
+            "runtime_preset": preset,
             "bridge_latency_ms": bridge_result.get("latency_ms", 0.0),
             "device_isolation": guarded.to_dict(),
             "budget_exhausted": guarded.status == "timeout",
@@ -452,3 +478,13 @@ class CognitiveHypervisor:
             "plan",
         )
         return len(query.split()) >= 18 or any(term in query for term in deep_terms)
+
+    def _normalize_runtime_preset(self, runtime_preset: str | None) -> str | None:
+        if runtime_preset is None:
+            return None
+        value = runtime_preset.strip().lower().replace("-", "_")
+        if value in {"", "none", "default"}:
+            return None
+        if value in {"business", "business_bot", "businessbot"}:
+            return "business_bot"
+        return value

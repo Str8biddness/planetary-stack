@@ -4,7 +4,9 @@
 Production-grade FastAPI server integrating the legacy-compatible character/RAG
 pipeline with the active Synthesus 5 CHAL runtime. The stable public response
 envelope remains `QueryResponse`; clients opt into the current Cognitive
-Hypervisor path with `mode="chal"` on `/api/v1/query`.
+Hypervisor path with `mode="chal"` on `/api/v1/query`. `mode="business_bot"`
+is a Synthesus 5 CHAL preset that routes through the hypervisor and Quad Brain
+CGPU path with concise action-oriented rendering.
 
 ## Architecture
 
@@ -18,7 +20,7 @@ Client Request
           │
           ▼
 ┌─────────────────────┐
-│  mode="chal"?        │  yes → Cognitive Hypervisor
+│  mode="chal"/preset? │  yes → Cognitive Hypervisor
 └──────┬──────────────┘
        │ no
        ▼
@@ -42,7 +44,12 @@ Client Request
 ### Synthesus 5 CHAL Mode
 
 `POST /api/v1/query` accepts `mode="chal"` and routes explicitly through
-`CognitiveHypervisor`. When `include_debug=true`, responses include:
+`CognitiveHypervisor`. `mode="business_bot"` is normalized to CHAL with
+`runtime_preset="business_bot"`, selecting `quad_brain_path` and CGPU
+`business_bot` rendering for concise operator/business answers. Clients may
+also send `runtime_preset="business_bot"` with `mode="chal"`.
+
+When `include_debug=true`, responses include:
 
 ```json
 {
@@ -59,6 +66,7 @@ Client Request
       },
       "device_isolation": {},
       "template_guard": {},
+      "runtime_preset": "business_bot | null",
       "knowledge_provenance": {
         "schema": "synthesus.chal.knowledge_provenance.v1",
         "source": "rom_mount:kc_knowledge_cloud_world_lore_json",
@@ -96,11 +104,13 @@ SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_chal_smoke.py
 ```
 
 The command uses the FastAPI app in-process and sends three public
-`/api/v1/query` calls with `mode="chal"` and `include_debug=true`. It fails if
+`/api/v1/query` calls with `mode="chal"` or `mode="business_bot"` and
+`include_debug=true`. It fails if
 the CHAL response source is missing, hypervisor trace schema is absent, the
-expected grounded/Quad Brain/safety route is not selected, the request degrades
-or exhausts budget, Quad Brain serial-order telemetry is malformed, or a legacy
-template signature leaks into final text.
+expected grounded/Quad Brain/business-bot/safety route is not selected, the
+request degrades or exhausts budget, Quad Brain serial-order telemetry is
+malformed, the business preset does not expose CGPU `business_bot` mode, or a
+legacy template signature leaks into final text.
 
 ### Synthesus 5 Focused Release Suite
 
@@ -122,7 +132,7 @@ and fails on the first broken release-readiness step.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/v1/query` | POST | Main query; `mode="chal"` routes through Synthesus 5 Cognitive Hypervisor, `auto` preserves the legacy-compatible pipeline |
+| `/api/v1/query` | POST | Main query; `mode="chal"` routes through Synthesus 5 Cognitive Hypervisor, `mode="business_bot"` selects the CHAL business-bot preset, `auto` preserves the legacy-compatible pipeline |
 | `/api/v1/chat` | POST | Multi-turn conversation |
 | `/api/v1/characters` | GET | List all characters |
 | `/api/v1/characters/{id}` | GET | Character details |

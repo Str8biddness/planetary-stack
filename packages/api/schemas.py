@@ -97,10 +97,15 @@ class QueryRequest(BaseModel):
     mode: str = Field(
         default="auto",
         description=(
-            "Processing mode: auto|chal|cognitive|rag|pattern. Use chal to "
-            "route explicitly through the Synthesus 5 Cognitive Hypervisor; "
+            "Processing mode: auto|chal|business_bot|cognitive|rag|pattern. Use "
+            "chal to route explicitly through the Synthesus 5 Cognitive Hypervisor; "
+            "business_bot is a CHAL preset for concise action-oriented answers; "
             "auto preserves the legacy-compatible production pipeline."
         ),
+    )
+    runtime_preset: Optional[str] = Field(
+        default=None,
+        description="Optional Synthesus 5 runtime preset, currently business_bot.",
     )
     session_id: Optional[str] = Field(default=None, description="Session ID for multi-turn")
     player_id: str = Field(default="default", description="Player/user ID for relationship tracking")
@@ -114,6 +119,7 @@ class LegacyQueryRequest(BaseModel):
     query: Optional[str] = Field(default=None, max_length=2000)
     character: str = Field(default="synth")
     mode: str = Field(default="auto")
+    runtime_preset: Optional[str] = Field(default=None)
     session_id: Optional[str] = Field(default=None)
     player_id: str = Field(default="default")
     include_sources: bool = Field(default=False)

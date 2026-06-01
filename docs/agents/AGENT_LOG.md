@@ -1885,3 +1885,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Cold-start hardware mounting is healthy, including ROM, parameter disk, grounding corpus, and provenance mounts.
 - The current blocker is not KAL/CHAL mount readiness or manifest hash drift; it is semantic incompatibility between two generated retrieval artifacts.
+
+## Current Session — 2026-06-01 (Agent 1 — Business-Bot CHAL Preset Path)
+
+### 📝 Summary
+- Wired `runtime_preset="business_bot"` through `CognitiveHypervisor` and exposed `mode="business_bot"` on `/api/v1/query` as a CHAL preset instead of a legacy pipeline branch.
+- Routed the preset through `quad_brain_path`, Executive Reasoning, CGPU `business_bot` rendering, and Critic/Metacognition so concise operator/business answers still preserve CHAL arbitration and template-leakage checks.
+- Extended the CHAL smoke command, OpenAPI/schema mirrors, CGPU/API docs, and Phase 9 checklist for the new public preset path.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/hypervisor.py packages/core/chal/quad_brain.py packages/api/schemas.py packages/api/production_server.py tools/synthesus5_chal_smoke.py tests/test_chal_hypervisor.py tests/e2e/test_chat_e2e.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_hypervisor.py` — 14 passed.
+- `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off SYNTHESUS_API_KEY=synthesus5-test PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/api:/home/workspace/Synthesus_4.0/packages/knowledge:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/e2e/test_chat_e2e.py::TestChatE2E::test_chal_mode_routes_through_cognitive_hypervisor tests/e2e/test_chat_e2e.py::TestChatE2E::test_business_bot_mode_routes_through_chal_preset` — 2 passed, 8 warnings.
+- `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off SYNTHESUS_API_KEY=synthesus5-smoke-local python tools/synthesus5_chal_smoke.py` — passed across grounded, Quad Brain NPC, business-bot preset, and safety turns.
+
+### 🚧 Left Off / Next Steps
+- Continue Phase 6 conversion/removal of the six `legacy_quarantine_required` template surfaces from `tools/audit_template_surfaces.py`.
+- Add frontend control/trace visibility for `runtime_preset` and CHAL route decisions.
+- Keep pre-existing unrelated working-tree changes in root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` separated from Agent 1 source/docs commits.
+
+### 💡 Architectural Notes
+- Business-bot is now a production API preset over the Synthesus 5 runtime, not a standalone renderer demo: public request → hypervisor preset → Quad Brain → CGPU business surface → critic final emission.
+- The preset intentionally uses `quad_brain_path` with a smaller candidate budget and compact constraints, preserving the release-readiness invariant that new public behavior carries traceability and no normal-path template leakage.

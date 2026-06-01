@@ -76,6 +76,29 @@ class TestChatE2E:
             "safety_path",
         }
 
+    def test_business_bot_mode_routes_through_chal_preset(self, client):
+        """Business-bot mode should expose the concise Synthesus 5 CHAL preset."""
+        payload = {
+            "query": "Tell the operator the safest next step for a flaky worker.",
+            "character": "synthesus",
+            "session_id": "e2e-chat-business-bot",
+            "mode": "business_bot",
+            "include_debug": True,
+        }
+        resp = client.post("/api/v1/query", json=payload)
+        assert resp.status_code == 200
+        data = resp.json()
+
+        hv_debug = data["debug"]["cognitive_hypervisor"]
+        cgpu_output = hv_debug["quad_brain"]["outputs"][2]
+
+        assert data["source"] == "cognitive_hypervisor"
+        assert hv_debug["route"] == "quad_brain_path"
+        assert hv_debug["runtime_preset"] == "business_bot"
+        assert "business_bot_preset" in hv_debug["reasons"]
+        assert cgpu_output["content"]["trace"]["mode"] == "business_bot"
+        assert data["response"].startswith(("Direct answer:", "Recommended next step:"))
+
     def test_debug_info_when_requested(self, client):
         """include_debug=True should add a debug block to the response."""
         payload = {

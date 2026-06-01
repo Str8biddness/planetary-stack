@@ -109,6 +109,7 @@ class QuadBrainOrchestrator:
         rag_context: str = "",
         character_context: Mapping[str, Any] | None = None,
         constraints: list[str] | None = None,
+        runtime_preset: str | None = None,
         max_tokens: int = 512,
         surface: TemplateSurface = TemplateSurface.NORMAL,
     ) -> QuadBrainArbitration:
@@ -130,6 +131,7 @@ class QuadBrainOrchestrator:
             knowledge=knowledge,
             character_context=character_context,
             constraints=constraints or [],
+            runtime_preset=runtime_preset,
             max_tokens=max_tokens,
             transition=transitions[QuadBrainRole.EXECUTIVE_REASONING],
         )
@@ -139,6 +141,7 @@ class QuadBrainOrchestrator:
             executive=executive,
             knowledge=knowledge,
             character_context=character_context,
+            runtime_preset=runtime_preset,
             transition=transitions[QuadBrainRole.CGPU_RENDERING],
         )
         critic = self._critic_metacognition(
@@ -223,21 +226,23 @@ class QuadBrainOrchestrator:
         knowledge: QuadBrainOutput,
         character_context: Mapping[str, Any] | None,
         constraints: list[str],
+        runtime_preset: str | None,
         max_tokens: int,
         transition: QuadBrainStateTransition,
     ) -> QuadBrainOutput:
         facts = [str(fact) for fact in knowledge.content.get("facts", []) if str(fact).strip()]
-        style = "concise" if max_tokens <= 256 else "balanced"
-        mode = "persona" if character_context else "general"
+        business_preset = runtime_preset == "business_bot"
+        style = "concise" if business_preset or max_tokens <= 256 else "balanced"
+        mode = "business_bot" if business_preset else "persona" if character_context else "general"
         forbidden = ["[module]", "[fallback]", "response_template", "Handled:", "No route matched"]
         plan = ResponsePlan(
-            intent=self._intent_for_route(decision.route),
+            intent="business_action" if business_preset else self._intent_for_route(decision.route),
             style=style,
             safety_level=0.8 if decision.route == HypervisorRoute.SAFETY_PATH else 0.25,
-            target_length=max(48, min(max_tokens, 220)),
+            target_length=max(48, min(160 if business_preset else max_tokens, 220)),
             personality=[
                 str(character_context.get("persona") or character_context.get("character_id"))
-            ] if character_context else [],
+            ] if character_context and not business_preset else [],
             key_points=facts[:2],
             required_phrases=[],
             forbidden_phrases=forbidden,
@@ -264,20 +269,22 @@ class QuadBrainOrchestrator:
         self,
         *,
         query: str,
-        decision: HypervisorDecision,
-        executive: QuadBrainOutput,
-        knowledge: QuadBrainOutput,
-        character_context: Mapping[str, Any] | None,
-        transition: QuadBrainStateTransition,
+            decision: HypervisorDecision,
+            executive: QuadBrainOutput,
+            knowledge: QuadBrainOutput,
+            character_context: Mapping[str, Any] | None,
+            runtime_preset: str | None,
+            transition: QuadBrainStateTransition,
     ) -> QuadBrainOutput:
         plan = ResponsePlan(**executive.content["plan"])
         facts = [str(fact) for fact in knowledge.content.get("facts", []) if str(fact).strip()]
+        mode = "business_bot" if runtime_preset == "business_bot" else "persona" if character_context else "general"
         frame = CGPUFrame.create(
             query=query,
             plan=plan,
             trace_id=decision.trace_id,
             grounded_state={"facts": facts},
-            mode="persona" if character_context else "general",
+            mode=mode,
             candidate_count=decision.budget.candidate_count,
             critic_passes=decision.budget.critic_passes,
             constraints=list(executive.content.get("constraints", [])),

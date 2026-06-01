@@ -1405,10 +1405,17 @@ components:
         mode:
           type: string
           title: Mode
-          description: 'Processing mode: auto|chal|cognitive|rag|pattern. Use chal
-            to route explicitly through the Synthesus 5 Cognitive Hypervisor; auto
+          description: 'Processing mode: auto|chal|business_bot|cognitive|rag|pattern.
+            Use chal to route explicitly through the Synthesus 5 Cognitive Hypervisor;
+            business_bot is a CHAL preset for concise action-oriented answers; auto
             preserves the legacy-compatible production pipeline.'
           default: auto
+        runtime_preset:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Runtime Preset
+          description: Optional Synthesus 5 runtime preset, currently business_bot.
         session_id:
           anyOf:
           - type: string
@@ -1569,6 +1576,12 @@ components:
           type: array
           items:
             type: string
+        runtime_preset:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Active Synthesus 5 runtime preset, such as business_bot,
+            or null for default CHAL routing.
         bridge_latency_ms:
           type: number
         device_isolation:

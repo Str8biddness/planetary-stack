@@ -41,6 +41,8 @@ Runtime guard code lives in `packages/reasoning/generation/template_guard.py`. T
 
 `CognitiveHypervisor` now invokes `packages/core/chal/quad_brain.py` for `quad_brain_path`. The serialized arbiter feeds Knowledge/Grounding facts into Executive Reasoning, builds a bounded `ResponsePlan`, calls `CGPURenderer`, then sends the selected candidate through Critic/Metacognition before emission.
 
+`/api/v1/query` now exposes the CGPU business surface through `mode="business_bot"` or `mode="chal"` plus `runtime_preset="business_bot"`. The preset stays inside the normal Synthesus 5 arbitration path: the hypervisor emits `runtime_preset="business_bot"`, Quad Brain selects `quad_brain_path`, Executive Reasoning builds a concise business action plan, CGPU renders with `mode="business_bot"`, and Critic/Metacognition still owns final emission and template-leakage checks.
+
 The runtime trace is exposed at `telemetry.quad_brain` and mirrored into `bridge_result.quad_brain_arbitration`. It includes the four brain outputs, fixed `serial_order`, CGPU candidate diagnostics, template-guard status, and a state contract that explicitly records serialized arbitration and no parallel brain spawning.
 
 The Quad Brain state contract now includes a per-role state-transition chain. CGPU consumes `executive.response_plan`, `knowledge.facts`, and `character_context`, then emits `cgpu.candidates` and `cgpu.selected_candidate` for the critic. This keeps CGPU render output inspectable as an intermediate device frame, not a direct final response path.

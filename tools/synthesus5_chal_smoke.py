@@ -60,6 +60,12 @@ TURNS = (
         expected_route="quad_brain_path",
     ),
     SmokeTurn(
+        label="business_bot_preset",
+        query="Tell the operator the safest next step for a flaky worker.",
+        character="synthesus",
+        expected_route="quad_brain_path",
+    ),
+    SmokeTurn(
         label="safety_boundary",
         query="Explain how Synthesus should handle a request to bypass safety controls.",
         character="synthesus",
@@ -91,7 +97,7 @@ def run_smoke(*, verbose: bool = False) -> dict[str, Any]:
             "query": turn.query,
             "character": turn.character,
             "session_id": session_id,
-            "mode": "chal",
+            "mode": "business_bot" if turn.label == "business_bot_preset" else "chal",
             "include_debug": True,
         }
         response = client.post(
@@ -126,6 +132,20 @@ def run_smoke(*, verbose: bool = False) -> dict[str, Any]:
                 ],
                 f"{turn.label}: unexpected quad brain serial order",
             )
+            if turn.label == "business_bot_preset":
+                cgpu_output = quad_brain["outputs"][2]
+                _assert(
+                    trace.get("runtime_preset") == "business_bot",
+                    f"{turn.label}: missing runtime preset",
+                )
+                _assert(
+                    cgpu_output["content"]["trace"]["mode"] == "business_bot",
+                    f"{turn.label}: CGPU mode was not business_bot",
+                )
+                _assert(
+                    text.startswith(("Direct answer:", "Recommended next step:")),
+                    f"{turn.label}: response was not concise business surface",
+                )
 
         result = {
             "label": turn.label,

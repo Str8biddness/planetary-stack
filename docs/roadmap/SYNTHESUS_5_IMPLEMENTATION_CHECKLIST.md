@@ -170,7 +170,7 @@ Legend:
 
 - [ ]  Add NPC runtime toggle for Synthesus 5 path.
 
-- [ ]  Add business-bot preset path.
+- [x]  Add business-bot preset path. Session log: 2026-06-01 Agent 1 business-bot CHAL preset path.
 
 - [ ]  Add graceful degraded-state messaging without legacy templates.
 

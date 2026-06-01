@@ -885,6 +885,17 @@ def _detect_domain(char_id: str, char_data: Optional[Dict[str, Any]]) -> str:
     return "chat"
 
 
+def _normalize_runtime_preset(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    preset = value.strip().lower().replace("-", "_")
+    if preset in {"", "none", "default"}:
+        return None
+    if preset in {"business", "business_bot", "businessbot"}:
+        return "business_bot"
+    return preset
+
+
 def _load_character(char_id: str) -> Optional[Dict[str, Any]]:
     """Load character data, prioritizing the Universal Substrate (Right Hemisphere)."""
     if char_id in _character_cache:
@@ -1073,13 +1084,14 @@ def _normalize_legacy_query_payload(payload: LegacyQueryRequest) -> QueryRequest
 
     mode = (payload.mode or "auto").strip().lower()
     # Older clients used "character"/domain values; map unknowns to auto routing.
-    if mode not in {"auto", "cognitive", "rag", "pattern"}:
+    if mode not in {"auto", "chal", "business_bot", "business", "cognitive", "rag", "pattern"}:
         mode = "auto"
 
     return QueryRequest(
         query=query_text,
         character=(payload.character or "synth"),
-        mode=mode
+        mode=mode,
+        runtime_preset=payload.runtime_preset,
     )
 
 
@@ -1289,7 +1301,13 @@ async def query_endpoint(req: QueryRequest, auth=Depends(get_auth)):
 
     _conversations.setdefault(session_id, [])
 
-    if req.mode == "chal":
+    mode = (req.mode or "auto").strip().lower().replace("-", "_")
+    runtime_preset = _normalize_runtime_preset(req.runtime_preset)
+    if mode in {"business", "business_bot"}:
+        runtime_preset = "business_bot"
+        mode = "chal"
+
+    if mode == "chal":
         hypervisor = _get_cognitive_hypervisor()
         if hypervisor is None:
             raise HTTPException(
@@ -1310,7 +1328,9 @@ async def query_endpoint(req: QueryRequest, auth=Depends(get_auth)):
                 "session_id": session_id,
                 "player_id": req.player_id,
                 "domain": domain,
+                "runtime_preset": runtime_preset,
             },
+            runtime_preset=runtime_preset,
             max_tokens=512,
         )
         latency = (time.time() - t0) * 1000
