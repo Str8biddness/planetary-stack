@@ -1341,7 +1341,9 @@ components:
           - route
           - required_roles
           - state_transitions
+          - critic_input_ref
           - final_output_ref
+          - final_output_owner
           properties:
             topology:
               type: string
@@ -1381,11 +1383,27 @@ components:
                 $ref: '#/components/schemas/QuadBrainStateTransition'
               minItems: 4
               maxItems: 4
+            critic_input_ref:
+              type: string
+              const: cgpu.selected_candidate
+              description: State reference reviewed by Critic/Metacognition before final
+                response ownership.
+            critic_reviewed_candidate_id:
+              anyOf:
+              - type: string
+              - type: 'null'
+              description: Concrete CGPU candidate id reviewed by Critic/Metacognition.
             final_output_ref:
               type: string
               const: critic.selected_response
               description: State reference that owns the final selected response after
                 critic/metacognition arbitration.
+            final_output_owner:
+              type: string
+              enum:
+              - critic_metacognition
+              - hemisphere_bridge_fallback
+              description: Runtime source that supplied the selected response.
           additionalProperties: true
         latency_ms:
           type: number

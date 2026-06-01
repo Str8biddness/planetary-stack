@@ -2060,3 +2060,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Source manifests are now a CHAL hardware admission boundary, not passive metadata. Hash manifests prove bytes, while the source-plane gate proves minimal provenance and license review before ingestion expands the public Knowledge Cloud.
 - The current generated retrieval bundle is intentionally still blocked; this run improves future source hygiene and cross-repo validation without blessing or modifying generated artifacts.
+
+## Current Session — 2026-06-01 (Agent 7 — Quad Brain Critic Handoff Trace)
+
+### 📝 Summary
+- Added explicit Quad Brain critic handoff metadata tying `cgpu.selected_candidate` to `critic.selected_response`.
+- Recorded `critic_input_ref`, `critic_reviewed_candidate_id`, and `final_output_owner` in `QuadBrainArbitration.state_contract`.
+- Mirrored the reviewed CGPU candidate id in Critic/Metacognition content and trace metadata so final emission can be audited without spawning extra brain nodes.
+- Updated the Phase 3 checklist, CGPU docs, Dual Hemisphere docs, and OpenAPI/schema mirrors for the expanded state contract.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/quad_brain.py packages/core/chal/hypervisor.py tests/test_chal_hypervisor.py` — passed.
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_hypervisor.py` — 14 passed.
+
+### 🚧 Left Off / Next Steps
+- Continue Phase 6 conversion/removal of the five remaining `legacy_quarantine_required` paths from `tools/audit_template_surfaces.py`.
+- If API clients begin validating Quad Brain traces strictly, promote the critic handoff fields into a reusable schema object rather than leaving them inside the open state-contract object.
+- Keep pre-existing unrelated working-tree changes in root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` separated from Agent 7 commits.
+
+### 💡 Architectural Notes
+- The normal Quad Brain path now exposes a concrete handoff chain: CGPU selects a candidate, Critic/Metacognition reviews that exact candidate id, and final response ownership remains `critic.selected_response`.
+- This preserves the bounded four-brain topology and strengthens traceability without introducing uncontrolled multi-agent fan-out.

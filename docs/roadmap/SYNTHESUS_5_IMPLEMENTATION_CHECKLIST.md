@@ -71,7 +71,7 @@ Legend:
 
 - [x]  Implement Brain 4: Critic / Safety / Metacognition as evaluator/rewrite trigger. Session log: 2026-05-28 Agent 7 Quad Brain arbiter added critic/metacognition template-guard arbitration; 2026-05-31 Agent 7 added trace-verified `critic.selected_response` and `critic.template_guard` final-output contract.
 
-- [x]  Add serialized arbiter that merges four brain outputs into a single response frame. Session log: 2026-05-28 Agent 7 Quad Brain arbiter.
+- [x]  Add serialized arbiter that merges four brain outputs into a single response frame. Session log: 2026-05-28 Agent 7 Quad Brain arbiter; 2026-06-01 Agent 7 added critic handoff proof tying `cgpu.selected_candidate` to `critic.selected_response` in inspectable trace metadata.
 
 - [x]  Mirror serialized Quad Brain arbitration telemetry in OpenAPI/API schema docs as `QuadBrainArbitration` under `CognitiveHypervisorTrace.quad_brain`. Session log: 2026-05-31 Agent 10 Quad Brain trace schema; 2026-06-01 Agent 10 typed `QuadBrainStateTransition` and the required final-output state contract fields.
 

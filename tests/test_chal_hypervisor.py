@@ -193,7 +193,9 @@ def test_hypervisor_quad_brain_path_serializes_four_brain_arbitration():
     assert quad_trace["state_contract"]["serialized_arbitration"] is True
     assert quad_trace["state_contract"]["parallel_brain_spawn"] is False
     assert quad_trace["state_contract"]["required_roles"] == [role.value for role in QuadBrainRole]
+    assert quad_trace["state_contract"]["critic_input_ref"] == "cgpu.selected_candidate"
     assert quad_trace["state_contract"]["final_output_ref"] == "critic.selected_response"
+    assert quad_trace["state_contract"]["final_output_owner"] == "critic_metacognition"
     assert quad_trace["selected_source"] == "critic_metacognition"
     assert "routed through both" in result.response
     assert result.bridge_result["quad_brain_arbitration"]["trace_id"] == result.decision.trace_id
@@ -222,6 +224,17 @@ def test_quad_brain_trace_records_serial_state_transitions():
 
     for output, transition in zip(quad_trace["outputs"], transitions):
         assert output["trace"]["state_transition"] == transition
+
+    cgpu_output = quad_trace["outputs"][2]
+    critic_output = quad_trace["outputs"][3]
+    selected_candidate_id = cgpu_output["content"]["selected_candidate_id"]
+
+    assert selected_candidate_id
+    assert quad_trace["state_contract"]["critic_reviewed_candidate_id"] == selected_candidate_id
+    assert critic_output["content"]["selected_candidate_id"] == selected_candidate_id
+    assert critic_output["content"]["reviewed_candidate_ref"] == "cgpu.selected_candidate"
+    assert critic_output["trace"]["input_refs"] == ["cgpu.selected_candidate", "template_surface"]
+    assert critic_output["trace"]["reviewed_candidate_id"] == selected_candidate_id
 
 
 def test_quad_brain_dispatch_preserves_grounding_and_improves_persona_surface_over_dual_hemi():

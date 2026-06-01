@@ -192,4 +192,4 @@ The arbiter intentionally runs these brain outputs in a fixed serial order after
 | CGPU Simulation / Rendering | `executive.response_plan`, `knowledge.facts`, `character_context` | `cgpu.candidates`, `cgpu.selected_candidate` |
 | Critic / Safety / Metacognition | `cgpu.selected_candidate`, `template_surface` | `critic.selected_response`, `critic.template_guard` |
 
-The contract also exposes `required_roles` and `final_output_ref=critic.selected_response`, so trace consumers can verify that normal Quad Brain responses pass through grounding, executive planning, CGPU rendering, and critic arbitration before emission.
+The contract also exposes `required_roles`, `critic_input_ref=cgpu.selected_candidate`, `critic_reviewed_candidate_id`, `final_output_ref=critic.selected_response`, and `final_output_owner`. Critic/Metacognition mirrors the reviewed CGPU candidate id in its output trace, so trace consumers can verify that normal Quad Brain responses pass through grounding, executive planning, CGPU rendering, and critic arbitration before emission.

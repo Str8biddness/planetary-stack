@@ -47,6 +47,8 @@ The runtime trace is exposed at `telemetry.quad_brain` and mirrored into `bridge
 
 The Quad Brain state contract now includes a per-role state-transition chain. CGPU consumes `executive.response_plan`, `knowledge.facts`, and `character_context`, then emits `cgpu.candidates` and `cgpu.selected_candidate` for the critic. This keeps CGPU render output inspectable as an intermediate device frame, not a direct final response path.
 
+The contract also records `critic_input_ref="cgpu.selected_candidate"` and the concrete `critic_reviewed_candidate_id`. Critic/Metacognition mirrors the same candidate id in its output trace before setting `critic.selected_response`, so trace consumers can prove that final emission came from a reviewed CGPU candidate rather than a bypass around arbitration.
+
 ## Validation
 
 Focused validation:

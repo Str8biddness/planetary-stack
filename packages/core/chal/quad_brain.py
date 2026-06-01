@@ -174,7 +174,10 @@ class QuadBrainOrchestrator:
                     transitions[role].to_dict()
                     for role in QuadBrainRole
                 ],
+                "critic_input_ref": "cgpu.selected_candidate",
+                "critic_reviewed_candidate_id": cgpu.content.get("selected_candidate_id"),
                 "final_output_ref": "critic.selected_response",
+                "final_output_owner": selected_source,
             },
             latency_ms=(time.time() - start) * 1000,
         )
@@ -319,6 +322,7 @@ class QuadBrainOrchestrator:
             content={
                 "selected_response": guard_result.text,
                 "selected_candidate_id": cgpu.content.get("selected_candidate_id"),
+                "reviewed_candidate_ref": "cgpu.selected_candidate",
                 "template_guard": guard_result.to_dict(),
                 "cgpu_confidence": cgpu.confidence,
             },
@@ -326,6 +330,8 @@ class QuadBrainOrchestrator:
             trace={
                 "trace_id": cgpu.content.get("trace_id") or f"critic-{uuid.uuid4().hex[:12]}",
                 "safety_arbitration_required": True,
+                "input_refs": ["cgpu.selected_candidate", "template_surface"],
+                "reviewed_candidate_id": cgpu.content.get("selected_candidate_id"),
                 "state_transition": transition.to_dict(),
             },
             warnings=warnings,

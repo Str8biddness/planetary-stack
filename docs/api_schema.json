@@ -380,7 +380,9 @@
               "route",
               "required_roles",
               "state_transitions",
-              "final_output_ref"
+              "critic_input_ref",
+              "final_output_ref",
+              "final_output_owner"
             ],
             "properties": {
               "topology": {
@@ -438,6 +440,30 @@
                 "type": "string",
                 "const": "critic.selected_response",
                 "description": "State reference that owns the final selected response after critic/metacognition arbitration."
+              },
+              "critic_input_ref": {
+                "type": "string",
+                "const": "cgpu.selected_candidate",
+                "description": "State reference reviewed by Critic/Metacognition before final response ownership."
+              },
+              "critic_reviewed_candidate_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Concrete CGPU candidate id reviewed by Critic/Metacognition."
+              },
+              "final_output_owner": {
+                "type": "string",
+                "enum": [
+                  "critic_metacognition",
+                  "hemisphere_bridge_fallback"
+                ],
+                "description": "Runtime source that supplied the selected response."
               }
             },
             "additionalProperties": true
