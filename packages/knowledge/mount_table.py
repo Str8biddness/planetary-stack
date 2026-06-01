@@ -156,15 +156,40 @@ class MountIntegrityReport:
 
 
 @dataclass(frozen=True)
+class RetrievalSemanticReport:
+    faiss_vectors: int | None
+    faiss_dim: int | None
+    metadata_records: int | None
+    embedder_dim: int | None
+    errors: tuple[str, ...] = ()
+
+    @property
+    def ok(self) -> bool:
+        return not self.errors
+
+    def as_metadata(self) -> dict[str, Any]:
+        return {
+            "faiss_vectors": self.faiss_vectors,
+            "faiss_dim": self.faiss_dim,
+            "metadata_records": self.metadata_records,
+            "embedder_dim": self.embedder_dim,
+            "semantic_integrity_ok": self.ok,
+            "errors": list(self.errors),
+        }
+
+
+@dataclass(frozen=True)
 class MountTableBootReport:
     manifest_path: str
     manifest_version: str | None
     mounts: tuple[Mount, ...]
     integrity: tuple[MountIntegrityReport, ...]
+    retrieval_semantics: RetrievalSemanticReport | None = None
 
     @property
     def ok(self) -> bool:
-        return all(report.ok for report in self.integrity)
+        semantic_ok = self.retrieval_semantics is None or self.retrieval_semantics.ok
+        return all(report.ok for report in self.integrity) and semantic_ok
 
     @property
     def active_mount_paths(self) -> tuple[str, ...]:
@@ -178,7 +203,7 @@ class MountTableBootReport:
         self,
         required_mounts: tuple[str, ...] = COLD_START_REQUIRED_MOUNTS,
     ) -> None:
-        if not self.ok:
+        if not all(report.ok for report in self.integrity):
             failed = ", ".join(
                 report.relative_path for report in self.integrity if not report.ok
             )
@@ -188,6 +213,11 @@ class MountTableBootReport:
             raise ValueError(
                 "Knowledge Cloud cold-start bundle missing required active mounts: "
                 + ", ".join(missing)
+            )
+        if self.retrieval_semantics is not None and not self.retrieval_semantics.ok:
+            raise ValueError(
+                "Knowledge Cloud retrieval semantic integrity failed: "
+                + "; ".join(self.retrieval_semantics.errors)
             )
 
 
@@ -253,10 +283,78 @@ class KnowledgeCloudMountTable:
         manifest_name: str = "manifest.json",
         *,
         required_mounts: tuple[str, ...] = COLD_START_REQUIRED_MOUNTS,
+        validate_retrieval_semantics: bool = False,
     ) -> MountTableBootReport:
         report = self.boot(root_dir, manifest_name=manifest_name, strict=True)
+        if validate_retrieval_semantics:
+            report = MountTableBootReport(
+                manifest_path=report.manifest_path,
+                manifest_version=report.manifest_version,
+                mounts=report.mounts,
+                integrity=report.integrity,
+                retrieval_semantics=self.validate_retrieval_semantics(root_dir),
+            )
         report.assert_cold_start_ready(required_mounts)
         return report
+
+    def validate_retrieval_semantics(self, root_dir: str | Path) -> RetrievalSemanticReport:
+        """Verify mounted FAISS, metadata, and embedder artifacts can work together."""
+        root = Path(root_dir)
+        errors: list[str] = []
+        faiss_vectors: int | None = None
+        faiss_dim: int | None = None
+        metadata_records: int | None = None
+        embedder_dim: int | None = None
+
+        try:
+            import faiss  # type: ignore
+
+            index = faiss.read_index(str(root / "faiss.index"))
+            faiss_vectors = int(index.ntotal)
+            faiss_dim = int(index.d)
+        except Exception as exc:
+            errors.append(f"FAISS load failed: {exc}")
+
+        try:
+            metadata = json.loads((root / "faiss_metadata.json").read_text(encoding="utf-8"))
+            if isinstance(metadata, list):
+                metadata_records = len(metadata)
+            elif isinstance(metadata, dict):
+                metadata_records = len(metadata)
+            else:
+                errors.append("faiss_metadata.json must be a list or object")
+        except Exception as exc:
+            errors.append(f"FAISS metadata load failed: {exc}")
+
+        try:
+            import joblib  # type: ignore
+
+            embedder = joblib.load(root / "models" / "swarm_embedder.pkl")
+            if isinstance(embedder, dict):
+                embedder_dim = int(embedder["dim"])
+            else:
+                dim = getattr(embedder, "dim", None)
+                if dim is None:
+                    errors.append("swarm_embedder.pkl has no dim field")
+                else:
+                    embedder_dim = int(dim)
+        except Exception as exc:
+            errors.append(f"Swarm embedder load failed: {exc}")
+
+        if faiss_vectors is not None and metadata_records is not None and faiss_vectors != metadata_records:
+            errors.append(
+                f"FAISS/metadata count mismatch: faiss={faiss_vectors}, metadata={metadata_records}"
+            )
+        if faiss_dim is not None and embedder_dim is not None and faiss_dim != embedder_dim:
+            errors.append(f"FAISS/embedder dim mismatch: faiss={faiss_dim}, embedder={embedder_dim}")
+
+        return RetrievalSemanticReport(
+            faiss_vectors=faiss_vectors,
+            faiss_dim=faiss_dim,
+            metadata_records=metadata_records,
+            embedder_dim=embedder_dim,
+            errors=tuple(errors),
+        )
 
     def _verify_artifact(
         self,
@@ -315,4 +413,5 @@ __all__ = [
     "KnowledgeCloudMountTable",
     "MountIntegrityReport",
     "MountTableBootReport",
+    "RetrievalSemanticReport",
 ]

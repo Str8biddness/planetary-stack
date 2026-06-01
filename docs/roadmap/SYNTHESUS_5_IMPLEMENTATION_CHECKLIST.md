@@ -102,7 +102,7 @@ Legend:
 
 - [x]  Add mount table boot sequence. Session log: 2026-05-28 Knowledge Cloud mount table.
 
-- [x]  Add partition integrity checks against Knowledge Cloud manifests. Session log: 2026-05-28 Knowledge Cloud mount table added runtime manifest SHA-256/size verification; 2026-05-28 Daily Knowledge Hardware Health Check tracked a current standalone artifact FAISS/embedder dim mismatch separately.
+- [x]  Add partition integrity checks against Knowledge Cloud manifests. Session log: 2026-05-28 Knowledge Cloud mount table added runtime manifest SHA-256/size verification; 2026-05-28 Daily Knowledge Hardware Health Check tracked a current standalone artifact FAISS/embedder dim mismatch separately; 2026-06-01 Agent 5 added runtime cold-start retrieval-semantic integrity checks for FAISS/metadata counts and FAISS/embedder dimensions.
 
 - [x]  Add cache locality and hot-context retrieval. Session log: 2026-05-30 Knowledge Hardware Hot-Context Validation.
 
@@ -186,7 +186,7 @@ Legend:
 
 - [x]  Validate Knowledge Cloud bundle integrity from cold start. Session log: 2026-05-31 Agent 5 Knowledge Cloud cold-start integrity gate.
 
-- [~]  Restore Knowledge Cloud golden-query health after artifact rebuild. Blocker note: 2026-06-01 Daily Knowledge Hardware Health Check confirmed manifest/source/bootstrap/cold-start mount validation passes, but golden-query retrieval fails because the current `synthesus-knowledge-cloud/artifacts/faiss.index` is 384-dimensional while `artifacts/models/swarm_embedder.pkl` persists `dim=128`; fix requires regenerating aligned generated artifacts, not a runtime source edit. Session log: 2026-06-01 Knowledge Cloud Provenance Stamp Guard added a source-only hardening gate so `synthesus-kc build --execute` and `synthesus-kc stamp-manifest` refuse to stamp provenance over that semantic mismatch.
+- [~]  Restore Knowledge Cloud golden-query health after artifact rebuild. Blocker note: 2026-06-01 Daily Knowledge Hardware Health Check confirmed manifest/source/bootstrap/cold-start mount validation passes, but golden-query retrieval fails because the current `synthesus-knowledge-cloud/artifacts/faiss.index` is 384-dimensional while `artifacts/models/swarm_embedder.pkl` persists `dim=128`; fix requires regenerating aligned generated artifacts, not a runtime source edit. Session log: 2026-06-01 Knowledge Cloud Provenance Stamp Guard added a source-only hardening gate so `synthesus-kc build --execute` and `synthesus-kc stamp-manifest` refuse to stamp provenance over that semantic mismatch; 2026-06-01 Agent 5 upgraded the Synthesus runtime cold-start gate to fail the same mismatch before declaring mounted Knowledge Cloud hardware ready.
 
 - [ ]  Publish release notes describing Synthesus 5 behavior and limitations.
 

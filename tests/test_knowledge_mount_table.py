@@ -6,6 +6,7 @@ import json
 import sys
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -37,6 +38,16 @@ def _write_artifact(root: Path, relative_path: str, content: bytes) -> dict:
     }
 
 
+def _record_existing_artifact(root: Path, relative_path: str) -> dict:
+    path = root / relative_path
+    content = path.read_bytes()
+    return {
+        "path": relative_path,
+        "size": len(content),
+        "sha256": hashlib.sha256(content).hexdigest(),
+    }
+
+
 def _write_manifest(root: Path, artifacts: list[dict]) -> None:
     (root / "manifest.json").write_text(
         json.dumps(
@@ -48,6 +59,52 @@ def _write_manifest(root: Path, artifacts: list[dict]) -> None:
         ),
         encoding="utf-8",
     )
+
+
+def _write_required_bundle_with_retrieval_semantics(
+    root: Path,
+    *,
+    faiss_dim: int = 3,
+    embedder_dim: int = 3,
+    metadata_records: int = 2,
+) -> None:
+    import faiss
+    import joblib
+
+    artifacts = [
+        _write_artifact(root, "knowledge_cloud/world_lore.json", b'{"lore": []}\n'),
+        _write_artifact(root, "knowledge_cloud/transitions.json", b'{"edges": []}\n'),
+        _write_artifact(root, "knowledge_cloud/chaining_patterns.json", b'{"patterns": []}\n'),
+        _write_artifact(root, "knowledge_cloud/learned_transitions.json", b'{"learned_transitions": {}}\n'),
+        _write_artifact(root, "knowledge.kndb", b"kndb-bytes"),
+        _write_artifact(root, "knowledge.kndb.meta.db", b"metadata-bytes"),
+        _write_artifact(root, "knowledge.meta.db", b"knowledge-metadata-bytes"),
+    ]
+
+    model_path = root / "models" / "swarm_embedder.pkl"
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump({"dim": embedder_dim}, model_path)
+
+    index = faiss.IndexFlatIP(faiss_dim)
+    vectors = np.zeros((metadata_records, faiss_dim), dtype=np.float32)
+    if metadata_records:
+        vectors[:, 0] = 1.0
+        index.add(vectors)
+    faiss.write_index(index, str(root / "faiss.index"))
+
+    (root / "faiss_metadata.json").write_text(
+        json.dumps([{"id": f"node-{idx}"} for idx in range(metadata_records)]),
+        encoding="utf-8",
+    )
+
+    artifacts.extend(
+        [
+            _record_existing_artifact(root, "models/swarm_embedder.pkl"),
+            _record_existing_artifact(root, "faiss.index"),
+            _record_existing_artifact(root, "faiss_metadata.json"),
+        ]
+    )
+    _write_manifest(root, artifacts)
 
 
 def test_mount_table_boots_manifest_artifacts_as_chal_mounts(tmp_path: Path):
@@ -175,6 +232,37 @@ def test_mount_table_cold_start_rejects_missing_required_mount(tmp_path: Path):
 
     with pytest.raises(ValueError, match="/mnt/params/chaining_patterns"):
         KnowledgeCloudMountTable().validate_cold_start_bundle(tmp_path)
+
+
+def test_mount_table_validates_retrieval_semantic_integrity(tmp_path: Path):
+    _write_required_bundle_with_retrieval_semantics(tmp_path)
+
+    report = KnowledgeCloudMountTable().validate_cold_start_bundle(
+        tmp_path,
+        validate_retrieval_semantics=True,
+    )
+
+    assert report.ok is True
+    assert report.retrieval_semantics is not None
+    assert report.retrieval_semantics.faiss_vectors == 2
+    assert report.retrieval_semantics.metadata_records == 2
+    assert report.retrieval_semantics.faiss_dim == 3
+    assert report.retrieval_semantics.embedder_dim == 3
+    assert report.retrieval_semantics.errors == ()
+
+
+def test_mount_table_rejects_retrieval_semantic_dimension_mismatch(tmp_path: Path):
+    _write_required_bundle_with_retrieval_semantics(
+        tmp_path,
+        faiss_dim=3,
+        embedder_dim=2,
+    )
+
+    with pytest.raises(ValueError, match="FAISS/embedder dim mismatch: faiss=3, embedder=2"):
+        KnowledgeCloudMountTable().validate_cold_start_bundle(
+            tmp_path,
+            validate_retrieval_semantics=True,
+        )
 
 
 def test_kal_controller_boots_from_manifest_before_default_mounts(tmp_path: Path):

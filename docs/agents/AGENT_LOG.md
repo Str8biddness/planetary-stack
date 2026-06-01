@@ -1975,3 +1975,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Response composition for character/NPC patterns is now an explicit script surface, not a hidden normal assistant response owner.
 - The compatibility wrapper preserves old callers while giving Synthesus 5 trace consumers a labeled boundary for local character behavior.
+
+## Current Session — 2026-06-01 (Agent 5 — Knowledge Cold-Start Semantic Integrity Gate)
+
+### 📝 Summary
+- Added `RetrievalSemanticReport` to the Knowledge Cloud mount table so cold-start readiness can validate mounted FAISS, FAISS metadata, and swarm embedder compatibility in addition to manifest SHA-256/size checks.
+- Upgraded `tools/validate_knowledge_cold_start.py` to require retrieval-semantic integrity, causing the runtime release gate to reject hash-valid bundles whose retrieval hardware cannot answer queries because FAISS and the embedder disagree on vector dimension.
+- Added focused regression coverage for valid mounted retrieval semantics and FAISS/embedder dimension mismatch rejection.
+- Updated the Phase 5 partition-integrity checklist and KN module docs.
+
+### ✅ Verified
+- `python -m py_compile packages/knowledge/mount_table.py tools/validate_knowledge_cold_start.py tests/test_knowledge_mount_table.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_knowledge_mount_table.py` — 11 passed, 3 warnings.
+- `python tools/validate_knowledge_cold_start.py --root /home/workspace/synthesus-knowledge-cloud/artifacts` — failed as expected with `FAISS/embedder dim mismatch: faiss=384, embedder=128`, proving the cold-start gate now catches the current generated artifact blocker.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace the generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` are semantically aligned; then rerun `synthesus-kc validate`, `tools/validate_knowledge_cold_start.py`, and `packages/knowledge/health_check.py`.
+- After artifact regeneration, refresh the public mirror with `zopub sync synthesus-knowledge artifacts`.
+- Continue avoiding commits of generated FAISS/KNDB/model/cache/report artifacts; this run changed only runtime source, tests, and docs.
+
+### 💡 Architectural Notes
+- Manifest hashes prove mounted artifact bytes, not retrieval compatibility. Cold-start CHAL readiness now requires both byte integrity and semantic compatibility for the mounted grounding corpus and parameter-disk embedder.
+- The current live bundle is intentionally still blocked; this source change prevents the runtime from advertising retrieval-incompatible Knowledge Cloud hardware as cold-start ready.

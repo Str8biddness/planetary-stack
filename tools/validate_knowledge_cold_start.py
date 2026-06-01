@@ -28,10 +28,22 @@ def _default_root() -> Path:
 
 
 def validate(root: Path) -> int:
-    report = KnowledgeCloudMountTable().validate_cold_start_bundle(root)
+    report = KnowledgeCloudMountTable().validate_cold_start_bundle(
+        root,
+        validate_retrieval_semantics=True,
+    )
     print(f"Knowledge Cloud cold-start bundle OK: {root}")
     print(f"manifest={report.manifest_path} version={report.manifest_version or 'unknown'}")
     print(f"active_mounts={len(report.active_mount_paths)} checked_artifacts={len(report.integrity)}")
+    if report.retrieval_semantics is not None:
+        metadata = report.retrieval_semantics.as_metadata()
+        print(
+            "retrieval_semantics="
+            f"faiss_vectors={metadata['faiss_vectors']} "
+            f"metadata_records={metadata['metadata_records']} "
+            f"faiss_dim={metadata['faiss_dim']} "
+            f"embedder_dim={metadata['embedder_dim']}"
+        )
     for mount_path in COLD_START_REQUIRED_MOUNTS:
         print(f"mounted {mount_path}")
     return 0
