@@ -76,6 +76,16 @@ class OrganScorecard:
     notes: list[str]
 
 
+@dataclass
+class QualityGateResult:
+    passed: bool
+    failures: list[str]
+    min_replay_coverage: float | None
+    min_scientific_consistency: float | None
+    fail_under_baseline: bool
+    fail_missing_models: bool
+
+
 def _safe_float(value: Any) -> float:
     try:
         if value is None:
@@ -508,11 +518,65 @@ def render_markdown(scorecards: list[OrganScorecard]) -> str:
     return "\n".join(lines)
 
 
+def evaluate_quality_gate(
+    scorecards: list[OrganScorecard],
+    *,
+    min_replay_coverage: float | None = None,
+    min_scientific_consistency: float | None = None,
+    fail_under_baseline: bool = False,
+    fail_missing_models: bool = False,
+) -> QualityGateResult:
+    failures: list[str] = []
+
+    for scorecard in scorecards:
+        label = f"{scorecard.domain}/{scorecard.organ}"
+
+        if fail_missing_models and not scorecard.model_exists:
+            failures.append(f"{label} model is missing: {scorecard.model_path}")
+
+        if min_replay_coverage is not None and scorecard.replay_coverage < min_replay_coverage:
+            failures.append(
+                f"{label} replay coverage {scorecard.replay_coverage:.2%} is below required {min_replay_coverage:.2%}"
+            )
+
+        if min_scientific_consistency is not None and scorecard.scientific_consistency < min_scientific_consistency:
+            failures.append(
+                f"{label} scientific consistency {scorecard.scientific_consistency:.2%} is below required {min_scientific_consistency:.2%}"
+            )
+
+        if (
+            fail_under_baseline
+            and scorecard.validation_metric is not None
+            and scorecard.baseline_metric is not None
+        ):
+            if scorecard.metric_name == "mse":
+                under_baseline = scorecard.validation_metric > scorecard.baseline_metric
+            else:
+                under_baseline = scorecard.validation_metric < scorecard.baseline_metric
+            if under_baseline:
+                failures.append(
+                    f"{label} validation {scorecard.validation_metric:.4f} failed baseline {scorecard.baseline_metric:.4f} ({scorecard.metric_name})"
+                )
+
+    return QualityGateResult(
+        passed=not failures,
+        failures=failures,
+        min_replay_coverage=min_replay_coverage,
+        min_scientific_consistency=min_scientific_consistency,
+        fail_under_baseline=fail_under_baseline,
+        fail_missing_models=fail_missing_models,
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Evaluate trace-trained Synthesus ML organs")
     parser.add_argument("--domain", type=str, choices=["chat", "sysops", "gm"], default="", help="Optional domain filter")
     parser.add_argument("--write-json", action="store_true", default=True, help="Write JSON scorecard")
     parser.add_argument("--write-md", action="store_true", default=True, help="Write Markdown scorecard")
+    parser.add_argument("--min-replay-coverage", type=float, default=None, help="Fail if any organ replay metadata coverage is below this 0.0-1.0 threshold")
+    parser.add_argument("--min-scientific-consistency", type=float, default=None, help="Fail if any organ numeric consistency is below this 0.0-1.0 threshold")
+    parser.add_argument("--fail-under-baseline", action="store_true", help="Fail when validation performance is worse than the relevant baseline")
+    parser.add_argument("--fail-missing-models", action="store_true", help="Fail when traces exist but a trained model file is missing")
     args = parser.parse_args()
 
     if np is None or joblib is None or accuracy_score is None or r2_score is None or train_test_split is None or mean_squared_error is None:
@@ -534,6 +598,15 @@ def main() -> int:
         "scorecards": [asdict(s) for s in scorecards],
     }
 
+    quality_gate = evaluate_quality_gate(
+        scorecards,
+        min_replay_coverage=args.min_replay_coverage,
+        min_scientific_consistency=args.min_scientific_consistency,
+        fail_under_baseline=args.fail_under_baseline,
+        fail_missing_models=args.fail_missing_models,
+    )
+    payload["quality_gate"] = asdict(quality_gate)
+
     if args.write_json:
         REPORT_JSON.write_text(json.dumps(payload, indent=2))
     if args.write_md:
@@ -545,6 +618,10 @@ def main() -> int:
         logger.info(
             f"{s.domain}/{s.organ}: train={_format_metric(s.train_metric)} validation={_format_metric(s.validation_metric)} baseline={_format_metric(s.baseline_metric)} consistency={s.scientific_consistency:.2%} replay={s.replay_coverage:.2%}"
         )
+    if not quality_gate.passed:
+        for failure in quality_gate.failures:
+            logger.error(f"Quality gate failed: {failure}")
+        return 1
     return 0
 
 

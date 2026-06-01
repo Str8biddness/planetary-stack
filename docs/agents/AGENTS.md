@@ -167,6 +167,7 @@ This repo is currently in a validated PPBRS baseline state. Future PPBRS optimiz
 - Future organ families should keep the same registry/versioning contract and should usually start as heads on a shared representation model rather than standalone black-box networks.
 - Any future organ family added here should update the registry, bootstrap, organ config, hub routing, architecture docs, and this log together.
 - When the organ surface changes, keep `AGENT_LOG.md` and the relevant module docs in sync in the same session.
+- `tools/evaluate_organs.py` has a source-controlled quality gate for replay coverage, scientific consistency, missing trained models, and validation-vs-baseline checks; `tools/selfImprove.ts` enforces complete replay metadata, complete scientific consistency, and model presence after training.
 
 ## Datasets Sourced
 1. **Jeopardy Questions** (JephthaT/Jeopardy_Questions) - ~216,930 Q&A pairs, diverse categories

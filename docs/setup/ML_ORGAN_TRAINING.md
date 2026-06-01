@@ -128,8 +128,10 @@ Before pushing:
 - Trace generation is now diversified across GM, SysOps, and Chat sessions.
 - `tools/train_triad.py` now reports train/validation metrics instead of only fitting on the full trace set.
 - `tools/evaluate_organs.py` now produces a runtime scorecard after the full self-improvement loop.
+- `tools/evaluate_organs.py` now supports a quality gate for replay metadata coverage, scientific consistency, missing models, and validation-vs-baseline checks.
+- `tools/selfImprove.ts` runs evaluation with `--min-replay-coverage 1.0 --min-scientific-consistency 1.0 --fail-missing-models` so generated traces must remain replayable and numerically valid.
 - `packages/organs/cli.ts selfImprove` runs the updated loop.
 
 ## Updated next step
 
-Keep expanding trace variety if risk or attention metrics still look weak; the orchestration layer is now stable.
+Keep expanding trace variety if risk or attention metrics still look weak; use `python tools/evaluate_organs.py --fail-under-baseline` as the stricter local gate before making baseline performance mandatory in the full loop.

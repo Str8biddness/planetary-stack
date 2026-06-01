@@ -1790,3 +1790,28 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The snapshot footer still seals the whole payload, while the new device fingerprint manifest verifies restored device state after replay. This gives traceability at both envelope and mounted-device levels.
 - The VPD pybind dump remains an inspection surface only. Hardware claims require a successful native build and smoke test.
+
+## Current Session — 2026-05-31 (Agent 9 — Organ Evaluation Quality Gate)
+
+### 📝 Summary
+- Added a source-controlled organ evaluation quality gate to `tools/evaluate_organs.py` for replay metadata coverage, scientific consistency, missing model files, and optional validation-vs-baseline failure checks.
+- Wired `tools/selfImprove.ts` so the self-improvement loop now fails unless generated organ traces are fully replayable, numerically consistent, and backed by trained models.
+- Added focused regression tests for the gate and documented the stricter organ-training contract in the ML organ guide and agent operating notes.
+- Advanced the Phase 7 replayable trace storage checklist item without marking it complete because broader runtime conversation trace replay remains.
+
+### ✅ Verified
+- `python -m py_compile tools/evaluate_organs.py tests/test_organ_evaluation_quality_gate.py` — passed.
+- `python -m pytest -q tests/test_organ_evaluation_quality_gate.py` — 3 passed.
+- `npx ts-node --transpile-only --compiler-options '{"module":"CommonJS","moduleResolution":"node"}' -e "import('./tools/selfImprove').then(() => console.log('selfImprove import ok'))"` — passed.
+- `npx ts-node --transpile-only --compiler-options '{"module":"CommonJS","moduleResolution":"node"}' packages/organs/cli.ts selfImprove` — passed; generated ignored traces/models/scorecards, trained all nine triad models, and passed the new replay/consistency/model quality gate.
+- `git diff --check` — passed.
+- Note: `npx tsc --noEmit -p packages/organs/tsconfig.json` still fails because the existing package `tsconfig.json` include roots match no files from either repo root or package cwd; this is pre-existing and unrelated to this session.
+
+### 🚧 Left Off / Next Steps
+- Improve trace diversity before making `--fail-under-baseline` mandatory in `tools/selfImprove.ts`; the current generated chat policy-prior validation remains under majority baseline on the small deterministic sample.
+- Extend replayable trace storage beyond organ training into the broader runtime conversation comparison traces.
+- Keep pre-existing unrelated working-tree changes in root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` separated from Agent 9 source/docs commits.
+
+### 💡 Architectural Notes
+- Organ training now has a hard trace-quality contract, not just a generated scorecard.
+- Baseline-performance enforcement is available as an explicit evaluator switch, but it stays opt-in until trace diversity improves enough to avoid failing the stable self-improvement loop.

@@ -134,7 +134,7 @@ Legend:
 
 - [ ]  Add memory provenance and TTL policy.
 
-- [~]  Add replayable trace storage for comparison harnesses. Session log: 2026-05-30 Agent 9 added deterministic organ-training trace replay metadata and scorecard coverage; broader runtime conversation trace replay remains.
+- [~]  Add replayable trace storage for comparison harnesses. Session log: 2026-05-30 Agent 9 added deterministic organ-training trace replay metadata and scorecard coverage; 2026-05-31 Agent 9 added an organ-evaluation quality gate for replay coverage, numeric consistency, and missing trained models; broader runtime conversation trace replay remains.
 
 - \[\~\] Add save/load tests across CHAL memory partitions. Session log: 2026-05-27 Agent 8 AIVM snapshot integrity added default VMD snapshot/restore parity and tamper rejection; 2026-05-31 Agent 8 added per-device fingerprint manifests and restore verification across mounted AIVM devices; broader CHAL partition save/load remains.
 
