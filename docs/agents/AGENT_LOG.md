@@ -2038,3 +2038,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Shared pattern tokens now behave like low-selectivity firmware evidence rather than forcing PPBRS to score every related pattern on the normal route.
 - The fallback to broad candidates preserves bounded firmware behavior for intentionally generic triggers while keeping normal selective matches under the <1ms target.
+
+## Current Session — 2026-06-01 (Knowledge Cloud Source Provenance Gate)
+
+### 📝 Summary
+- Added source-plane provenance validation in `/home/workspace/synthesus-knowledge-cloud` so `synthesus-kc validate-sources` now rejects `sources/*.yaml` manifests that lack required identity fields, SPDX/license notes, loader declarations, enabled-source upstream locators, or per-pending-dataset SPDX declarations.
+- Added regression coverage for missing top-level license notes and pending dataset SPDX omissions while preserving the current repository source-plane validation.
+- Documented the stricter source manifest contract in the Knowledge Cloud sources guide.
+- Advanced Synthesus 5 Phase 5 Knowledge Cloud hardware hygiene: public sources must now satisfy a license/provenance gate before they can be treated as mounted CHAL hardware substrate.
+
+### ✅ Verified
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m py_compile synthesus_knowledge_cloud/source_planes.py tests/test_cli.py` — passed.
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m pytest -q tests/test_cli.py` — 6 passed.
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m synthesus_knowledge_cloud validate-sources --root .` — passed; 25 required paths and 7 character pattern banks.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace the generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` are semantically aligned; the live bundle remains blocked by the known `faiss=384` / `embedder=128` mismatch.
+- After artifact regeneration, rerun `synthesus-kc validate`, `tools/validate_knowledge_cold_start.py`, and `packages/knowledge/health_check.py`, then refresh the public mirror with `zopub sync synthesus-knowledge artifacts`.
+- Continue avoiding commits of generated FAISS/KNDB/model/cache/report artifacts; this run changed only source, tests, and docs plus the Synthesus checklist/log.
+
+### 💡 Architectural Notes
+- Source manifests are now a CHAL hardware admission boundary, not passive metadata. Hash manifests prove bytes, while the source-plane gate proves minimal provenance and license review before ingestion expands the public Knowledge Cloud.
+- The current generated retrieval bundle is intentionally still blocked; this run improves future source hygiene and cross-repo validation without blessing or modifying generated artifacts.

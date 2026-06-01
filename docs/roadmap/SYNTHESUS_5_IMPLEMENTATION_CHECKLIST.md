@@ -110,6 +110,8 @@ Legend:
 
 - [x]  Add tests for mounted Knowledge Cloud partitions. Session log: 2026-05-28 Knowledge Cloud mount table; 2026-06-01 Agent 5 validated volatile cache/writeback boundaries stay active and artifact-free.
 
+- [x]  Add source-plane license/provenance validation for Knowledge Cloud hardware manifests before public sources can be treated as mounted CHAL substrate. Session log: 2026-06-01 Knowledge Cloud Source Provenance Gate.
+
 ## Phase 6: Legacy Template Path Removal
 
 - [ ] 
