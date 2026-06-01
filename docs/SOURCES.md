@@ -43,3 +43,14 @@ Do not enable automatic fetch until dataset IDs, revisions, splits, and licenses
 Manifest: `sources/kaggle.yaml`
 
 Do not commit Kaggle credentials or raw archives without checking redistribution rights.
+
+## Source manifest validation contract
+
+`synthesus-kc validate-sources --root .` now treats source manifests as provenance gates, not just file presence checks. Every `sources/*.yaml` declaration other than the aggregate `sources/datasets.yaml` must include:
+
+- `version`, `id`, `name`, and `source_type`
+- a `license.spdx` value and non-empty `license.notes`
+- a `loader` value in `module.py::function` form
+- an upstream locator (`url`, `repository`, `files`, or `docs`) for enabled sources
+
+Planned aggregate manifests such as Hugging Face or Kaggle may stay `default_enabled: false`, but every `pending[]` dataset still needs its own `license.spdx`. This keeps future Knowledge Cloud expansion provenance-clean before a source can become mounted CHAL hardware.

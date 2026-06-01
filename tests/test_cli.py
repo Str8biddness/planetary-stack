@@ -45,3 +45,65 @@ def test_source_planes_current_repo():
     result = validate_source_planes(".")
     assert result.ok, result.errors
     assert result.character_pattern_banks >= 1
+
+
+def test_source_planes_rejects_source_manifest_without_license_notes(tmp_path):
+    root = tmp_path
+    sources = root / "sources"
+    sources.mkdir()
+    (sources / "datasets.yaml").write_text('version: "1"\nname: datasets\n', encoding="utf-8")
+    (sources / "bad.yaml").write_text(
+        "\n".join(
+            [
+                'version: "1"',
+                "id: bad_source",
+                "name: Bad Source",
+                "source_type: github_tsv",
+                "license:",
+                '  spdx: "MIT"',
+                "repository: https://example.com/repo",
+                "loader: pipelines/ingest/example.py::load",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = validate_source_planes(root)
+
+    assert not result.ok
+    assert "source manifest missing license.notes: sources/bad.yaml" in result.errors
+
+
+def test_source_planes_rejects_pending_dataset_without_spdx(tmp_path):
+    root = tmp_path
+    sources = root / "sources"
+    sources.mkdir()
+    (sources / "datasets.yaml").write_text('version: "1"\nname: datasets\n', encoding="utf-8")
+    (sources / "planned.yaml").write_text(
+        "\n".join(
+            [
+                'version: "1"',
+                "id: planned_source",
+                "name: Planned Source",
+                "source_type: huggingface_datasets",
+                "license:",
+                '  spdx: "MIXED"',
+                "  notes: Per-dataset licenses are required.",
+                "default_enabled: false",
+                "pending:",
+                "  - id: weak_dataset",
+                "    repo: weak/dataset",
+                "    license:",
+                "      notes: Missing SPDX should fail.",
+                "loader: pipelines/ingest/huggingface_loader.py::load_dataset",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = validate_source_planes(root)
+
+    assert not result.ok
+    assert "pending source entry missing license.spdx: sources/planned.yaml[0]" in result.errors

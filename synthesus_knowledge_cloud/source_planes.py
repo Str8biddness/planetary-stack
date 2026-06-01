@@ -6,6 +6,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
+
 REQUIRED_PATHS = [
     "sources/datasets.yaml",
     "sources/jeopardy.yaml",
@@ -46,6 +48,72 @@ class SourcePlaneValidation:
         return not self.errors
 
 
+def _validate_license_block(data: dict, rel: str, errors: list[str]) -> None:
+    license_block = data.get("license")
+    if not isinstance(license_block, dict):
+        errors.append(f"source manifest missing license block: {rel}")
+        return
+    spdx = license_block.get("spdx")
+    notes = license_block.get("notes")
+    if not isinstance(spdx, str) or not spdx.strip():
+        errors.append(f"source manifest missing license.spdx: {rel}")
+    if not isinstance(notes, str) or not notes.strip():
+        errors.append(f"source manifest missing license.notes: {rel}")
+
+
+def _validate_source_manifest_yaml(path: Path, root_path: Path, errors: list[str]) -> None:
+    rel = path.relative_to(root_path).as_posix()
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        errors.append(f"invalid yaml {rel}: {exc}")
+        return
+    if not isinstance(data, dict):
+        errors.append(f"source manifest is not a mapping: {rel}")
+        return
+    if path.name == "datasets.yaml":
+        return
+
+    for field in ("version", "id", "name", "source_type"):
+        value = data.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"source manifest missing {field}: {rel}")
+
+    _validate_license_block(data, rel, errors)
+
+    loader = data.get("loader")
+    if not isinstance(loader, str) or "::" not in loader:
+        errors.append(f"source manifest missing loader module path: {rel}")
+
+    if data.get("default_enabled", True) is not False:
+        has_fetch_target = any(
+            key in data for key in ("url", "repository", "files", "docs")
+        )
+        if not has_fetch_target:
+            errors.append(f"enabled source manifest missing upstream locator: {rel}")
+
+    pending = data.get("pending", [])
+    if pending is None:
+        pending = []
+    if not isinstance(pending, list):
+        errors.append(f"source manifest pending field must be a list: {rel}")
+        return
+    for index, item in enumerate(pending):
+        if not isinstance(item, dict):
+            errors.append(f"pending source entry is not a mapping: {rel}[{index}]")
+            continue
+        entry_id = item.get("id")
+        if not isinstance(entry_id, str) or not entry_id.strip():
+            errors.append(f"pending source entry missing id: {rel}[{index}]")
+        entry_license = item.get("license")
+        if not isinstance(entry_license, dict):
+            errors.append(f"pending source entry missing license block: {rel}[{index}]")
+            continue
+        spdx = entry_license.get("spdx")
+        if not isinstance(spdx, str) or not spdx.strip():
+            errors.append(f"pending source entry missing license.spdx: {rel}[{index}]")
+
+
 def validate_source_planes(root: str | Path = ".") -> SourcePlaneValidation:
     root_path = Path(root).resolve()
     errors: list[str] = []
@@ -63,6 +131,11 @@ def validate_source_planes(root: str | Path = ".") -> SourcePlaneValidation:
                 json.loads(path.read_text(encoding="utf-8"))
             except Exception as exc:
                 errors.append(f"invalid json {rel}: {exc}")
+
+    sources_dir = root_path / "sources"
+    if sources_dir.exists():
+        for path in sorted(sources_dir.glob("*.yaml")):
+            _validate_source_manifest_yaml(path, root_path, errors)
 
     char_dir = root_path / "patterns/characters"
     pattern_files = sorted(char_dir.glob("*/patterns.json")) if char_dir.exists() else []
