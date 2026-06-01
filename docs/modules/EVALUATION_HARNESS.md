@@ -17,7 +17,7 @@ The harness currently evaluates six fixed cases:
 - business-bot task handling
 - safety boundary handling
 
-Each case compares a legacy template-style output against the Synthesus 5 `CognitiveHypervisor` path. The Synthesus 5 path uses the existing `HemisphereBridge` with seeded left-firmware routes and a deterministic right-hemisphere handler so scheduled agents can run the benchmark without external model calls.
+Each case compares a legacy template-style output against the Synthesus 5 `CognitiveHypervisor` path. The Synthesus 5 path uses the existing `HemisphereBridge` with seeded left-firmware routes and a deterministic right-hemisphere handler so scheduled agents can run the benchmark without external model calls. The business-bot case explicitly runs the `runtime_preset="business_bot"` CHAL preset so public preset routing, CGPU business rendering, and critic-owned final emission stay covered by the comparison harness.
 
 ## Scoring
 
@@ -46,8 +46,11 @@ Write ignored benchmark artifacts:
 python tools/chal_conversation_compare.py \
   --fail-on-leak \
   --write tools/results/synthesus5_chal_comparison_YYYY-MM-DD.md \
-  --json tools/results/synthesus5_chal_comparison_YYYY-MM-DD.json
+  --json tools/results/synthesus5_chal_comparison_YYYY-MM-DD.json \
+  --trace-jsonl tools/results/synthesus5_chal_replay_YYYY-MM-DD.jsonl
 ```
+
+`--trace-jsonl` writes compact replay records with case id, category, trace id, route, runtime preset, score metadata, latency metadata, template-leak flags, and Quad Brain state-contract references when present. It intentionally omits full response text so runtime comparison traces can be stored and diffed without committing bulky generated scorecards.
 
 Run the regression tests:
 

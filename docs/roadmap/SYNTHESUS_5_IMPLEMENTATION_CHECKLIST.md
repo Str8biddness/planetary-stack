@@ -134,7 +134,7 @@ Legend:
 
 - [ ]  Add memory provenance and TTL policy.
 
-- [~]  Add replayable trace storage for comparison harnesses. Session log: 2026-05-30 Agent 9 added deterministic organ-training trace replay metadata and scorecard coverage; 2026-05-31 Agent 9 added an organ-evaluation quality gate for replay coverage, numeric consistency, and missing trained models; broader runtime conversation trace replay remains.
+- [~]  Add replayable trace storage for comparison harnesses. Session log: 2026-05-30 Agent 9 added deterministic organ-training trace replay metadata and scorecard coverage; 2026-05-31 Agent 9 added an organ-evaluation quality gate for replay coverage, numeric consistency, and missing trained models; 2026-06-01 Agent 3 added compact Phase 8 runtime conversation replay JSONL records for the legacy-vs-Synthesus-5 harness; broader persistent runtime conversation trace storage remains.
 
 - \[\~\] Add save/load tests across CHAL memory partitions. Session log: 2026-05-27 Agent 8 AIVM snapshot integrity added default VMD snapshot/restore parity and tamper rejection; 2026-05-31 Agent 8 added per-device fingerprint manifests and restore verification across mounted AIVM devices; broader CHAL partition save/load remains.
 
@@ -160,6 +160,8 @@ Legend:
 
 - [x]  Store benchmark summaries in ignored artifacts and commit only harness source/docs. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
 
+- [x]  Add compact replay trace records and explicit business-bot preset coverage to the legacy-vs-Synthesus-5 comparison harness. Session log: 2026-06-01 Agent 3 Phase 8 replay trace and business preset harness.
+
 ## Phase 9: Product Runtime Polish
 
 - \[\~\] Wire Synthesus 5 path into API entrypoints. Session log: 2026-05-28 Agent 1 API CHAL mode added explicit `/api/v1/query` `mode="chal"` routing through `CognitiveHypervisor`; default `auto` cutover remains.
@@ -184,7 +186,7 @@ Legend:
 
 - [x]  Validate Knowledge Cloud bundle integrity from cold start. Session log: 2026-05-31 Agent 5 Knowledge Cloud cold-start integrity gate.
 
-- [~]  Restore Knowledge Cloud golden-query health after artifact rebuild. Blocker note: 2026-06-01 Daily Knowledge Hardware Health Check confirmed manifest/source/bootstrap/cold-start mount validation passes, but golden-query retrieval fails because the current `synthesus-knowledge-cloud/artifacts/faiss.index` is 384-dimensional while `artifacts/models/swarm_embedder.pkl` persists `dim=128`; fix requires regenerating aligned generated artifacts, not a runtime source edit.
+- [~]  Restore Knowledge Cloud golden-query health after artifact rebuild. Blocker note: 2026-06-01 Daily Knowledge Hardware Health Check confirmed manifest/source/bootstrap/cold-start mount validation passes, but golden-query retrieval fails because the current `synthesus-knowledge-cloud/artifacts/faiss.index` is 384-dimensional while `artifacts/models/swarm_embedder.pkl` persists `dim=128`; fix requires regenerating aligned generated artifacts, not a runtime source edit. Session log: 2026-06-01 Knowledge Cloud Provenance Stamp Guard added a source-only hardening gate so `synthesus-kc build --execute` and `synthesus-kc stamp-manifest` refuse to stamp provenance over that semantic mismatch.
 
 - [ ]  Publish release notes describing Synthesus 5 behavior and limitations.
 

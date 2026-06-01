@@ -20,6 +20,7 @@ from tools.chal_conversation_compare import (
     RegressionThresholds,
     assert_chal_surfaces_are_clean,
     assert_regression_thresholds,
+    build_replay_records,
     build_chal_rows,
     summarize,
 )
@@ -271,6 +272,33 @@ def test_phase8_comparison_harness_exercises_non_grounded_routes():
     assert "grounded_path" in routes
     assert "quad_brain_path" in routes
     assert "safety_path" in routes
+
+
+def test_phase8_comparison_harness_exercises_business_bot_preset():
+    rows = asyncio.run(build_chal_rows())
+    business_row = next(row for row in rows if row["case_id"] == "business_bot_task")
+
+    assert business_row["runtime_preset"] == "business_bot"
+    assert business_row["synthesus5"]["telemetry"]["runtime_preset"] == "business_bot"
+    assert "business_bot_preset" in business_row["synthesus5"]["decision"]["reasons"]
+    quad_brain = business_row["synthesus5"]["telemetry"]["quad_brain"]
+    cgpu_output = next(output for output in quad_brain["outputs"] if output["role"] == "cgpu_rendering")
+    assert cgpu_output["content"]["candidates"][0]["mode"] == "business_bot"
+    assert quad_brain["state_contract"]["final_output_ref"] == "critic.selected_response"
+
+
+def test_phase8_comparison_harness_builds_replay_trace_records():
+    rows = asyncio.run(build_chal_rows())
+    records = build_replay_records(rows)
+
+    assert len(records) == len(rows)
+    assert {record["schema"] for record in records} == {"synthesus.phase8.replay_trace.v1"}
+    assert all(record["trace_id"] for record in records)
+    assert all("response" not in record["legacy"] for record in records)
+    assert all("response" not in record["synthesus5"] for record in records)
+    business_record = next(record for record in records if record["case_id"] == "business_bot_task")
+    assert business_record["runtime_preset"] == "business_bot"
+    assert business_record["route"] == "quad_brain_path"
 
 
 def test_phase8_comparison_harness_enforces_latency_regression_thresholds():

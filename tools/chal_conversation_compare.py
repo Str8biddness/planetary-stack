@@ -53,6 +53,7 @@ class EvalCase:
     prohibited_terms: tuple[str, ...] = LEGACY_SURFACE_SIGNATURES
     character_context: dict[str, Any] = field(default_factory=dict)
     constraints: list[str] = field(default_factory=list)
+    runtime_preset: str | None = None
 
 
 @dataclass(frozen=True)
@@ -154,6 +155,7 @@ CASES: tuple[EvalCase, ...] = (
         ),
         expected_terms=("invoice", "total", "review"),
         character_context={"character_id": "business_bot", "persona": "concise support agent"},
+        runtime_preset="business_bot",
     ),
     EvalCase(
         case_id="safety_boundary",
@@ -257,6 +259,7 @@ async def run_synthesus5_case(case: EvalCase) -> dict[str, Any]:
         rag_context=rag_context,
         character_context=case.character_context,
         constraints=case.constraints,
+        runtime_preset=case.runtime_preset,
         max_tokens=384,
     )
     payload = result.to_dict()
@@ -279,6 +282,7 @@ async def build_chal_rows(cases: Iterable[EvalCase] = CASES) -> list[dict[str, A
                 "category": case.category,
                 "user": case.prompt,
                 "expected_terms": list(case.expected_terms),
+                "runtime_preset": case.runtime_preset,
                 "legacy": legacy,
                 "synthesus5": chal,
                 "chal": chal["bridge_result"],
@@ -411,6 +415,53 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def build_replay_records(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    summary = summarize(rows)
+    records = []
+    for row in rows:
+        synth = row["synthesus5"]
+        telemetry = synth.get("telemetry", {})
+        decision = synth.get("decision", {})
+        record = {
+            "schema": "synthesus.phase8.replay_trace.v1",
+            "case_id": row["case_id"],
+            "category": row["category"],
+            "turn": row["turn"],
+            "prompt": row["user"],
+            "runtime_preset": row.get("runtime_preset"),
+            "trace_id": telemetry.get("trace_id") or decision.get("trace_id"),
+            "route": decision.get("route"),
+            "decision_reasons": decision.get("reasons", []),
+            "constraints": decision.get("constraints", []),
+            "legacy": {
+                "source": row["legacy"]["source"],
+                "runtime_ms": row["legacy"]["runtime_ms"],
+                "overall_score": row["scores"]["legacy"]["overall"],
+                "template_leak": row["scores"]["legacy"]["template_leakage"] == 0.0,
+            },
+            "synthesus5": {
+                "runtime_ms": synth["runtime_ms"],
+                "overall_score": row["scores"]["synthesus5"]["overall"],
+                "template_leak": row["scores"]["synthesus5"]["template_leakage"] == 0.0,
+                "hemisphere_used": synth["bridge_result"].get("hemisphere_used"),
+            },
+            "summary": {
+                "score_delta": summary["score_delta"],
+                "synthesus5_mean_latency_ms": summary["synthesus5_mean_latency_ms"],
+                "synthesus5_p95_latency_ms": summary["synthesus5_p95_latency_ms"],
+            },
+        }
+        quad_brain = telemetry.get("quad_brain")
+        if isinstance(quad_brain, dict):
+            state_contract = quad_brain.get("state_contract", {})
+            record["quad_brain"] = {
+                "required_roles": state_contract.get("required_roles", []),
+                "final_output_ref": state_contract.get("final_output_ref"),
+            }
+        records.append(record)
+    return records
+
+
 def assert_regression_thresholds(summary: dict[str, Any], thresholds: RegressionThresholds) -> None:
     failures = []
     if thresholds.max_mean_latency_ms is not None:
@@ -508,6 +559,7 @@ async def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--write", type=Path, help="Write markdown comparison to this path.")
     parser.add_argument("--json", type=Path, help="Write machine-readable comparison to this path.")
+    parser.add_argument("--trace-jsonl", type=Path, help="Write compact replay trace records to this JSONL path.")
     parser.add_argument("--baseline-json", type=Path, help="Write summary-only latency/quality baseline JSON.")
     parser.add_argument("--fail-on-leak", action="store_true", help="Fail if Synthesus 5 output leaks legacy surface signatures.")
     parser.add_argument("--max-mean-latency-ms", type=float, help="Fail if Synthesus 5 mean runtime exceeds this value.")
@@ -539,6 +591,13 @@ async def main() -> int:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
         print(args.json)
+    if args.trace_jsonl:
+        args.trace_jsonl.parent.mkdir(parents=True, exist_ok=True)
+        args.trace_jsonl.write_text(
+            "\n".join(json.dumps(record, sort_keys=True) for record in build_replay_records(rows)) + "\n",
+            encoding="utf-8",
+        )
+        print(args.trace_jsonl)
     if args.baseline_json:
         args.baseline_json.parent.mkdir(parents=True, exist_ok=True)
         args.baseline_json.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")

@@ -1907,3 +1907,49 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Business-bot is now a production API preset over the Synthesus 5 runtime, not a standalone renderer demo: public request → hypervisor preset → Quad Brain → CGPU business surface → critic final emission.
 - The preset intentionally uses `quad_brain_path` with a smaller candidate budget and compact constraints, preserving the release-readiness invariant that new public behavior carries traceability and no normal-path template leakage.
+
+## Current Session — 2026-06-01 (Knowledge Cloud Provenance Stamp Guard)
+
+### 📝 Summary
+- Added a source-only Knowledge Cloud hardening gate in `/home/workspace/synthesus-knowledge-cloud` so provenance stamping cannot bless semantically incompatible generated artifacts.
+- Exposed `validate_runtime_bundle_semantics()` from the Knowledge Cloud manifest module and wired `synthesus-kc build --execute` plus `synthesus-kc stamp-manifest` to require FAISS/metadata count and FAISS/embedder dimension compatibility before writing `artifacts/manifest.json`.
+- Added a regression test proving `stamp-manifest` rejects the current class of mismatch without rewriting the existing manifest, updated build/provenance docs, and refreshed `manifests/source_manifest.json`.
+- Advanced the Phase 10 Knowledge Cloud golden-query blocker by preventing future invalid provenance stamps; the current generated bundle still needs a real artifact rebuild because `faiss.index` is 384-dimensional and `models/swarm_embedder.pkl` persists `dim=128`.
+
+### ✅ Verified
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m py_compile synthesus_knowledge_cloud/manifest.py synthesus_knowledge_cloud/build.py synthesus_knowledge_cloud/__main__.py tests/test_build.py tests/test_cli.py` — passed.
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m pytest -q tests/test_build.py tests/test_cli.py tests/test_provenance.py` — 11 passed.
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m synthesus_knowledge_cloud validate --root artifacts` — failed as expected with `FAISS/embedder dim mismatch: faiss=384, embedder=128`.
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m synthesus_knowledge_cloud stamp-manifest --profile profiles/public-base.yaml` — failed as expected with `runtime bundle semantic validation failed: FAISS/embedder dim mismatch: faiss=384, embedder=128`.
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m synthesus_knowledge_cloud build-source-manifest --root .` — wrote 139 source-plane entries.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace the generated Knowledge Cloud artifacts so FAISS and the persisted swarm embedder use the same vector dimension; then rerun `synthesus-kc validate`, `tools/validate_knowledge_cold_start.py`, and `packages/knowledge/health_check.py`.
+- After artifact regeneration, refresh the public mirror with `zopub sync synthesus-knowledge artifacts`.
+- Continue avoiding commits of generated FAISS/KNDB/model/cache/report artifacts; commit only the Knowledge Cloud source/docs/tests/source manifest and the Synthesus runtime checklist/log docs.
+
+### 💡 Architectural Notes
+- Manifest hashes prove artifact bytes, but they do not prove retrieval compatibility. The build/stamp path now treats cross-artifact semantics as a provenance precondition.
+- This does not repair the current bundle; it blocks a weaker failure mode where an invalid bundle receives fresh provenance and looks operationally current.
+
+## Current Session — 2026-06-01 (Agent 3 — Phase 8 Replay Trace And Business Preset Harness)
+
+### 📝 Summary
+- Extended `tools/chal_conversation_compare.py` so the business-bot case now explicitly runs `runtime_preset="business_bot"` through the Synthesus 5 CHAL path instead of relying only on character context.
+- Added `--trace-jsonl` support that writes compact replayable runtime comparison records with case id, category, trace id, route, runtime preset, latency/score metadata, template-leak flags, and Quad Brain state-contract references while omitting bulky response text.
+- Added focused regressions for business-bot preset coverage and replay trace record shape, and documented the new harness output in `docs/modules/EVALUATION_HARNESS.md`.
+- Advanced Phase 8 comparison harness coverage and Phase 7 replayable trace storage without marking broader persistent runtime trace storage complete.
+
+### ✅ Verified
+- `python -m py_compile tools/chal_conversation_compare.py tests/test_chal_reasoning_firmware.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/chal_conversation_compare.py --fail-on-leak --max-mean-latency-ms 1000 --max-p95-latency-ms 1500 --min-score-delta 0.1 --json tools/results/synthesus5_phase8_comparison_latest.json --trace-jsonl tools/results/synthesus5_phase8_replay_latest.jsonl --baseline-json tools/results/synthesus5_phase8_latency_latest.json` — passed; 6 cases, Synthesus 5 mean score 0.939 vs legacy 0.424, score delta 0.515, Synthesus 5 mean latency 1.713ms, p95 latency 2.886ms, 0 Synthesus 5 template leaks, and 6 compact replay records generated under ignored `tools/results/`.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_reasoning_firmware.py` — 14 passed.
+
+### 🚧 Left Off / Next Steps
+- Extend replay trace storage beyond deterministic harness output into durable runtime conversation trace persistence for broader Phase 7 completion.
+- Continue Phase 6 conversion/removal of the six `legacy_quarantine_required` template surfaces from `tools/audit_template_surfaces.py`.
+- Keep pre-existing unrelated working-tree changes in root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` separated from Agent 3 source/docs commits.
+
+### 💡 Architectural Notes
+- Phase 8 now covers the public business-bot CHAL preset as a first-class comparison path: hypervisor preset decision, Quad Brain route, CGPU business-mode candidate, critic final-output reference, latency, score, and template leak status are all replay-visible.
+- Replay trace JSONL is deliberately compact and source-controlled only as harness capability; concrete run outputs remain generated artifacts under ignored `tools/results/`.
