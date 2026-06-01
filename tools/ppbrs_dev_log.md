@@ -440,3 +440,36 @@ PPBRS micro-benchmark after the serialization patch:
 - `python -m pytest -q tests/test_template_surface_audit.py`
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py tests/test_chal_reasoning_firmware.py tests/test_template_surface_audit.py` — 126 passed.
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py` — pattern p50 210.5716ms, rule p50 0.0144ms, graph p50 0.0157ms.
+
+## Daily Entry: 2026-06-01 (Agent 6 — Pattern Fanout Candidate Pruning)
+
+### Actions Performed
+
+1. Added fanout-aware candidate selection to `PatternClassifier._get_candidates()` so high-frequency shared trigger tokens do not expand a selective query into full-corpus scoring.
+2. Preserved broad-token-only behavior by falling back to broad candidates when no selective token is present.
+3. Added PPBRS regressions for both the narrow selective-token path and broad-token-only compatibility path.
+4. Updated the PPBRS module docs, optimization plan, and Synthesus 5 checklist.
+
+### Benchmark Run
+
+Same-run pre-edit baseline:
+
+| Component | p50 (ms) | p95 (ms) | Avg (ms) |
+|---|---:|---:|---:|
+| pattern_matching | 207.8596 | 242.3881 | 217.4766 |
+| rule_evaluation | 0.0153 | 0.0264 | 0.0185 |
+| graph_traversal | 0.0157 | 0.0194 | 0.0167 |
+
+Post-edit benchmark:
+
+| Component | p50 (ms) | p95 (ms) | Avg (ms) |
+|---|---:|---:|---:|
+| pattern_matching | 0.3595 | 0.4127 | 0.3406 |
+| rule_evaluation | 0.0144 | 0.0201 | 0.0158 |
+| graph_traversal | 0.0152 | 0.0193 | 0.0169 |
+
+### Verified
+
+- `python -m py_compile packages/reasoning/pattern_classifier.py tests/test_ppbrs.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 114 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py`

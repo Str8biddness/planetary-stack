@@ -114,7 +114,7 @@ Legend:
 
 - [ ] 
 
-- \[\~\] Convert PPBRS normal-path output into non-user-facing firmware signals.
+- \[\~\] Convert PPBRS normal-path output into non-user-facing firmware signals. Session log: 2026-06-01 Agent 6 added fanout-aware PPBRS pattern candidate pruning so shared broad tokens no longer expand normal firmware matching to full-corpus scoring while preserving broad-token-only fallback behavior.
 
 - [x]  Search and classify every direct fallback/template response path. Session log: 2026-05-31 Agent 6 template surface audit.
 

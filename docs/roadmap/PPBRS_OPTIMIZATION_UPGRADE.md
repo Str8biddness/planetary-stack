@@ -19,7 +19,7 @@ PPBRS already passes its current unit and integration tests. The optimization wo
 
 The current PPBRS modules are functional, but several paths are still linear scan style implementations:
 
-- `ppbrs/pattern_classifier.py` scores patterns against inputs without a candidate index.
+- `ppbrs/pattern_classifier.py` now uses an inverted token index plus fanout-aware candidate pruning so shared broad tokens do not force full-corpus scoring when selective query tokens are present.
 - `ppbrs/reasoning_chain.py` evaluates rules and reasoning chains without a dedicated trigger index.
 - `ppbrs/multi_step_reasoning.py` uses a graph object, but repeated traversal logic can be tightened with adjacency caching and better path bookkeeping.
 - `ppbrs/rule_to_action.py` evaluates every rule before selecting actions.
@@ -50,6 +50,8 @@ Output should be written to `logs/ppbrs_dev_log.md` and any dedicated benchmark 
 ### Phase 1 — Candidate Reduction in Pattern Classification
 
 Target file: `ppbrs/pattern_classifier.py`
+
+Status 2026-06-01: implemented an inverted token index and fanout-aware broad-token pruning in `PatternClassifier`. Queries with a selective token plus a shared trigger now score only selective candidates; broad-token-only queries still evaluate the broad candidate set for compatibility.
 
 Implementation order:
 1. Build an inverted index from normalized token -> pattern IDs.

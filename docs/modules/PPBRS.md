@@ -65,7 +65,8 @@ Allowed fixed-response exceptions remain safety, abuse prevention, identity/righ
 The repository is currently in a validated PPBRS baseline state. Significant optimizations have been implemented in `pattern_classifier.py` and `multi_step_reasoning.py`, including **token indexing** and **adjacency map traversal** to handle higher complexity reasoning chains.
 
 ### Key Optimizations
-- **Token Indexing**: Reduced candidate volume in `PatternClassifier` by 70% using inverted token indexes.
+- **Token Indexing**: Reduced candidate volume in `PatternClassifier` using inverted token indexes.
+- **Fanout-Aware Candidate Pruning**: Shared high-frequency trigger tokens are treated as broad evidence and ignored when more selective query tokens are available. If a query only contains broad tokens, PPBRS still evaluates those broad candidates so compatibility and fallback behavior remain intact.
 - **Adjacency Maps**: Replaced linear edge scans with constant-time adjacency lookups in `multi_step_reasoning`.
 - **Cached Topology**: Pre-computed reasoning graph structures for zero-overhead traversal.
 - **Rule Tag Indexing**: Rule evaluators prefilter by context tags before evaluating conditions.

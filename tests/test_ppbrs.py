@@ -83,6 +83,32 @@ class TestPatternClassifier:
         assert len(results) == 2
         assert results[0].confidence >= results[1].confidence
 
+    def test_broad_tokens_do_not_expand_specific_candidate_set(self):
+        classifier = PatternClassifier(threshold=0.1)
+        for i in range(120):
+            classifier.add_pattern(Pattern(
+                id=f"p{i}",
+                tokens=[f"signal_{i}", "common_token"],
+                weight=1.0,
+            ))
+
+        candidates = classifier._get_candidates({"signal_17", "common_token"})
+
+        assert [pattern.id for pattern in candidates] == ["p17"]
+
+    def test_broad_tokens_still_match_when_no_specific_token_exists(self):
+        classifier = PatternClassifier(threshold=0.1)
+        for i in range(12):
+            classifier.add_pattern(Pattern(
+                id=f"p{i}",
+                tokens=[f"signal_{i}", "common_token"],
+                weight=1.0,
+            ))
+
+        candidates = classifier._get_candidates({"common_token"})
+
+        assert len(candidates) == 12
+
 
 class TestReasoningChain:
     """Tests for ReasoningChain."""

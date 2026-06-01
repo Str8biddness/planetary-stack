@@ -2016,3 +2016,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Manifest hashes prove mounted artifact bytes, not retrieval compatibility. Cold-start CHAL readiness now requires both byte integrity and semantic compatibility for the mounted grounding corpus and parameter-disk embedder.
 - The current live bundle is intentionally still blocked; this source change prevents the runtime from advertising retrieval-incompatible Knowledge Cloud hardware as cold-start ready.
+
+## Current Session — 2026-06-01 (Agent 6 — PPBRS Pattern Fanout Candidate Pruning)
+
+### 📝 Summary
+- Added fanout-aware PPBRS pattern candidate selection so high-frequency shared trigger tokens no longer expand selective queries into full-corpus scoring.
+- Preserved compatibility for broad-token-only queries by falling back to the broad candidate set when no selective token is present.
+- Added regression tests for selective-token pruning and broad-token-only matching behavior.
+- Updated the Phase 6 PPBRS firmware checklist entry, PPBRS module docs, optimization plan, and PPBRS dev benchmark log.
+
+### ✅ Verified
+- `python -m py_compile packages/reasoning/pattern_classifier.py tests/test_ppbrs.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 114 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py` — pattern matching improved from p50 207.8596ms / avg 217.4766ms to p50 0.3595ms / avg 0.3406ms on the shared-token benchmark corpus.
+
+### 🚧 Left Off / Next Steps
+- Continue Phase 6 conversion/removal of the five remaining `legacy_quarantine_required` paths from `tools/audit_template_surfaces.py`: `packages/api/fastapi_server.py`, `packages/api/production_server.py`, `packages/core/cognitive/cognitive_engine.py`, `packages/core/els_bridge.py`, and `packages/core/pattern_engine.py`.
+- Continue the PPBRS optimization plan with confidence-path tightening or kernel hot-path protocol work after another baseline run.
+- Keep pre-existing unrelated working-tree changes in root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` separated from Agent 6 source/docs commits.
+
+### 💡 Architectural Notes
+- Shared pattern tokens now behave like low-selectivity firmware evidence rather than forcing PPBRS to score every related pattern on the normal route.
+- The fallback to broad candidates preserves bounded firmware behavior for intentionally generic triggers while keeping normal selective matches under the <1ms target.

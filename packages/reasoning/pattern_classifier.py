@@ -86,6 +86,7 @@ class PatternClassifier:
         self.use_fuzzy = use_fuzzy
         self._token_cache: Dict[str, set] = {}
         self._inverted_index: Dict[str, set] = {}
+        self._max_broad_token_fanout = 64
         
     def add_pattern(self, pattern: Pattern) -> None:
         """Registers a new pattern for classification.
@@ -247,11 +248,25 @@ class PatternClassifier:
             List of Pattern objects that share at least one token with the input.
         """
         candidate_ids = set()
+        broad_candidate_ids = set()
+        pattern_count = max(len(self.patterns), 1)
+        broad_threshold = min(
+            self._max_broad_token_fanout,
+            max(8, int(pattern_count * 0.25)),
+        )
         for token in input_tokens:
-            if token in self._inverted_index:
-                candidate_ids.update(self._inverted_index[token])
+            indexed = self._inverted_index.get(token)
+            if not indexed:
+                continue
+            if len(indexed) > broad_threshold:
+                broad_candidate_ids.update(indexed)
+                continue
+            candidate_ids.update(indexed)
+
+        if not candidate_ids:
+            candidate_ids = broad_candidate_ids
         
-        return [self.patterns[pid] for pid in candidate_ids if pid in self.patterns]
+        return [self.patterns[pid] for pid in sorted(candidate_ids) if pid in self.patterns]
 
     def classify(self, input_str: str, top_k: int = 1) -> List[ClassificationResult]:
         """Classifies the input string against all registered patterns.
