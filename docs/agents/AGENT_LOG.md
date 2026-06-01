@@ -1859,3 +1859,29 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Degraded generation is now a traceable state, not a hidden fallback template surface.
 - The degraded wording remains surface-safe while exposing enough metadata for future CHAL replay/debug consumers to distinguish generation failure from normal CGPU rendering.
+
+## Current Session — 2026-06-01 (Daily Knowledge Hardware Health Check)
+
+### 📝 Summary
+- Ran the fast Synthesus 5 Knowledge Cloud hardware health surface across artifact manifest validation, source-plane validation, source-manifest verification, local sync/bootstrap smoke, cold-start CHAL mount validation, and runtime golden-query/KAL health.
+- Fixed `packages/knowledge/health_check.py` so `--report-path` creates missing parent directories before writing JSON reports.
+- Recorded a Phase 10 blocker: the current generated Knowledge Cloud bundle cannot satisfy golden-query retrieval because `faiss.index` is 384-dimensional while `models/swarm_embedder.pkl` persists `dim=128`.
+
+### ✅ Verified
+- `python -m synthesus_knowledge_cloud validate --root artifacts` — failed as expected with `FAISS/embedder dim mismatch: faiss=384, embedder=128`.
+- `python -m synthesus_knowledge_cloud validate-sources --root .` — passed; 25 required paths and 7 character pattern banks.
+- `python -m synthesus_knowledge_cloud verify-source-manifest --root .` — passed; verified 139 source files.
+- `python -m synthesus_knowledge_cloud sync --dest /tmp/synthesus-kc-health-sync --base-url "file://$PWD/artifacts" --workers 4` — passed.
+- `python -m synthesus_knowledge_cloud bootstrap --target /tmp/synthesus-kc-health-bootstrap --base-url "file://$PWD/artifacts" --workers 4` — passed and wrote the bootstrap marker.
+- `python -m synthesus_knowledge_cloud status --local /tmp/synthesus-kc-health-sync --base-url "file://$PWD/artifacts" --json` — passed; all artifacts reported `ok`.
+- `python tools/validate_knowledge_cold_start.py --root /home/workspace/synthesus-knowledge-cloud/artifacts` — passed; 10 active mounts and 10 checked artifacts.
+- `python packages/knowledge/health_check.py --artifact-root /home/workspace/synthesus-knowledge-cloud/artifacts --report-path /tmp/synthesus_knowledge_health_report.json` — failed on the expected five golden-query dimension mismatches while manifest hashes, FAISS/metadata counts, and KAL mount initialization completed.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace the generated Knowledge Cloud artifacts so the FAISS index and persisted swarm embedder share the same vector dimension; then rerun `synthesus-kc validate`, `tools/validate_knowledge_cold_start.py`, and `packages/knowledge/health_check.py`.
+- After artifact regeneration, refresh the public mirror with `zopub sync synthesus-knowledge artifacts`.
+- Continue avoiding commits of generated runtime reports, temp sync/bootstrap output, and other validation artifacts.
+
+### 💡 Architectural Notes
+- Cold-start hardware mounting is healthy, including ROM, parameter disk, grounding corpus, and provenance mounts.
+- The current blocker is not KAL/CHAL mount readiness or manifest hash drift; it is semantic incompatibility between two generated retrieval artifacts.

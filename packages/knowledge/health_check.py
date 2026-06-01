@@ -211,6 +211,7 @@ def run_health_check(
     }
 
     output_path = Path(report_path) if report_path else Path(tempfile.gettempdir()) / "synthesus_knowledge_health_report.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     logger.info("wrote health report to %s", output_path)
     if errors:

@@ -184,6 +184,8 @@ Legend:
 
 - [x]  Validate Knowledge Cloud bundle integrity from cold start. Session log: 2026-05-31 Agent 5 Knowledge Cloud cold-start integrity gate.
 
+- [~]  Restore Knowledge Cloud golden-query health after artifact rebuild. Blocker note: 2026-06-01 Daily Knowledge Hardware Health Check confirmed manifest/source/bootstrap/cold-start mount validation passes, but golden-query retrieval fails because the current `synthesus-knowledge-cloud/artifacts/faiss.index` is 384-dimensional while `artifacts/models/swarm_embedder.pkl` persists `dim=128`; fix requires regenerating aligned generated artifacts, not a runtime source edit.
+
 - [ ]  Publish release notes describing Synthesus 5 behavior and limitations.
 
 - [ ]  Tag a Synthesus 5 release candidate.
