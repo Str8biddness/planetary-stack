@@ -35,6 +35,24 @@ class CompositeResponse:
     emotion_variants: Dict[str, str] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class ComposedSurface:
+    """Labeled response-composition result for Synthesus 5 template-boundary audit."""
+    text: str
+    surface: str
+    boundary: str
+    user_facing: bool
+    legacy_template_signature_present: bool
+
+    def to_debug_dict(self) -> Dict[str, Any]:
+        return {
+            "surface": self.surface,
+            "boundary": self.boundary,
+            "user_facing": self.user_facing,
+            "legacy_template_signature_present": self.legacy_template_signature_present,
+        }
+
+
 class ResponseCompositor:
     """
     Module 3 of the Cognitive Engine.
@@ -75,25 +93,54 @@ class ResponseCompositor:
         Returns:
             The assembled response string
         """
+        return self.compose_labeled(pattern, context, emotion, player_id).text
+
+    def compose_labeled(
+        self,
+        pattern: Dict[str, Any],
+        context: Dict[str, Any],
+        emotion: EmotionState = EmotionState.NEUTRAL,
+        player_id: str = "default",
+    ) -> ComposedSurface:
+        """
+        Compose an explicitly labeled NPC-script surface.
+
+        ResponseCompositor is a character/NPC rendering module, not the
+        Synthesus 5 normal assistant final-language path. Classic
+        response_template strings remain compatible here only as explicit
+        NPC script material, and callers that need CHAL traceability should
+        use this labeled form instead of the legacy string-only wrapper.
+        """
         # Check for emotion variant override first
         emotion_variants = pattern.get("emotion_variants", {})
         emotion_key = emotion.value
         if emotion_key in emotion_variants and emotion != EmotionState.NEUTRAL:
-            return emotion_variants[emotion_key]
+            return self._label_surface(emotion_variants[emotion_key])
 
         # If DialogueRanker is available and pattern has parts, use ranked composition
         if self._dialogue_ranker and "response_parts" in pattern:
             ranked = self._compose_ranked(pattern, context, player_id)
             if ranked:
-                return ranked
+                return self._label_surface(ranked)
 
         # Check if this pattern uses composite format
         if "response_parts" in pattern:
-            return self._compose_from_parts(pattern, context, player_id)
+            return self._label_surface(self._compose_from_parts(pattern, context, player_id))
 
         # Classic format: apply context inserts to static template
         template = pattern.get("response_template", "")
-        return self._apply_context_inserts(template, pattern, context)
+        return self._label_surface(self._apply_context_inserts(template, pattern, context))
+
+    @staticmethod
+    def _label_surface(text: str) -> ComposedSurface:
+        legacy_signatures = ("[fallback]", "[module]", "Handled:", "No route matched", "response_template")
+        return ComposedSurface(
+            text=text,
+            surface="explicit_npc_script",
+            boundary="response_compositor",
+            user_facing=True,
+            legacy_template_signature_present=any(signature in text for signature in legacy_signatures),
+        )
 
     def _compose_from_parts(
         self,

@@ -17,18 +17,19 @@ The executable audit is `tools/audit_template_surfaces.py`. It scans Python sour
 
 ## Current Results
 
-The audit currently classifies 90 matched package-level Python template signatures across 17 paths. The remaining `legacy_quarantine_required` paths are:
+The audit currently classifies 92 matched package-level Python template signatures across 17 paths. The remaining `legacy_quarantine_required` paths are:
 
 - `packages/api/fastapi_server.py` — legacy character router can return direct `response_template` text and character fallback strings.
 - `packages/api/production_server.py` — legacy pattern ingestion/lookup preserves `response_template` and response text for compatibility outside the explicit CHAL route.
 - `packages/core/cognitive/cognitive_engine.py` — legacy cognitive character behavior still reads pattern templates and fallback text outside the explicit CHAL hypervisor path.
-- `packages/core/cognitive/response_compositor.py` — older response composition can realize classic `response_template` strings directly.
 - `packages/core/els_bridge.py` — ELS pattern storage persists `response_template` data for legacy pattern recall.
 - `packages/core/pattern_engine.py` — PatternEngine stores templated output structures that must be consumed through firmware/generation boundaries.
 
 The PPBRS normal path is classified as `firmware_context_only`: `packages/reasoning/reasoning_chain.py` stores legacy template text only in `chal_firmware_signal.module_message.payload.template_context`, while `response` remains empty and `user_facing` remains false.
 
 `packages/reasoning/generation/spine.py` is now classified as `labeled_degraded_state`: primary-generation failures emit non-legacy degraded wording and attach `SpineOutput.degraded_state` metadata with `surface="degraded_state"`, `reason="primary_generation_unavailable"`, and a `legacy_template_signature_present` guard field.
+
+`packages/core/cognitive/response_compositor.py` is now classified as `allowed_labeled_exception`: `ResponseCompositor.compose_labeled()` marks realized character pattern text as `surface="explicit_npc_script"` and `boundary="response_compositor"`. The legacy `compose()` string wrapper remains for compatibility, but cognitive-engine local handling now records the labeled surface in debug metadata.
 
 ## Validation Command
 

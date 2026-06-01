@@ -26,6 +26,13 @@ def test_template_surface_audit_tracks_generation_spine_as_labeled_degraded_stat
     assert classification.boundary == "generation_spine_degraded_state"
 
 
+def test_template_surface_audit_tracks_response_compositor_as_labeled_npc_script():
+    classification = CLASSIFICATIONS["packages/core/cognitive/response_compositor.py"]
+
+    assert classification.status == "allowed_labeled_exception"
+    assert classification.boundary == "explicit_npc_script"
+
+
 def test_template_surface_audit_labels_allowed_exceptions():
     allowed = [
         item

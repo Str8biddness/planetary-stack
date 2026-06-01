@@ -215,6 +215,17 @@ Legacy import paths are preserved through thin compatibility packages:
 - `ppbrs.*` -> `packages/reasoning/*`
 - `core.reasoning.*` -> `packages/reasoning/*`
 
+### NPC Response-Compositor Boundary (2026-06-01)
+
+`packages/core/cognitive/response_compositor.py` is no longer classified as an unlabeled legacy template emitter. It exposes `ResponseCompositor.compose_labeled()`, which returns text plus Synthesus 5 surface metadata:
+
+- `surface="explicit_npc_script"`
+- `boundary="response_compositor"`
+- `user_facing=True`
+- `legacy_template_signature_present=<bool>`
+
+The older `compose()` API remains as a string-returning compatibility wrapper. Cognitive-engine local character handling now calls the labeled form and records `debug.template_surface`, so classic character `response_template` strings remain visible as an explicit NPC-script exception instead of an unclassified normal-path final-language source.
+
 ## Integration with Dual-Hemisphere
 
 PPBRS runs primarily in the **Left Hemisphere** of the dual-hemisphere architecture:

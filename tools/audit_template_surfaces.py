@@ -77,10 +77,10 @@ CLASSIFICATIONS: dict[str, SurfaceClassification] = {
     ),
     "packages/core/cognitive/response_compositor.py": SurfaceClassification(
         path="packages/core/cognitive/response_compositor.py",
-        surface="legacy_response_compositor_template",
-        status="legacy_quarantine_required",
-        boundary="outside_explicit_synthesus5_chal_path",
-        notes="The older response compositor can realize classic response_template strings directly.",
+        surface="explicit_npc_response_compositor",
+        status="allowed_labeled_exception",
+        boundary="explicit_npc_script",
+        notes="ResponseCompositor now exposes compose_labeled() metadata so classic response_template strings remain only as explicit NPC-script surfaces.",
     ),
     "packages/core/els_bridge.py": SurfaceClassification(
         path="packages/core/els_bridge.py",

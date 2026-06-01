@@ -1953,3 +1953,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Phase 8 now covers the public business-bot CHAL preset as a first-class comparison path: hypervisor preset decision, Quad Brain route, CGPU business-mode candidate, critic final-output reference, latency, score, and template leak status are all replay-visible.
 - Replay trace JSONL is deliberately compact and source-controlled only as harness capability; concrete run outputs remain generated artifacts under ignored `tools/results/`.
+
+## Current Session — 2026-06-01 (Agent 4 — Response Compositor Template Boundary)
+
+### 📝 Summary
+- Added `ComposedSurface` and `ResponseCompositor.compose_labeled()` so classic character `response_template` text is explicitly labeled as `surface="explicit_npc_script"` and `boundary="response_compositor"`.
+- Updated `CognitiveEngine` local character handling to call the labeled compositor and record `debug.template_surface` metadata while preserving the legacy `compose()` string wrapper for compatibility.
+- Reclassified `packages/core/cognitive/response_compositor.py` from `legacy_quarantine_required` to `allowed_labeled_exception`, reducing remaining Phase 6 quarantine paths from six to five.
+- Updated the Phase 6 checklist, template-path audit, and PPBRS module boundary docs.
+
+### ✅ Verified
+- `python -m py_compile packages/core/cognitive/response_compositor.py packages/core/cognitive/cognitive_engine.py tools/audit_template_surfaces.py tests/test_template_surface_audit.py tests/test_response_compositor_surface.py` — passed.
+- `python tools/audit_template_surfaces.py --fail-on-unclassified` — passed; 92 signatures, 17 classified paths, 0 unclassified hits, 5 `legacy_quarantine_required` paths remain.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_template_surface_audit.py tests/test_response_compositor_surface.py` — 7 passed.
+
+### 🚧 Left Off / Next Steps
+- Continue Phase 6 conversion/removal of the five remaining `legacy_quarantine_required` paths from `tools/audit_template_surfaces.py`: `packages/api/fastapi_server.py`, `packages/api/production_server.py`, `packages/core/cognitive/cognitive_engine.py`, `packages/core/els_bridge.py`, and `packages/core/pattern_engine.py`.
+- The cognitive engine still has fallback text outside the CHAL hypervisor path; the compositor is now labeled, but engine-level fallback handling remains a separate quarantine target.
+- Keep pre-existing unrelated working-tree changes in root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` separated from Agent 4 source/docs commits.
+
+### 💡 Architectural Notes
+- Response composition for character/NPC patterns is now an explicit script surface, not a hidden normal assistant response owner.
+- The compatibility wrapper preserves old callers while giving Synthesus 5 trace consumers a labeled boundary for local character behavior.

@@ -120,7 +120,7 @@ Legend:
 
 - [ ]  Delete unused legacy response emitters.
 
-- [~]  Quarantine safety/platform/explicit NPC-script templates behind labeled interfaces. Session log: 2026-05-28 Agent 4 template guard added `TemplateSurface` labels and hypervisor telemetry; 2026-06-01 generation spine fallback is now labeled as an explicit degraded state with non-legacy wording; remaining work is converting/removing the six older character/API/template emitters outside the Synthesus 5 hypervisor path.
+- [~]  Quarantine safety/platform/explicit NPC-script templates behind labeled interfaces. Session log: 2026-05-28 Agent 4 template guard added `TemplateSurface` labels and hypervisor telemetry; 2026-06-01 generation spine fallback is now labeled as an explicit degraded state with non-legacy wording; 2026-06-01 Agent 4 labeled `ResponseCompositor` output as an explicit NPC-script surface with cognitive-engine debug metadata; remaining work is converting/removing the five older character/API/template emitters outside the Synthesus 5 hypervisor path.
 
 - [x]  Add regression tests that fail on normal-path template leakage. Session log: 2026-05-28 Agent 4 template guard.
 

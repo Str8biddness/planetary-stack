@@ -1059,12 +1059,13 @@ class CognitiveEngine:
                 "world_state": world_result.get("world_state", {}),
             }
 
-            response = self.compositor.compose(
+            composed_surface = self.compositor.compose_labeled(
                 pattern=matched_pattern,
                 context=full_context,
                 emotion=current_emotion,
                 player_id=player_id,
             )
+            response = composed_surface.text
 
             self.tracker.record_npc_response(player_id, response)
             self.recall.record_response(player_id, response)  # Feed Module 9
@@ -1083,6 +1084,7 @@ class CognitiveEngine:
                 pattern_id=matched_pattern.get("id", "unknown"),
                 start_time=start_time,
                 ml_context=ml_context,
+                debug_extra={"template_surface": composed_surface.to_debug_dict()},
                 actions_taken=actions_taken,
                 kal_context=kal_context,
             )
