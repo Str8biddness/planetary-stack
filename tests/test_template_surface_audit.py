@@ -11,13 +11,19 @@ def test_template_surface_audit_keeps_legacy_api_emitters_labeled():
     legacy_required = {
         "packages/api/fastapi_server.py",
         "packages/api/production_server.py",
-        "packages/reasoning/generation/spine.py",
     }
 
     for path in legacy_required:
         classification = CLASSIFICATIONS[path]
         assert classification.status == "legacy_quarantine_required"
         assert classification.boundary
+
+
+def test_template_surface_audit_tracks_generation_spine_as_labeled_degraded_state():
+    classification = CLASSIFICATIONS["packages/reasoning/generation/spine.py"]
+
+    assert classification.status == "labeled_degraded_state"
+    assert classification.boundary == "generation_spine_degraded_state"
 
 
 def test_template_surface_audit_labels_allowed_exceptions():

@@ -35,6 +35,8 @@ Runtime guard code lives in `packages/reasoning/generation/template_guard.py`. T
 
 `CognitiveHypervisor` now applies the guard after hemisphere bridge dispatch. If a normal Synthesus 5 path receives a legacy-shaped surface, it replaces the text with a degraded CHAL quarantine message and records the matched signatures in `telemetry.template_guard`. Safety, platform, identity/rights, and explicit NPC-script exceptions are allowed only when labeled through the template surface boundary.
 
+`GenerationSpine` also labels primary-generation failures through `SpineOutput.degraded_state` instead of emitting classic fallback phrasing. The degraded surface uses non-legacy wording and records `surface="degraded_state"`, `reason="primary_generation_unavailable"`, and whether any known legacy template signature reached the degraded text.
+
 ## Quad Brain Runtime Wiring
 
 `CognitiveHypervisor` now invokes `packages/core/chal/quad_brain.py` for `quad_brain_path`. The serialized arbiter feeds Knowledge/Grounding facts into Executive Reasoning, builds a bounded `ResponsePlan`, calls `CGPURenderer`, then sends the selected candidate through Critic/Metacognition before emission.

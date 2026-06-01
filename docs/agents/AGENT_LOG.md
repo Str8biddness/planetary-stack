@@ -1837,3 +1837,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The public debug schema now matches the expanded Quad Brain runtime contract: four required roles, fixed serial state transitions, per-output mirrored transition traces, and critic-owned final response emission.
 - This remains a schema/documentation alignment change only; runtime behavior was already implemented and covered by `tests/test_chal_hypervisor.py`.
+
+## Current Session — 2026-06-01 (Knowledge Hardware / Phase 6 Degraded Generation Label)
+
+### 📝 Summary
+- Converted `GenerationSpine` primary-generation failure output from unlabeled fallback wording into explicit degraded-state output with `SpineOutput.degraded_state` metadata.
+- Updated the template surface audit so `packages/reasoning/generation/spine.py` is classified as `labeled_degraded_state` instead of `legacy_quarantine_required`, reducing remaining legacy quarantine paths from seven to six.
+- Added regression coverage proving degraded generation output avoids legacy signatures and carries the degraded-state surface/reason metadata.
+- Updated the Phase 6 checklist, template audit notes, and CGPU module docs.
+
+### ✅ Verified
+- `python -m py_compile packages/reasoning/generation/spine.py tools/audit_template_surfaces.py tests/test_chal_reasoning_firmware.py tests/test_template_surface_audit.py` — passed.
+- `python tools/audit_template_surfaces.py --fail-on-unclassified` — passed; 90 signatures, 17 classified paths, 0 unclassified hits, 6 `legacy_quarantine_required` paths remain.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_reasoning_firmware.py tests/test_template_surface_audit.py` — 16 passed.
+
+### 🚧 Left Off / Next Steps
+- Convert or remove the six remaining `legacy_quarantine_required` paths from `tools/audit_template_surfaces.py`: `packages/api/fastapi_server.py`, `packages/api/production_server.py`, `packages/core/cognitive/cognitive_engine.py`, `packages/core/cognitive/response_compositor.py`, `packages/core/els_bridge.py`, and `packages/core/pattern_engine.py`.
+- Consider adding a reusable degraded-state schema to the public API docs if `SpineOutput.degraded_state` becomes part of the external debug envelope.
+- Keep pre-existing unrelated working-tree changes in root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` separated from this source/docs commit.
+
+### 💡 Architectural Notes
+- Degraded generation is now a traceable state, not a hidden fallback template surface.
+- The degraded wording remains surface-safe while exposing enough metadata for future CHAL replay/debug consumers to distinguish generation failure from normal CGPU rendering.

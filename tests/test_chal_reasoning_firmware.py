@@ -161,6 +161,25 @@ def test_generation_spine_realizes_firmware_without_legacy_template_signature():
     assert "commerce" not in out.final_text
 
 
+def test_generation_spine_fallback_is_labeled_degraded_state_without_legacy_signature():
+    out = GenerationSpine(models_dir="/tmp/nonexistent-synthesus-models").generate(
+        SpineInput(
+            query="Explain memory cache hierarchy",
+            domain="general",
+            source_module="generation_spine_test",
+        )
+    )
+
+    assert out.final_text
+    assert "Generation is in a degraded state" in out.final_text
+    assert "[fallback]" not in out.final_text
+    assert "response_template" not in out.final_text
+    assert out.degraded_state is not None
+    assert out.degraded_state["surface"] == "degraded_state"
+    assert out.degraded_state["reason"] == "primary_generation_unavailable"
+    assert out.degraded_state["legacy_template_signature_present"] is False
+
+
 def test_dual_hemi_auto_routes_left_firmware_through_generation_spine():
     bridge = HemisphereBridge(
         kernel_bin="/tmp/nonexistent-zo-kernel",

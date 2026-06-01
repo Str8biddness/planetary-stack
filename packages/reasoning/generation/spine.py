@@ -52,7 +52,7 @@ class SpineInput:
     conversation_history: List[Dict] = field(default_factory=list)
 
 
-@dataclass  
+@dataclass
 class SpineOutput:
     """Output from the generation spine."""
     text: str
@@ -73,6 +73,7 @@ class SpineOutput:
     latency_ms: float = 0.0
     constraints_satisfied: bool = True
     safety_passed: bool = True
+    degraded_state: Optional[Dict[str, Any]] = None
     
     # Timing
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -207,7 +208,8 @@ class GenerationSpine:
             execution_recommendation=inp.execution_recommendation,
             latency_ms=latency_ms,
             constraints_satisfied=trace.constraints_satisfied if trace else True,
-            safety_passed=safety_passed
+            safety_passed=safety_passed,
+            degraded_state=self._build_degraded_state(inp, text) if trace is None else None,
         )
         
         # Update metrics
@@ -340,29 +342,55 @@ class GenerationSpine:
         return self._generate_fallback(inp, organ_scores), None
     
     def _generate_fallback(self, inp: SpineInput, organ_scores: Dict[str, float]) -> str:
-        """Fallback generation when primary methods fail."""
-        # Simple template-based fallback with context awareness
-        domain_prefixes = {
-            "chat": f"[{inp.character_id}] ",
-            "sysops": "[SYSTEM] ",
-            "gm": f"[GM] ",
-            "multimodal": f"[{inp.character_id}] ",
-            "general": ""
-        }
-        
-        prefix = domain_prefixes.get(inp.domain, "")
-        
-        # Risk-aware fallback length
+        """Emit explicit degraded-state wording when primary generation fails."""
+        domain_context = {
+            "chat": "dialogue",
+            "sysops": "system operations",
+            "gm": "game master narration",
+            "multimodal": "multimodal synthesis",
+            "general": "general reasoning",
+        }.get(inp.domain, "general reasoning")
+        query_focus = (inp.query or "the request").strip()[:120]
+
         if inp.risk_score > 0.7:
-            return f"{prefix}I need to be careful here. Let me confirm: you're asking about {inp.query[:50]}..."
-        
+            return (
+                f"Generation is in a degraded state for {domain_context}. "
+                f"The request needs confirmation before continuing: {query_focus}"
+            )
+
         if inp.rag_context:
-            return f"{prefix}Based on available information: {inp.rag_context[:200]}"
-        
+            return (
+                f"Generation is in a degraded state for {domain_context}. "
+                f"Available grounding says: {inp.rag_context[:200]}"
+            )
+
         if inp.conversation_history:
-            return f"{prefix}Continuing our conversation about {inp.query}..."
-        
-        return f"{prefix}I understand you're asking about {inp.query}. Let me provide what I know."
+            return (
+                f"Generation is in a degraded state for {domain_context}. "
+                f"Continue from the active conversation context and address: {query_focus}"
+            )
+
+        return (
+            f"Generation is in a degraded state for {domain_context}. "
+            f"Ground the response before answering: {query_focus}"
+        )
+
+    def _build_degraded_state(self, inp: SpineInput, text: str) -> Dict[str, Any]:
+        """Return trace metadata for explicit degraded generation surfaces."""
+        return {
+            "state": "degraded_generation",
+            "surface": "degraded_state",
+            "reason": "primary_generation_unavailable",
+            "source_module": inp.source_module,
+            "domain": inp.domain,
+            "query_present": bool(inp.query),
+            "rag_context_present": bool(inp.rag_context),
+            "conversation_history_present": bool(inp.conversation_history),
+            "legacy_template_signature_present": any(
+                signature in text
+                for signature in ("[module]", "[fallback]", "response_template", "Handled:", "No route matched")
+            ),
+        }
     
     def _generate_variant(self, inp: SpineInput, organ_scores: Dict[str, float], original: str) -> tuple:
         """Generate a variant when we detect repetition."""

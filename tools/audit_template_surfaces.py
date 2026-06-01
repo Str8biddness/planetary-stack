@@ -169,9 +169,9 @@ CLASSIFICATIONS: dict[str, SurfaceClassification] = {
     "packages/reasoning/generation/spine.py": SurfaceClassification(
         path="packages/reasoning/generation/spine.py",
         surface="generation_degraded_fallback",
-        status="legacy_quarantine_required",
+        status="labeled_degraded_state",
         boundary="generation_spine_degraded_state",
-        notes="Fallback wording is generated in the surface layer and needs an explicit degraded-state label before Phase 6 closes.",
+        notes="Last-resort generation wording now carries explicit degraded-state metadata and avoids legacy template signatures.",
     ),
     "packages/reasoning/generation/template_guard.py": SurfaceClassification(
         path="packages/reasoning/generation/template_guard.py",
