@@ -162,11 +162,15 @@ def cmd_build(args: argparse.Namespace) -> int:
 
 
 def cmd_stamp_manifest(args: argparse.Namespace) -> int:
-    path, manifest = stamp_existing_manifest(
-        repo_root=args.repo_root,
-        artifact_root=args.artifact_root,
-        profile_path=args.profile,
-    )
+    try:
+        path, manifest = stamp_existing_manifest(
+            repo_root=args.repo_root,
+            artifact_root=args.artifact_root,
+            profile_path=args.profile,
+        )
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     print(f"wrote {path} ({len(manifest.get('artifacts', []))} artifacts, profile={manifest.get('build', {}).get('profile')})")
     return 0
 

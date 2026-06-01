@@ -133,6 +133,18 @@ def validate_manifest(root: str | Path, manifest_name: str = "manifest.json") ->
     return ValidationResult(checked=checked, failures=tuple(failures))
 
 
+def validate_runtime_bundle_semantics(root: str | Path) -> ValidationResult:
+    """Validate cross-artifact runtime compatibility before publishing/stamping."""
+    root_path = Path(root).resolve()
+    semantic_paths = [
+        root_path / "faiss.index",
+        root_path / "faiss_metadata.json",
+        root_path / "models" / "swarm_embedder.pkl",
+    ]
+    checked = sum(1 for path in semantic_paths if path.exists())
+    return ValidationResult(checked=checked, failures=tuple(_validate_runtime_bundle_semantics(root_path)))
+
+
 def _validate_runtime_bundle_semantics(root: Path) -> list[str]:
     """Validate artifact relationships that hashes alone cannot prove."""
     failures: list[str] = []
