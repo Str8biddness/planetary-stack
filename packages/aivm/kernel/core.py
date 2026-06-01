@@ -11,6 +11,8 @@ from ..devices.vgd import VGD
 from ..devices.vrd import VRD
 from ..devices.vtd import VTD
 from ..devices.vdd import VDD
+from ..devices.vcd import VCD
+from ..devices.vwd import VWD
 from ..devices.stubs import VND, VSLLM
 from ..isolation.guard import FaultGuard
 from ..snapshot.manager import SnapshotManager
@@ -73,6 +75,8 @@ class AIVMKernel:
         npc.mounted_devices["VPD"] = VPD(identity)
         npc.mounted_devices["VMD"] = VMD(identity.id, self._memory_store)
         npc.mounted_devices["VQD"] = VQD(self._knowledge_cloud)
+        npc.mounted_devices["VCD"] = VCD(identity.id)
+        npc.mounted_devices["VWD"] = VWD(identity.id)
         npc.mounted_devices["VGD"] = VGD(reasoning_core)
         npc.mounted_devices["VND"] = VND()
         npc.mounted_devices["VRD"] = VRD(reasoning_core)

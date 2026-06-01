@@ -44,6 +44,12 @@ def test_snapshot_records_and_verifies_device_fingerprints():
     kernel = AIVMKernel(enable_scheduler=False)
     npc = kernel.spawn_npc(PersonaIdentity(id="fp_npc", name="Fingerprint NPC", archetype="scribe"))
     npc.mounted_devices["VMD"].write("writeback memory partition event")
+    npc.mounted_devices["VCD"].put("turn-plan", {"route": "quad_brain_path"}, tier="L1")
+    npc.mounted_devices["VWD"].stage(
+        {"trace_id": "trace-1", "event": "critic.accepted"},
+        target="crystallized",
+        provenance="critic.selected_response",
+    )
 
     blob = SnapshotManager.capture(npc)
     data = json.loads(blob.decode())
@@ -52,8 +58,19 @@ def test_snapshot_records_and_verifies_device_fingerprints():
     assert data["device_fingerprints"]["VPD"] == npc.mounted_devices["VPD"].fingerprint()
     assert data["device_fingerprints"]["VMD"] == npc.mounted_devices["VMD"].fingerprint()
     assert data["device_fingerprints"]["VQD"] == npc.mounted_devices["VQD"].fingerprint()
+    assert data["device_fingerprints"]["VCD"] == npc.mounted_devices["VCD"].fingerprint()
+    assert data["device_fingerprints"]["VWD"] == npc.mounted_devices["VWD"].fingerprint()
 
     restored = AIVMKernel(enable_scheduler=False).restore_npc(blob)
+    assert restored.mounted_devices["VCD"].get("turn-plan") == {"route": "quad_brain_path"}
+    assert restored.mounted_devices["VWD"].pending() == [
+        {
+            "ref": "fp_npc:writeback:0",
+            "target": "crystallized",
+            "provenance": "critic.selected_response",
+            "content": {"trace_id": "trace-1", "event": "critic.accepted"},
+        }
+    ]
     for name, expected in data["device_fingerprints"].items():
         assert restored.mounted_devices[name].fingerprint() == expected
 
@@ -73,4 +90,39 @@ def test_snapshot_restore_rejects_device_payload_mismatch_with_valid_outer_seal(
     data["footer"]["fingerprint"] = SnapshotManager._fingerprint_payload(data)
 
     with pytest.raises(ValueError, match="device fingerprint mismatch: VMD"):
+        AIVMKernel(enable_scheduler=False).restore_npc(json.dumps(data, sort_keys=True).encode())
+
+
+def test_snapshot_restore_rejects_cache_partition_payload_mismatch_with_valid_outer_seal():
+    kernel = AIVMKernel(enable_scheduler=False)
+    npc = kernel.spawn_npc(PersonaIdentity(id="cache_tamper_npc", name="Cache Tamper", archetype="scribe"))
+    npc.mounted_devices["VCD"].put("grounding", {"hits": 1}, tier="L2")
+
+    data = json.loads(SnapshotManager.capture(npc).decode())
+    cache_payload = json.loads(bytes.fromhex(data["devices"]["VCD"]).decode())
+    cache_payload["entries"]["grounding"]["value"] = {"hits": 999}
+    data["devices"]["VCD"] = json.dumps(cache_payload, sort_keys=True).encode().hex()
+    data["footer"]["fingerprint"] = SnapshotManager._fingerprint_payload(data)
+
+    with pytest.raises(ValueError, match="device fingerprint mismatch: VCD"):
+        AIVMKernel(enable_scheduler=False).restore_npc(json.dumps(data, sort_keys=True).encode())
+
+
+def test_snapshot_restore_rejects_writeback_partition_payload_mismatch_with_valid_outer_seal():
+    kernel = AIVMKernel(enable_scheduler=False)
+    npc = kernel.spawn_npc(PersonaIdentity(id="writeback_tamper_npc", name="Writeback Tamper", archetype="scribe"))
+    npc.mounted_devices["VWD"].stage({"trace_id": "trace-2"}, target="episodic")
+
+    data = json.loads(SnapshotManager.capture(npc).decode())
+    writeback_payload = json.loads(bytes.fromhex(data["devices"]["VWD"]).decode())
+    writeback_payload["records"].append({
+        "ref": "writeback_tamper_npc:writeback:1",
+        "target": "crystallized",
+        "provenance": "forged",
+        "content": {"trace_id": "forged"},
+    })
+    data["devices"]["VWD"] = json.dumps(writeback_payload, sort_keys=True).encode().hex()
+    data["footer"]["fingerprint"] = SnapshotManager._fingerprint_payload(data)
+
+    with pytest.raises(ValueError, match="device fingerprint mismatch: VWD"):
         AIVMKernel(enable_scheduler=False).restore_npc(json.dumps(data, sort_keys=True).encode())

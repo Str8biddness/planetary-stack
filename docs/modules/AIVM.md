@@ -188,9 +188,16 @@ The Cognitive Hypervisor wraps hemisphere bridge dispatch with this guard, so ti
 
 The AIVM kernel can now complete the canonical 12-step tick without external Knowledge Cloud or MemoryStore backends mounted. `VQD` returns an empty scoped result set when no knowledge backend is present, and `VMD` uses a local in-memory event buffer that participates in snapshot/restore. This keeps default kernel smoke tests bounded while preserving the mount points for real CHAL hardware backends.
 
+Every spawned NPC also mounts `VCD` and `VWD` as explicit Python-side CHAL partitions:
+
+| Device | Partition | Snapshot role |
+|-------|-----------|---------------|
+| `VCD` | Volatile cache / hot context | Captures L1/L2-style turn or session cache entries independently from durable memory. |
+| `VWD` | Writeback staging | Captures validated trace or memory commits waiting for episodic/crystallized backend admission. |
+
 `SnapshotManager` seals every snapshot payload with a SHA-256 fingerprint over the unsigned payload. Restore now recomputes that fingerprint before spawning devices and rejects tampered blobs with a `ValueError`, giving AIVM snapshotting an explicit integrity gate instead of treating the footer as advisory metadata.
 
-Snapshots also carry a per-device fingerprint manifest. Restore replays each mounted device blob and verifies that the restored `VPD`, `VMD`, `VQD`, generation, reasoning, narrative, and model-selection devices match the captured fingerprints before the NPC is admitted back into the kernel. This guards against validly resealed outer snapshots that contain forged device-state blobs.
+Snapshots also carry a per-device fingerprint manifest. Restore replays each mounted device blob and verifies that the restored `VPD`, `VMD`, `VQD`, `VCD`, `VWD`, generation, reasoning, narrative, and model-selection devices match the captured fingerprints before the NPC is admitted back into the kernel. This guards against validly resealed outer snapshots that contain forged device-state blobs.
 
 ## VPD Pybind Inspection Surface
 

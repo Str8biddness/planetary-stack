@@ -2082,3 +2082,27 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The normal Quad Brain path now exposes a concrete handoff chain: CGPU selects a candidate, Critic/Metacognition reviews that exact candidate id, and final response ownership remains `critic.selected_response`.
 - This preserves the bounded four-brain topology and strengthens traceability without introducing uncontrolled multi-agent fan-out.
+
+## Current Session — 2026-06-01 (Agent 8 — AIVM Cache/Writeback Snapshot Partitions)
+
+### 📝 Summary
+- Added `VCD` and `VWD` Python-side AIVM devices so every spawned NPC has explicit CHAL cache and writeback partitions alongside `VMD` and `VQD`.
+- Wired the new devices through normal kernel spawn so `SnapshotManager` captures, restores, and fingerprints cache/writeback state with the existing sealed snapshot manifest.
+- Extended snapshot integrity regressions to prove cache/writeback restore parity and to reject forged cache or writeback payloads even when the outer snapshot seal is recomputed.
+- Advanced the Phase 7 CHAL partition save/load checklist item without marking broader persistent runtime trace storage complete.
+
+### ✅ Verified
+- `python -m py_compile packages/aivm/devices/vcd.py packages/aivm/devices/vwd.py packages/aivm/kernel/core.py tests/aivm/test_snapshot_integrity.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages python -m pytest -q tests/aivm/test_snapshot_integrity.py` — 6 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages python tests/aivm/verify_kernel.py` — passed; canonical 12-step tick sequence preserved.
+- `cd packages/kernel && cmake -S . -B build -DBUILD_PYBIND=ON && cmake --build build -j2` — passed; `_synthesus_kernel` built.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/kernel/build python -m pytest -q tests/test_kernel_pybind_vpd.py` — 1 passed.
+
+### 🚧 Left Off / Next Steps
+- Extend the same CHAL partition save/load contract from deterministic NPC snapshots into durable runtime conversation trace persistence.
+- Keep native build outputs under `packages/kernel/build/` ignored and out of source commits.
+- Pre-existing unrelated working-tree changes in root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` were not touched.
+
+### 💡 Architectural Notes
+- `VCD` is the volatile hot-context/cache partition; `VWD` is the writeback staging partition for validated trace or memory commits.
+- These are inspectable Python AIVM devices and snapshot validation surfaces, not claims of hardware acceleration.
