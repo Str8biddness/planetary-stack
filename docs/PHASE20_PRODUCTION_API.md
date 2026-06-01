@@ -80,6 +80,9 @@ provenance for grounded CHAL routes, including KAL operation, source mount,
 cache state, and artifact integrity metadata when available.
 `CognitiveHypervisorTrace.quad_brain` references `QuadBrainArbitration` when the
 route is `quad_brain_path`, matching the runtime `telemetry.quad_brain` payload.
+The Quad Brain schema also types `QuadBrainStateTransition` records so clients
+can validate the fixed knowledge -> executive -> CGPU -> critic state handoff
+and the `final_output_ref=critic.selected_response` contract.
 CGPU device-frame schemas are documented separately as `CGPUFrame` and
 `CGPUOutputFrame`; `/api/v1/query` does not emit CGPU candidate sets as top-level
 payloads.

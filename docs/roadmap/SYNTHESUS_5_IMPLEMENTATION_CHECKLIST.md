@@ -73,7 +73,7 @@ Legend:
 
 - [x]  Add serialized arbiter that merges four brain outputs into a single response frame. Session log: 2026-05-28 Agent 7 Quad Brain arbiter.
 
-- [x]  Mirror serialized Quad Brain arbitration telemetry in OpenAPI/API schema docs as `QuadBrainArbitration` under `CognitiveHypervisorTrace.quad_brain`. Session log: 2026-05-31 Agent 10 Quad Brain trace schema.
+- [x]  Mirror serialized Quad Brain arbitration telemetry in OpenAPI/API schema docs as `QuadBrainArbitration` under `CognitiveHypervisorTrace.quad_brain`. Session log: 2026-05-31 Agent 10 Quad Brain trace schema; 2026-06-01 Agent 10 typed `QuadBrainStateTransition` and the required final-output state contract fields.
 
 - [x]  Add tests showing four-brain dispatch improves or preserves output quality over legacy dual-hemi path. Session log: 2026-05-30 Agent 7 Quad Brain quality-preservation regression.
 

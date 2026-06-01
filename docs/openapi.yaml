@@ -5,9 +5,9 @@ info:
     5 CHAL runtime. The public query path currently exposes explicit Cognitive Hypervisor
     routing through mode=chal plus generation-spine, cognitive, RAG, kernel, and amplification
     telemetry. CognitiveHypervisorTrace documents debug.cognitive_hypervisor for CHAL
-    requests, including QuadBrainArbitration when route=quad_brain_path; CGPU
-    traces are documented as CHAL contracts until candidate-set payloads are surfaced
-    by this endpoint.
+    requests, including QuadBrainArbitration when route=quad_brain_path; CGPU traces
+    are documented as CHAL contracts until candidate-set payloads are surfaced by
+    this endpoint.
   version: 5.0.0
 paths:
   /parameter-cloud/v2/fetch-batch:
@@ -465,8 +465,7 @@ paths:
   /api/v1/query:
     post:
       summary: Query Endpoint
-      description: "Main query endpoint \u2014 ML Swarm \u2192 Cognitive \u2192 RAG\
-        \ \u2192 Fallback."
+      description: Main query endpoint — ML Swarm → Cognitive → RAG → Fallback.
       operationId: query_endpoint_api_v1_query_post
       parameters:
       - name: x-api-key
@@ -1314,6 +1313,11 @@ components:
               trace:
                 type: object
                 additionalProperties: true
+                properties:
+                  state_transition:
+                    $ref: '#/components/schemas/QuadBrainStateTransition'
+                description: Role-local trace metadata. Runtime output includes the
+                  matching state_transition record for this role.
               warnings:
                 type: array
                 items:
@@ -1335,6 +1339,9 @@ components:
           - serialized_arbitration
           - template_leakage_allowed
           - route
+          - required_roles
+          - state_transitions
+          - final_output_ref
           properties:
             topology:
               type: string
@@ -1354,6 +1361,31 @@ components:
             route:
               type: string
               const: quad_brain_path
+            required_roles:
+              type: array
+              description: The four required Quad Brain roles in fixed serialized
+                arbitration order.
+              items:
+                type: string
+                enum: &id001
+                - knowledge_grounding
+                - executive_reasoning
+                - cgpu_rendering
+                - critic_metacognition
+            state_transitions:
+              type: array
+              description: Inspectable state handoffs for knowledge, executive, CGPU,
+                and critic roles. Each role output trace mirrors its corresponding
+                transition.
+              items:
+                $ref: '#/components/schemas/QuadBrainStateTransition'
+              minItems: 4
+              maxItems: 4
+            final_output_ref:
+              type: string
+              const: critic.selected_response
+              description: State reference that owns the final selected response after
+                critic/metacognition arbitration.
           additionalProperties: true
         latency_ms:
           type: number
@@ -1454,10 +1486,9 @@ components:
             is true. Current keys include kernel_triggered, symbolic_triggered, trace,
             rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. For explicit
             mode=chal calls, cognitive_hypervisor follows the CognitiveHypervisorTrace
-            OpenAPI component, including typed QuadBrainArbitration records when
-            route=quad_brain_path. CGPU candidate-set trace records should also live
-            here as the runtime wiring expands without changing the stable response
-            envelope.
+            OpenAPI component, including typed QuadBrainArbitration records when route=quad_brain_path.
+            CGPU candidate-set trace records should also live here as the runtime
+            wiring expands without changing the stable response envelope.
       type: object
       required:
       - response
@@ -1557,9 +1588,9 @@ components:
           - type: object
             additionalProperties: true
           - type: 'null'
-          description: Mounted Knowledge Cloud provenance trace for grounded CHAL routes,
-            including KAL operation, source mount, cache state, and artifact integrity
-            metadata; null when no grounded hardware lookup was attempted.
+          description: Mounted Knowledge Cloud provenance trace for grounded CHAL
+            routes, including KAL operation, source mount, cache state, and artifact
+            integrity metadata; null when no grounded hardware lookup was attempted.
         quad_brain:
           anyOf:
           - $ref: '#/components/schemas/QuadBrainArbitration'
@@ -1583,3 +1614,31 @@ components:
       title: CognitiveHypervisorTrace
       description: Debug trace emitted under QueryResponse.debug.cognitive_hypervisor
         for explicit mode=chal requests.
+    QuadBrainStateTransition:
+      type: object
+      title: QuadBrainStateTransition
+      description: One serialized state handoff in the fixed Synthesus 5 Quad Brain
+        arbitration chain.
+      required:
+      - role
+      - input_refs
+      - output_refs
+      - device
+      properties:
+        role:
+          type: string
+          enum: *id001
+        input_refs:
+          type: array
+          items:
+            type: string
+          description: Named state references consumed by this brain role.
+        output_refs:
+          type: array
+          items:
+            type: string
+          description: Named state references produced by this brain role.
+        device:
+          type: string
+          description: CHAL device URI responsible for this transition.
+      additionalProperties: false

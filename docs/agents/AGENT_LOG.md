@@ -1815,3 +1815,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Organ training now has a hard trace-quality contract, not just a generated scorecard.
 - Baseline-performance enforcement is available as an explicit evaluator switch, but it stays opt-in until trace diversity improves enough to avoid failing the stable self-improvement loop.
+
+## Current Session — 2026-06-01 (Agent 10 — Quad Brain State-Transition Schema)
+
+### 📝 Summary
+- Promoted `QuadBrainStateTransition` to a reusable OpenAPI/API schema component in `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`.
+- Tightened `QuadBrainArbitration.state_contract` so the schema now requires the runtime-emitted `required_roles`, `state_transitions`, and `final_output_ref=critic.selected_response` fields.
+- Documented that each Quad Brain output trace mirrors its role-local state transition and updated the Phase 3 checklist log reference.
+
+### ✅ Verified
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed `QuadBrainStateTransition` exists and `QuadBrainArbitration.state_contract` requires `required_roles`, `state_transitions`, and `final_output_ref`.
+- `python -m py_compile packages/core/chal/quad_brain.py packages/core/chal/hypervisor.py tests/test_chal_hypervisor.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_hypervisor.py` — passed.
+- `git diff --check -- docs/openapi.yaml docs/openapi.json docs/api_schema.json docs/PHASE20_PRODUCTION_API.md docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md docs/agents/AGENT_LOG.md` — passed.
+
+### 🚧 Left Off / Next Steps
+- Continue Phase 6 conversion/removal of the seven `legacy_quarantine_required` template surfaces from `tools/audit_template_surfaces.py`.
+- Consider replacing generic `CognitiveHypervisorTrace.knowledge_provenance` with a typed reusable component if clients begin validating provenance metadata strictly.
+- Keep pre-existing unrelated working-tree changes in root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` separated from Agent 10 source/docs commits.
+
+### 💡 Architectural Notes
+- The public debug schema now matches the expanded Quad Brain runtime contract: four required roles, fixed serial state transitions, per-output mirrored transition traces, and critic-owned final response emission.
+- This remains a schema/documentation alignment change only; runtime behavior was already implemented and covered by `tests/test_chal_hypervisor.py`.

@@ -341,7 +341,13 @@
                 },
                 "trace": {
                   "type": "object",
-                  "additionalProperties": true
+                  "additionalProperties": true,
+                  "properties": {
+                    "state_transition": {
+                      "$ref": "#/components/schemas/QuadBrainStateTransition"
+                    }
+                  },
+                  "description": "Role-local trace metadata. Runtime output includes the matching state_transition record for this role."
                 },
                 "warnings": {
                   "type": "array",
@@ -371,7 +377,10 @@
               "parallel_brain_spawn",
               "serialized_arbitration",
               "template_leakage_allowed",
-              "route"
+              "route",
+              "required_roles",
+              "state_transitions",
+              "final_output_ref"
             ],
             "properties": {
               "topology": {
@@ -402,6 +411,33 @@
               "route": {
                 "type": "string",
                 "const": "quad_brain_path"
+              },
+              "required_roles": {
+                "type": "array",
+                "description": "The four required Quad Brain roles in fixed serialized arbitration order.",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "knowledge_grounding",
+                    "executive_reasoning",
+                    "cgpu_rendering",
+                    "critic_metacognition"
+                  ]
+                }
+              },
+              "state_transitions": {
+                "type": "array",
+                "description": "Inspectable state handoffs for knowledge, executive, CGPU, and critic roles. Each role output trace mirrors its corresponding transition.",
+                "items": {
+                  "$ref": "#/components/schemas/QuadBrainStateTransition"
+                },
+                "minItems": 4,
+                "maxItems": 4
+              },
+              "final_output_ref": {
+                "type": "string",
+                "const": "critic.selected_response",
+                "description": "State reference that owns the final selected response after critic/metacognition arbitration."
               }
             },
             "additionalProperties": true
@@ -813,6 +849,47 @@
         ],
         "title": "CognitiveHypervisorTrace",
         "description": "Debug trace emitted under QueryResponse.debug.cognitive_hypervisor for explicit mode=chal requests."
+      },
+      "QuadBrainStateTransition": {
+        "type": "object",
+        "title": "QuadBrainStateTransition",
+        "description": "One serialized state handoff in the fixed Synthesus 5 Quad Brain arbitration chain.",
+        "required": [
+          "role",
+          "input_refs",
+          "output_refs",
+          "device"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "knowledge_grounding",
+              "executive_reasoning",
+              "cgpu_rendering",
+              "critic_metacognition"
+            ]
+          },
+          "input_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Named state references consumed by this brain role."
+          },
+          "output_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Named state references produced by this brain role."
+          },
+          "device": {
+            "type": "string",
+            "description": "CHAL device URI responsible for this transition."
+          }
+        },
+        "additionalProperties": false
       }
     }
   }
