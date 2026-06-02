@@ -19,7 +19,9 @@ from tools.chal_conversation_compare import (
     CASES,
     RegressionThresholds,
     assert_chal_surfaces_are_clean,
+    assert_reference_scorecard,
     assert_regression_thresholds,
+    build_reference_scorecard,
     build_replay_records,
     build_chal_rows,
     summarize,
@@ -299,6 +301,41 @@ def test_phase8_comparison_harness_builds_replay_trace_records():
     business_record = next(record for record in records if record["case_id"] == "business_bot_task")
     assert business_record["runtime_preset"] == "business_bot"
     assert business_record["route"] == "quad_brain_path"
+
+
+def test_phase8_comparison_harness_builds_reference_scorecard():
+    rows = asyncio.run(build_chal_rows())
+    scorecard = build_reference_scorecard(rows)
+
+    assert scorecard["schema"] == "synthesus.phase8.reference_scorecard.v1"
+    assert scorecard["summary"]["case_count"] == len(rows)
+    assert scorecard["summary"]["failed_cases"] == 0
+    assert scorecard["summary"]["passed_cases"] == len(rows)
+    assert_reference_scorecard(scorecard)
+
+    business_case = next(case for case in scorecard["cases"] if case["case_id"] == "business_bot_task")
+    assert business_case["expected_route"] == "quad_brain_path"
+    assert business_case["runtime_preset"] == "business_bot"
+    assert set(business_case["quad_brain_roles"]) == {
+        "knowledge_grounding",
+        "executive_reasoning",
+        "cgpu_rendering",
+        "critic_metacognition",
+    }
+
+
+def test_phase8_reference_scorecard_reports_failed_checks():
+    rows = asyncio.run(build_chal_rows())
+    scorecard = build_reference_scorecard(rows)
+    scorecard["cases"][0]["checks"]["route"] = False
+    scorecard["cases"][0]["passed"] = False
+
+    try:
+        assert_reference_scorecard(scorecard)
+    except AssertionError as exc:
+        assert f"{scorecard['cases'][0]['case_id']} failed route" in str(exc)
+    else:
+        raise AssertionError("reference scorecard gate must fail when a case check fails")
 
 
 def test_phase8_comparison_harness_enforces_latency_regression_thresholds():

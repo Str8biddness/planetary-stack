@@ -164,6 +164,8 @@ Legend:
 
 - [x]  Add compact replay trace records and explicit business-bot preset coverage to the legacy-vs-Synthesus-5 comparison harness. Session log: 2026-06-01 Agent 3 Phase 8 replay trace and business preset harness.
 
+- [x]  Add a deterministic GPT-4-class reference expectation scorecard gate for the legacy-vs-Synthesus-5 comparison harness. Session log: 2026-06-02 Agent 3 Phase 8 reference scorecard gate.
+
 ## Phase 9: Product Runtime Polish
 
 - \[\~\] Wire Synthesus 5 path into API entrypoints. Session log: 2026-05-28 Agent 1 API CHAL mode added explicit `/api/v1/query` `mode="chal"` routing through `CognitiveHypervisor`; default `auto` cutover remains.

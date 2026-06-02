@@ -2242,3 +2242,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - `build.source_manifest` makes the source-plane manifest a first-class hardware admission fingerprint, complementing byte-level runtime artifact hashes and semantic FAISS/embedder compatibility checks.
 - This does not bless the current generated bundle; it improves the provenance contract that the next clean artifact rebuild will stamp.
+
+## Current Session — 2026-06-02 (Agent 3 — Phase 8 Reference Scorecard Gate)
+
+### 📝 Summary
+- Added a deterministic GPT-4-class reference expectation scorecard to `tools/chal_conversation_compare.py`.
+- The new scorecard checks per-case route selection, minimum overall score, grounding, expected-term coverage, latency, template leakage, runtime-preset telemetry, required decision reasons, and Quad Brain role evidence for persona/business cases.
+- Wired `--fail-on-reference` and `--scorecard-json` into the comparison harness and focused release suite so aggregate score regressions cannot hide missing CHAL trace evidence.
+- Updated the Phase 8 evaluation harness docs and implementation checklist.
+
+### ✅ Verified
+- `python -m py_compile tools/chal_conversation_compare.py tools/synthesus5_focused_suite.py tests/test_chal_reasoning_firmware.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_reasoning_firmware.py` — 16 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/chal_conversation_compare.py --fail-on-leak --fail-on-reference --max-mean-latency-ms 1000 --max-p95-latency-ms 1500 --min-score-delta 0.1 --write tools/results/synthesus5_phase8_reference_latest.md --json tools/results/synthesus5_phase8_reference_latest.json --trace-jsonl tools/results/synthesus5_phase8_reference_replay_latest.jsonl --scorecard-json tools/results/synthesus5_phase8_reference_scorecard_latest.json --baseline-json tools/results/synthesus5_phase8_reference_baseline_latest.json` — passed; generated ignored artifacts. Scorecard summary: 6/6 cases passed, score delta 0.515, mean latency 4.566ms, p95 latency 9.051ms, 0 Synthesus 5 template leaks.
+
+### 🚧 Left Off / Next Steps
+- Add model-backed reference comparison only when a stable provider contract and cost policy are available; keep this deterministic scorecard as the source-controlled regression gate.
+- Consider adding a public API trace fixture that exercises the same reference expectations through `/api/v1/query` rather than only the deterministic in-process harness.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, untracked `synthesus_framework/`, and the Knowledge Hardware Source-Manifest Fingerprint checklist hunk were left unstaged for this Agent 3 commit.
+
+### 💡 Architectural Notes
+- Phase 8 now has two complementary generated artifacts: compact replay records for trace diffing and a compact reference scorecard for fixed GPT-4-class expectation checks.
+- The reference gate is intentionally deterministic and trace-based; it validates CHAL architecture evidence instead of claiming external GPT-4 judgment.

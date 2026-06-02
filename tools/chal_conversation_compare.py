@@ -94,6 +94,66 @@ class RegressionThresholds:
     min_score_delta: float | None = None
 
 
+@dataclass(frozen=True)
+class ReferenceExpectation:
+    route: str
+    min_overall: float = 0.85
+    min_grounding: float = 0.5
+    min_term_coverage: float = 0.5
+    max_latency_ms: float = 1000.0
+    runtime_preset: str | None = None
+    required_decision_reasons: tuple[str, ...] = ()
+    require_quad_brain_roles: bool = False
+
+
+QUAD_BRAIN_ROLES = (
+    "knowledge_grounding",
+    "executive_reasoning",
+    "cgpu_rendering",
+    "critic_metacognition",
+)
+
+
+REFERENCE_EXPECTATIONS: dict[str, ReferenceExpectation] = {
+    "conversation_quality": ReferenceExpectation(
+        route="grounded_path",
+        min_overall=0.85,
+        min_grounding=0.5,
+    ),
+    "cross_domain_reasoning": ReferenceExpectation(
+        route="grounded_path",
+        min_overall=0.9,
+        min_grounding=0.75,
+    ),
+    "grounded_retrieval": ReferenceExpectation(
+        route="grounded_path",
+        min_overall=0.9,
+        min_grounding=0.75,
+    ),
+    "npc_persona_behavior": ReferenceExpectation(
+        route="quad_brain_path",
+        min_overall=0.95,
+        min_grounding=0.75,
+        require_quad_brain_roles=True,
+    ),
+    "business_bot_task": ReferenceExpectation(
+        route="quad_brain_path",
+        min_overall=0.9,
+        min_grounding=0.66,
+        min_term_coverage=0.66,
+        runtime_preset="business_bot",
+        required_decision_reasons=("business_bot_preset",),
+        require_quad_brain_roles=True,
+    ),
+    "safety_boundary": ReferenceExpectation(
+        route="safety_path",
+        min_overall=0.95,
+        min_grounding=0.75,
+        required_decision_reasons=("safety_or_platform_constraint",),
+    ),
+}
+
+
 CASES: tuple[EvalCase, ...] = (
     EvalCase(
         case_id="conversation_quality",
@@ -462,6 +522,89 @@ def build_replay_records(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return records
 
 
+def _quad_brain_roles(row: dict[str, Any]) -> list[str]:
+    quad_brain = row["synthesus5"].get("telemetry", {}).get("quad_brain")
+    if not isinstance(quad_brain, dict):
+        return []
+    return [
+        output.get("role")
+        for output in quad_brain.get("outputs", [])
+        if isinstance(output, dict) and output.get("role")
+    ]
+
+
+def build_reference_scorecard(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    summary = summarize(rows)
+    case_results = []
+    for row in rows:
+        expectation = REFERENCE_EXPECTATIONS[row["case_id"]]
+        synth = row["synthesus5"]
+        score = row["scores"]["synthesus5"]
+        decision = synth["decision"]
+        reasons = set(decision.get("reasons", []))
+        roles = _quad_brain_roles(row)
+        role_set = set(roles)
+        term_coverage = _term_coverage(synth["response"], row["expected_terms"])
+        checks = {
+            "route": decision.get("route") == expectation.route,
+            "overall_score": score["overall"] >= expectation.min_overall,
+            "grounding_score": score["grounding"] >= expectation.min_grounding,
+            "term_coverage": term_coverage >= expectation.min_term_coverage,
+            "latency": synth["runtime_ms"] <= expectation.max_latency_ms,
+            "template_leakage": score["template_leakage"] == 1.0,
+            "runtime_preset": (
+                synth.get("telemetry", {}).get("runtime_preset") == expectation.runtime_preset
+                if expectation.runtime_preset is not None
+                else True
+            ),
+            "decision_reasons": set(expectation.required_decision_reasons).issubset(reasons),
+            "quad_brain_roles": (
+                set(QUAD_BRAIN_ROLES).issubset(role_set)
+                if expectation.require_quad_brain_roles
+                else True
+            ),
+        }
+        case_results.append(
+            {
+                "case_id": row["case_id"],
+                "category": row["category"],
+                "expected_route": expectation.route,
+                "observed_route": decision.get("route"),
+                "runtime_preset": synth.get("telemetry", {}).get("runtime_preset"),
+                "overall_score": score["overall"],
+                "grounding_score": score["grounding"],
+                "term_coverage": round(term_coverage, 3),
+                "latency_ms": synth["runtime_ms"],
+                "quad_brain_roles": roles,
+                "checks": checks,
+                "passed": all(checks.values()),
+            }
+        )
+    return {
+        "schema": "synthesus.phase8.reference_scorecard.v1",
+        "summary": {
+            "case_count": len(case_results),
+            "passed_cases": sum(1 for case in case_results if case["passed"]),
+            "failed_cases": sum(1 for case in case_results if not case["passed"]),
+            "comparison_score_delta": summary["score_delta"],
+            "synthesus5_mean_latency_ms": summary["synthesus5_mean_latency_ms"],
+            "synthesus5_p95_latency_ms": summary["synthesus5_p95_latency_ms"],
+            "synthesus5_template_leaks": summary["synthesus5_template_leaks"],
+        },
+        "cases": case_results,
+    }
+
+
+def assert_reference_scorecard(scorecard: dict[str, Any]) -> None:
+    failures = []
+    for case in scorecard["cases"]:
+        for check, passed in case["checks"].items():
+            if not passed:
+                failures.append(f"{case['case_id']} failed {check}")
+    if failures:
+        raise AssertionError("\n".join(failures))
+
+
 def assert_regression_thresholds(summary: dict[str, Any], thresholds: RegressionThresholds) -> None:
     failures = []
     if thresholds.max_mean_latency_ms is not None:
@@ -560,8 +703,10 @@ async def main() -> int:
     parser.add_argument("--write", type=Path, help="Write markdown comparison to this path.")
     parser.add_argument("--json", type=Path, help="Write machine-readable comparison to this path.")
     parser.add_argument("--trace-jsonl", type=Path, help="Write compact replay trace records to this JSONL path.")
+    parser.add_argument("--scorecard-json", type=Path, help="Write GPT-4-class reference expectation scorecard JSON.")
     parser.add_argument("--baseline-json", type=Path, help="Write summary-only latency/quality baseline JSON.")
     parser.add_argument("--fail-on-leak", action="store_true", help="Fail if Synthesus 5 output leaks legacy surface signatures.")
+    parser.add_argument("--fail-on-reference", action="store_true", help="Fail if any fixed reference expectation check fails.")
     parser.add_argument("--max-mean-latency-ms", type=float, help="Fail if Synthesus 5 mean runtime exceeds this value.")
     parser.add_argument("--max-p95-latency-ms", type=float, help="Fail if Synthesus 5 p95 runtime exceeds this value.")
     parser.add_argument("--min-score-delta", type=float, help="Fail if Synthesus 5 score delta falls below this value.")
@@ -570,6 +715,9 @@ async def main() -> int:
     rows = await build_chal_rows()
     if args.fail_on_leak:
         assert_chal_surfaces_are_clean(rows)
+    reference_scorecard = build_reference_scorecard(rows)
+    if args.fail_on_reference:
+        assert_reference_scorecard(reference_scorecard)
     summary = summarize(rows)
     assert_regression_thresholds(
         summary,
@@ -598,6 +746,13 @@ async def main() -> int:
             encoding="utf-8",
         )
         print(args.trace_jsonl)
+    if args.scorecard_json:
+        args.scorecard_json.parent.mkdir(parents=True, exist_ok=True)
+        args.scorecard_json.write_text(
+            json.dumps(reference_scorecard, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        print(args.scorecard_json)
     if args.baseline_json:
         args.baseline_json.parent.mkdir(parents=True, exist_ok=True)
         args.baseline_json.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")

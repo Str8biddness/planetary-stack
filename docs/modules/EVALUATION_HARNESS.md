@@ -32,6 +32,8 @@ Each output receives axis scores for:
 
 The overall score is the mean of those axes. Template leakage is checked against legacy surface signatures such as `[module]`, `[fallback]`, `response_template`, `Handled:`, and `No route matched`.
 
+The harness also builds a deterministic GPT-4-class reference scorecard. This is not an external model judge. It checks each case against fixed expectations for route selection, minimum score, grounding coverage, term coverage, latency, template leakage, required decision reasons, runtime preset telemetry, and Quad Brain role evidence where applicable.
+
 ## Commands
 
 Run the harness and fail on Synthesus 5 template leakage:
@@ -40,17 +42,27 @@ Run the harness and fail on Synthesus 5 template leakage:
 python tools/chal_conversation_compare.py --fail-on-leak
 ```
 
+Run the stricter Phase 8 gate:
+
+```bash
+python tools/chal_conversation_compare.py --fail-on-leak --fail-on-reference
+```
+
 Write ignored benchmark artifacts:
 
 ```bash
 python tools/chal_conversation_compare.py \
   --fail-on-leak \
+  --fail-on-reference \
   --write tools/results/synthesus5_chal_comparison_YYYY-MM-DD.md \
   --json tools/results/synthesus5_chal_comparison_YYYY-MM-DD.json \
-  --trace-jsonl tools/results/synthesus5_chal_replay_YYYY-MM-DD.jsonl
+  --trace-jsonl tools/results/synthesus5_chal_replay_YYYY-MM-DD.jsonl \
+  --scorecard-json tools/results/synthesus5_chal_reference_scorecard_YYYY-MM-DD.json
 ```
 
 `--trace-jsonl` writes compact replay records with case id, category, trace id, route, runtime preset, score metadata, latency metadata, template-leak flags, and Quad Brain state-contract references when present. It intentionally omits full response text so runtime comparison traces can be stored and diffed without committing bulky generated scorecards.
+
+`--scorecard-json` writes the compact reference expectation scorecard. `--fail-on-reference` fails the run if any fixed expectation check fails, even when aggregate scores remain above threshold.
 
 Run the regression tests:
 
