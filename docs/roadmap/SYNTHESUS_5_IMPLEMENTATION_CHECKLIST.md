@@ -100,7 +100,7 @@ Legend:
 - [x]  Define CHAL mount and partition interfaces for ROM, parameter disk, grounding corpus, provenance, cache, and writeback memory. Session log: 2026-05-31 Knowledge Hardware Complete Mount Interface; 2026-06-01 Agent 5 added artifact-free volatile cache/writeback mounts to manifest-backed boot.
 - [x]  Upgrade KAL into a CHAL memory controller. Session log: 2026-05-28 Knowledge Cloud mount table.
 
-- [x]  Add mount table boot sequence. Session log: 2026-05-28 Knowledge Cloud mount table; 2026-06-01 Agent 5 extended manifest-backed boot with `/mnt/cache/hot_context` and `/mnt/mem/writeback` CHAL boundaries.
+- [x]  Add mount table boot sequence. Session log: 2026-05-28 Knowledge Cloud mount table; 2026-06-01 Agent 5 extended manifest-backed boot with `/mnt/cache/hot_context` and `/mnt/mem/writeback` CHAL boundaries; 2026-06-02 Agent 5 added manifest coverage reporting for known-but-absent Knowledge Cloud hardware partitions.
 
 - [x]  Add partition integrity checks against Knowledge Cloud manifests. Session log: 2026-05-28 Knowledge Cloud mount table added runtime manifest SHA-256/size verification; 2026-05-28 Daily Knowledge Hardware Health Check tracked a current standalone artifact FAISS/embedder dim mismatch separately; 2026-06-01 Agent 5 added runtime cold-start retrieval-semantic integrity checks for FAISS/metadata counts and FAISS/embedder dimensions.
 
@@ -108,7 +108,7 @@ Legend:
 
 - [x]  Add provenance traces to final response metadata. Session log: 2026-05-31 Knowledge Hardware Provenance Trace.
 
-- [x]  Add tests for mounted Knowledge Cloud partitions. Session log: 2026-05-28 Knowledge Cloud mount table; 2026-06-01 Agent 5 validated volatile cache/writeback boundaries stay active and artifact-free.
+- [x]  Add tests for mounted Knowledge Cloud partitions. Session log: 2026-05-28 Knowledge Cloud mount table; 2026-06-01 Agent 5 validated volatile cache/writeback boundaries stay active and artifact-free; 2026-06-02 Agent 5 validated manifest coverage telemetry for missing optional and complete known artifact partitions.
 
 - [x]  Add source-plane license/provenance validation for Knowledge Cloud hardware manifests before public sources can be treated as mounted CHAL substrate. Session log: 2026-06-01 Knowledge Cloud Source Provenance Gate; 2026-06-02 Knowledge Hardware Source-Manifest Fingerprint added `build.source_manifest` provenance fingerprints so stamped runtime bundles point back to the exact source-plane hash set.
 

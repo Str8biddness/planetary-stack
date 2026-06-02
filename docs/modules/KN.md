@@ -150,6 +150,8 @@ Default mount mappings:
 
 `CHALMemoryController` attempts this manifest-backed boot before falling back to legacy default mounts. Failed integrity checks deactivate the affected mount and set trust to `0.0`; strict boot mode raises immediately.
 
+Boot reports now include manifest coverage metadata for every known Knowledge Cloud artifact partition. `ManifestCoverageReport` records which expected artifacts were mounted and which known mount paths are absent from the manifest, including optional partitions such as `/mnt/rom/evolution`. Cold-start readiness still gates only the required mount set, but coverage metadata makes incomplete CHAL hardware partitions visible to health checks, docs, and future release tooling without treating optional partitions as generated artifact blockers.
+
 The cache and writeback mounts are CHAL boundaries rather than generated Knowledge Cloud files. They are always marked `volatile=true` and `artifact_backed=false`, so cold-start validation can verify the ROM/parameter/corpus/provenance partitions without encouraging agents to commit runtime cache or memory artifacts.
 
 ### Core CHAL Interface Metadata

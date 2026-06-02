@@ -2286,3 +2286,24 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - `CognitiveEngine` remains a local NPC behavior engine. Its final fallback text is now inspectable as an explicit NPC-script exception, not a normal assistant template owner.
 - The normal Synthesus 5 assistant path still belongs to CHAL, the Cognitive Hypervisor, CGPU rendering, and critic arbitration.
+
+## Current Session — 2026-06-02 (Agent 5 — Knowledge Hardware Manifest Coverage)
+
+### 📝 Summary
+- Added `ManifestCoverageReport` to the Knowledge Cloud mount-table boot report so known CHAL artifact partitions absent from `manifest.json` are visible as coverage metadata.
+- Exposed `MountTableBootReport.missing_known_mount_paths` for health/release tooling to inspect optional missing partitions such as `/mnt/rom/evolution` without expanding the current cold-start required mount set.
+- Preserved coverage metadata when retrieval-semantic validation is added to a cold-start report.
+- Updated KN module docs and the Phase 5 checklist with the new manifest-coverage validation boundary.
+
+### ✅ Verified
+- `python -m py_compile packages/knowledge/mount_table.py tests/test_knowledge_mount_table.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_knowledge_mount_table.py` — 12 passed, 3 FAISS/SWIG deprecation warnings.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` are semantically aligned; the known live blocker remains `faiss=384` / `embedder=128`.
+- Future health/release tooling can promote selected `ManifestCoverageReport.missing_mount_paths` from telemetry into warnings or hard gates when optional partitions become required.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Required mount checks prove the minimum bootable hardware set. Manifest coverage proves whether the bundle is a complete known hardware map.
+- This keeps optional partitions observable without encouraging agents to commit generated cache, writeback, FAISS, KNDB, or model artifacts.

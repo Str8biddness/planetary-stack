@@ -127,6 +127,35 @@ def test_mount_table_boots_manifest_artifacts_as_chal_mounts(tmp_path: Path):
     assert mounts["/mnt/mem/writeback"].mount_type == MountType.WRITEBACK_MEMORY
     assert mounts["/mnt/cache/hot_context"].partition.metadata["artifact_backed"] is False
     assert mounts["/mnt/mem/writeback"].partition.is_read_only is False
+    assert report.coverage is not None
+    assert report.coverage.complete is False
+    assert "knowledge_cloud/evolution.json" in report.coverage.missing_artifacts
+    assert "/mnt/rom/evolution" in report.missing_known_mount_paths
+
+
+def test_mount_table_reports_complete_known_manifest_coverage(tmp_path: Path):
+    artifacts = [
+        _write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n'),
+        _write_artifact(tmp_path, "knowledge_cloud/evolution.json", b'{"evolution": []}\n'),
+        _write_artifact(tmp_path, "knowledge_cloud/transitions.json", b'{"edges": []}\n'),
+        _write_artifact(tmp_path, "knowledge_cloud/chaining_patterns.json", b'{"patterns": []}\n'),
+        _write_artifact(tmp_path, "knowledge_cloud/learned_transitions.json", b'{"learned_transitions": {}}\n'),
+        _write_artifact(tmp_path, "models/swarm_embedder.pkl", b"model-bytes"),
+        _write_artifact(tmp_path, "faiss.index", b"index-bytes"),
+        _write_artifact(tmp_path, "faiss_metadata.json", b'{"sources": []}\n'),
+        _write_artifact(tmp_path, "knowledge.kndb", b"kndb-bytes"),
+        _write_artifact(tmp_path, "knowledge.kndb.meta.db", b"metadata-bytes"),
+        _write_artifact(tmp_path, "knowledge.meta.db", b"knowledge-metadata-bytes"),
+    ]
+    _write_manifest(tmp_path, artifacts)
+
+    report = KnowledgeCloudMountTable().boot(tmp_path, strict=True)
+
+    assert report.coverage is not None
+    assert report.coverage.complete is True
+    assert report.coverage.missing_artifacts == ()
+    assert report.missing_known_mount_paths == ()
+    assert report.coverage.as_metadata()["coverage_complete"] is True
 
 
 def test_legacy_chal_interface_frames_carry_trace_and_budget_metadata():
@@ -255,6 +284,8 @@ def test_mount_table_validates_retrieval_semantic_integrity(tmp_path: Path):
     assert report.retrieval_semantics.faiss_dim == 3
     assert report.retrieval_semantics.embedder_dim == 3
     assert report.retrieval_semantics.errors == ()
+    assert report.coverage is not None
+    assert "/mnt/rom/evolution" in report.coverage.missing_mount_paths
 
 
 def test_mount_table_rejects_retrieval_semantic_dimension_mismatch(tmp_path: Path):

@@ -200,11 +200,33 @@ class RetrievalSemanticReport:
 
 
 @dataclass(frozen=True)
+class ManifestCoverageReport:
+    expected_artifacts: tuple[str, ...]
+    mounted_artifacts: tuple[str, ...]
+    missing_artifacts: tuple[str, ...]
+    missing_mount_paths: tuple[str, ...]
+
+    @property
+    def complete(self) -> bool:
+        return not self.missing_artifacts
+
+    def as_metadata(self) -> dict[str, Any]:
+        return {
+            "expected_artifacts": list(self.expected_artifacts),
+            "mounted_artifacts": list(self.mounted_artifacts),
+            "missing_artifacts": list(self.missing_artifacts),
+            "missing_mount_paths": list(self.missing_mount_paths),
+            "coverage_complete": self.complete,
+        }
+
+
+@dataclass(frozen=True)
 class MountTableBootReport:
     manifest_path: str
     manifest_version: str | None
     mounts: tuple[Mount, ...]
     integrity: tuple[MountIntegrityReport, ...]
+    coverage: ManifestCoverageReport | None = None
     retrieval_semantics: RetrievalSemanticReport | None = None
 
     @property
@@ -219,6 +241,12 @@ class MountTableBootReport:
     def missing_active_mounts(self, required_mounts: tuple[str, ...]) -> tuple[str, ...]:
         active = set(self.active_mount_paths)
         return tuple(mount_path for mount_path in required_mounts if mount_path not in active)
+
+    @property
+    def missing_known_mount_paths(self) -> tuple[str, ...]:
+        if self.coverage is None:
+            return ()
+        return self.coverage.missing_mount_paths
 
     def assert_cold_start_ready(
         self,
@@ -261,6 +289,7 @@ class KnowledgeCloudMountTable:
 
         mounts: list[Mount] = []
         reports: list[MountIntegrityReport] = []
+        mounted_artifacts: set[str] = set()
 
         for item in manifest.get("artifacts", []):
             relative_path = str(item.get("path", "")).replace("\\", "/")
@@ -271,6 +300,7 @@ class KnowledgeCloudMountTable:
             mount_path, mount_type, namespace, read_only, locality = spec
             report = self._verify_artifact(root, relative_path, mount_path, item)
             reports.append(report)
+            mounted_artifacts.add(relative_path)
             if strict and not report.ok:
                 raise ValueError(f"Knowledge Cloud artifact integrity failed: {relative_path}")
 
@@ -298,6 +328,7 @@ class KnowledgeCloudMountTable:
             manifest_version=str(manifest.get("version")) if manifest.get("version") is not None else None,
             mounts=tuple(mounts),
             integrity=tuple(reports),
+            coverage=self._coverage_report(mounted_artifacts),
         )
 
     def validate_cold_start_bundle(
@@ -315,6 +346,7 @@ class KnowledgeCloudMountTable:
                 manifest_version=report.manifest_version,
                 mounts=report.mounts,
                 integrity=report.integrity,
+                coverage=report.coverage,
                 retrieval_semantics=self.validate_retrieval_semantics(root_dir),
             )
         report.assert_cold_start_ready(required_mounts)
@@ -421,6 +453,18 @@ class KnowledgeCloudMountTable:
     def _partition_id(relative_path: str) -> str:
         return "kc_" + relative_path.replace("/", "_").replace(".", "_")
 
+    def _coverage_report(self, mounted_artifacts: set[str]) -> ManifestCoverageReport:
+        expected = tuple(sorted(self._artifact_specs))
+        mounted = tuple(sorted(mounted_artifacts))
+        missing = tuple(path for path in expected if path not in mounted_artifacts)
+        missing_mount_paths = tuple(self._artifact_specs[path][0] for path in missing)
+        return ManifestCoverageReport(
+            expected_artifacts=expected,
+            mounted_artifacts=mounted,
+            missing_artifacts=missing,
+            missing_mount_paths=missing_mount_paths,
+        )
+
     @staticmethod
     def _volatile_mounts() -> list[Mount]:
         mounts: list[Mount] = []
@@ -462,6 +506,7 @@ __all__ = [
     "COLD_START_REQUIRED_MOUNTS",
     "DEFAULT_MOUNT_SPECS",
     "KnowledgeCloudMountTable",
+    "ManifestCoverageReport",
     "MountIntegrityReport",
     "MountTableBootReport",
     "RetrievalSemanticReport",
