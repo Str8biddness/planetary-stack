@@ -22,7 +22,14 @@ except ImportError:
     EventSourceResponse = None
 
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+PROJ_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJ_ROOT))
+sys.path.insert(0, str(PROJ_ROOT / "packages"))
+sys.path.insert(0, str(PROJ_ROOT / "packages" / "core"))
+sys.path.insert(0, str(PROJ_ROOT / "packages" / "knowledge"))
+sys.path.insert(0, str(PROJ_ROOT / "packages" / "reasoning"))
+sys.path.insert(0, str(PROJ_ROOT / "packages" / "kernel"))
+sys.path.insert(0, str(PROJ_ROOT / "packages" / "api"))
 from cognitive.cognitive_engine import CognitiveEngine
 from core.knowledge_cloud import KnowledgeCloud
 from core.universal_substrate import UniversalSubstrate
@@ -76,7 +83,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PROJ_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.environ.get("SYNTHESUS_DATA_DIR", str(PROJ_ROOT / "data")))
 KERNEL_BIN = os.path.join(os.path.dirname(__file__), "..", "zo_kernel")
 CHARACTERS_DIR = os.path.join(os.path.dirname(__file__), "..", "characters")
@@ -88,6 +94,22 @@ _rate_limits: Dict[str, List[float]] = defaultdict(list)
 _rate_limit_lock = asyncio.Lock()
 _knowledge_cloud: Optional[KnowledgeCloud] = None
 _substrate: Optional[UniversalSubstrate] = None
+
+LEGACY_API_NPC_SCRIPT_SURFACE = {
+    "surface": "legacy_fastapi_character_router",
+    "status": "allowed_labeled_exception",
+    "boundary": "explicit_npc_script",
+    "user_facing": True,
+    "normal_assistant_path": False,
+}
+
+
+def _template_surface(kind: str, char_id: str, pattern_id: str = "") -> Dict[str, Any]:
+    surface = dict(LEGACY_API_NPC_SCRIPT_SURFACE)
+    surface.update({"kind": kind, "character": char_id})
+    if pattern_id:
+        surface["pattern_id"] = pattern_id
+    return surface
 
 
 def _get_shared_layers() -> tuple[Optional[KnowledgeCloud], Optional[UniversalSubstrate]]:
@@ -289,7 +311,10 @@ def _character_fallback(query_text: str, char_id: str) -> Dict[str, Any]:
         return {
             "response": f"Character '{char_id}' not found.",
             "confidence": 0.0, "module": "character_router",
-            "source": "fallback", "character": char_id
+            "source": "fallback", "character": char_id,
+            "debug": {
+                "template_surface": _template_surface("character_not_found", char_id),
+            },
         }
     patterns_data = char_data["patterns"]
     match, match_score = _match_pattern(query_text, patterns_data)
@@ -300,7 +325,14 @@ def _character_fallback(query_text: str, char_id: str) -> Dict[str, Any]:
             "module": f"ppbrs_character_{char_id}",
             "source": "character_pattern",
             "character": char_id,
-            "pattern_id": match.get("id", "unknown")
+            "pattern_id": match.get("id", "unknown"),
+            "debug": {
+                "template_surface": _template_surface(
+                    "character_pattern",
+                    char_id,
+                    match.get("id", "unknown"),
+                ),
+            },
         }
     # Character fallback string
     fallback_text = patterns_data.get(
@@ -310,7 +342,10 @@ def _character_fallback(query_text: str, char_id: str) -> Dict[str, Any]:
     return {
         "response": fallback_text,
         "confidence": 0.3, "module": f"ppbrs_character_{char_id}",
-        "source": "character_fallback", "character": char_id
+        "source": "character_fallback", "character": char_id,
+        "debug": {
+            "template_surface": _template_surface("character_fallback", char_id),
+        },
     }
 
 
@@ -513,8 +548,14 @@ async def query(req: QueryRequest, auth=Depends(get_auth)):
             result = _character_fallback(query_text, char_id)
             return QueryResponse(**result)
         return QueryResponse(
-            response=f"[FALLBACK] Processed: {query_text}",
-            confidence=0.5, module="python_fallback", source="fallback"
+            response="Synthesus kernel is unavailable; retry after runtime initialization.",
+            confidence=0.5,
+            module="python_fallback",
+            source="fallback",
+            character=char_id,
+            debug={
+                "template_surface": _template_surface("kernel_unavailable", char_id),
+            },
         )
     try:
         kernel.stdin.write(query_text + "\n")
@@ -559,7 +600,12 @@ async def stream(q: str):
             line = kernel.stdout.readline().strip()
             yield {"data": line}
         else:
-            yield {"data": json.dumps({"r": f"[FALLBACK] {q}", "c": 0.5, "m": "fallback"})}
+            yield {"data": json.dumps({
+                "r": "Synthesus kernel is unavailable; retry after runtime initialization.",
+                "c": 0.5,
+                "m": "fallback",
+                "template_surface": _template_surface("stream_kernel_unavailable", "synth"),
+            })}
     return EventSourceResponse(generator())
 
 

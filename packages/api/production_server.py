@@ -397,6 +397,32 @@ _start_time = time.time()
 _substrate: Optional[UniversalSubstrate] = None
 _knowledge_cloud: Optional[KnowledgeCloud] = None
 
+API_PATTERN_STORAGE_SURFACE = {
+    "surface": "production_api_pattern_storage",
+    "status": "non_user_facing",
+    "boundary": "legacy_api_pattern_storage",
+    "user_facing": False,
+    "normal_assistant_path": False,
+}
+
+API_PATTERN_RECALL_SURFACE = {
+    "surface": "production_api_pattern_recall",
+    "status": "allowed_labeled_exception",
+    "boundary": "explicit_npc_script",
+    "user_facing": True,
+    "normal_assistant_path": False,
+}
+
+
+def _pattern_surface(kind: str, char_id: Optional[str] = None, pattern: str = "") -> Dict[str, Any]:
+    surface = dict(API_PATTERN_RECALL_SURFACE if kind == "pattern_recall" else API_PATTERN_STORAGE_SURFACE)
+    surface["kind"] = kind
+    if char_id:
+        surface["character"] = char_id
+    if pattern:
+        surface["pattern"] = pattern
+    return surface
+
 # ─── Query Trace Logger (Self-Improvement) ───────────────────────────
 _TRACE_LOG = PROJ_ROOT / "logs" / "query_traces.jsonl"
 
@@ -1002,8 +1028,8 @@ def _get_cognitive_engine(char_id: str) -> Optional[CognitiveEngine]:
         return None
 
 
-def _find_response_for_pattern(pattern_text: str, char_id: Optional[str] = None) -> Optional[str]:
-    """Search character pattern caches for a response matching the given pattern text."""
+def _find_response_for_pattern(pattern_text: str, char_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Search character pattern caches for a labeled NPC-script response candidate."""
     # If a specific character is requested, search only that one first
     search_order = []
     if char_id and char_id in _character_cache:
@@ -1026,7 +1052,10 @@ def _find_response_for_pattern(pattern_text: str, char_id: Optional[str] = None)
                     if t.strip().lower() == pattern_lower:
                         resp = pat.get("response_template", pat.get("response", ""))
                         if resp:
-                            return resp
+                            return {
+                                "response": resp,
+                                "template_surface": _pattern_surface("pattern_recall", cid, pattern_lower),
+                            }
     return None
 
 
@@ -1198,7 +1227,8 @@ async def add_patterns(req: Request, auth=Depends(get_auth)):
                 "pattern": text,
                 "response": resp,
                 "source": src,
-                "domain": dom
+                "domain": dom,
+                "template_surface": _pattern_surface("pattern_ingest", p_char_id, text),
             }
             if p_char_id:
                 item["character_id"] = p_char_id
@@ -1746,11 +1776,13 @@ async def query_endpoint(req: QueryRequest, auth=Depends(get_auth)):
 
                 if top_score >= 0.65:
                     response_text = ""
+                    response_match = None
                     for src in sources:
                         pattern_text = src.get("pattern", "")
                         if pattern_text:
-                            response_text = _find_response_for_pattern(pattern_text, char_id) # type: ignore
-                            if response_text:
+                            response_match = _find_response_for_pattern(pattern_text, char_id) # type: ignore
+                            if response_match:
+                                response_text = response_match["response"]
                                 break
 
                     if not response_text:
@@ -1774,6 +1806,9 @@ async def query_endpoint(req: QueryRequest, auth=Depends(get_auth)):
                     _conversations[session_id].append({"role": "user", "content": query_text})
                     _conversations[session_id].append({"role": "assistant", "content": response_text})
                     debug_data = {"rag": {"top_score": top_score}} if req.include_debug else None
+                    if req.include_debug and response_match:
+                        debug_data = debug_data or {}
+                        debug_data["template_surface"] = response_match["template_surface"]
                     return QueryResponse(
                         response=response_text,
                         confidence=_linter_safe_round(top_score, 2)

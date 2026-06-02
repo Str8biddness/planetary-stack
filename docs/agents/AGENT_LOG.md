@@ -2307,3 +2307,28 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Required mount checks prove the minimum bootable hardware set. Manifest coverage proves whether the bundle is a complete known hardware map.
 - This keeps optional partitions observable without encouraging agents to commit generated cache, writeback, FAISS, KNDB, or model artifacts.
+
+## Current Session — 2026-06-02 (Agent 6 — Legacy API Template Boundary)
+
+### 📝 Summary
+- Converted the two remaining `legacy_quarantine_required` template surfaces in `packages/api/fastapi_server.py` and `packages/api/production_server.py` into labeled boundaries.
+- FastAPI character-pattern and fallback responses now include `debug.template_surface` metadata with `boundary="explicit_npc_script"` and `normal_assistant_path=False`.
+- Removed visible `[FALLBACK]` signatures from FastAPI kernel-unavailable `/query` and `/stream` fallback output.
+- Production API pattern ingestion now labels stored response text as non-user-facing pattern storage, and production pattern recall returns an explicit NPC-script candidate before RAG finalization.
+- Advanced Phase 6 by reducing template-surface audit quarantine paths to 0 while preserving safety/platform/explicit NPC-script exceptions behind labels.
+
+### ✅ Verified
+- `python -m py_compile packages/api/fastapi_server.py packages/api/production_server.py tools/audit_template_surfaces.py tests/test_template_surface_audit.py tests/test_legacy_api_template_surface.py` — passed.
+- `python tools/audit_template_surfaces.py --fail-on-unclassified` — passed; 93 signatures, 17 classified paths, 0 unclassified hits, 0 `legacy_quarantine_required` paths.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0:/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/api:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_template_surface_audit.py tests/test_legacy_api_template_surface.py` — 11 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 114 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py` — pattern matching p50 0.2783ms / p95 1.5140ms / avg 0.4279ms; rule evaluation p50 0.0191ms / p95 0.0383ms / avg 0.0254ms; graph traversal p50 0.0181ms / p95 0.0281ms / avg 0.0199ms.
+
+### 🚧 Left Off / Next Steps
+- Continue Phase 6 by checking whether any legacy API callers can be migrated to explicit `mode="chal"` defaults after compatibility needs are reviewed.
+- Next Agent 6 pass can move from quarantine cleanup back to PPBRS confidence-path tightening or C++ hot-path protocol work.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- The legacy API layer is now classified as an explicit NPC-script compatibility boundary or non-user-facing storage substrate, not a normal assistant final-language owner.
+- The template surface audit now reports no remaining quarantine-required paths; normal Synthesus 5 wording remains owned by CHAL, the Cognitive Hypervisor, generation spine, and critic/template guard.

@@ -1,5 +1,35 @@
 # PPBRS Dev Log
 
+## 2026-06-02 — Agent 6 Legacy API Template Boundary
+
+### Actions Performed
+
+1. Converted the remaining legacy API template surfaces in `packages/api/fastapi_server.py` and `packages/api/production_server.py` into labeled explicit NPC-script or non-user-facing storage boundaries.
+2. Removed visible `[FALLBACK]` signatures from FastAPI kernel-unavailable `/query` and `/stream` fallback output.
+3. Updated `tools/audit_template_surfaces.py`, PPBRS module docs, Synthesus 5 checklist, and focused regression tests.
+4. Re-ran PPBRS-focused validation and the PPBRS benchmark.
+
+### Benchmark Summary
+
+| Component | p50 (ms) | p95 (ms) | Avg (ms) |
+| --- | ---: | ---: | ---: |
+| pattern_matching | 0.2783 | 1.5140 | 0.4279 |
+| rule_evaluation | 0.0191 | 0.0383 | 0.0254 |
+| graph_traversal | 0.0181 | 0.0281 | 0.0199 |
+
+### Validation Summary
+
+```text
+tests/test_template_surface_audit.py tests/test_legacy_api_template_surface.py — 11 passed
+tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py — 114 passed
+tools/audit_template_surfaces.py --fail-on-unclassified — 0 unclassified hits, 0 legacy_quarantine_required paths
+```
+
+### Notes
+
+- Legacy API compatibility remains available only behind explicit metadata labels.
+- Normal Synthesus 5 assistant wording remains owned by CHAL, the Cognitive Hypervisor, generation spine, and critic/template guard.
+
 ## 2026-04-26
 
 ### Status: ALL COMPONENTS PRODUCTION-READY

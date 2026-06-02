@@ -36,16 +36,16 @@ CLASSIFICATIONS: dict[str, SurfaceClassification] = {
     "packages/api/fastapi_server.py": SurfaceClassification(
         path="packages/api/fastapi_server.py",
         surface="legacy_api_character_pattern",
-        status="legacy_quarantine_required",
-        boundary="outside_explicit_synthesus5_chal_path",
-        notes="Direct character-pattern response_template and fallback strings remain in the legacy FastAPI character router.",
+        status="allowed_labeled_exception",
+        boundary="explicit_npc_script",
+        notes="The legacy FastAPI character router now labels pattern and fallback text as explicit NPC-script surfaces and removed visible normal-path [FALLBACK] signatures.",
     ),
     "packages/api/production_server.py": SurfaceClassification(
         path="packages/api/production_server.py",
         surface="legacy_api_pattern_storage_and_lookup",
-        status="legacy_quarantine_required",
-        boundary="outside_explicit_synthesus5_chal_path",
-        notes="Pattern ingestion and lookup still preserve response_template text for legacy character/API compatibility.",
+        status="allowed_labeled_exception",
+        boundary="explicit_npc_script",
+        notes="Production API pattern lookup is labeled as explicit NPC-script recall, while pattern ingestion labels response_template text as non-user-facing storage substrate.",
     ),
     "packages/core/reasoning_core.py": SurfaceClassification(
         path="packages/core/reasoning_core.py",

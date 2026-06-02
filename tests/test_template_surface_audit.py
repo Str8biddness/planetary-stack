@@ -7,16 +7,16 @@ def test_template_surface_audit_has_no_unclassified_package_hits():
     assert result["unclassified"] == []
 
 
-def test_template_surface_audit_keeps_legacy_api_emitters_labeled():
-    legacy_required = {
+def test_template_surface_audit_tracks_legacy_api_emitters_as_labeled_exceptions():
+    labeled_paths = {
         "packages/api/fastapi_server.py",
         "packages/api/production_server.py",
     }
 
-    for path in legacy_required:
+    for path in labeled_paths:
         classification = CLASSIFICATIONS[path]
-        assert classification.status == "legacy_quarantine_required"
-        assert classification.boundary
+        assert classification.status == "allowed_labeled_exception"
+        assert classification.boundary == "explicit_npc_script"
 
 
 def test_template_surface_audit_tracks_generation_spine_as_labeled_degraded_state():

@@ -250,6 +250,17 @@ This keeps learned pattern text available to legacy stores while making the Synt
 
 This preserves classic NPC behavior while making the exception explicit: local character fallback remains an NPC-script surface outside the normal Synthesus 5 assistant path, not an unlabeled PPBRS or template-owned final response.
 
+### Legacy API Template Boundary (2026-06-02)
+
+`packages/api/fastapi_server.py` and `packages/api/production_server.py` are no longer classified as `legacy_quarantine_required` template emitters. The remaining legacy-compatible API surfaces now carry explicit template metadata:
+
+- FastAPI character pattern and fallback responses include `debug.template_surface` with `boundary="explicit_npc_script"` and `normal_assistant_path=False`.
+- FastAPI kernel-unavailable fallback text no longer emits `[FALLBACK]` signatures on `/query` or `/stream`.
+- Production API pattern ingestion labels stored response text as `boundary="legacy_api_pattern_storage"` with `user_facing=False`.
+- Production API pattern recall returns a labeled candidate with `boundary="explicit_npc_script"` before any RAG response is finalized through the generation spine.
+
+This completes the current Phase 6 quarantine pass: legacy API compatibility remains available for explicit NPC-script and non-user-facing storage paths, while normal Synthesus 5 assistant responses stay owned by CHAL, the Cognitive Hypervisor, generation spine, and critic/template guard.
+
 ## Integration with Dual-Hemisphere
 
 PPBRS runs primarily in the **Left Hemisphere** of the dual-hemisphere architecture:
