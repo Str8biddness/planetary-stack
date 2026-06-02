@@ -65,6 +65,18 @@ class CandidatePattern:
     status: str = "pending"   # "pending" | "approved" | "rejected" | "integrated"
     source_interaction_id: Optional[str] = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    surface: str = "writeback_candidate"
+    boundary: str = "els_candidate_writeback"
+    user_facing: bool = False
+
+
+def candidate_writeback_metadata() -> Dict[str, Any]:
+    return {
+        "surface": "writeback_candidate",
+        "boundary": "els_candidate_writeback",
+        "user_facing": False,
+        "legacy_template_signature_present": False,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -256,6 +268,7 @@ class ELSBridge:
             "status": "pending",
             "source_interaction_id": interaction.id,
             "created_at": now,
+            "template_surface": candidate_writeback_metadata(),
         })
         self.patterns_path.write_text(json.dumps(existing, indent=2))
 
@@ -298,6 +311,7 @@ class ELSBridge:
             return 0
 
         patterns_file = Path("data/patterns.json")
+        patterns_file.parent.mkdir(parents=True, exist_ok=True)
         existing: List[Dict] = []
         if patterns_file.exists():
             try:
@@ -307,12 +321,15 @@ class ELSBridge:
 
         added = 0
         for a in approved:
+            metadata = a.get("metadata") or {}
+            metadata["template_surface"] = candidate_writeback_metadata()
             existing.append({
                 "character_id": character_id,
                 "pattern_type": "reasoning",
                 "trigger": a["trigger"],
                 "response_template": a["response_template"],
                 "weight": a.get("score", 0.5),
+                "metadata": metadata,
             })
             added += 1
 

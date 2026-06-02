@@ -2151,3 +2151,23 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - `business_bot` is now documented as the canonical telemetry value for the public CHAL preset. Request aliases are input convenience only, not separate runtime modes or additional brain topologies.
+
+## Current Session — 2026-06-02 (Knowledge Hardware Hygiene — ELS Writeback Boundary)
+
+### 📝 Summary
+- Labeled `ELSBridge` candidate-pattern exports and integrated pattern records with `template_surface` metadata so stored `response_template` text is explicitly non-user-facing `els_candidate_writeback` substrate.
+- Reclassified `packages/core/els_bridge.py` from `legacy_quarantine_required` to `non_user_facing` in the template surface audit, reducing remaining Phase 6 quarantine paths from five to four.
+- Updated the Phase 6 checklist, template-path audit doc, and PPBRS module boundary notes.
+
+### ✅ Verified
+- `python -m py_compile packages/core/els_bridge.py tools/audit_template_surfaces.py tests/test_els_bridge_surface.py tests/test_template_surface_audit.py` — passed.
+- `python tools/audit_template_surfaces.py --fail-on-unclassified` — passed; 92 signatures, 17 classified paths, 0 unclassified hits, 4 `legacy_quarantine_required` paths remain.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages python -m pytest -q tests/test_els_bridge_surface.py tests/test_template_surface_audit.py` — 8 passed.
+
+### 🚧 Left Off / Next Steps
+- Continue Phase 6 conversion/removal of the four remaining `legacy_quarantine_required` paths from `tools/audit_template_surfaces.py`: `packages/api/fastapi_server.py`, `packages/api/production_server.py`, `packages/core/cognitive/cognitive_engine.py`, and `packages/core/pattern_engine.py`.
+- The generated Knowledge Cloud bundle remains blocked by the known FAISS/embedder dimension mismatch; this run intentionally stayed source/docs/tests-only and did not commit generated artifacts.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, staged health-check source/test changes, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- ELS is now documented as a writeback substrate, not a final wording owner. Candidate pattern text remains available for review and integration, but any later user-facing use must pass through a labeled NPC-script, firmware, generation, or critic-controlled boundary.

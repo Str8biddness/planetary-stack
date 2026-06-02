@@ -33,6 +33,13 @@ def test_template_surface_audit_tracks_response_compositor_as_labeled_npc_script
     assert classification.boundary == "explicit_npc_script"
 
 
+def test_template_surface_audit_tracks_els_bridge_as_writeback_substrate():
+    classification = CLASSIFICATIONS["packages/core/els_bridge.py"]
+
+    assert classification.status == "non_user_facing"
+    assert classification.boundary == "els_candidate_writeback"
+
+
 def test_template_surface_audit_labels_allowed_exceptions():
     allowed = [
         item

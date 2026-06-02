@@ -85,9 +85,9 @@ CLASSIFICATIONS: dict[str, SurfaceClassification] = {
     "packages/core/els_bridge.py": SurfaceClassification(
         path="packages/core/els_bridge.py",
         surface="legacy_pattern_storage_bridge",
-        status="legacy_quarantine_required",
-        boundary="outside_explicit_synthesus5_chal_path",
-        notes="ELS pattern storage persists response_template data for legacy pattern recall.",
+        status="non_user_facing",
+        boundary="els_candidate_writeback",
+        notes="ELS pattern storage now labels response_template data as non-user-facing candidate/writeback substrate before review or integration.",
     ),
     "packages/core/pattern_engine.py": SurfaceClassification(
         path="packages/core/pattern_engine.py",

@@ -227,6 +227,17 @@ Legacy import paths are preserved through thin compatibility packages:
 
 The older `compose()` API remains as a string-returning compatibility wrapper. Cognitive-engine local character handling now calls the labeled form and records `debug.template_surface`, so classic character `response_template` strings remain visible as an explicit NPC-script exception instead of an unclassified normal-path final-language source.
 
+### ELS Candidate Writeback Boundary (2026-06-02)
+
+`packages/core/els_bridge.py` is classified as non-user-facing writeback substrate. It can extract and persist `response_template` text from successful interactions for review, but candidate JSON exports and integrated pattern records carry `template_surface` metadata:
+
+- `surface="writeback_candidate"`
+- `boundary="els_candidate_writeback"`
+- `user_facing=False`
+- `legacy_template_signature_present=False`
+
+This keeps learned pattern text available to legacy stores while making the Synthesus 5 boundary explicit: ELS does not own final wording, and any later user-facing use must pass through a labeled NPC-script, firmware, generation, or critic-controlled path.
+
 ## Integration with Dual-Hemisphere
 
 PPBRS runs primarily in the **Left Hemisphere** of the dual-hemisphere architecture:
