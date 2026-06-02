@@ -102,6 +102,22 @@ def _load_embedder(artifact_root: Path):
     return SwarmEmbedder(model_dir=artifact_root / "models")
 
 
+def _validate_retrieval_semantics(artifact_root: Path) -> tuple[bool, list[str]]:
+    packages_root = REPO_ROOT / "packages"
+    for path in (packages_root, packages_root / "knowledge", packages_root / "core"):
+        value = str(path)
+        if value not in sys.path:
+            sys.path.insert(0, value)
+
+    try:
+        from knowledge.mount_table import KnowledgeCloudMountTable
+    except Exception as exc:
+        return False, [f"retrieval semantic validator import failed: {exc}"]
+
+    report = KnowledgeCloudMountTable().validate_retrieval_semantics(artifact_root)
+    return report.ok, list(report.errors)
+
+
 def _run_golden_queries(artifact_root: Path, top_k: int = 5) -> tuple[list[float], list[str]]:
     import faiss
 
@@ -182,8 +198,15 @@ def run_health_check(
     except Exception as exc:
         errors.append(f"metadata validation failed: {exc}")
 
+    retrieval_semantics_ok = False
+    try:
+        retrieval_semantics_ok, semantic_errors = _validate_retrieval_semantics(artifact_root)
+        errors.extend(semantic_errors)
+    except Exception as exc:
+        errors.append(f"retrieval semantic validation failed: {exc}")
+
     latencies: list[float] = []
-    if faiss_total:
+    if faiss_total and retrieval_semantics_ok:
         try:
             latencies, golden_errors = _run_golden_queries(artifact_root)
             errors.extend(golden_errors)

@@ -2171,3 +2171,29 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - ELS is now documented as a writeback substrate, not a final wording owner. Candidate pattern text remains available for review and integration, but any later user-facing use must pass through a labeled NPC-script, firmware, generation, or critic-controlled boundary.
+
+## Current Session — 2026-06-02 (Daily Knowledge Hardware Health Check)
+
+### 📝 Summary
+- Verified standalone Knowledge Cloud bundle integrity, source-plane validation, source manifest hashes, runtime cold-start mount validation, KAL mount initialization, and fast golden-query health against `/home/workspace/synthesus-knowledge-cloud/artifacts`.
+- Confirmed the live bundle remains blocked by the known retrieval semantic mismatch: `faiss.index` is 384-dimensional while `models/swarm_embedder.pkl` persists `dim=128`.
+- Hardened `packages/knowledge/health_check.py` to reuse the mount-table retrieval semantic validator before golden queries, so fast health checks report one canonical FAISS/embedder blocker and skip query latency scoring until the mounted retrieval hardware is semantically valid.
+- Added focused regression coverage for semantic-mismatch short-circuit behavior.
+
+### ✅ Verified
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m synthesus_knowledge_cloud validate --root artifacts` — failed as expected with `FAISS/embedder dim mismatch: faiss=384, embedder=128`.
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m synthesus_knowledge_cloud validate-sources --root .` — passed; 25 required paths and 7 character pattern banks.
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m synthesus_knowledge_cloud verify-source-manifest --root .` — passed; 139 source files verified.
+- In `/home/workspace/Synthesus_4.0`: `python tools/validate_knowledge_cold_start.py --root /home/workspace/synthesus-knowledge-cloud/artifacts` — failed as expected with `FAISS/embedder dim mismatch: faiss=384, embedder=128`.
+- `python -m py_compile packages/knowledge/health_check.py tests/test_knowledge_health_check.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_knowledge_health_check.py` — 1 passed, 3 FAISS SWIG deprecation warnings.
+- `python packages/knowledge/health_check.py --artifact-root /home/workspace/synthesus-knowledge-cloud/artifacts --report-path /home/.z/workspaces/con_jo2Bi6LgFUdXIySs/synthesus5_health_check_after_fix_2026-06-02.json` — failed as expected with one canonical error: `FAISS/embedder dim mismatch: faiss=384, embedder=128`; manifest hashes, 501819 FAISS vectors, 501819 metadata records, and 4 KAL mounts were verified.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace the generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` are semantically aligned; then rerun `synthesus-kc validate`, `tools/validate_knowledge_cold_start.py`, and `packages/knowledge/health_check.py`.
+- After artifact regeneration, refresh the public mirror with `zopub sync synthesus-knowledge artifacts`.
+- Keep generated FAISS/KNDB/model/cache/report artifacts out of the Synthesus runtime commit; this run changed only source, tests, checklist, and log.
+
+### 💡 Architectural Notes
+- The fast daily health check now treats retrieval semantic integrity as a precondition for golden-query latency, matching the runtime cold-start CHAL readiness gate.
+- Golden-query latency remains intentionally unscored while retrieval hardware dimensions disagree, preventing a semantic corruption blocker from being presented as five query-specific failures.
