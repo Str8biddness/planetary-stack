@@ -199,6 +199,8 @@ Every spawned NPC also mounts `VCD` and `VWD` as explicit Python-side CHAL parti
 
 Snapshots also carry a per-device fingerprint manifest. Restore replays each mounted device blob and verifies that the restored `VPD`, `VMD`, `VQD`, `VCD`, `VWD`, generation, reasoning, narrative, and model-selection devices match the captured fingerprints before the NPC is admitted back into the kernel. This guards against validly resealed outer snapshots that contain forged device-state blobs.
 
+`VQD` snapshotting now captures the mounted knowledge scope, retrieval policy, lookup count, last lookup trace, and last backend error. This makes the Virtual Knowledge Device replayable across AIVM snapshot/restore even when the restored kernel has no Knowledge Cloud backend mounted, and it lets the per-device fingerprint manifest reject forged knowledge-scope payloads before NPC admission.
+
 ## VPD Pybind Inspection Surface
 
 The native `_synthesus_kernel.EmulEngine.dump_vpd()` pybind surface exposes the Virtual Parameter Device as an inspectable parameter-hardware partition. The JSON-ready dump includes:

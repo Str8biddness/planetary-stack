@@ -12,6 +12,14 @@ from aivm.kernel.types import PersonaIdentity
 from aivm.snapshot.manager import SnapshotManager
 
 
+class FakeKnowledgeCloud:
+    def search(self, query: str, top_k: int = 5):
+        return [
+            {"content": f"{query} knowledge hit", "rank": idx}
+            for idx in range(top_k)
+        ]
+
+
 @pytest.mark.asyncio
 async def test_snapshot_restore_preserves_local_memory_without_backend():
     kernel = AIVMKernel(enable_scheduler=False)
@@ -75,6 +83,31 @@ def test_snapshot_records_and_verifies_device_fingerprints():
         assert restored.mounted_devices[name].fingerprint() == expected
 
 
+def test_snapshot_restore_preserves_vqd_scope_policy_and_lookup_trace():
+    kernel = AIVMKernel(knowledge_cloud=FakeKnowledgeCloud(), enable_scheduler=False)
+    npc = kernel.spawn_npc(PersonaIdentity(id="vqd_npc", name="VQD NPC", archetype="archivist"))
+    vqd = npc.mounted_devices["VQD"]
+    vqd.set_scope(["kc://rom/lore", "kc://provenance/source-plane"])
+    vqd.set_policy({"pruning": "semantic", "chain_length": 2, "gating": "scoped"})
+
+    assert len(vqd.lookup("chal mount", limit=2)) == 2
+
+    restored = AIVMKernel(enable_scheduler=False).restore_npc(SnapshotManager.capture(npc))
+    restored_vqd = restored.mounted_devices["VQD"]
+
+    assert restored_vqd.scope() == ["kc://rom/lore", "kc://provenance/source-plane"]
+    assert restored_vqd.policy() == {"pruning": "semantic", "chain_length": 2, "gating": "scoped"}
+    assert restored_vqd.lookup_count() == 1
+    assert restored_vqd.last_lookup() == {
+        "query": "chal mount",
+        "limit": 2,
+        "hit_count": 2,
+        "scope": ["kc://rom/lore", "kc://provenance/source-plane"],
+        "backend_mounted": True,
+        "status": "ok",
+    }
+
+
 def test_snapshot_restore_rejects_device_payload_mismatch_with_valid_outer_seal():
     kernel = AIVMKernel(enable_scheduler=False)
     npc = kernel.spawn_npc(PersonaIdentity(id="device_tamper_npc", name="Device Tamper", archetype="scribe"))
@@ -125,4 +158,19 @@ def test_snapshot_restore_rejects_writeback_partition_payload_mismatch_with_vali
     data["footer"]["fingerprint"] = SnapshotManager._fingerprint_payload(data)
 
     with pytest.raises(ValueError, match="device fingerprint mismatch: VWD"):
+        AIVMKernel(enable_scheduler=False).restore_npc(json.dumps(data, sort_keys=True).encode())
+
+
+def test_snapshot_restore_rejects_knowledge_partition_payload_mismatch_with_valid_outer_seal():
+    kernel = AIVMKernel(enable_scheduler=False)
+    npc = kernel.spawn_npc(PersonaIdentity(id="vqd_tamper_npc", name="VQD Tamper", archetype="scribe"))
+    npc.mounted_devices["VQD"].set_scope(["kc://rom/core"])
+
+    data = json.loads(SnapshotManager.capture(npc).decode())
+    knowledge_payload = json.loads(bytes.fromhex(data["devices"]["VQD"]).decode())
+    knowledge_payload["scope"].append("kc://rom/forged")
+    data["devices"]["VQD"] = json.dumps(knowledge_payload, sort_keys=True).encode().hex()
+    data["footer"]["fingerprint"] = SnapshotManager._fingerprint_payload(data)
+
+    with pytest.raises(ValueError, match="device fingerprint mismatch: VQD"):
         AIVMKernel(enable_scheduler=False).restore_npc(json.dumps(data, sort_keys=True).encode())

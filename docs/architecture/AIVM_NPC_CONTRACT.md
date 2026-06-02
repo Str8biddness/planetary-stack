@@ -78,6 +78,9 @@ class VQD(Device):
     def lookup(self, query: KnowledgeQuery) -> KnowledgeResult: ...
     def scope(self) -> KnowledgeScope: ...   # which sources this character may read
     def policy(self) -> RetrievalPolicy: ... # pruning, chain length, gating
+    def snapshot(self) -> bytes: ...          # scope, policy, and lookup trace
+    def restore(self, blob: bytes) -> None: ...
+    def fingerprint(self) -> str: ...         # content hash of current knowledge-device state
 ```
 
 ### 3.4 VGD — Virtual Generation Device

@@ -2375,3 +2375,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Profile `embedding.dim` is now part of the Knowledge Cloud hardware admission boundary for profile-aware publication, not just a build-plan hint.
 - This guard does not bless the current generated bundle; it prevents the next clean rebuild from being stamped under a profile whose declared retrieval vector contract does not match the persisted embedder.
+
+## Current Session — 2026-06-02 (Agent 8 — VQD Snapshot Replay Boundary)
+
+### 📝 Summary
+- Replaced the Python-side `VQD` static snapshot stub with replayable Virtual Knowledge Device state: mounted scope, retrieval policy, lookup count, last lookup trace, and last backend error.
+- Added VQD scope/policy mutators and inspectors so AIVM snapshots can prove which Knowledge Cloud partitions an NPC was admitted to read.
+- Added focused snapshot/restore coverage for VQD trace replay and validly resealed VQD payload tamper rejection.
+- Advanced the Phase 7 CHAL memory partition save/load checklist item for the knowledge-device partition while preserving existing no-backend safe defaults.
+
+### ✅ Verified
+- `python -m py_compile packages/aivm/devices/vqd.py tests/aivm/test_snapshot_integrity.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages python -m pytest -q tests/aivm/test_snapshot_integrity.py` — 8 passed.
+- `cmake --build packages/kernel/build -j2` — passed; `_synthesus_kernel` target already up to date after build.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/kernel/build python -m pytest -q tests/test_kernel_pybind_vpd.py` — 1 passed.
+
+### 🚧 Left Off / Next Steps
+- Broader persistent runtime trace storage remains open under Phase 7; this run only made the AIVM VQD partition replayable and tamper-auditable.
+- A future Agent 8 pass can expose analogous native pybind inspection for a C++ Virtual Knowledge Device if/when one is added distinct from the current VPD parameter disk and VQD quantum device naming.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- The Python `VQD` is now a real CHAL knowledge partition boundary for snapshot admission instead of a constant fingerprint. Snapshot restore can preserve scoped Knowledge Cloud access metadata without requiring a live Knowledge Cloud backend in the restoring kernel.
