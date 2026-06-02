@@ -105,7 +105,12 @@ class QueryRequest(BaseModel):
     )
     runtime_preset: Optional[str] = Field(
         default=None,
-        description="Optional Synthesus 5 runtime preset, currently business_bot.",
+        description=(
+            "Optional Synthesus 5 runtime preset. The only named preset with "
+            "specialized behavior is business_bot; aliases business, "
+            "business-bot, and businessbot normalize to business_bot, while "
+            "default/none/null means default CHAL routing."
+        ),
     )
     session_id: Optional[str] = Field(default=None, description="Session ID for multi-turn")
     player_id: str = Field(default="default", description="Player/user ID for relationship tracking")

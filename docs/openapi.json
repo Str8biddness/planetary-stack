@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Synthesus 5 CHAL API",
-    "description": "Legacy-compatible Synthesus query and control API for the active Synthesus 5 CHAL runtime. The public query path currently exposes explicit Cognitive Hypervisor routing through mode=chal plus generation-spine, cognitive, RAG, kernel, and amplification telemetry. CognitiveHypervisorTrace documents debug.cognitive_hypervisor for CHAL requests, including QuadBrainArbitration when route=quad_brain_path; CGPU traces are documented as CHAL contracts until candidate-set payloads are surfaced by this endpoint.",
+    "description": "Legacy-compatible Synthesus query and control API for the active Synthesus 5 CHAL runtime. The public query path currently exposes explicit Cognitive Hypervisor routing through mode=chal, the business_bot CHAL preset, plus generation-spine, cognitive, RAG, kernel, and amplification telemetry. CognitiveHypervisorTrace documents debug.cognitive_hypervisor for CHAL requests, including QuadBrainArbitration when route=quad_brain_path; CGPU traces are documented as CHAL contracts until candidate-set payloads are surfaced by this endpoint.",
     "version": "5.0.0"
   },
   "paths": {
@@ -516,7 +516,7 @@
               }
             ],
             "title": "Runtime Preset",
-            "description": "Optional Synthesus 5 runtime preset, currently business_bot."
+            "description": "Optional Synthesus 5 runtime preset. The only named preset with specialized behavior is business_bot; aliases business, business-bot, and businessbot normalize to business_bot, while default/none/null means default CHAL routing."
           },
           "character": {
             "type": "string",
@@ -836,7 +836,7 @@
                 "type": "null"
               }
             ],
-            "description": "Active Synthesus 5 runtime preset, such as business_bot, or null for default CHAL routing."
+            "description": "Active Synthesus 5 runtime preset after normalization. The business, business-bot, and businessbot request aliases are reported as business_bot; null means default CHAL routing."
           },
           "bridge_latency_ms": {
             "type": "number"

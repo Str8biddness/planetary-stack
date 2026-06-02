@@ -47,7 +47,10 @@ Client Request
 `CognitiveHypervisor`. `mode="business_bot"` is normalized to CHAL with
 `runtime_preset="business_bot"`, selecting `quad_brain_path` and CGPU
 `business_bot` rendering for concise operator/business answers. Clients may
-also send `runtime_preset="business_bot"` with `mode="chal"`.
+also send `runtime_preset="business_bot"` with `mode="chal"`. The request
+aliases `business`, `business-bot`, and `businessbot` normalize to the same
+canonical telemetry value, `business_bot`; `default`, `none`, and `null` mean
+ordinary CHAL routing with no named preset.
 
 When `include_debug=true`, responses include:
 
@@ -83,6 +86,9 @@ When `include_debug=true`, responses include:
 
 The typed trace contract is mirrored as `CognitiveHypervisorTrace` in
 `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`.
+Those schema mirrors document the canonical `runtime_preset` value after
+normalization, so trace consumers should key on `business_bot` rather than on
+request aliases.
 `CognitiveHypervisorTrace.knowledge_provenance` records mounted Knowledge Cloud
 provenance for grounded CHAL routes, including KAL operation, source mount,
 cache state, and artifact integrity metadata when available.

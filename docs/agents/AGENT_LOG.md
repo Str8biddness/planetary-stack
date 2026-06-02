@@ -2130,3 +2130,24 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - `VCD` is the volatile hot-context/cache partition; `VWD` is the writeback staging partition for validated trace or memory commits.
 - These are inspectable Python AIVM devices and snapshot validation surfaces, not claims of hardware acceleration.
+
+## Current Session — 2026-06-02 (Agent 10 — Business-Bot API Preset Schema Normalization)
+
+### 📝 Summary
+- Tightened the `/api/v1/query` API contract docs around the implemented `business_bot` CHAL preset without changing runtime behavior.
+- Updated `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json` so the top-level API description names the business-bot CHAL preset and `runtime_preset` descriptions document canonical normalization.
+- Updated `packages/api/schemas.py` and `docs/PHASE20_PRODUCTION_API.md` to state that `business`, `business-bot`, and `businessbot` normalize to `business_bot`, while `default`/`none`/`null` means default CHAL routing.
+- Advanced the Phase 9 API-entrypoint documentation checklist item.
+
+### ✅ Verified
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed `QueryRequest.runtime_preset`, `CognitiveHypervisorTrace.runtime_preset`, and the API info description document the `business_bot` preset and aliases.
+- `python -m py_compile packages/api/schemas.py` — passed.
+- `git diff --check -- packages/api/schemas.py docs/openapi.yaml docs/openapi.json docs/api_schema.json docs/PHASE20_PRODUCTION_API.md docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md docs/agents/AGENT_LOG.md` — passed.
+
+### 🚧 Left Off / Next Steps
+- Continue Phase 6 conversion/removal of the five remaining `legacy_quarantine_required` paths from `tools/audit_template_surfaces.py`.
+- If runtime starts rejecting unknown `runtime_preset` values instead of passing them through as inert constraints, update the OpenAPI fields from descriptive strings to an explicit enum.
+- Keep pre-existing unrelated working-tree changes in root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` separated from Agent 10 commits.
+
+### 💡 Architectural Notes
+- `business_bot` is now documented as the canonical telemetry value for the public CHAL preset. Request aliases are input convenience only, not separate runtime modes or additional brain topologies.
