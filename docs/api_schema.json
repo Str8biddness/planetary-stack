@@ -6,9 +6,689 @@
     "version": "5.0.0"
   },
   "paths": {
+    "/parameter-cloud/v2/fetch-batch": {
+      "post": {
+        "tags": [
+          "parameter-cloud-v2"
+        ],
+        "summary": "Fetch Batch Params",
+        "description": "Fetch parameters matching namespace patterns across shards",
+        "operationId": "fetch_batch_params_parameter_cloud_v2_fetch_batch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchParameterFetch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Fetch Batch Params Parameter Cloud V2 Fetch Batch Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/parameter-cloud/v2/query": {
+      "post": {
+        "tags": [
+          "parameter-cloud-v2"
+        ],
+        "summary": "Query Params",
+        "description": "Advanced parameter query with filtering and vector search",
+        "operationId": "query_params_parameter_cloud_v2_query_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParameterQuery"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Query Params Parameter Cloud V2 Query Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/parameter-cloud/v2/update-batch": {
+      "post": {
+        "tags": [
+          "parameter-cloud-v2"
+        ],
+        "summary": "Update Batch Params",
+        "description": "Batch update parameters with merge/replace/gradient strategies",
+        "operationId": "update_batch_params_parameter_cloud_v2_update_batch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchParameterUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Update Batch Params Parameter Cloud V2 Update Batch Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/parameter-cloud/v2/apply-gradients": {
+      "post": {
+        "tags": [
+          "parameter-cloud-v2"
+        ],
+        "summary": "Apply Gradients",
+        "description": "Apply accumulated gradients to parameters (background batch job)",
+        "operationId": "apply_gradients_parameter_cloud_v2_apply_gradients_post",
+        "parameters": [
+          {
+            "name": "max_gradients",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10000,
+              "title": "Max Gradients"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Apply Gradients Parameter Cloud V2 Apply Gradients Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/parameter-cloud/v2/shards": {
+      "get": {
+        "tags": [
+          "parameter-cloud-v2"
+        ],
+        "summary": "List Shards",
+        "description": "List all configured shards",
+        "operationId": "list_shards_parameter_cloud_v2_shards_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response List Shards Parameter Cloud V2 Shards Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/parameter-cloud/v2/stats": {
+      "get": {
+        "tags": [
+          "parameter-cloud-v2"
+        ],
+        "summary": "Get Stats",
+        "description": "Get parameter storage statistics",
+        "operationId": "get_stats_parameter_cloud_v2_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Stats Parameter Cloud V2 Stats Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/search": {
+      "get": {
+        "tags": [
+          "knowledge-cloud"
+        ],
+        "summary": "Search Knowledge",
+        "description": "Semantic search across the Knowledge Cloud.",
+        "operationId": "search_knowledge_api_v1_knowledge_search_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Search query text",
+              "title": "Q"
+            },
+            "description": "Search query text"
+          },
+          {
+            "name": "top_k",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Number of results",
+              "default": 5,
+              "title": "Top K"
+            },
+            "description": "Number of results"
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated tag filter",
+              "title": "Tags"
+            },
+            "description": "Comma-separated tag filter"
+          },
+          {
+            "name": "trust",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 100,
+              "minimum": 0,
+              "description": "Player trust level",
+              "default": 50.0,
+              "title": "Trust"
+            },
+            "description": "Player trust level"
+          },
+          {
+            "name": "emotion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Current NPC emotion",
+              "default": "neutral",
+              "title": "Emotion"
+            },
+            "description": "Current NPC emotion"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Search Knowledge Api V1 Knowledge Search Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/entries": {
+      "get": {
+        "tags": [
+          "knowledge-cloud"
+        ],
+        "summary": "List Entries",
+        "description": "List all knowledge entries with optional filters.",
+        "operationId": "list_entries_api_v1_knowledge_entries_get",
+        "parameters": [
+          {
+            "name": "entity_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by entity type",
+              "title": "Entity Type"
+            },
+            "description": "Filter by entity type"
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated tag filter",
+              "title": "Tags"
+            },
+            "description": "Comma-separated tag filter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response List Entries Api V1 Knowledge Entries Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "knowledge-cloud"
+        ],
+        "summary": "Create Entry",
+        "description": "Add a new knowledge entry to the cloud.",
+        "operationId": "create_entry_api_v1_knowledge_entries_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeEntryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Create Entry Api V1 Knowledge Entries Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/entries/{entity_id}": {
+      "get": {
+        "tags": [
+          "knowledge-cloud"
+        ],
+        "summary": "Get Entry",
+        "description": "Get a specific knowledge entry by ID.",
+        "operationId": "get_entry_api_v1_knowledge_entries__entity_id__get",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Entry Api V1 Knowledge Entries  Entity Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "knowledge-cloud"
+        ],
+        "summary": "Update Entry",
+        "description": "Update an existing knowledge entry.",
+        "operationId": "update_entry_api_v1_knowledge_entries__entity_id__put",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeEntryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Update Entry Api V1 Knowledge Entries  Entity Id  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "knowledge-cloud"
+        ],
+        "summary": "Delete Entry",
+        "description": "Remove a knowledge entry from the cloud.",
+        "operationId": "delete_entry_api_v1_knowledge_entries__entity_id__delete",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Entry Api V1 Knowledge Entries  Entity Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/rebuild-index": {
+      "post": {
+        "tags": [
+          "knowledge-cloud"
+        ],
+        "summary": "Rebuild Index",
+        "description": "Force rebuild the FAISS semantic index.",
+        "operationId": "rebuild_index_api_v1_knowledge_rebuild_index_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Rebuild Index Api V1 Knowledge Rebuild Index Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/stats": {
+      "get": {
+        "tags": [
+          "knowledge-cloud"
+        ],
+        "summary": "Get Stats",
+        "description": "Get Knowledge Cloud statistics.",
+        "operationId": "get_stats_api_v1_knowledge_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Stats Api V1 Knowledge Stats Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/patterns": {
+      "post": {
+        "summary": "Add Patterns",
+        "description": "Add or update patterns in the RAG pipeline.",
+        "operationId": "add_patterns_api_v1_admin_patterns_post",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Root",
+        "description": "Dashboard UI.",
         "operationId": "root__get",
         "responses": {
           "200": {
@@ -24,10 +704,11 @@
         }
       }
     },
-    "/query": {
+    "/api/v1/query": {
       "post": {
-        "summary": "Query",
-        "operationId": "query_query_post",
+        "summary": "Query Endpoint",
+        "description": "Main query endpoint \u2014 ML Swarm \u2192 Cognitive \u2192 RAG \u2192 Fallback.",
+        "operationId": "query_endpoint_api_v1_query_post",
         "parameters": [
           {
             "name": "x-api-key",
@@ -80,10 +761,10 @@
         }
       }
     },
-    "/health": {
+    "/api/v1/characters": {
       "get": {
-        "summary": "Health",
-        "operationId": "health_health_get",
+        "summary": "List Characters",
+        "operationId": "list_characters_api_v1_characters_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -96,18 +777,18 @@
         }
       }
     },
-    "/stream": {
+    "/api/v1/characters/{char_id}": {
       "get": {
-        "summary": "Stream",
-        "operationId": "stream_stream_get",
+        "summary": "Get Character",
+        "operationId": "get_character_api_v1_characters__char_id__get",
         "parameters": [
           {
-            "name": "q",
-            "in": "query",
+            "name": "char_id",
+            "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Q"
+              "title": "Char Id"
             }
           }
         ],
@@ -133,44 +814,45 @@
         }
       }
     },
-    "/characters": {
-      "get": {
-        "summary": "Characters",
-        "operationId": "characters_characters_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
+    "/api/v1/feedback": {
+      "post": {
+        "summary": "Store Feedback",
+        "description": "Store user feedback for quality monitoring.",
+        "operationId": "store_feedback_api_v1_feedback_post",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
             }
           }
-        }
-      }
-    },
-    "/process": {
-      "post": {
-        "summary": "Process",
-        "operationId": "process_process_post",
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/QueryRequest"
+                "$ref": "#/components/schemas/FeedbackRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueryResponse"
-                }
+                "schema": {}
               }
             }
           },
@@ -187,38 +869,216 @@
         }
       }
     },
-    "/world_state": {
+    "/api/v1/kernel/status": {
       "get": {
-        "summary": "Get World State",
-        "description": "Get current world state flags.",
-        "operationId": "get_world_state_world_state_get",
+        "summary": "Get Kernel Status",
+        "description": "Get detailed kernel statistics via HemisphereBridge.",
+        "operationId": "get_kernel_status_api_v1_kernel_status_get",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "summary": "Health",
+        "description": "System health and stats.",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/api-keys": {
+      "get": {
+        "summary": "List Api Keys",
+        "description": "List all active API keys. Requires master admin key.",
+        "operationId": "list_api_keys_api_v1_admin_api_keys_get",
+        "parameters": [
+          {
+            "name": "x-admin-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "X-Admin-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminAPIKeyResponse"
+                  },
+                  "title": "Response List Api Keys Api V1 Admin Api Keys Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
         }
       },
       "post": {
-        "summary": "Set World State",
-        "description": "Set world state flags for all cognitive engines.",
-        "operationId": "set_world_state_world_state_post",
+        "summary": "Create Api Key",
+        "description": "Generate a new API key.",
+        "operationId": "create_api_key_api_v1_admin_api_keys_post",
+        "parameters": [
+          {
+            "name": "x-admin-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "X-Admin-Key"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "type": "object",
-                "title": "Flags"
+                "$ref": "#/components/schemas/AdminAPIKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAPIKeyResponse"
+                }
               }
             }
           },
-          "required": true
-        },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/usage": {
+      "get": {
+        "summary": "Get Usage Stats",
+        "description": "Get aggregated system usage statistics.",
+        "operationId": "get_usage_stats_api_v1_admin_usage_get",
+        "parameters": [
+          {
+            "name": "x-admin-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "X-Admin-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUsageStatistics"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conscious_state": {
+      "get": {
+        "summary": "Conscious State",
+        "operationId": "conscious_state_api_v1_conscious_state_get",
+        "parameters": [
+          {
+            "name": "character_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "synth",
+              "title": "Character Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -241,17 +1101,159 @@
         }
       }
     },
-    "/cognitive_stats": {
+    "/api/v1/admin/evolve/{character_id}": {
+      "post": {
+        "summary": "Evolve Character",
+        "description": "Triggers a synthesis session to evolve a character's traits and knowledge.",
+        "operationId": "evolve_character_api_v1_admin_evolve__character_id__post",
+        "parameters": [
+          {
+            "name": "character_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Character Id"
+            }
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterEvolutionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modules": {
       "get": {
-        "summary": "Cognitive Stats",
-        "description": "Get statistics from all active cognitive engines.",
-        "operationId": "cognitive_stats_cognitive_stats_get",
+        "summary": "Modules Report",
+        "operationId": "modules_report_api_v1_modules_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stats": {
+      "get": {
+        "summary": "Stats",
+        "description": "Detailed system statistics.",
+        "operationId": "stats_api_v1_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/amplification/status": {
+      "get": {
+        "summary": "Amplification Status",
+        "description": "Detailed status of the Amplification Plane.",
+        "operationId": "amplification_status_api_v1_amplification_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/amplification/metrics": {
+      "get": {
+        "summary": "Amplification Metrics",
+        "description": "Detailed Amplification Plane performance metrics with real counters from Generation Spine.",
+        "operationId": "amplification_metrics_api_v1_amplification_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/monitoring/dashboard": {
+      "get": {
+        "summary": "Monitoring Dashboard",
+        "description": "Unified monitoring dashboard with all system metrics.",
+        "operationId": "monitoring_dashboard_api_v1_monitoring_dashboard_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard": {
+      "get": {
+        "summary": "Dashboard Ui",
+        "description": "Simple HTML dashboard for monitoring.",
+        "operationId": "dashboard_ui_dashboard_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -261,6 +1263,297 @@
   },
   "components": {
     "schemas": {
+      "AdminAPIKeyRequest": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Description for this key"
+          },
+          "expiry_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiry Days",
+            "description": "Days until expiry"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "title": "AdminAPIKeyRequest",
+        "description": "Request to create a new API key."
+      },
+      "AdminAPIKeyResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "last_used": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "created_at"
+        ],
+        "title": "AdminAPIKeyResponse",
+        "description": "Information about an API key."
+      },
+      "AdminUsageStatistics": {
+        "properties": {
+          "total_requests": {
+            "type": "integer",
+            "title": "Total Requests"
+          },
+          "successful_requests": {
+            "type": "integer",
+            "title": "Successful Requests"
+          },
+          "failed_requests": {
+            "type": "integer",
+            "title": "Failed Requests"
+          },
+          "avg_latency_ms": {
+            "type": "number",
+            "title": "Avg Latency Ms"
+          },
+          "organ_usage_breakdown": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Organ Usage Breakdown"
+          },
+          "daily_traffic": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Daily Traffic"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_requests",
+          "successful_requests",
+          "failed_requests",
+          "avg_latency_ms",
+          "organ_usage_breakdown",
+          "daily_traffic"
+        ],
+        "title": "AdminUsageStatistics",
+        "description": "System-wide usage statistics."
+      },
+      "BatchParameterFetch": {
+        "properties": {
+          "namespace_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Namespace Patterns",
+            "description": "List of namespace patterns (e.g. ['model.layers.*', 'organ.chat.*'])"
+          },
+          "include_metadata": {
+            "type": "boolean",
+            "title": "Include Metadata",
+            "default": true
+          },
+          "max_results": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "title": "Max Results",
+            "default": 10000
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "namespace_patterns"
+        ],
+        "title": "BatchParameterFetch",
+        "description": "Request to fetch multiple parameters by pattern"
+      },
+      "BatchParameterUpdate": {
+        "properties": {
+          "updates": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ParameterValue"
+            },
+            "type": "object",
+            "title": "Updates"
+          },
+          "strategy": {
+            "type": "string",
+            "pattern": "^(merge|replace|gradient)$",
+            "title": "Strategy",
+            "default": "merge"
+          },
+          "learning_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Learning Rate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "updates"
+        ],
+        "title": "BatchParameterUpdate",
+        "description": "Batch update multiple parameters"
+      },
+      "CharacterEvolutionResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "character_id": {
+            "type": "string",
+            "title": "Character Id"
+          },
+          "directives": {
+            "$ref": "#/components/schemas/EvolutionDirective"
+          },
+          "files_updated": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files Updated"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "character_id",
+          "directives",
+          "files_updated"
+        ],
+        "title": "CharacterEvolutionResponse"
+      },
+      "EvolutionDirective": {
+        "properties": {
+          "add_knowledge": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Add Knowledge"
+          },
+          "update_traits": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Update Traits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "add_knowledge",
+          "update_traits"
+        ],
+        "title": "EvolutionDirective"
+      },
+      "FeedbackRequest": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "response": {
+            "type": "string",
+            "title": "Response"
+          },
+          "rating": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Rating"
+          },
+          "comments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "query",
+          "response",
+          "rating"
+        ],
+        "title": "FeedbackRequest"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -274,239 +1567,9 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "QuadBrainArbitration": {
-        "type": "object",
-        "title": "QuadBrainArbitration",
-        "description": "Serialized four-brain arbitration emitted inside CognitiveHypervisorTrace.quad_brain when the Synthesus 5 hypervisor selects route=quad_brain_path.",
-        "required": [
-          "schema",
-          "trace_id",
-          "selected_response",
-          "selected_source",
-          "outputs",
-          "serial_order",
-          "state_contract",
-          "latency_ms"
-        ],
+      "KnowledgeEntryRequest": {
         "properties": {
-          "schema": {
-            "type": "string",
-            "const": "synthesus.chal.quad_brain_arbitration.v1",
-            "description": "Trace schema identifier emitted by QuadBrainArbitration."
-          },
-          "trace_id": {
-            "type": "string"
-          },
-          "selected_response": {
-            "type": "string",
-            "description": "Response selected by critic/metacognition or the bridge fallback."
-          },
-          "selected_source": {
-            "type": "string",
-            "enum": [
-              "critic_metacognition",
-              "hemisphere_bridge_fallback"
-            ]
-          },
-          "outputs": {
-            "type": "array",
-            "description": "Serialized outputs for knowledge, executive, CGPU, and critic roles in fixed arbitration order.",
-            "items": {
-              "type": "object",
-              "required": [
-                "role",
-                "device",
-                "content",
-                "confidence"
-              ],
-              "properties": {
-                "role": {
-                  "type": "string",
-                  "enum": [
-                    "knowledge_grounding",
-                    "executive_reasoning",
-                    "cgpu_rendering",
-                    "critic_metacognition"
-                  ]
-                },
-                "device": {
-                  "type": "string"
-                },
-                "content": {
-                  "type": "object",
-                  "additionalProperties": true
-                },
-                "confidence": {
-                  "type": "number"
-                },
-                "trace": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "properties": {
-                    "state_transition": {
-                      "$ref": "#/components/schemas/QuadBrainStateTransition"
-                    }
-                  },
-                  "description": "Role-local trace metadata. Runtime output includes the matching state_transition record for this role."
-                },
-                "warnings": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          },
-          "serial_order": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "knowledge_grounding",
-                "executive_reasoning",
-                "cgpu_rendering",
-                "critic_metacognition"
-              ]
-            }
-          },
-          "state_contract": {
-            "type": "object",
-            "required": [
-              "topology",
-              "parallel_brain_spawn",
-              "serialized_arbitration",
-              "template_leakage_allowed",
-              "route",
-              "required_roles",
-              "state_transitions",
-              "critic_input_ref",
-              "final_output_ref",
-              "final_output_owner"
-            ],
-            "properties": {
-              "topology": {
-                "type": "string",
-                "const": "knowledge->executive->cgpu->critic"
-              },
-              "parallel_brain_spawn": {
-                "type": "boolean",
-                "const": false
-              },
-              "serialized_arbitration": {
-                "type": "boolean",
-                "const": true
-              },
-              "template_leakage_allowed": {
-                "type": "boolean"
-              },
-              "bridge_trace_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "route": {
-                "type": "string",
-                "const": "quad_brain_path"
-              },
-              "required_roles": {
-                "type": "array",
-                "description": "The four required Quad Brain roles in fixed serialized arbitration order.",
-                "items": {
-                  "type": "string",
-                  "enum": [
-                    "knowledge_grounding",
-                    "executive_reasoning",
-                    "cgpu_rendering",
-                    "critic_metacognition"
-                  ]
-                }
-              },
-              "state_transitions": {
-                "type": "array",
-                "description": "Inspectable state handoffs for knowledge, executive, CGPU, and critic roles. Each role output trace mirrors its corresponding transition.",
-                "items": {
-                  "$ref": "#/components/schemas/QuadBrainStateTransition"
-                },
-                "minItems": 4,
-                "maxItems": 4
-              },
-              "final_output_ref": {
-                "type": "string",
-                "const": "critic.selected_response",
-                "description": "State reference that owns the final selected response after critic/metacognition arbitration."
-              },
-              "critic_input_ref": {
-                "type": "string",
-                "const": "cgpu.selected_candidate",
-                "description": "State reference reviewed by Critic/Metacognition before final response ownership."
-              },
-              "critic_reviewed_candidate_id": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "Concrete CGPU candidate id reviewed by Critic/Metacognition."
-              },
-              "final_output_owner": {
-                "type": "string",
-                "enum": [
-                  "critic_metacognition",
-                  "hemisphere_bridge_fallback"
-                ],
-                "description": "Runtime source that supplied the selected response."
-              }
-            },
-            "additionalProperties": true
-          },
-          "latency_ms": {
-            "type": "number"
-          }
-        }
-      },
-      "QueryRequest": {
-        "properties": {
-          "query": {
-            "type": "string",
-            "title": "Query",
-            "default": ""
-          },
-          "q": {
-            "type": "string",
-            "title": "Q",
-            "default": ""
-          },
-          "text": {
-            "type": "string",
-            "title": "Text",
-            "default": ""
-          },
-          "stream": {
-            "type": "boolean",
-            "title": "Stream",
-            "default": false
-          },
-          "context": {
-            "type": "string",
-            "title": "Context",
-            "default": ""
-          },
-          "mode": {
-            "type": "string",
-            "title": "Mode",
-            "default": "auto",
-            "description": "Processing mode: auto|chal|business_bot|cognitive|rag|pattern. Use chal to route explicitly through the Synthesus 5 Cognitive Hypervisor; business_bot is a CHAL preset for concise action-oriented answers; auto preserves the legacy-compatible production pipeline."
-          },
-          "runtime_preset": {
+          "entity_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -515,119 +1578,213 @@
                 "type": "null"
               }
             ],
-            "title": "Runtime Preset",
-            "description": "Optional Synthesus 5 runtime preset. The only named preset with specialized behavior is business_bot; aliases business, business-bot, and businessbot normalize to business_bot, while default/none/null means default CHAL routing."
+            "title": "Entity Id"
           },
-          "character": {
+          "entity": {
             "type": "string",
-            "title": "Character",
+            "title": "Entity",
+            "description": "Display name of the entity"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type",
+            "description": "creature, location, item, faction, event, concept",
+            "default": "concept"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Full prose description",
             "default": ""
           },
-          "player_id": {
-            "type": "string",
-            "title": "Player Id",
-            "default": "default"
-          }
-        },
-        "type": "object",
-        "title": "QueryRequest"
-      },
-      "QueryResponse": {
-        "properties": {
-          "response": {
-            "type": "string",
-            "title": "Response"
-          },
-          "confidence": {
-            "type": "number",
-            "title": "Confidence"
-          },
-          "module": {
-            "type": "string",
-            "title": "Module"
-          },
-          "source": {
-            "type": "string",
-            "title": "Source",
-            "default": "kernel",
-            "description": "Runtime source that produced the response, such as zo_kernel, symbolic_core, cognitive_hypervisor, cognitive, synthesus_master, rag, or fallback."
-          },
-          "character": {
-            "type": "string",
-            "title": "Character",
-            "default": ""
-          },
-          "pattern_id": {
-            "type": "string",
-            "title": "Pattern Id",
-            "default": ""
-          },
-          "emotion": {
-            "type": "string",
-            "title": "Emotion",
-            "default": ""
-          },
-          "relationship": {
+          "attributes": {
             "additionalProperties": true,
             "type": "object",
-            "title": "Relationship",
-            "default": {}
+            "title": "Attributes"
           },
-          "debug": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Debug",
-            "default": {},
-            "description": "Optional implementation telemetry returned only when include_debug is true. Current keys include kernel_triggered, symbolic_triggered, trace, rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. For explicit mode=chal calls, cognitive_hypervisor follows the CognitiveHypervisorTrace OpenAPI component, including typed QuadBrainArbitration records when route=quad_brain_path. CGPU candidate-set trace records should also live here as the runtime wiring expands without changing the stable response envelope."
-          }
-        },
-        "type": "object",
-        "required": [
-          "response",
-          "confidence",
-          "module"
-        ],
-        "title": "QueryResponse"
-      },
-      "ValidationError": {
-        "properties": {
-          "loc": {
+          "facts": {
             "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
+              "type": "string"
             },
             "type": "array",
-            "title": "Location"
+            "title": "Facts"
           },
-          "msg": {
-            "type": "string",
-            "title": "Message"
-          },
-          "type": {
-            "type": "string",
-            "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
+          "relations": {
+            "additionalProperties": true,
             "type": "object",
-            "title": "Context"
+            "title": "Relations"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases"
+          },
+          "depth": {
+            "type": "string",
+            "title": "Depth",
+            "description": "intimate, familiar, acquainted, rumor",
+            "default": "acquainted"
+          },
+          "trust_threshold": {
+            "type": "number",
+            "title": "Trust Threshold",
+            "description": "Trust level required (0 = public)",
+            "default": 0.0
+          },
+          "emotion_variants": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Emotion Variants"
           }
         },
         "type": "object",
         "required": [
-          "loc",
-          "msg",
-          "type"
+          "entity"
         ],
-        "title": "ValidationError"
+        "title": "KnowledgeEntryRequest",
+        "description": "Request body for creating/updating a knowledge entry."
+      },
+      "ParameterQuery": {
+        "properties": {
+          "namespace_prefix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Namespace Prefix"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "min_importance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Importance"
+          },
+          "updated_after_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated After Ms"
+          },
+          "vector_similarity": {
+            "anyOf": [
+              {
+                "prefixItems": [
+                  {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array",
+                "maxItems": 2,
+                "minItems": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vector Similarity"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "title": "Limit",
+            "default": 1000
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          }
+        },
+        "type": "object",
+        "title": "ParameterQuery",
+        "description": "Advanced parameter query with filtering"
+      },
+      "ParameterValue": {
+        "properties": {
+          "value": {
+            "title": "Value"
+          },
+          "value_type": {
+            "type": "string",
+            "pattern": "^(float|vector|sparse|json)$",
+            "title": "Value Type"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "value_type"
+        ],
+        "title": "ParameterValue",
+        "description": "Single parameter value with type information"
       },
       "CGPUFrame": {
         "type": "object",
@@ -764,6 +1921,478 @@
             "type": "array"
           }
         }
+      },
+      "QuadBrainArbitration": {
+        "type": "object",
+        "title": "QuadBrainArbitration",
+        "description": "Serialized four-brain arbitration emitted inside CognitiveHypervisorTrace.quad_brain when the Synthesus 5 hypervisor selects route=quad_brain_path.",
+        "required": [
+          "schema",
+          "trace_id",
+          "selected_response",
+          "selected_source",
+          "outputs",
+          "serial_order",
+          "state_contract",
+          "latency_ms"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "synthesus.chal.quad_brain_arbitration.v1",
+            "description": "Trace schema identifier emitted by QuadBrainArbitration."
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "selected_response": {
+            "type": "string",
+            "description": "Response selected by critic/metacognition or the bridge fallback."
+          },
+          "selected_source": {
+            "type": "string",
+            "enum": [
+              "critic_metacognition",
+              "hemisphere_bridge_fallback"
+            ]
+          },
+          "outputs": {
+            "type": "array",
+            "description": "Serialized outputs for knowledge, executive, CGPU, and critic roles in fixed arbitration order.",
+            "items": {
+              "type": "object",
+              "required": [
+                "role",
+                "device",
+                "content",
+                "confidence"
+              ],
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "knowledge_grounding",
+                    "executive_reasoning",
+                    "cgpu_rendering",
+                    "critic_metacognition"
+                  ]
+                },
+                "device": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "confidence": {
+                  "type": "number"
+                },
+                "trace": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "state_transition": {
+                      "$ref": "#/components/schemas/QuadBrainStateTransition"
+                    }
+                  },
+                  "description": "Role-local trace metadata. Runtime output includes the matching state_transition record for this role."
+                },
+                "warnings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "serial_order": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "knowledge_grounding",
+                "executive_reasoning",
+                "cgpu_rendering",
+                "critic_metacognition"
+              ]
+            }
+          },
+          "state_contract": {
+            "type": "object",
+            "required": [
+              "topology",
+              "parallel_brain_spawn",
+              "serialized_arbitration",
+              "template_leakage_allowed",
+              "route",
+              "required_roles",
+              "state_transitions",
+              "critic_input_ref",
+              "final_output_ref",
+              "final_output_owner",
+              "integrity"
+            ],
+            "properties": {
+              "topology": {
+                "type": "string",
+                "const": "knowledge->executive->cgpu->critic"
+              },
+              "parallel_brain_spawn": {
+                "type": "boolean",
+                "const": false
+              },
+              "serialized_arbitration": {
+                "type": "boolean",
+                "const": true
+              },
+              "template_leakage_allowed": {
+                "type": "boolean"
+              },
+              "bridge_trace_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "route": {
+                "type": "string",
+                "const": "quad_brain_path"
+              },
+              "required_roles": {
+                "type": "array",
+                "description": "The four required Quad Brain roles in fixed serialized arbitration order.",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "knowledge_grounding",
+                    "executive_reasoning",
+                    "cgpu_rendering",
+                    "critic_metacognition"
+                  ]
+                }
+              },
+              "state_transitions": {
+                "type": "array",
+                "description": "Inspectable state handoffs for knowledge, executive, CGPU, and critic roles. Each role output trace mirrors its corresponding transition.",
+                "items": {
+                  "$ref": "#/components/schemas/QuadBrainStateTransition"
+                },
+                "minItems": 4,
+                "maxItems": 4
+              },
+              "critic_input_ref": {
+                "type": "string",
+                "const": "cgpu.selected_candidate",
+                "description": "State reference reviewed by Critic/Metacognition before final response ownership."
+              },
+              "critic_reviewed_candidate_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Concrete CGPU candidate id reviewed by Critic/Metacognition."
+              },
+              "final_output_ref": {
+                "type": "string",
+                "const": "critic.selected_response",
+                "description": "State reference that owns the final selected response after critic/metacognition arbitration."
+              },
+              "final_output_owner": {
+                "type": "string",
+                "enum": [
+                  "critic_metacognition",
+                  "hemisphere_bridge_fallback"
+                ],
+                "description": "Runtime source that supplied the selected response."
+              },
+              "integrity": {
+                "type": "object",
+                "required": [
+                  "status",
+                  "checks"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "passed",
+                      "failed"
+                    ],
+                    "description": "Aggregate state-contract verification result for the serialized Quad Brain handoff chain."
+                  },
+                  "checks": {
+                    "type": "object",
+                    "required": [
+                      "roles_complete",
+                      "serial_order_valid",
+                      "transitions_complete",
+                      "output_transition_mirrors",
+                      "critic_handoff_valid",
+                      "final_output_owned_by_critic"
+                    ],
+                    "properties": {
+                      "roles_complete": {
+                        "type": "boolean"
+                      },
+                      "serial_order_valid": {
+                        "type": "boolean"
+                      },
+                      "transitions_complete": {
+                        "type": "boolean"
+                      },
+                      "output_transition_mirrors": {
+                        "type": "boolean"
+                      },
+                      "critic_handoff_valid": {
+                        "type": "boolean"
+                      },
+                      "final_output_owned_by_critic": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "selected_candidate_id": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "CGPU candidate id selected before critic review."
+                  },
+                  "reviewed_candidate_id": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Candidate id reviewed by Critic/Metacognition."
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": true
+          },
+          "latency_ms": {
+            "type": "number"
+          }
+        }
+      },
+      "QueryRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Query",
+            "description": "The query text"
+          },
+          "character": {
+            "type": "string",
+            "title": "Character",
+            "description": "Character ID to route to",
+            "default": "synth"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "description": "Processing mode: auto|chal|business_bot|cognitive|rag|pattern. Use chal to route explicitly through the Synthesus 5 Cognitive Hypervisor; business_bot is a CHAL preset for concise action-oriented answers; auto preserves the legacy-compatible production pipeline.",
+            "default": "auto"
+          },
+          "runtime_preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runtime Preset",
+            "description": "Optional Synthesus 5 runtime preset. The only named preset with specialized behavior is business_bot; aliases business, business-bot, and businessbot normalize to business_bot, while default/none/null means default CHAL routing."
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id",
+            "description": "Session ID for multi-turn"
+          },
+          "player_id": {
+            "type": "string",
+            "title": "Player Id",
+            "description": "Player/user ID for relationship tracking",
+            "default": "default"
+          },
+          "include_sources": {
+            "type": "boolean",
+            "title": "Include Sources",
+            "description": "Include RAG source citations",
+            "default": false
+          },
+          "include_debug": {
+            "type": "boolean",
+            "title": "Include Debug",
+            "description": "Include debug telemetry",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "QueryRequest"
+      },
+      "QueryResponse": {
+        "properties": {
+          "response": {
+            "type": "string",
+            "title": "Response"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "character": {
+            "type": "string",
+            "title": "Character"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Runtime source that produced the response, such as zo_kernel, symbolic_core, cognitive_hypervisor, cognitive, synthesus_master, rag, or fallback."
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "latency_ms": {
+            "type": "number",
+            "title": "Latency Ms"
+          },
+          "sources": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sources"
+          },
+          "emotion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emotion"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship"
+          },
+          "debug": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Debug",
+            "description": "Optional implementation telemetry returned only when include_debug is true. Current keys include kernel_triggered, symbolic_triggered, trace, rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. For explicit mode=chal calls, cognitive_hypervisor follows the CognitiveHypervisorTrace OpenAPI component, including typed QuadBrainArbitration records when route=quad_brain_path. CGPU candidate-set trace records should also live here as the runtime wiring expands without changing the stable response envelope."
+          }
+        },
+        "type": "object",
+        "required": [
+          "response",
+          "confidence",
+          "character",
+          "source",
+          "session_id",
+          "latency_ms"
+        ],
+        "title": "QueryResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
       },
       "CognitiveHypervisorTrace": {
         "properties": {

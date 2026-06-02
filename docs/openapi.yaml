@@ -1344,6 +1344,7 @@ components:
           - critic_input_ref
           - final_output_ref
           - final_output_owner
+          - integrity
           properties:
             topology:
               type: string
@@ -1404,6 +1405,53 @@ components:
               - critic_metacognition
               - hemisphere_bridge_fallback
               description: Runtime source that supplied the selected response.
+            integrity:
+              type: object
+              required:
+              - status
+              - checks
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - passed
+                  - failed
+                  description: Aggregate state-contract verification result for the serialized
+                    Quad Brain handoff chain.
+                checks:
+                  type: object
+                  required:
+                  - roles_complete
+                  - serial_order_valid
+                  - transitions_complete
+                  - output_transition_mirrors
+                  - critic_handoff_valid
+                  - final_output_owned_by_critic
+                  properties:
+                    roles_complete:
+                      type: boolean
+                    serial_order_valid:
+                      type: boolean
+                    transitions_complete:
+                      type: boolean
+                    output_transition_mirrors:
+                      type: boolean
+                    critic_handoff_valid:
+                      type: boolean
+                    final_output_owned_by_critic:
+                      type: boolean
+                  additionalProperties: false
+                selected_candidate_id:
+                  anyOf:
+                  - type: string
+                  - type: 'null'
+                  description: CGPU candidate id selected before critic review.
+                reviewed_candidate_id:
+                  anyOf:
+                  - type: string
+                  - type: 'null'
+                  description: Candidate id reviewed by Critic/Metacognition.
+              additionalProperties: false
           additionalProperties: true
         latency_ms:
           type: number

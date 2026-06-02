@@ -196,6 +196,7 @@ def test_hypervisor_quad_brain_path_serializes_four_brain_arbitration():
     assert quad_trace["state_contract"]["critic_input_ref"] == "cgpu.selected_candidate"
     assert quad_trace["state_contract"]["final_output_ref"] == "critic.selected_response"
     assert quad_trace["state_contract"]["final_output_owner"] == "critic_metacognition"
+    assert quad_trace["state_contract"]["integrity"]["status"] == "passed"
     assert quad_trace["selected_source"] == "critic_metacognition"
     assert "routed through both" in result.response
     assert result.bridge_result["quad_brain_arbitration"]["trace_id"] == result.decision.trace_id
@@ -235,6 +236,19 @@ def test_quad_brain_trace_records_serial_state_transitions():
     assert critic_output["content"]["reviewed_candidate_ref"] == "cgpu.selected_candidate"
     assert critic_output["trace"]["input_refs"] == ["cgpu.selected_candidate", "template_surface"]
     assert critic_output["trace"]["reviewed_candidate_id"] == selected_candidate_id
+
+    integrity = quad_trace["state_contract"]["integrity"]
+    assert integrity["status"] == "passed"
+    assert integrity["selected_candidate_id"] == selected_candidate_id
+    assert integrity["reviewed_candidate_id"] == selected_candidate_id
+    assert integrity["checks"] == {
+        "roles_complete": True,
+        "serial_order_valid": True,
+        "transitions_complete": True,
+        "output_transition_mirrors": True,
+        "critic_handoff_valid": True,
+        "final_output_owned_by_critic": True,
+    }
 
 
 def test_quad_brain_dispatch_preserves_grounding_and_improves_persona_surface_over_dual_hemi():

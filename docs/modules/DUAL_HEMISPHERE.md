@@ -193,3 +193,9 @@ The arbiter intentionally runs these brain outputs in a fixed serial order after
 | Critic / Safety / Metacognition | `cgpu.selected_candidate`, `template_surface` | `critic.selected_response`, `critic.template_guard` |
 
 The contract also exposes `required_roles`, `critic_input_ref=cgpu.selected_candidate`, `critic_reviewed_candidate_id`, `final_output_ref=critic.selected_response`, and `final_output_owner`. Critic/Metacognition mirrors the reviewed CGPU candidate id in its output trace, so trace consumers can verify that normal Quad Brain responses pass through grounding, executive planning, CGPU rendering, and critic arbitration before emission.
+
+### Quad Brain State-Contract Integrity Update (2026-06-02)
+
+`QuadBrainArbitration.state_contract.integrity` now carries a compact pass/fail proof for the serialized four-brain handoff chain. The verifier checks that all required roles are present in fixed order, transition records match the serial order, each role output mirrors its state transition, the Critic/Metacognition brain reviewed the selected CGPU candidate id, and final output ownership stayed with `critic_metacognition`.
+
+This is intentionally trace metadata, not a new brain or parallel worker. It strengthens the existing serialized arbitration contract so API/frontend trace consumers can reject malformed Quad Brain traces without inferring the handoff chain from loose fields.

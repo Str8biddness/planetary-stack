@@ -156,29 +156,38 @@ class QuadBrainOrchestrator:
             selected_response = str(bridge_result.get("response", ""))
             selected_source = "hemisphere_bridge_fallback"
 
+        outputs = [knowledge, executive, cgpu, critic]
+        state_contract = {
+            "topology": "knowledge->executive->cgpu->critic",
+            "parallel_brain_spawn": False,
+            "serialized_arbitration": True,
+            "template_leakage_allowed": surface is not TemplateSurface.NORMAL,
+            "bridge_trace_id": bridge_result.get("hypervisor_trace", {}).get("trace_id"),
+            "route": decision.route.value,
+            "required_roles": serial_order,
+            "state_transitions": [
+                transitions[role].to_dict()
+                for role in QuadBrainRole
+            ],
+            "critic_input_ref": "cgpu.selected_candidate",
+            "critic_reviewed_candidate_id": cgpu.content.get("selected_candidate_id"),
+            "final_output_ref": "critic.selected_response",
+            "final_output_owner": selected_source,
+        }
+        state_contract["integrity"] = self._state_contract_integrity(
+            outputs=outputs,
+            serial_order=serial_order,
+            transitions=state_contract["state_transitions"],
+            selected_source=selected_source,
+        )
+
         return QuadBrainArbitration(
             trace_id=decision.trace_id,
             selected_response=selected_response,
             selected_source=selected_source,
-            outputs=[knowledge, executive, cgpu, critic],
+            outputs=outputs,
             serial_order=serial_order,
-            state_contract={
-                "topology": "knowledge->executive->cgpu->critic",
-                "parallel_brain_spawn": False,
-                "serialized_arbitration": True,
-                "template_leakage_allowed": surface is not TemplateSurface.NORMAL,
-                "bridge_trace_id": bridge_result.get("hypervisor_trace", {}).get("trace_id"),
-                "route": decision.route.value,
-                "required_roles": serial_order,
-                "state_transitions": [
-                    transitions[role].to_dict()
-                    for role in QuadBrainRole
-                ],
-                "critic_input_ref": "cgpu.selected_candidate",
-                "critic_reviewed_candidate_id": cgpu.content.get("selected_candidate_id"),
-                "final_output_ref": "critic.selected_response",
-                "final_output_owner": selected_source,
-            },
+            state_contract=state_contract,
             latency_ms=(time.time() - start) * 1000,
         )
 
@@ -363,6 +372,55 @@ class QuadBrainOrchestrator:
                 input_refs=["cgpu.selected_candidate", "template_surface"],
                 output_refs=["critic.selected_response", "critic.template_guard"],
             ),
+        }
+
+    def _state_contract_integrity(
+        self,
+        *,
+        outputs: list[QuadBrainOutput],
+        serial_order: list[str],
+        transitions: list[dict[str, Any]],
+        selected_source: str,
+    ) -> dict[str, Any]:
+        output_roles = [output.role.value for output in outputs]
+        transition_roles = [str(transition.get("role")) for transition in transitions]
+        mirrored_transitions = [
+            output.trace.get("state_transition") == transition
+            for output, transition in zip(outputs, transitions)
+        ]
+        cgpu_output = next(
+            (output for output in outputs if output.role == QuadBrainRole.CGPU_RENDERING),
+            None,
+        )
+        critic_output = next(
+            (output for output in outputs if output.role == QuadBrainRole.CRITIC_METACOGNITION),
+            None,
+        )
+        selected_candidate_id = (
+            cgpu_output.content.get("selected_candidate_id")
+            if cgpu_output
+            else None
+        )
+        reviewed_candidate_id = (
+            critic_output.content.get("selected_candidate_id")
+            if critic_output
+            else None
+        )
+        checks = {
+            "roles_complete": output_roles == serial_order,
+            "serial_order_valid": serial_order == [role.value for role in QuadBrainRole],
+            "transitions_complete": transition_roles == serial_order,
+            "output_transition_mirrors": all(mirrored_transitions)
+            and len(mirrored_transitions) == len(serial_order),
+            "critic_handoff_valid": bool(selected_candidate_id)
+            and selected_candidate_id == reviewed_candidate_id,
+            "final_output_owned_by_critic": selected_source == "critic_metacognition",
+        }
+        return {
+            "status": "passed" if all(checks.values()) else "failed",
+            "checks": checks,
+            "selected_candidate_id": selected_candidate_id,
+            "reviewed_candidate_id": reviewed_candidate_id,
         }
 
     def _intent_for_route(self, route: HypervisorRoute) -> str:

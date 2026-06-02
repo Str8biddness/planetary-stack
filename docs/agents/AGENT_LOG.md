@@ -2333,6 +2333,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 - The legacy API layer is now classified as an explicit NPC-script compatibility boundary or non-user-facing storage substrate, not a normal assistant final-language owner.
 - The template surface audit now reports no remaining quarantine-required paths; normal Synthesus 5 wording remains owned by CHAL, the Cognitive Hypervisor, generation spine, and critic/template guard.
 
+## Current Session — 2026-06-02 (Agent 7 — Quad Brain State-Contract Integrity)
+
+### 📝 Summary
+- Added `state_contract.integrity` to `QuadBrainArbitration` so serialized Quad Brain traces carry an explicit pass/fail proof for role completeness, fixed serial order, transition coverage, output-transition mirroring, CGPU-to-critic handoff, and final-output ownership.
+- Mirrored the new integrity proof into focused hypervisor tests and OpenAPI/API schema docs.
+- Advanced the Phase 3 serialized arbitration checklist item without adding any new brain nodes or parallel worker topology.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/quad_brain.py tests/test_chal_hypervisor.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_hypervisor.py` — 14 passed.
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed `QuadBrainArbitration.state_contract.integrity.checks.critic_handoff_valid` is documented as a boolean mirror of the runtime trace contract.
+- `git diff --check -- packages/core/chal/quad_brain.py tests/test_chal_hypervisor.py docs/openapi.yaml docs/openapi.json docs/api_schema.json docs/modules/DUAL_HEMISPHERE.md docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md docs/agents/AGENT_LOG.md` — passed.
+
+### 🚧 Left Off / Next Steps
+- Continue surfacing `debug.cognitive_hypervisor.quad_brain.state_contract.integrity` in frontend/API trace views once the Phase 9 trace UI work begins.
+- Keep root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` changes separated because they were pre-existing and unrelated to this Agent 7 run.
+
+### 💡 Architectural Notes
+- The integrity proof is trace metadata on the existing serialized arbiter. It is not uncontrolled multi-agent sprawl and it does not change final-language ownership: Critic/Metacognition still owns normal Quad Brain emission after reviewing the selected CGPU candidate.
+
 ## Current Session — 2026-06-02 (Knowledge Hardware Profile-Dim Gate)
 
 ### 📝 Summary
