@@ -129,8 +129,9 @@ def _stamp_artifact_manifest(plan: BuildPlan) -> tuple[Path, dict[str, Any]]:
     return path, manifest
 
 
-def _require_runtime_bundle_semantics(plan: BuildPlan) -> None:
-    validation = validate_runtime_bundle_semantics(plan.artifact_root)
+def _require_runtime_bundle_semantics(plan: BuildPlan, *, require_profile_dim: bool = True) -> None:
+    expected_embed_dim = plan.embed_dim if require_profile_dim else None
+    validation = validate_runtime_bundle_semantics(plan.artifact_root, expected_embed_dim=expected_embed_dim)
     if not validation.ok:
         failures = "; ".join(validation.failures)
         raise RuntimeError(f"runtime bundle semantic validation failed: {failures}")
@@ -159,7 +160,7 @@ def stamp_existing_manifest(
             sources=[],
         )
 
-    _require_runtime_bundle_semantics(plan)
+    _require_runtime_bundle_semantics(plan, require_profile_dim=profile_path is not None)
 
     # Preserve original bundle generated_at if a previous manifest exists.
     existing_generated_at: str | None = None

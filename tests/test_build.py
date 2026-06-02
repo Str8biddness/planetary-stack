@@ -47,3 +47,54 @@ def test_stamp_manifest_rejects_runtime_semantic_mismatch(tmp_path: Path, monkey
     assert "build" not in (artifacts / "manifest.json").read_text(encoding="utf-8")
 
     assert main(["stamp-manifest", "--repo-root", str(tmp_path), "--artifact-root", str(artifacts)]) == 1
+
+
+def test_stamp_manifest_rejects_profile_embed_dim_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifacts = tmp_path / "artifacts"
+    (artifacts / "models").mkdir(parents=True)
+    (artifacts / "faiss.index").write_bytes(b"fake-index")
+    (artifacts / "faiss_metadata.json").write_text("[{}]", encoding="utf-8")
+    (artifacts / "models" / "swarm_embedder.pkl").write_bytes(b"fake-model")
+    profile = tmp_path / "profile.yaml"
+    profile.write_text(
+        "\n".join(
+            [
+                "name: profile-dim-contract",
+                "embedding:",
+                "  dim: 128",
+                "outputs: {}",
+                "sources: []",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    original_manifest = build_manifest(artifacts, ["."], kind="test")
+    write_manifest(original_manifest, artifacts / "manifest.json")
+
+    fake_faiss = SimpleNamespace(read_index=lambda _path: SimpleNamespace(ntotal=1, d=384))
+    fake_joblib = SimpleNamespace(load=lambda _path: {"dim": 384})
+    monkeypatch.setitem(__import__("sys").modules, "faiss", fake_faiss)
+    monkeypatch.setitem(__import__("sys").modules, "joblib", fake_joblib)
+
+    with pytest.raises(RuntimeError, match="swarm embedder profile dim mismatch"):
+        stamp_existing_manifest(repo_root=tmp_path, artifact_root=artifacts, profile_path=profile)
+    assert "build" not in (artifacts / "manifest.json").read_text(encoding="utf-8")
+
+    assert (
+        main(
+            [
+                "stamp-manifest",
+                "--repo-root",
+                str(tmp_path),
+                "--artifact-root",
+                str(artifacts),
+                "--profile",
+                str(profile),
+            ]
+        )
+        == 1
+    )

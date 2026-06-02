@@ -110,7 +110,12 @@ def load_manifest(path: str | Path) -> dict:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def validate_manifest(root: str | Path, manifest_name: str = "manifest.json") -> ValidationResult:
+def validate_manifest(
+    root: str | Path,
+    manifest_name: str = "manifest.json",
+    *,
+    expected_embed_dim: int | None = None,
+) -> ValidationResult:
     root_path = Path(root).resolve()
     manifest = load_manifest(root_path / manifest_name)
     failures: list[str] = []
@@ -129,11 +134,11 @@ def validate_manifest(root: str | Path, manifest_name: str = "manifest.json") ->
         digest = sha256_file(path)
         if digest != item["sha256"]:
             failures.append(f"sha256 mismatch {rel}")
-    failures.extend(_validate_runtime_bundle_semantics(root_path))
+    failures.extend(_validate_runtime_bundle_semantics(root_path, expected_embed_dim=expected_embed_dim))
     return ValidationResult(checked=checked, failures=tuple(failures))
 
 
-def validate_runtime_bundle_semantics(root: str | Path) -> ValidationResult:
+def validate_runtime_bundle_semantics(root: str | Path, *, expected_embed_dim: int | None = None) -> ValidationResult:
     """Validate cross-artifact runtime compatibility before publishing/stamping."""
     root_path = Path(root).resolve()
     semantic_paths = [
@@ -142,10 +147,13 @@ def validate_runtime_bundle_semantics(root: str | Path) -> ValidationResult:
         root_path / "models" / "swarm_embedder.pkl",
     ]
     checked = sum(1 for path in semantic_paths if path.exists())
-    return ValidationResult(checked=checked, failures=tuple(_validate_runtime_bundle_semantics(root_path)))
+    return ValidationResult(
+        checked=checked,
+        failures=tuple(_validate_runtime_bundle_semantics(root_path, expected_embed_dim=expected_embed_dim)),
+    )
 
 
-def _validate_runtime_bundle_semantics(root: Path) -> list[str]:
+def _validate_runtime_bundle_semantics(root: Path, *, expected_embed_dim: int | None = None) -> list[str]:
     """Validate artifact relationships that hashes alone cannot prove."""
     failures: list[str] = []
     faiss_path = root / "faiss.index"
@@ -188,6 +196,10 @@ def _validate_runtime_bundle_semantics(root: Path) -> list[str]:
                     failures.append("swarm embedder missing persisted dim")
                 elif embedder_dim != int(index.d):
                     failures.append(f"FAISS/embedder dim mismatch: faiss={int(index.d)}, embedder={embedder_dim}")
+                if expected_embed_dim is not None and embedder_dim is not None and embedder_dim != expected_embed_dim:
+                    failures.append(
+                        f"swarm embedder profile dim mismatch: expected={expected_embed_dim}, embedder={embedder_dim}"
+                    )
 
     return failures
 

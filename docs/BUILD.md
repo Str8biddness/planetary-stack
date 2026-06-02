@@ -38,7 +38,7 @@ Steps:
 
 1. Validate source planes (`pipelines/*`, `sources/*`, `patterns/*`, `synthetic/*`, `grounding_corpus/*`, `support_models/*`).
 2. Shell out to `python -m pipelines.build.run_population` with the derived sample sizes and embed dim.
-3. Validate runtime bundle semantics before stamping, including FAISS vector count versus metadata records and FAISS dimension versus the persisted swarm embedder dimension.
+3. Validate runtime bundle semantics before stamping, including FAISS vector count versus metadata records, FAISS dimension versus the persisted swarm embedder dimension, and persisted swarm embedder dimension versus the profile's declared `embedding.dim`.
 4. Walk `artifacts/` and regenerate `artifacts/manifest.json` from real file hashes.
 5. Capture provenance (profile, git sha, embedder fingerprint, dataset versions, host) and stamp it into the manifest's `build` block.
 
@@ -52,7 +52,7 @@ synthesus-kc stamp-manifest --profile profiles/public-base.yaml
 
 The original `generated_at` is preserved; `manifest_revised_at` and `build` are added/updated.
 
-`stamp-manifest` fails without rewriting `manifest.json` when the existing runtime bundle is semantically incompatible. It must not be used to bless stale generated artifacts such as a `faiss.index` built at one dimension with a `models/swarm_embedder.pkl` persisted at another dimension; rebuild or replace the generated bundle first, then stamp.
+`stamp-manifest --profile ...` fails without rewriting `manifest.json` when the existing runtime bundle is semantically incompatible. It must not be used to bless stale generated artifacts such as a `faiss.index` built at one dimension with a `models/swarm_embedder.pkl` persisted at another dimension, or an internally aligned retrieval pair built at a dimension that disagrees with the selected profile. Rebuild or replace the generated bundle first, then stamp.
 
 ## Profiles
 

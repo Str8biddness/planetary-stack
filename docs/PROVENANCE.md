@@ -61,6 +61,6 @@
 - `synthesus-kc stamp-manifest --profile profiles/public-base.yaml` re-stamps an existing bundle without rerunning the pipeline. The original `generated_at` is preserved; only `manifest_revised_at` and the `build` block are updated.
 - `synthesus-kc info` prints the same provenance shape without modifying any file — useful for support diagnostics.
 
-Before an executed build or manual re-stamp writes `manifest.json`, the CLI validates runtime bundle semantics that hashes alone cannot prove. FAISS vector count must match `faiss_metadata.json`, and FAISS dimensionality must match `models/swarm_embedder.pkl`. A mismatch aborts stamping so provenance cannot accidentally legitimize incompatible generated retrieval artifacts.
+Before an executed build or profile-aware manual re-stamp writes `manifest.json`, the CLI validates runtime bundle semantics that hashes alone cannot prove. FAISS vector count must match `faiss_metadata.json`, FAISS dimensionality must match `models/swarm_embedder.pkl`, and the persisted swarm embedder dimension must match the selected profile's `embedding.dim`. A mismatch aborts stamping so provenance cannot accidentally legitimize incompatible generated retrieval artifacts.
 
 `build.source_manifest` is captured from `manifests/source_manifest.json` when present. Rebuild operators should run `synthesus-kc build-source-manifest --root .` and `synthesus-kc verify-source-manifest --root .` before stamping so the runtime artifact manifest points at a current source-plane hash set.
