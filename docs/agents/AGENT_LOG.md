@@ -2219,3 +2219,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Core PatternEngine remains a learned candidate retrieval surface. Final normal-path wording must still pass through CHAL firmware, generation, or critic-controlled boundaries.
 - Storage labels are added at both write and read boundaries so older SQLite pattern stores can be audited without a migration.
+
+## Current Session — 2026-06-02 (Knowledge Hardware Source-Manifest Fingerprint)
+
+### 📝 Summary
+- Hardened `/home/workspace/synthesus-knowledge-cloud` build provenance so stamped `artifacts/manifest.json` build blocks now include `source_manifest` identity: path, SHA-256, size, kind, generated timestamp, roots, and artifact count for `manifests/source_manifest.json`.
+- Added regression coverage for populated and missing source-manifest fingerprints and documented the field in `docs/PROVENANCE.md`.
+- Advanced Synthesus 5 Phase 5 Knowledge Cloud hardware provenance: runtime artifact manifests can now point back to the exact source-plane hash set that admitted sources, pipelines, patterns, synthetic corpora, support models, and hardware/emulation corpora.
+- No generated runtime artifacts, FAISS indexes, KNDB files, model caches, reports, or workflow files were modified.
+
+### ✅ Verified
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m py_compile synthesus_knowledge_cloud/provenance.py tests/test_provenance.py` — passed.
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m pytest -q tests/test_provenance.py` — 6 passed.
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m synthesus_knowledge_cloud validate-sources --root .` — passed; 25 required paths and 7 character pattern banks.
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m synthesus_knowledge_cloud verify-source-manifest --root .` — passed; 139 source files verified.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` are semantically aligned; the known live blocker remains `faiss=384` / `embedder=128`.
+- After artifact regeneration, rerun `synthesus-kc validate`, `tools/validate_knowledge_cold_start.py`, and `packages/knowledge/health_check.py`, then refresh the public mirror with `zopub sync synthesus-knowledge artifacts`.
+- Continue avoiding commits of generated FAISS/KNDB/model/cache/report artifacts and keep pre-existing unrelated Synthesus runtime root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` changes separated.
+
+### 💡 Architectural Notes
+- `build.source_manifest` makes the source-plane manifest a first-class hardware admission fingerprint, complementing byte-level runtime artifact hashes and semantic FAISS/embedder compatibility checks.
+- This does not bless the current generated bundle; it improves the provenance contract that the next clean artifact rebuild will stamp.
