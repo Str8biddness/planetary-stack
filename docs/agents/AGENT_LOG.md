@@ -2332,3 +2332,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The legacy API layer is now classified as an explicit NPC-script compatibility boundary or non-user-facing storage substrate, not a normal assistant final-language owner.
 - The template surface audit now reports no remaining quarantine-required paths; normal Synthesus 5 wording remains owned by CHAL, the Cognitive Hypervisor, generation spine, and critic/template guard.
+
+## Current Session — 2026-06-02 (Knowledge Hardware Profile-Dim Gate)
+
+### 📝 Summary
+- Hardened `/home/workspace/synthesus-knowledge-cloud` profile-aware build/stamp validation so `synthesus-kc build --execute` and `synthesus-kc stamp-manifest --profile ...` now reject runtime bundles whose persisted swarm embedder dimension disagrees with the selected profile's `embedding.dim`.
+- Preserved ad hoc stamping behavior for cross-artifact compatibility only when no profile is declared.
+- Added regression coverage for the previously possible failure mode where FAISS and the embedder are internally aligned at the wrong dimension, which hashes and FAISS/embedder cross-checks alone cannot catch.
+- Updated Knowledge Cloud build/provenance docs and the Synthesus 5 Phase 5 checklist without modifying generated FAISS, KNDB, model, cache, report, or workflow artifacts.
+
+### ✅ Verified
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m py_compile synthesus_knowledge_cloud/manifest.py synthesus_knowledge_cloud/build.py tests/test_build.py tests/test_cli.py` — passed.
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m pytest -q tests/test_build.py tests/test_cli.py` — 10 passed.
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m synthesus_knowledge_cloud validate-sources --root .` — passed; 25 required paths and 7 character pattern banks.
+- In `/home/workspace/synthesus-knowledge-cloud`: `python -m synthesus_knowledge_cloud verify-source-manifest --root .` — passed; 139 source files verified.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace the generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` are semantically aligned with the intended profile; the known live blocker remains `faiss=384` / `embedder=128`.
+- After artifact regeneration, rerun `synthesus-kc validate`, `tools/validate_knowledge_cold_start.py`, and `packages/knowledge/health_check.py`, then refresh the public mirror with `zopub sync synthesus-knowledge artifacts`.
+- Keep generated FAISS/KNDB/model/cache/report artifacts and `.github/workflows/` out of automated commits unless explicitly instructed.
+
+### 💡 Architectural Notes
+- Profile `embedding.dim` is now part of the Knowledge Cloud hardware admission boundary for profile-aware publication, not just a build-plan hint.
+- This guard does not bless the current generated bundle; it prevents the next clean rebuild from being stamped under a profile whose declared retrieval vector contract does not match the persisted embedder.
