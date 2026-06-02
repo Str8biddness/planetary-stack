@@ -6,6 +6,7 @@ from synthesus_knowledge_cloud.provenance import (
     capture_provenance,
     dataset_versions,
     embedder_fingerprint,
+    source_manifest_fingerprint,
     stamp_manifest,
 )
 
@@ -46,6 +47,31 @@ def test_embedder_fingerprint_round_trip(tmp_path: Path) -> None:
     assert len(fp["sha256"]) == 64
 
 
+def test_source_manifest_fingerprint_captures_manifest_identity(tmp_path: Path) -> None:
+    repo = tmp_path
+    manifest_dir = repo / "manifests"
+    source_dir = repo / "sources"
+    manifest_dir.mkdir()
+    source_dir.mkdir()
+    (source_dir / "sample.yaml").write_text("id: sample\n", encoding="utf-8")
+    manifest = build_manifest(repo, ["sources"], kind="synthesus-knowledge-source-plane")
+    write_manifest(manifest, manifest_dir / "source_manifest.json")
+
+    fp = source_manifest_fingerprint(repo)
+
+    assert fp is not None
+    assert fp["path"] == "manifests/source_manifest.json"
+    assert fp["kind"] == "synthesus-knowledge-source-plane"
+    assert fp["roots"] == ["sources"]
+    assert fp["artifact_count"] == 1
+    assert fp["size"] > 0
+    assert len(fp["sha256"]) == 64
+
+
+def test_source_manifest_fingerprint_missing_manifest_is_none(tmp_path: Path) -> None:
+    assert source_manifest_fingerprint(tmp_path) is None
+
+
 def test_stamp_manifest_adds_build_block(tmp_path: Path) -> None:
     artifacts = tmp_path / "artifacts"
     artifacts.mkdir()
@@ -55,6 +81,7 @@ def test_stamp_manifest_adds_build_block(tmp_path: Path) -> None:
     stamped = stamp_manifest(manifest, prov)
     assert "build" in stamped
     assert stamped["build"]["profile"] == "public-base"
+    assert "source_manifest" in stamped["build"]
     assert "manifest_revised_at" in stamped
     write_manifest(stamped, artifacts / "manifest.json")
     loaded = json.loads((artifacts / "manifest.json").read_text(encoding="utf-8"))

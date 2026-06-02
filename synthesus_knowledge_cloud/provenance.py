@@ -8,6 +8,7 @@ versions, and host produced a bundle.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import platform
 import subprocess
@@ -79,6 +80,37 @@ def embedder_fingerprint(artifact_root: str | Path, *, rel: str = "models/swarm_
     }
 
 
+def source_manifest_fingerprint(
+    repo_root: str | Path,
+    *,
+    rel: str = "manifests/source_manifest.json",
+) -> dict[str, Any] | None:
+    root = Path(repo_root).resolve()
+    path = root / rel
+    digest = _sha256(path)
+    if digest is None:
+        return None
+    fingerprint: dict[str, Any] = {
+        "path": rel,
+        "sha256": digest,
+        "size": path.stat().st_size,
+    }
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return fingerprint
+    artifacts = manifest.get("artifacts")
+    fingerprint.update(
+        {
+            "kind": manifest.get("kind"),
+            "generated_at": manifest.get("generated_at"),
+            "roots": manifest.get("roots"),
+            "artifact_count": len(artifacts) if isinstance(artifacts, list) else 0,
+        }
+    )
+    return fingerprint
+
+
 def dataset_versions(repo_root: str | Path) -> dict[str, Any]:
     """Read declared dataset versions from sources/*.yaml without a YAML hard dep."""
     sources_dir = Path(repo_root).resolve() / "sources"
@@ -123,6 +155,7 @@ class Provenance:
     platform: str
     host: str | None
     embedder: dict[str, Any] | None
+    source_manifest: dict[str, Any] | None
     datasets: dict[str, Any]
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -157,6 +190,7 @@ def capture_provenance(
         platform=platform.platform(aliased=True, terse=True),
         host=os.environ.get("HOSTNAME") or platform.node() or None,
         embedder=embedder_fingerprint(artifacts),
+        source_manifest=source_manifest_fingerprint(repo),
         datasets=dataset_versions(repo),
         extra=extra or {},
     )

@@ -27,6 +27,15 @@
       "sha256": "<sha256>",
       "size": 4443817
     },
+    "source_manifest": {
+      "path": "manifests/source_manifest.json",
+      "sha256": "<sha256>",
+      "size": 25100,
+      "kind": "synthesus-knowledge-source-plane",
+      "generated_at": "<ISO timestamp>",
+      "roots": ["sources", "pipelines", "patterns", "synthetic", "grounding_corpus", "support_models", "corpus"],
+      "artifact_count": 139
+    },
     "datasets": {
       "jeopardy": {"version": "1", "id": "jeopardy_clue_dataset", "license": "..."},
       "conceptnet": {"version": "1", "id": "conceptnet5_assertions", "license": "..."}
@@ -43,6 +52,7 @@
 - **Reproducibility** — anyone can know which profile + git sha + embedder produced the bundle.
 - **Inspectability** — local Synthesus runtimes can refuse to load a bundle when the embedder fingerprint disagrees with the FAISS index expectation.
 - **Auditability** — license fields per source make later distribution decisions reviewable.
+- **Source-plane integrity** — the source-manifest fingerprint ties a stamped runtime bundle back to the exact hash set that admitted sources, pipelines, patterns, synthetic corpora, support models, and hardware/emulation corpora into the rebuild plane.
 - **Drift detection** — `manifest_revised_at` separates "bundle generated" from "manifest re-stamped".
 
 ## How it's produced
@@ -52,3 +62,5 @@
 - `synthesus-kc info` prints the same provenance shape without modifying any file — useful for support diagnostics.
 
 Before an executed build or manual re-stamp writes `manifest.json`, the CLI validates runtime bundle semantics that hashes alone cannot prove. FAISS vector count must match `faiss_metadata.json`, and FAISS dimensionality must match `models/swarm_embedder.pkl`. A mismatch aborts stamping so provenance cannot accidentally legitimize incompatible generated retrieval artifacts.
+
+`build.source_manifest` is captured from `manifests/source_manifest.json` when present. Rebuild operators should run `synthesus-kc build-source-manifest --root .` and `synthesus-kc verify-source-manifest --root .` before stamping so the runtime artifact manifest points at a current source-plane hash set.
