@@ -40,6 +40,13 @@ def test_template_surface_audit_tracks_els_bridge_as_writeback_substrate():
     assert classification.boundary == "els_candidate_writeback"
 
 
+def test_template_surface_audit_tracks_pattern_engine_as_candidate_storage():
+    classification = CLASSIFICATIONS["packages/core/pattern_engine.py"]
+
+    assert classification.status == "non_user_facing"
+    assert classification.boundary == "core_pattern_engine_candidate_storage"
+
+
 def test_template_surface_audit_labels_allowed_exceptions():
     allowed = [
         item

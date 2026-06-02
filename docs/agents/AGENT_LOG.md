@@ -2197,3 +2197,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The fast daily health check now treats retrieval semantic integrity as a precondition for golden-query latency, matching the runtime cold-start CHAL readiness gate.
 - Golden-query latency remains intentionally unscored while retrieval hardware dimensions disagree, preventing a semantic corruption blocker from being presented as five query-specific failures.
+
+## Current Session — 2026-06-02 (Agent 1 — PatternEngine Template Surface Boundary)
+
+### 📝 Summary
+- Labeled `PatternEngine` learned `response_template` records with `template_surface` metadata so core pattern storage is explicitly non-user-facing candidate storage.
+- Added read-time backfill for older pattern rows that lack the label, while forcing `user_facing=false` even if caller metadata claims otherwise.
+- Reclassified `packages/core/pattern_engine.py` from `legacy_quarantine_required` to `non_user_facing`, reducing remaining Phase 6 quarantine paths from four to three.
+- Updated the Phase 6 checklist, template-path audit docs, and core orchestrator docs.
+
+### ✅ Verified
+- `python -m py_compile packages/core/pattern_engine.py tools/audit_template_surfaces.py tests/test_pattern_engine_surface.py tests/test_template_surface_audit.py` — passed.
+- `python tools/audit_template_surfaces.py --fail-on-unclassified` — passed; 92 signatures, 17 classified paths, 0 unclassified hits, 3 `legacy_quarantine_required` paths remain.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages python -m pytest -q tests/test_pattern_engine_surface.py tests/test_template_surface_audit.py` — 9 passed.
+
+### 🚧 Left Off / Next Steps
+- Continue Phase 6 conversion/removal of the three remaining `legacy_quarantine_required` paths from `tools/audit_template_surfaces.py`: `packages/api/fastapi_server.py`, `packages/api/production_server.py`, and `packages/core/cognitive/cognitive_engine.py`.
+- The generated Knowledge Cloud bundle remains blocked by the known FAISS/embedder dimension mismatch; this run intentionally stayed source/docs/tests-only.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Core PatternEngine remains a learned candidate retrieval surface. Final normal-path wording must still pass through CHAL firmware, generation, or critic-controlled boundaries.
+- Storage labels are added at both write and read boundaries so older SQLite pattern stores can be audited without a migration.

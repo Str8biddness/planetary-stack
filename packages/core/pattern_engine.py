@@ -15,6 +15,13 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timezone
 
 
+PATTERN_TEMPLATE_SURFACE = {
+    "surface": "pattern_candidate_storage",
+    "boundary": "core_pattern_engine",
+    "user_facing": False,
+}
+
+
 # ---------------------------------------------------------------------------
 # Data Models
 # ---------------------------------------------------------------------------
@@ -38,7 +45,7 @@ class Pattern:
         success_rate: Ratio of successful to total activations.
         created_at: ISO-8601 UTC timestamp of creation.
         updated_at: ISO-8601 UTC timestamp of last update.
-        metadata: Additional flexible data (context windows, examples, etc.).
+        metadata: Additional flexible data (context windows, examples, surface labels, etc.).
     """
     id: str
     character_id: str
@@ -200,6 +207,7 @@ class PatternEngine:
         """
         pid = self._make_id(character_id, trigger, pattern_type)
         now = datetime.now(timezone.utc).isoformat()
+        pattern_metadata = self._with_template_surface(metadata or {})
         pattern = Pattern(
             id=pid,
             character_id=character_id,
@@ -209,7 +217,7 @@ class PatternEngine:
             weight=weight,
             created_at=now,
             updated_at=now,
-            metadata=metadata or {},
+            metadata=pattern_metadata,
         )
         with self._get_conn() as conn:
             conn.execute(
@@ -447,7 +455,22 @@ class PatternEngine:
         """
         d = dict(row)
         d["metadata"] = json.loads(d.get("metadata") or "{}")
+        d["metadata"] = PatternEngine._with_template_surface(d["metadata"])
         return Pattern(**d)
+
+    @staticmethod
+    def _with_template_surface(metadata: Dict[str, Any]) -> Dict[str, Any]:
+        enriched = dict(metadata)
+        existing_surface = enriched.get("template_surface")
+        if not isinstance(existing_surface, dict):
+            enriched["template_surface"] = dict(PATTERN_TEMPLATE_SURFACE)
+            return enriched
+
+        merged_surface = dict(PATTERN_TEMPLATE_SURFACE)
+        merged_surface.update(existing_surface)
+        merged_surface["user_facing"] = False
+        enriched["template_surface"] = merged_surface
+        return enriched
 
     @staticmethod
     def _token_overlap(ctx_tokens: set, trigger: str) -> float:

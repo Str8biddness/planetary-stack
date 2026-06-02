@@ -145,7 +145,7 @@ The `MemoryStore` handles four distinct memory layers:
 
 ## Pattern Engine
 
-The `PatternEngine` discovers, scores, and manages learned reasoning patterns. Patterns are discovered from interaction history and scored by success rate. The left hemisphere uses them to generate fast, contextually appropriate responses.
+The `PatternEngine` discovers, scores, and manages learned reasoning patterns. Patterns are discovered from interaction history and scored by success rate. Stored `response_template` text is labeled as non-user-facing candidate storage through `metadata.template_surface`; final Synthesus 5 wording must still pass through the CHAL firmware, generation, or critic-controlled boundaries.
 
 ```python
 from core.pattern_engine import PatternEngine, Pattern, PatternMatch

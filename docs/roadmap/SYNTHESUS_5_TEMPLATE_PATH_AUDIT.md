@@ -22,7 +22,6 @@ The audit currently classifies 92 matched package-level Python template signatur
 - `packages/api/fastapi_server.py` — legacy character router can return direct `response_template` text and character fallback strings.
 - `packages/api/production_server.py` — legacy pattern ingestion/lookup preserves `response_template` and response text for compatibility outside the explicit CHAL route.
 - `packages/core/cognitive/cognitive_engine.py` — legacy cognitive character behavior still reads pattern templates and fallback text outside the explicit CHAL hypervisor path.
-- `packages/core/pattern_engine.py` — PatternEngine stores templated output structures that must be consumed through firmware/generation boundaries.
 
 The PPBRS normal path is classified as `firmware_context_only`: `packages/reasoning/reasoning_chain.py` stores legacy template text only in `chal_firmware_signal.module_message.payload.template_context`, while `response` remains empty and `user_facing` remains false.
 
@@ -31,6 +30,8 @@ The PPBRS normal path is classified as `firmware_context_only`: `packages/reason
 `packages/core/cognitive/response_compositor.py` is now classified as `allowed_labeled_exception`: `ResponseCompositor.compose_labeled()` marks realized character pattern text as `surface="explicit_npc_script"` and `boundary="response_compositor"`. The legacy `compose()` string wrapper remains for compatibility, but cognitive-engine local handling now records the labeled surface in debug metadata.
 
 `packages/core/els_bridge.py` is now classified as `non_user_facing`: successful interactions may still create `response_template` candidate text for review and later integration, but JSON exports and integrated pattern records now attach `template_surface` metadata with `surface="writeback_candidate"`, `boundary="els_candidate_writeback"`, and `user_facing=false`. ELS therefore remains a learning/writeback substrate rather than a final response owner.
+
+`packages/core/pattern_engine.py` is now classified as `non_user_facing`: learned `response_template` records are labeled with `template_surface` metadata using `surface="pattern_candidate_storage"`, `boundary="core_pattern_engine"`, and `user_facing=false`. Existing legacy rows are backfilled with the same label when read, so PatternEngine remains a candidate retrieval surface rather than a final response owner.
 
 ## Validation Command
 

@@ -92,9 +92,9 @@ CLASSIFICATIONS: dict[str, SurfaceClassification] = {
     "packages/core/pattern_engine.py": SurfaceClassification(
         path="packages/core/pattern_engine.py",
         surface="legacy_pattern_engine_storage",
-        status="legacy_quarantine_required",
-        boundary="outside_explicit_synthesus5_chal_path",
-        notes="PatternEngine stores templated output structures; Synthesus 5 must consume them through firmware/generation boundaries.",
+        status="non_user_facing",
+        boundary="core_pattern_engine_candidate_storage",
+        notes="PatternEngine now labels stored response_template text as non-user-facing candidate storage; Synthesus 5 must consume it through firmware/generation boundaries.",
     ),
     "packages/core/unpc_engine/genome_expander.py": SurfaceClassification(
         path="packages/core/unpc_engine/genome_expander.py",
