@@ -12,7 +12,7 @@ import { ChatWorldState, ChatAction, ChatFocusTarget } from '../packages/core/do
 import { SysWorldState, SysAction, SysFocusTarget, SysHistory } from '../packages/core/domains/sysops/types';
 import { GMWorldState, GMAction, GMFocusTarget, GMNpc, GMWorldEvent } from '../packages/core/domains/gm/types';
 
-const GENERATOR_VERSION = 'organ-triad-replay-v1';
+const GENERATOR_VERSION = 'organ-triad-replay-v2';
 const DEFAULT_TRACE_SEED = 950907;
 const BASE_TIME_MS = Date.UTC(2026, 4, 30, 12, 0, 0);
 const HOUR_MS = 3_600_000;
@@ -50,14 +50,23 @@ function timestamp(sessionIndex: number, offsetMs = 0): Date {
   return new Date(BASE_TIME_MS + sessionIndex * 10 * 60_000 + offsetMs);
 }
 
-function replay(runtime: TraceRuntime, scenarioId: string, sessionIndex: number) {
+function replay(runtime: TraceRuntime, scenarioId: string, sessionIndex: number, domain: string, organ: string, phase: string) {
   runtime.step += 1;
+  const frameStem = `${runtime.seed}-${runtime.step}-${scenarioId}`.replace(/[^a-zA-Z0-9_-]/g, '-');
   return {
     generator: GENERATOR_VERSION,
     seed: runtime.seed,
     scenarioId,
     step: runtime.step,
     simulatedTime: timestamp(sessionIndex).toISOString(),
+    chal: {
+      frameId: `chal-organ-${frameStem}`,
+      parentFrameId: `chal-training-session-${domain}-${sessionIndex}`,
+      device: `chal://organs/${domain}/${organ}`,
+      role: 'organ_accelerator' as const,
+      route: 'organ_training_replay',
+      outputRef: `${domain}.${organ}.${phase}`,
+    },
   };
 }
 
@@ -193,7 +202,7 @@ function logChatTrace(runtime: TraceRuntime, sessionId: string, worldState: Chat
     decision: chosenAction,
     outcome: { quality },
     trajectoryFeatures,
-    replay: replay(runtime, `chat-${sessionIndex}-policy-prior`, sessionIndex),
+    replay: replay(runtime, `chat-${sessionIndex}-policy-prior`, sessionIndex, 'chat', 'policy_prior', 'planning'),
   });
 
   appendTraceEntry({
@@ -210,7 +219,7 @@ function logChatTrace(runtime: TraceRuntime, sessionId: string, worldState: Chat
     decision: chosenAction,
     outcome: { quality },
     trajectoryFeatures,
-    replay: replay(runtime, `chat-${sessionIndex}-attention`, sessionIndex),
+    replay: replay(runtime, `chat-${sessionIndex}-attention`, sessionIndex, 'chat', 'attention', 'planning'),
   });
 
   appendTraceEntry({
@@ -237,7 +246,7 @@ function logChatTrace(runtime: TraceRuntime, sessionId: string, worldState: Chat
       },
     },
     trajectoryFeatures,
-    replay: replay(runtime, `chat-${sessionIndex}-risk-outcome`, sessionIndex),
+    replay: replay(runtime, `chat-${sessionIndex}-risk-outcome`, sessionIndex, 'chat', 'risk_outcome', 'output'),
   });
 }
 
@@ -368,7 +377,7 @@ function logSysOpsTrace(runtime: TraceRuntime, sessionId: string, worldState: Sy
     decision: chosenAction,
     outcome: { quality },
     trajectoryFeatures,
-    replay: replay(runtime, `sysops-${sessionIndex}-policy-prior`, sessionIndex),
+    replay: replay(runtime, `sysops-${sessionIndex}-policy-prior`, sessionIndex, 'sysops', 'policy_prior', 'planning'),
   });
 
   appendTraceEntry({
@@ -385,7 +394,7 @@ function logSysOpsTrace(runtime: TraceRuntime, sessionId: string, worldState: Sy
     decision: chosenAction,
     outcome: { quality },
     trajectoryFeatures,
-    replay: replay(runtime, `sysops-${sessionIndex}-attention`, sessionIndex),
+    replay: replay(runtime, `sysops-${sessionIndex}-attention`, sessionIndex, 'sysops', 'attention', 'planning'),
   });
 
   appendTraceEntry({
@@ -412,7 +421,7 @@ function logSysOpsTrace(runtime: TraceRuntime, sessionId: string, worldState: Sy
       },
     },
     trajectoryFeatures,
-    replay: replay(runtime, `sysops-${sessionIndex}-risk-outcome`, sessionIndex),
+    replay: replay(runtime, `sysops-${sessionIndex}-risk-outcome`, sessionIndex, 'sysops', 'risk_outcome', 'output'),
   });
 }
 
@@ -528,7 +537,7 @@ function logGmTrace(runtime: TraceRuntime, sessionId: string, worldState: GMWorl
     decision: chosenAction,
     outcome: { quality },
     trajectoryFeatures,
-    replay: replay(runtime, `gm-${sessionIndex}-policy-prior`, sessionIndex),
+    replay: replay(runtime, `gm-${sessionIndex}-policy-prior`, sessionIndex, 'gm', 'policy_prior', 'planning'),
   });
 
   appendTraceEntry({
@@ -545,7 +554,7 @@ function logGmTrace(runtime: TraceRuntime, sessionId: string, worldState: GMWorl
     decision: chosenAction,
     outcome: { quality },
     trajectoryFeatures,
-    replay: replay(runtime, `gm-${sessionIndex}-attention`, sessionIndex),
+    replay: replay(runtime, `gm-${sessionIndex}-attention`, sessionIndex, 'gm', 'attention', 'planning'),
   });
 
   appendTraceEntry({
@@ -572,7 +581,7 @@ function logGmTrace(runtime: TraceRuntime, sessionId: string, worldState: GMWorl
       },
     },
     trajectoryFeatures,
-    replay: replay(runtime, `gm-${sessionIndex}-risk-outcome`, sessionIndex),
+    replay: replay(runtime, `gm-${sessionIndex}-risk-outcome`, sessionIndex, 'gm', 'risk_outcome', 'output'),
   });
 }
 

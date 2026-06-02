@@ -1886,6 +1886,30 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 - Cold-start hardware mounting is healthy, including ROM, parameter disk, grounding corpus, and provenance mounts.
 - The current blocker is not KAL/CHAL mount readiness or manifest hash drift; it is semantic incompatibility between two generated retrieval artifacts.
 
+## Current Session — 2026-06-02 (Agent 9 — CHAL-Bounded Organ Replay Traces)
+
+### 📝 Summary
+- Upgraded ML organ trace generation to `organ-triad-replay-v2` and added deterministic CHAL accelerator frame metadata under `replay.chal` for every GM/SysOps/Chat training trace.
+- Each current trace now records a frame id, parent training-session frame id, `chal://organs/<domain>/<organ>` device URI, `role="organ_accelerator"`, route, and output reference so organs remain auditable accelerators under CHAL rather than independent brain nodes.
+- Extended `tools/evaluate_organs.py` with `chal_accelerator_coverage`, Markdown/JSON scorecard reporting, and `--min-chal-accelerator-coverage`; wired `tools/selfImprove.ts` to require 100% current-v2 CHAL coverage.
+- Updated the ML organ training guide, agent handoff notes, and Phase 7 checklist without committing generated traces, models, or scorecards.
+
+### ✅ Verified
+- `python -m py_compile tools/evaluate_organs.py tests/test_organ_evaluation_quality_gate.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0 python -m pytest -q tests/test_organ_evaluation_quality_gate.py` — 5 passed.
+- `cd /home/workspace/Synthesus_4.0 && npx tsc --noEmit --skipLibCheck --target ES2020 --module commonjs --moduleResolution node --esModuleInterop tools/runTrainingSessions.ts tools/selfImprove.ts packages/core/learning/teacherTrace.ts` — passed.
+- `cd packages/organs && bun test` — no matching test files found.
+- `cd packages/organs && npm run build` — blocked by existing `packages/organs/tsconfig.json` include paths that point at old folders and find no inputs.
+
+### 🚧 Left Off / Next Steps
+- Fix or replace `packages/organs/tsconfig.json` so package-level `npm run build` can validate the current package layout instead of reporting no inputs.
+- Run a fresh `selfImprove` cycle when generated trace/model artifacts are desired; keep `logs/teacher_traces.jsonl`, scorecards, and `data/models/` out of Git.
+- Continue broader Phase 7 persistent runtime conversation trace storage beyond organ-training replay traces.
+
+### 💡 Architectural Notes
+- CHAL accelerator coverage is scoped to current `organ-triad-replay-v2` records so older ignored v1 trace lines do not fail a fresh self-improvement run after new bounded traces are appended.
+- The gate verifies the device URI and output reference against the trace domain, organ, and phase, making organ routing visible in replay/eval artifacts without promoting organs into uncontrolled autonomous brains.
+
 ## Current Session — 2026-06-01 (Agent 1 — Business-Bot CHAL Preset Path)
 
 ### 📝 Summary

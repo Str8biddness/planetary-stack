@@ -238,6 +238,12 @@ This repo is currently in a validated PPBRS baseline state. Future PPBRS optimiz
 - `tools/evaluate_organs.py` reports replay metadata coverage in the runtime scorecard; newly generated trace slices should stay at 100%.
 - Runtime artifacts remain ignored: commit the generator/evaluator source and docs, not `logs/teacher_traces.jsonl`, `logs/organ_evaluation_scorecard.*`, or `data/models/`.
 
+### CHAL accelerator trace update (2026-06-02)
+- `tools/runTrainingSessions.ts` now emits `organ-triad-replay-v2` traces with `replay.chal` metadata on every organ trace.
+- Each current trace names its deterministic frame id, training-session parent frame id, `chal://organs/<domain>/<organ>` device, `role="organ_accelerator"`, route, and output reference.
+- `tools/evaluate_organs.py` reports CHAL accelerator frame coverage for current v2 traces, and `tools/selfImprove.ts` requires 100% coverage with `--min-chal-accelerator-coverage 1.0`.
+- This is the durable boundary that keeps GM/SysOps/Chat organs as CHAL accelerators under training/eval control, not independent uncontrolled brain nodes.
+
 ## Emergent Resonance & Consciousness Loop (2026-05-05)
 
 ... (rest of the section) ...

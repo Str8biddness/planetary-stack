@@ -136,7 +136,7 @@ Legend:
 
 - [ ]  Add memory provenance and TTL policy.
 
-- [~]  Add replayable trace storage for comparison harnesses. Session log: 2026-05-30 Agent 9 added deterministic organ-training trace replay metadata and scorecard coverage; 2026-05-31 Agent 9 added an organ-evaluation quality gate for replay coverage, numeric consistency, and missing trained models; 2026-06-01 Agent 3 added compact Phase 8 runtime conversation replay JSONL records for the legacy-vs-Synthesus-5 harness; broader persistent runtime conversation trace storage remains.
+- [~]  Add replayable trace storage for comparison harnesses. Session log: 2026-05-30 Agent 9 added deterministic organ-training trace replay metadata and scorecard coverage; 2026-05-31 Agent 9 added an organ-evaluation quality gate for replay coverage, numeric consistency, and missing trained models; 2026-06-01 Agent 3 added compact Phase 8 runtime conversation replay JSONL records for the legacy-vs-Synthesus-5 harness; 2026-06-02 Agent 9 added CHAL accelerator frame metadata and coverage gating for current organ-training traces; broader persistent runtime conversation trace storage remains.
 
 - \[\~\] Add save/load tests across CHAL memory partitions. Session log: 2026-05-27 Agent 8 AIVM snapshot integrity added default VMD snapshot/restore parity and tamper rejection; 2026-05-31 Agent 8 added per-device fingerprint manifests and restore verification across mounted AIVM devices; 2026-06-01 Agent 8 added explicit AIVM cache/writeback partition devices with snapshot restore parity and tamper rejection; broader persistent runtime trace storage remains.
 

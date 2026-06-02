@@ -42,6 +42,7 @@ MODELS_DIR = REPO_ROOT / "data" / "models"
 REPORT_JSON = REPO_ROOT / "logs" / "organ_evaluation_scorecard.json"
 REPORT_MD = REPO_ROOT / "logs" / "organ_evaluation_scorecard.md"
 ATTENTION_WIDTH = 10
+CHAL_ACCELERATOR_GENERATOR = "organ-triad-replay-v2"
 
 
 @dataclass
@@ -72,6 +73,7 @@ class OrganScorecard:
     metric_name: str
     scientific_consistency: float
     replay_coverage: float
+    chal_accelerator_coverage: float
     consistency_warnings: list[str]
     notes: list[str]
 
@@ -81,6 +83,7 @@ class QualityGateResult:
     passed: bool
     failures: list[str]
     min_replay_coverage: float | None
+    min_chal_accelerator_coverage: float | None
     min_scientific_consistency: float | None
     fail_under_baseline: bool
     fail_missing_models: bool
@@ -343,6 +346,30 @@ def _replay_coverage(records: Iterable[TraceRecord]) -> float:
     return (replayable / total) if total else 0.0
 
 
+def _chal_accelerator_coverage(records: Iterable[TraceRecord]) -> float:
+    total = 0
+    bounded = 0
+    for rec in records:
+        if rec.replay.get("generator") != CHAL_ACCELERATOR_GENERATOR:
+            continue
+        total += 1
+        chal = rec.replay.get("chal") if isinstance(rec.replay, dict) else None
+        if not isinstance(chal, dict):
+            continue
+        device = chal.get("device")
+        expected_device = f"chal://organs/{rec.domain}/{rec.organ}"
+        if (
+            chal.get("frameId")
+            and chal.get("parentFrameId")
+            and device == expected_device
+            and chal.get("role") == "organ_accelerator"
+            and chal.get("route") == "organ_training_replay"
+            and chal.get("outputRef") == f"{rec.domain}.{rec.organ}.{rec.phase}"
+        ):
+            bounded += 1
+    return (bounded / total) if total else 0.0
+
+
 def _load_model(domain: str, organ: str):
     if joblib is None:
         raise RuntimeError("joblib is required to load trained models")
@@ -358,6 +385,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
     metric_name = _metric_name(organ)
     sci_consistency, warnings = _consistency_check(records)
     replay_coverage = _replay_coverage(records)
+    chal_accelerator_coverage = _chal_accelerator_coverage(records)
     notes: list[str] = []
 
     if len(records) == 0:
@@ -373,6 +401,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
             metric_name=metric_name,
             scientific_consistency=sci_consistency,
             replay_coverage=replay_coverage,
+            chal_accelerator_coverage=chal_accelerator_coverage,
             consistency_warnings=warnings,
             notes=["No matching traces found."],
         )
@@ -391,6 +420,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
             metric_name=metric_name,
             scientific_consistency=sci_consistency,
             replay_coverage=replay_coverage,
+            chal_accelerator_coverage=chal_accelerator_coverage,
             consistency_warnings=warnings,
             notes=notes,
         )
@@ -423,6 +453,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
             metric_name=metric_name,
             scientific_consistency=sci_consistency,
             replay_coverage=replay_coverage,
+            chal_accelerator_coverage=chal_accelerator_coverage,
             consistency_warnings=warnings,
             notes=notes,
         )
@@ -451,6 +482,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
             metric_name=metric_name,
             scientific_consistency=sci_consistency,
             replay_coverage=replay_coverage,
+            chal_accelerator_coverage=chal_accelerator_coverage,
             consistency_warnings=warnings,
             notes=notes,
         )
@@ -477,6 +509,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
         metric_name=metric_name,
         scientific_consistency=sci_consistency,
         replay_coverage=replay_coverage,
+        chal_accelerator_coverage=chal_accelerator_coverage,
         consistency_warnings=warnings,
         notes=notes,
     )
@@ -492,12 +525,12 @@ def render_markdown(scorecards: list[OrganScorecard]) -> str:
         "",
         "Fictional narrative traces are acceptable input as long as scientific/math fields are numeric, bounded, and internally consistent.",
         "",
-        "| Domain | Organ | Traces | Metric | Train | Validation | Baseline | Consistency | Replay |",
+        "| Domain | Organ | Traces | Metric | Train | Validation | Baseline | Consistency | Replay / CHAL |",
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for s in scorecards:
         lines.append(
-            f"| {s.domain} | {s.organ} | {s.trace_count} | {s.metric_name} | {_format_metric(s.train_metric)} | {_format_metric(s.validation_metric)} | {_format_metric(s.baseline_metric)} | {s.scientific_consistency:.2%} | {s.replay_coverage:.2%} |"
+            f"| {s.domain} | {s.organ} | {s.trace_count} | {s.metric_name} | {_format_metric(s.train_metric)} | {_format_metric(s.validation_metric)} | {_format_metric(s.baseline_metric)} | {s.scientific_consistency:.2%} | {s.replay_coverage:.2%} / CHAL {s.chal_accelerator_coverage:.2%} |"
         )
     lines.append("")
     for s in scorecards:
@@ -506,6 +539,7 @@ def render_markdown(scorecards: list[OrganScorecard]) -> str:
         lines.append(f"- Model exists: {'yes' if s.model_exists else 'no'}")
         lines.append(f"- Scientific consistency: {s.scientific_consistency:.2%}")
         lines.append(f"- Replay metadata coverage: {s.replay_coverage:.2%}")
+        lines.append(f"- CHAL accelerator frame coverage: {s.chal_accelerator_coverage:.2%}")
         if s.consistency_warnings:
             lines.append("- Warnings:")
             for warning in s.consistency_warnings:
@@ -522,6 +556,7 @@ def evaluate_quality_gate(
     scorecards: list[OrganScorecard],
     *,
     min_replay_coverage: float | None = None,
+    min_chal_accelerator_coverage: float | None = None,
     min_scientific_consistency: float | None = None,
     fail_under_baseline: bool = False,
     fail_missing_models: bool = False,
@@ -537,6 +572,14 @@ def evaluate_quality_gate(
         if min_replay_coverage is not None and scorecard.replay_coverage < min_replay_coverage:
             failures.append(
                 f"{label} replay coverage {scorecard.replay_coverage:.2%} is below required {min_replay_coverage:.2%}"
+            )
+
+        if (
+            min_chal_accelerator_coverage is not None
+            and scorecard.chal_accelerator_coverage < min_chal_accelerator_coverage
+        ):
+            failures.append(
+                f"{label} CHAL accelerator coverage {scorecard.chal_accelerator_coverage:.2%} is below required {min_chal_accelerator_coverage:.2%}"
             )
 
         if min_scientific_consistency is not None and scorecard.scientific_consistency < min_scientific_consistency:
@@ -562,6 +605,7 @@ def evaluate_quality_gate(
         passed=not failures,
         failures=failures,
         min_replay_coverage=min_replay_coverage,
+        min_chal_accelerator_coverage=min_chal_accelerator_coverage,
         min_scientific_consistency=min_scientific_consistency,
         fail_under_baseline=fail_under_baseline,
         fail_missing_models=fail_missing_models,
@@ -574,6 +618,7 @@ def main() -> int:
     parser.add_argument("--write-json", action="store_true", default=True, help="Write JSON scorecard")
     parser.add_argument("--write-md", action="store_true", default=True, help="Write Markdown scorecard")
     parser.add_argument("--min-replay-coverage", type=float, default=None, help="Fail if any organ replay metadata coverage is below this 0.0-1.0 threshold")
+    parser.add_argument("--min-chal-accelerator-coverage", type=float, default=None, help="Fail if any organ replay trace lacks CHAL accelerator frame metadata")
     parser.add_argument("--min-scientific-consistency", type=float, default=None, help="Fail if any organ numeric consistency is below this 0.0-1.0 threshold")
     parser.add_argument("--fail-under-baseline", action="store_true", help="Fail when validation performance is worse than the relevant baseline")
     parser.add_argument("--fail-missing-models", action="store_true", help="Fail when traces exist but a trained model file is missing")
@@ -601,6 +646,7 @@ def main() -> int:
     quality_gate = evaluate_quality_gate(
         scorecards,
         min_replay_coverage=args.min_replay_coverage,
+        min_chal_accelerator_coverage=args.min_chal_accelerator_coverage,
         min_scientific_consistency=args.min_scientific_consistency,
         fail_under_baseline=args.fail_under_baseline,
         fail_missing_models=args.fail_missing_models,
@@ -616,7 +662,7 @@ def main() -> int:
     logger.info(f"Wrote {REPORT_MD}")
     for s in scorecards:
         logger.info(
-            f"{s.domain}/{s.organ}: train={_format_metric(s.train_metric)} validation={_format_metric(s.validation_metric)} baseline={_format_metric(s.baseline_metric)} consistency={s.scientific_consistency:.2%} replay={s.replay_coverage:.2%}"
+            f"{s.domain}/{s.organ}: train={_format_metric(s.train_metric)} validation={_format_metric(s.validation_metric)} baseline={_format_metric(s.baseline_metric)} consistency={s.scientific_consistency:.2%} replay={s.replay_coverage:.2%} chal_accelerator={s.chal_accelerator_coverage:.2%}"
         )
     if not quality_gate.passed:
         for failure in quality_gate.failures:

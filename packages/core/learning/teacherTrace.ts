@@ -13,6 +13,14 @@ export interface TraceReplayMetadata {
   scenarioId: string;
   step: number;
   simulatedTime: string;
+  chal?: {
+    frameId: string;
+    parentFrameId: string;
+    device: string;
+    role: 'organ_accelerator';
+    route: string;
+    outputRef: string;
+  };
 }
 
 export interface IntakeTraceEntry {
