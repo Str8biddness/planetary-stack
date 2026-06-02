@@ -70,10 +70,10 @@ CLASSIFICATIONS: dict[str, SurfaceClassification] = {
     ),
     "packages/core/cognitive/cognitive_engine.py": SurfaceClassification(
         path="packages/core/cognitive/cognitive_engine.py",
-        surface="legacy_cognitive_character_fallback",
-        status="legacy_quarantine_required",
-        boundary="outside_explicit_synthesus5_chal_path",
-        notes="The legacy cognitive engine still reads pattern response templates and fallback text for direct character behavior outside the CHAL hypervisor path.",
+        surface="explicit_cognitive_engine_npc_fallback",
+        status="allowed_labeled_exception",
+        boundary="explicit_npc_script",
+        notes="The cognitive engine labels direct character fallback and escalation-stall text in debug.template_surface as explicit NPC-script output outside the normal Synthesus 5 assistant path.",
     ),
     "packages/core/cognitive/response_compositor.py": SurfaceClassification(
         path="packages/core/cognitive/response_compositor.py",

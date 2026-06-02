@@ -2264,3 +2264,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Phase 8 now has two complementary generated artifacts: compact replay records for trace diffing and a compact reference scorecard for fixed GPT-4-class expectation checks.
 - The reference gate is intentionally deterministic and trace-based; it validates CHAL architecture evidence instead of claiming external GPT-4 judgment.
+
+## Current Session — 2026-06-02 (Agent 4 — Cognitive Engine Fallback Surface Boundary)
+
+### 📝 Summary
+- Labeled terminal `CognitiveEngine` fallback output with `debug.template_surface` metadata so direct character fallback and escalation-stall text are explicit NPC-script surfaces.
+- Reclassified `packages/core/cognitive/cognitive_engine.py` from `legacy_quarantine_required` to `allowed_labeled_exception`, reducing remaining Phase 6 quarantine paths from three to two.
+- Added focused regression coverage for character fallback and escalation-stall labeling while preserving the legacy response string contract.
+- Updated the Phase 6 checklist and PPBRS/template-boundary documentation.
+
+### ✅ Verified
+- `python -m py_compile packages/core/cognitive/cognitive_engine.py tools/audit_template_surfaces.py tests/test_cognitive_engine_surface.py tests/test_template_surface_audit.py` — passed.
+- `python tools/audit_template_surfaces.py --fail-on-unclassified` — passed; 93 signatures, 17 classified paths, 0 unclassified hits, 2 `legacy_quarantine_required` paths remain.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_cognitive_engine_surface.py tests/test_template_surface_audit.py` — 10 passed, 3 FAISS/SWIG deprecation warnings.
+
+### 🚧 Left Off / Next Steps
+- Continue Phase 6 conversion/removal of the two remaining `legacy_quarantine_required` paths from `tools/audit_template_surfaces.py`: `packages/api/fastapi_server.py` and `packages/api/production_server.py`.
+- Convert legacy API character pattern and fallback emitters to call labeled cognitive-engine/compositor boundaries or route through the Synthesus 5 CHAL path.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- `CognitiveEngine` remains a local NPC behavior engine. Its final fallback text is now inspectable as an explicit NPC-script exception, not a normal assistant template owner.
+- The normal Synthesus 5 assistant path still belongs to CHAL, the Cognitive Hypervisor, CGPU rendering, and critic arbitration.

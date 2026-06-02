@@ -238,6 +238,18 @@ The older `compose()` API remains as a string-returning compatibility wrapper. C
 
 This keeps learned pattern text available to legacy stores while making the Synthesus 5 boundary explicit: ELS does not own final wording, and any later user-facing use must pass through a labeled NPC-script, firmware, generation, or critic-controlled path.
 
+### Cognitive Engine Fallback Boundary (2026-06-02)
+
+`packages/core/cognitive/cognitive_engine.py` now labels terminal local NPC fallback text in `debug.template_surface` before returning it from the legacy cognitive engine. Both direct character fallback text and escalation stall text carry:
+
+- `surface="explicit_npc_script"`
+- `boundary="cognitive_engine_fallback"`
+- `source="character_fallback"` or `source="escalation_stall"`
+- `user_facing=True`
+- `legacy_template_signature_present=<bool>`
+
+This preserves classic NPC behavior while making the exception explicit: local character fallback remains an NPC-script surface outside the normal Synthesus 5 assistant path, not an unlabeled PPBRS or template-owned final response.
+
 ## Integration with Dual-Hemisphere
 
 PPBRS runs primarily in the **Left Hemisphere** of the dual-hemisphere architecture:

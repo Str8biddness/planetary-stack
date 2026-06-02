@@ -47,6 +47,13 @@ def test_template_surface_audit_tracks_pattern_engine_as_candidate_storage():
     assert classification.boundary == "core_pattern_engine_candidate_storage"
 
 
+def test_template_surface_audit_tracks_cognitive_engine_fallback_as_labeled_npc_script():
+    classification = CLASSIFICATIONS["packages/core/cognitive/cognitive_engine.py"]
+
+    assert classification.status == "allowed_labeled_exception"
+    assert classification.boundary == "explicit_npc_script"
+
+
 def test_template_surface_audit_labels_allowed_exceptions():
     allowed = [
         item

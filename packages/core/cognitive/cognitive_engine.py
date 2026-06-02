@@ -678,6 +678,17 @@ class CognitiveEngine:
         if memory_store is not None:
             self._memory_store = memory_store
 
+    @staticmethod
+    def _label_fallback_surface(text: str, source: str) -> Dict[str, Any]:
+        legacy_signatures = ("[fallback]", "[module]", "Handled:", "No route matched", "response_template")
+        return {
+            "surface": "explicit_npc_script",
+            "boundary": "cognitive_engine_fallback",
+            "source": source,
+            "user_facing": True,
+            "legacy_template_signature_present": any(signature in text for signature in legacy_signatures),
+        }
+
     def process_query(
         self,
         player_id: str,
@@ -1266,8 +1277,10 @@ class CognitiveEngine:
             if escalation.should_escalate:
                 # Use stall response
                 response = escalation.fallback_response or self._fallback_text
+                fallback_source = "escalation_stall"
             else:
                 response = self._fallback_text
+                fallback_source = "character_fallback"
 
             self.tracker.record_npc_response(player_id, response)
             self.recall.record_response(player_id, response)
@@ -1291,6 +1304,9 @@ class CognitiveEngine:
                 start_time=start_time,
                 context=context,  # Pass context for goal evaluation
                 ml_context=ml_context,
+                debug_extra={
+                    "template_surface": self._label_fallback_surface(response, fallback_source),
+                },
                 actions_taken=actions_taken,
                 kal_context=kal_context,
             )
