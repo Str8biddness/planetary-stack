@@ -236,6 +236,26 @@ class TestContextAwareReasoningPipeline:
         assert [item["rule"]["tags"] for item in activated] == [["ops"], []]
         assert calls == ["ops", "shared"]
 
+    def test_weighted_rules_use_trigger_value_index(self):
+        evaluator = WeightedRuleEvaluator()
+        calls = []
+        evaluator.add_rule(
+            lambda ctx: calls.append("cpu") or True,
+            lambda ctx: "cpu",
+            trigger_values={"signal": "cpu_spike"},
+        )
+        evaluator.add_rule(
+            lambda ctx: calls.append("disk") or True,
+            lambda ctx: "disk",
+            trigger_values={"signal": "disk_full"},
+        )
+        evaluator.add_rule(lambda ctx: calls.append("shared") or True, lambda ctx: "shared")
+
+        activated = evaluator.evaluate({"signal": "disk_full"})
+
+        assert [item["rule"]["trigger_values"] for item in activated] == [{"signal": "disk_full"}, {}]
+        assert calls == ["disk", "shared"]
+
 
 class TestConfidenceScorer:
     """Tests for ConfidenceScorer."""
@@ -318,6 +338,40 @@ class TestRuleToActionMapper:
 
         assert [rule.rule_id for rule, _ in results] == ["ops", "shared"]
         assert calls == ["ops", "shared"]
+
+    def test_evaluate_rules_prefilters_by_trigger_values_and_tags(self):
+        mapper = RuleToActionMapper()
+        calls = []
+        mapper.add_rule(
+            "cpu_ops",
+            "CPU ops",
+            lambda ctx: calls.append("cpu_ops") or True,
+            [],
+            tags=["ops"],
+            metadata={"trigger_values": {"signal": "cpu_spike"}},
+        )
+        mapper.add_rule(
+            "disk_ops",
+            "Disk ops",
+            lambda ctx: calls.append("disk_ops") or True,
+            [],
+            tags=["ops"],
+            metadata={"trigger_values": {"signal": "disk_full"}},
+        )
+        mapper.add_rule(
+            "disk_chat",
+            "Disk chat",
+            lambda ctx: calls.append("disk_chat") or True,
+            [],
+            tags=["chat"],
+            metadata={"trigger_values": {"signal": "disk_full"}},
+        )
+        mapper.add_rule("shared_ops", "Shared ops", lambda ctx: calls.append("shared_ops") or True, [], tags=["ops"])
+
+        results = mapper.evaluate_rules({"tags": ["ops"], "signal": "disk_full"})
+
+        assert [rule.rule_id for rule, _ in results] == ["disk_ops", "shared_ops"]
+        assert calls == ["disk_ops", "shared_ops"]
     
     def test_execute_action(self):
         mapper = RuleToActionMapper()

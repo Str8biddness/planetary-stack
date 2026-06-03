@@ -113,7 +113,7 @@ Legend:
 ## Phase 6: Legacy Template Path Removal
 
 
-- [~] Convert PPBRS normal-path output into non-user-facing firmware signals. Session log: 2026-06-01 Agent 6 added fanout-aware PPBRS pattern candidate pruning so shared broad tokens no longer expand normal firmware matching to full-corpus scoring while preserving broad-token-only fallback behavior.
+- [~] Convert PPBRS normal-path output into non-user-facing firmware signals. Session log: 2026-06-01 Agent 6 added fanout-aware PPBRS pattern candidate pruning so shared broad tokens no longer expand normal firmware matching to full-corpus scoring while preserving broad-token-only fallback behavior; 2026-06-03 Agent 6 added trigger-key/value rule indexes so PPBRS rule/action evaluators skip unrelated conditions before firmware scoring.
 
 - [x]  Search and classify every direct fallback/template response path. Session log: 2026-05-31 Agent 6 template surface audit.
 

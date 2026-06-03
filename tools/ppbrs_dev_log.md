@@ -503,3 +503,35 @@ Post-edit benchmark:
 - `python -m py_compile packages/reasoning/pattern_classifier.py tests/test_ppbrs.py`
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 114 passed.
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py`
+
+## Daily Entry: 2026-06-03 (Agent 6 — Trigger-Indexed Rule Filtering)
+
+### Actions Performed
+
+1. Added trigger-key and exact trigger-value indexes to `WeightedRuleEvaluator` and `RuleToActionMapper`.
+2. Kept untriggered rules as shared firmware candidates while intersecting trigger filters with tag filters when both are present.
+3. Added regressions proving unrelated trigger-scoped rule conditions are not evaluated in either rule evaluator.
+4. Updated the PPBRS benchmark so rule evaluation exercises trigger-indexed action rules.
+
+### Benchmark Run
+
+PPBRS micro-benchmark after trigger indexing:
+
+| Component | p50 (ms) | p95 (ms) | Avg (ms) |
+|---|---:|---:|---:|
+| pattern_matching | 0.3308 | 0.3647 | 0.3063 |
+| rule_evaluation | 0.0207 | 0.0238 | 0.0214 |
+| graph_traversal | 0.0151 | 0.0174 | 0.0156 |
+
+Same-run rule comparison:
+
+| Rules | Tag-only p50/p95/avg (ms) | Trigger+tag p50/p95/avg (ms) |
+|---:|---:|---:|
+| 500 | 0.0238 / 0.0261 / 0.0242 | 0.0209 / 0.0225 / 0.0213 |
+| 5000 | 0.2343 / 0.2429 / 0.2356 | 0.2082 / 0.2171 / 0.2109 |
+
+### Verified
+
+- `python -m py_compile packages/reasoning/reasoning_chain.py packages/reasoning/rule_to_action.py tests/test_ppbrs.py tools/ppbrs_benchmark.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 116 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py`

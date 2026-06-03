@@ -6,6 +6,7 @@ from typing import Optional, List, Dict, Any, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 import re
+import json
 
 try:
     from .chal import build_ppbrs_firmware_signal
@@ -291,11 +292,17 @@ class WeightedRuleEvaluator:
         self.rules: List[Dict[str, Any]] = []
         self._tag_index: Dict[str, List[int]] = {}
         self._untagged_rule_ids: List[int] = []
+        self._trigger_key_index: Dict[str, List[int]] = {}
+        self._trigger_value_index: Dict[tuple, List[int]] = {}
+        self._trigger_value_key_rules: Dict[str, set] = {}
+        self._untriggered_rule_ids: List[int] = []
         
     def add_rule(self, condition: Callable[[Dict], bool],
                 consequence: Callable[[Dict], Any],
                 weight: float = 1.0,
-                tags: Optional[List[str]] = None) -> None:
+                tags: Optional[List[str]] = None,
+                trigger_keys: Optional[List[str]] = None,
+                trigger_values: Optional[Dict[str, Any]] = None) -> None:
         """Adds a new weighted rule to the evaluator.
 
         Args:
@@ -309,6 +316,8 @@ class WeightedRuleEvaluator:
             'consequence': consequence,
             'weight': weight,
             'tags': tags or [],
+            'trigger_keys': trigger_keys or [],
+            'trigger_values': trigger_values or {},
             'activation_count': 0
         }
         rule_id = len(self.rules)
@@ -319,22 +328,51 @@ class WeightedRuleEvaluator:
         else:
             self._untagged_rule_ids.append(rule_id)
 
+        indexed_trigger_keys = set(rule['trigger_keys']) | set(rule['trigger_values'].keys())
+        if indexed_trigger_keys:
+            for key in indexed_trigger_keys:
+                self._trigger_key_index.setdefault(key, []).append(rule_id)
+            for key, value in rule['trigger_values'].items():
+                self._trigger_value_index.setdefault((key, self._index_value(value)), []).append(rule_id)
+                self._trigger_value_key_rules.setdefault(key, set()).add(rule_id)
+        else:
+            self._untriggered_rule_ids.append(rule_id)
+
+    def _index_value(self, value: Any) -> str:
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return f"{type(value).__name__}:{value!r}"
+        return json.dumps(value, sort_keys=True, default=str)
+
     def _candidate_rules(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
         context_tags = set(context.get('tags', []))
-        if not context_tags:
+        tag_filtered = None
+        if context_tags:
+            tag_filtered = set(self._untagged_rule_ids)
+            for tag in context_tags:
+                tag_filtered.update(self._tag_index.get(tag, []))
+
+        trigger_filtered = None
+        for key, value in context.items():
+            if key == 'tags':
+                continue
+            exact_ids = set(self._trigger_value_index.get((key, self._index_value(value)), []))
+            key_ids = set(self._trigger_key_index.get(key, []))
+            if exact_ids or key_ids:
+                if trigger_filtered is None:
+                    trigger_filtered = set(self._untriggered_rule_ids)
+                trigger_filtered.update(exact_ids)
+                trigger_filtered.update(key_ids - self._trigger_value_key_rules.get(key, set()))
+
+        candidate_ids = None
+        for filtered in (tag_filtered, trigger_filtered):
+            if filtered is None:
+                continue
+            candidate_ids = set(filtered) if candidate_ids is None else candidate_ids & filtered
+
+        if candidate_ids is None:
             return self.rules
 
-        candidate_ids = []
-        for tag in context_tags:
-            candidate_ids.extend(self._tag_index.get(tag, []))
-        candidate_ids.extend(self._untagged_rule_ids)
-        seen = set()
-        ordered_ids = []
-        for rule_id in candidate_ids:
-            if rule_id not in seen:
-                seen.add(rule_id)
-                ordered_ids.append(rule_id)
-        return [self.rules[i] for i in ordered_ids]
+        return [rule for i, rule in enumerate(self.rules) if i in candidate_ids]
     
     def evaluate(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Evaluates all rules against the context and identifies triggered ones.

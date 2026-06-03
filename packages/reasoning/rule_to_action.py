@@ -112,6 +112,10 @@ class RuleToActionMapper:
         self._action_registry: Dict[str, Action] = {}
         self._tag_index: Dict[str, set] = {}
         self._untagged_rules: set = set()
+        self._trigger_key_index: Dict[str, set] = {}
+        self._trigger_value_index: Dict[tuple, set] = {}
+        self._trigger_value_key_rules: Dict[str, set] = {}
+        self._untriggered_rules: set = set()
         
     def register_rule(self, rule: Rule) -> None:
         """Registers a Rule object with the mapper.
@@ -133,37 +137,89 @@ class RuleToActionMapper:
         else:
             self._untagged_rules.add(rule.rule_id)
 
+        trigger_values = rule.metadata.get("trigger_values", {})
+        trigger_keys = set(rule.metadata.get("trigger_keys", [])) | set(trigger_values.keys())
+        if trigger_keys:
+            for key in trigger_keys:
+                self._trigger_key_index.setdefault(key, set()).add(rule.rule_id)
+            for key, value in trigger_values.items():
+                self._trigger_value_index.setdefault((key, self._index_value(value)), set()).add(rule.rule_id)
+                self._trigger_value_key_rules.setdefault(key, set()).add(rule.rule_id)
+        else:
+            self._untriggered_rules.add(rule.rule_id)
+
     def _remove_from_indexes(self, rule: Rule) -> None:
         self._untagged_rules.discard(rule.rule_id)
+        self._untriggered_rules.discard(rule.rule_id)
         for tag in rule.tags:
             rule_ids = self._tag_index.get(tag)
             if rule_ids:
                 rule_ids.discard(rule.rule_id)
                 if not rule_ids:
                     del self._tag_index[tag]
+        trigger_values = rule.metadata.get("trigger_values", {})
+        trigger_keys = set(rule.metadata.get("trigger_keys", [])) | set(trigger_values.keys())
+        for key in trigger_keys:
+            rule_ids = self._trigger_key_index.get(key)
+            if rule_ids:
+                rule_ids.discard(rule.rule_id)
+                if not rule_ids:
+                    del self._trigger_key_index[key]
+        for key, value in trigger_values.items():
+            index_key = (key, self._index_value(value))
+            rule_ids = self._trigger_value_index.get(index_key)
+            if rule_ids:
+                rule_ids.discard(rule.rule_id)
+                if not rule_ids:
+                    del self._trigger_value_index[index_key]
+            scoped_ids = self._trigger_value_key_rules.get(key)
+            if scoped_ids:
+                scoped_ids.discard(rule.rule_id)
+                if not scoped_ids:
+                    del self._trigger_value_key_rules[key]
+
+    def _index_value(self, value: Any) -> str:
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return f"{type(value).__name__}:{value!r}"
+        return json.dumps(value, sort_keys=True, default=str)
 
     def _candidate_rules(self, context: Dict[str, Any]) -> List[Rule]:
         context_tags = set(context.get('tags', []))
-        if not context_tags:
+        tag_filtered = None
+        if context_tags:
+            tag_filtered = set(self._untagged_rules)
+            for tag in context_tags:
+                tag_filtered.update(self._tag_index.get(tag, set()))
+
+        trigger_filtered = None
+        for key, value in context.items():
+            if key == 'tags':
+                continue
+            exact_ids = self._trigger_value_index.get((key, self._index_value(value)), set())
+            key_ids = self._trigger_key_index.get(key, set())
+            if exact_ids or key_ids:
+                if trigger_filtered is None:
+                    trigger_filtered = set(self._untriggered_rules)
+                trigger_filtered.update(exact_ids)
+                trigger_filtered.update(key_ids - self._trigger_value_key_rules.get(key, set()))
+
+        candidate_ids = None
+        for filtered in (tag_filtered, trigger_filtered):
+            if filtered is None:
+                continue
+            candidate_ids = set(filtered) if candidate_ids is None else candidate_ids & filtered
+
+        if candidate_ids is None:
             return list(self.rules.values())
 
-        candidate_ids = []
-        for tag in context_tags:
-            candidate_ids.extend(sorted(self._tag_index.get(tag, set())))
-        candidate_ids.extend(sorted(self._untagged_rules))
-        seen = set()
-        ordered_ids = []
-        for rule_id in candidate_ids:
-            if rule_id not in seen:
-                seen.add(rule_id)
-                ordered_ids.append(rule_id)
-        return [self.rules[rule_id] for rule_id in ordered_ids if rule_id in self.rules]
+        return [rule for rule_id, rule in self.rules.items() if rule_id in candidate_ids]
         
     def add_rule(self, rule_id: str, name: str,
                 condition: Callable[[Dict], bool],
                 actions: List[Action],
                 weight: float = 1.0,
-                tags: Optional[List[str]] = None) -> None:
+                tags: Optional[List[str]] = None,
+                metadata: Optional[Dict[str, Any]] = None) -> None:
         """Constructs and registers a new rule.
 
         Args:
@@ -180,7 +236,8 @@ class RuleToActionMapper:
             condition=condition,
             actions=actions,
             weight=weight,
-            tags=tags or []
+            tags=tags or [],
+            metadata=metadata or {}
         )
         self.register_rule(rule)
     

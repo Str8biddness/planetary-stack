@@ -2608,3 +2608,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - `/mnt/mem/writeback` is now exercised by a production API path as a CHAL boundary, with provenance and critic/template gates preserved before storage.
 - The API writeback hook is deliberately non-fatal: KAL/KN response quality remains owned by the Cognitive Hypervisor, while memory persistence is reported as telemetry and never revives legacy fallback ownership.
+
+## Current Session — 2026-06-03 (Agent 6 — PPBRS Trigger-Indexed Rule Filtering)
+
+### 📝 Summary
+- Added trigger-key and exact trigger-value indexes to `WeightedRuleEvaluator` and `RuleToActionMapper`, extending the existing tag indexes so PPBRS rule/action evaluation skips unrelated conditions before scoring.
+- Preserved untriggered rules as shared firmware candidates and intersected trigger filters with tag filters when both are present.
+- Updated `tools/ppbrs_benchmark.py` so rule evaluation exercises trigger-indexed action rules.
+- Advanced Phase 6 PPBRS firmware conversion work by tightening the rule/action hot path without changing final-language ownership or template boundaries.
+
+### ✅ Verified
+- `python -m py_compile packages/reasoning/reasoning_chain.py packages/reasoning/rule_to_action.py tests/test_ppbrs.py tools/ppbrs_benchmark.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 116 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py` — pattern p50 0.3308ms, rule p50 0.0207ms, graph p50 0.0151ms.
+- Same-run rule comparison: 500 rules tag-only p50 0.0238ms vs trigger+tag p50 0.0209ms; 5000 rules tag-only p50 0.2343ms vs trigger+tag p50 0.2082ms.
+
+### 🚧 Left Off / Next Steps
+- Consider top-rule short-circuiting once trigger-indexed rule candidates are stable across production call sites.
+- Continue keeping PPBRS outputs as CHAL firmware signals and route any remaining normal user-facing wording through generation/critic boundaries.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, release-packaging docs/scripts/tests/package metadata, checklist/log edits, and untracked `synthesus_framework/` changes were left untouched except for appending this Agent 6 checklist/log evidence.
+
+### 💡 Architectural Notes
+- PPBRS rule/action matching now uses structured context signals as firmware routing hints instead of executing every potentially unrelated condition.
+- Trigger metadata is optional and backwards compatible; rules without trigger metadata remain shared candidates.

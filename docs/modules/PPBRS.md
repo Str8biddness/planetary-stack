@@ -69,7 +69,7 @@ The repository is currently in a validated PPBRS baseline state. Significant opt
 - **Fanout-Aware Candidate Pruning**: Shared high-frequency trigger tokens are treated as broad evidence and ignored when more selective query tokens are available. If a query only contains broad tokens, PPBRS still evaluates those broad candidates so compatibility and fallback behavior remain intact.
 - **Adjacency Maps**: Replaced linear edge scans with constant-time adjacency lookups in `multi_step_reasoning`.
 - **Cached Topology**: Pre-computed reasoning graph structures for zero-overhead traversal.
-- **Rule Tag Indexing**: Rule evaluators prefilter by context tags before evaluating conditions.
+- **Rule Tag + Trigger Indexing**: Rule evaluators prefilter by context tags, trigger keys, and exact trigger values before evaluating conditions.
 
 ## Optimization Upgrade Path
 

@@ -54,7 +54,8 @@ def benchmark_rule_evaluation(n_rules=500, n_evals=100):
             condition=lambda ctx, i=i: ctx.get("key") == i,
             actions=[action],
             weight=1.0,
-            tags=[f"tag_{i % 10}"]
+            tags=[f"tag_{i % 10}"],
+            metadata={"trigger_values": {"key": i}},
         )
     
     latencies = []
