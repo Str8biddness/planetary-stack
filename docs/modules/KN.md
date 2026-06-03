@@ -214,11 +214,28 @@ context without changing the stable `QueryResponse` envelope.
 
 The cache is volatile and source-only: it does not write generated artifacts into `data/`, the standalone Knowledge Cloud repo, or the public artifact mirror. Runtime/debug surfaces can inspect it with `get_hot_context_stats()` and clear it with `clear_hot_context()`.
 
+## Synthesus 5 Memory And Cache Tier Policy
+
+`packages/core/chal/memory_policy.py` defines the source-level CHAL policy for the Phase 7 memory/cache hierarchy. The policy is intentionally separate from generated cache artifacts: it describes admission, provenance, TTL, and mount boundaries without writing FAISS, KNDB, model, cache, or memory files.
+
+| Tier | Mount | TTL | Provenance | Write |
+|------|-------|-----|------------|-------|
+| L1 turn cache | `/mnt/cache/turn` | 15 minutes | optional | writable |
+| L2 session cache | `/mnt/cache/session` | 6 hours | required | writable |
+| L3 project/user cache | `/mnt/cache/project_user` | 30 days | required | writable |
+| L4 Knowledge Cloud cache | `/mnt/cache/hot_context` | none | required | read-only seed |
+
+Writeback candidates use `MemoryWritebackCandidate` and are admitted by `decide_memory_writeback()`. The current gate accepts only critic-approved candidates with at least one provenance reference at confidence `>= 0.5`, then targets the volatile `/mnt/mem/writeback` CHAL boundary. Rejected candidates return typed reasons such as `critic_rejected`, `missing_provenance`, or `low_provenance_confidence`.
+
+This completes the cache-tier and TTL/provenance policy surface. The broader runtime task remains to connect accepted reasoning traces into episodic or crystallized memory writes through this gate.
+
 Validation:
 
 ```bash
 python -m py_compile packages/knowledge/mount_table.py packages/knowledge/kal_adapter.py tests/test_knowledge_mount_table.py
 PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_knowledge_mount_table.py tests/test_kal.py
+python -m py_compile packages/core/chal/memory_policy.py packages/core/chal/__init__.py tests/test_chal_memory_policy.py
+PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core python -m pytest -q tests/test_chal_memory_policy.py
 ```
 
 ## Usage

@@ -2522,6 +2522,28 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 - This run fixed control-plane drift only; it did not modify generated FAISS, KNDB, model, cache, scorecard, or workflow artifacts.
 - 4.1 remains historical foundation context, but active CHAL/KAL runtime surfaces should describe themselves as Synthesus 5 unless they explicitly reference preserved historical docs.
 
+## Current Session — 2026-06-03 (Knowledge Hardware Memory Policy)
+
+### 📝 Summary
+- Added `packages/core/chal/memory_policy.py` as the Synthesus 5 Phase 7 CHAL memory/cache policy contract.
+- Defined L1 turn cache, L2 session cache, L3 project/user cache, and L4 Knowledge Cloud cache with explicit mount paths, TTLs, provenance requirements, write permissions, and source-control hygiene flags.
+- Added typed memory provenance and writeback-admission records so critic/provenance-gated candidates target `/mnt/mem/writeback` and return structured rejection reasons instead of silently mutating memory.
+- Updated `docs/modules/KN.md` and the Phase 7 checklist to mark the cache-tier and TTL/provenance policy items complete while leaving runtime trace-to-memory writeback wiring in progress.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/memory_policy.py packages/core/chal/__init__.py tests/test_chal_memory_policy.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core python -m pytest -q tests/test_chal_memory_policy.py` — 7 passed.
+
+### 🚧 Left Off / Next Steps
+- Connect accepted `MemoryWritebackCandidate` decisions from actual reasoning traces into episodic/crystallized `MemoryStore` writes.
+- Keep `/mnt/cache/*` and `/mnt/mem/writeback` as CHAL boundaries, not generated artifacts to commit.
+- Rebuild or replace the standalone Knowledge Cloud generated artifacts separately so FAISS/embedder dimensions align before golden-query health can pass.
+- Pre-existing unrelated runtime root `AGENTS.md`, runtime root `README.md`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Phase 7 now has an executable source-level memory policy. It defines cache and writeback admission rules without creating any cache, writeback, FAISS, KNDB, scorecard, model, or workflow artifact.
+- L4 Knowledge Cloud cache is modeled as a read-only seed boundary; mutable session/project caches and memory writeback remain separate CHAL planes that require critic/provenance control.
+
 ## Current Session — 2026-06-03 (Agent 3 — Phase 8 Axis-Improvement Scorecard Gate)
 
 ### 📝 Summary

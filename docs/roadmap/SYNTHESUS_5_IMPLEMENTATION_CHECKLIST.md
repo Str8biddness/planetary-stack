@@ -127,11 +127,11 @@ Legend:
 
 ## Phase 7: Memory And Cache Hierarchy
 
-- [ ]  Define L1 turn cache, L2 session cache, L3 project/user cache, and L4 Knowledge Cloud cache.
+- [x]  Define L1 turn cache, L2 session cache, L3 project/user cache, and L4 Knowledge Cloud cache. Session log: 2026-06-03 Knowledge Hardware Memory Policy added CHAL tier policies with mount paths, TTLs, provenance requirements, and focused tests.
 
-- [ ]  Add writeback rules from reasoning traces into episodic/crystallized memory.
+- [~]  Add writeback rules from reasoning traces into episodic/crystallized memory. Session log: 2026-06-03 Knowledge Hardware Memory Policy added critic/provenance admission rules targeting `/mnt/mem/writeback`; broader runtime wiring from accepted reasoning traces into episodic/crystallized stores remains.
 
-- [ ]  Add memory provenance and TTL policy.
+- [x]  Add memory provenance and TTL policy. Session log: 2026-06-03 Knowledge Hardware Memory Policy added typed `MemoryProvenanceRef`, L1-L4 TTL policy, and writeback rejection reasons for missing/low-confidence provenance.
 
 - [~]  Add replayable trace storage for comparison harnesses. Session log: 2026-05-30 Agent 9 added deterministic organ-training trace replay metadata and scorecard coverage; 2026-05-31 Agent 9 added an organ-evaluation quality gate for replay coverage, numeric consistency, and missing trained models; 2026-06-01 Agent 3 added compact Phase 8 runtime conversation replay JSONL records for the legacy-vs-Synthesus-5 harness; 2026-06-02 Agent 9 added CHAL accelerator frame metadata and coverage gating for current organ-training traces; 2026-06-02 Agent 9 added `organ-triad-replay-v3` candidate refs, selected-candidate refs, critic feedback refs, and a strict evaluator/selfImprove coverage gate; broader persistent runtime conversation trace storage remains.
 

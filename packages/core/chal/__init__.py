@@ -29,6 +29,17 @@ from .hypervisor import (
     HypervisorResult,
     HypervisorRoute,
 )
+from .memory_policy import (
+    DEFAULT_MEMORY_TIER_POLICIES,
+    MemoryProvenanceRef,
+    MemoryTier,
+    MemoryTierPolicy,
+    MemoryWritebackCandidate,
+    MemoryWritebackDecision,
+    decide_memory_writeback,
+    get_memory_tier_policy,
+    memory_tier_policy_manifest,
+)
 from .quad_brain import (
     QuadBrainArbitration,
     QuadBrainOrchestrator,
@@ -50,6 +61,12 @@ __all__ = [
     "HypervisorDecision",
     "HypervisorResult",
     "HypervisorRoute",
+    "DEFAULT_MEMORY_TIER_POLICIES",
+    "MemoryProvenanceRef",
+    "MemoryTier",
+    "MemoryTierPolicy",
+    "MemoryWritebackCandidate",
+    "MemoryWritebackDecision",
     "ModuleMessage",
     "Mount",
     "MountType",
@@ -67,4 +84,7 @@ __all__ = [
     "CognitiveFrameTelemetry",
     "PPBRSFirmwareSignal",
     "build_ppbrs_firmware_signal",
+    "decide_memory_writeback",
+    "get_memory_tier_policy",
+    "memory_tier_policy_manifest",
 ]
