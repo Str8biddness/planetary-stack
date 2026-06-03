@@ -229,7 +229,9 @@ Writeback candidates use `MemoryWritebackCandidate` and are admitted by `decide_
 
 `packages/core/chal/memory_writeback.py` applies admitted candidates to runtime memory sinks. `candidate_from_hypervisor_trace()` converts accepted hypervisor traces into provenance-bearing writeback candidates, while `apply_memory_writeback()` writes accepted episodic, semantic, procedural, or working candidates through the formal memory store. Crystallized candidates require the same critic/provenance admission; when a `ConsciousState` is supplied they update `state.crystallized` and are also staged as semantic memory records tagged `crystallized` with `synthesus.chal.memory_writeback.v1` metadata.
 
-This completes the source-level cache-tier, TTL/provenance policy, and focused reasoning-trace-to-memory bridge. The broader runtime task remains to decide which production API/runtime call sites should invoke the bridge automatically after final critic arbitration.
+`packages/api/production_server.py` now invokes the writeback bridge for explicit `mode="chal"` and `mode="business_bot"` API calls after final Cognitive Hypervisor arbitration and before response emission. The endpoint records the result under `debug.cognitive_hypervisor.memory_writeback` when debug telemetry is requested. Accepted traces become episodic memory records with CHAL provenance metadata; degraded, template-rewritten, empty, or unavailable-sink paths fail closed with a typed `synthesus.chal.memory_writeback_result.v1` rejection and do not block the user response.
+
+This completes the source-level cache-tier, TTL/provenance policy, focused reasoning-trace-to-memory bridge, and first production API writeback call site. Remaining runtime work is to select non-API and crystallized-state call sites that should receive automatic writeback after final critic arbitration.
 
 Validation:
 
@@ -239,6 +241,8 @@ PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/
 python -m py_compile packages/core/chal/memory_policy.py packages/core/chal/__init__.py tests/test_chal_memory_policy.py
 PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core python -m pytest -q tests/test_chal_memory_policy.py
 python -m py_compile packages/core/chal/memory_writeback.py
+python -m py_compile packages/api/production_server.py tests/test_chal_api_memory_writeback.py
+PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/api:/home/workspace/Synthesus_4.0/packages/knowledge:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_api_memory_writeback.py tests/test_chal_memory_policy.py
 ```
 
 ## Usage

@@ -79,9 +79,15 @@ sys.path.insert(0, str(PROJ_ROOT / "packages" / "api"))
 _cognitive_hypervisor_import_error = None
 try:
     from core.chal.hypervisor import CognitiveHypervisor  # type: ignore
+    from core.chal.memory_writeback import (  # type: ignore
+        apply_memory_writeback,
+        candidate_from_hypervisor_trace,
+    )
     HAS_COGNITIVE_HYPERVISOR = True
 except Exception as e:
     CognitiveHypervisor = None  # type: ignore
+    apply_memory_writeback = None  # type: ignore
+    candidate_from_hypervisor_trace = None  # type: ignore
     HAS_COGNITIVE_HYPERVISOR = False
     _cognitive_hypervisor_import_error = e
 
@@ -203,6 +209,18 @@ except Exception as e:
 
 if _kal_import_error is not None:
     logger.warning(f"KAL components not available: {_kal_import_error}")
+
+_chal_memory_import_error = None
+try:
+    from memory_store import MemoryStore  # type: ignore
+    HAS_CHAL_MEMORY_WRITEBACK = True
+except Exception as e:
+    MemoryStore = None  # type: ignore
+    HAS_CHAL_MEMORY_WRITEBACK = False
+    _chal_memory_import_error = e
+
+if _chal_memory_import_error is not None:
+    logger.warning(f"CHAL memory writeback not available: {_chal_memory_import_error}")
 
 # ─── Linter Safe Helpers ─────────────────────────────────────────────
 def _linter_safe_round(val: Any, n: int = 2) -> float:
@@ -479,6 +497,7 @@ _dialogue_ranker: Optional[DialogueRanker] = None
 _master_registry: Dict[str, SynthesusMaster] = {}
 _hemisphere_bridge: Optional[HemisphereBridge] = None
 _cognitive_hypervisor: Optional[Any] = None
+_chal_memory_store: Optional[Any] = None
 _veai_trainer: Optional[VEAITrainer] = None
 _accelerator_registry: Optional[Any] = None
 
@@ -513,6 +532,73 @@ def _get_cognitive_hypervisor() -> Optional[Any]:
 
         _cognitive_hypervisor = cast(Any, CognitiveHypervisor)(bridge_factory=_bridge_factory)
     return _cognitive_hypervisor
+
+
+def _get_chal_memory_store() -> Optional[Any]:
+    global _chal_memory_store
+    if os.environ.get("SYNTHESUS_CHAL_MEMORY_WRITEBACK", "on").strip().lower() in {"0", "false", "off"}:
+        return None
+    if not HAS_CHAL_MEMORY_WRITEBACK or MemoryStore is None:
+        return None
+    if _chal_memory_store is None:
+        _chal_memory_store = cast(Any, MemoryStore)(db_path=str(DATA_DIR / "memory.db"))
+    return _chal_memory_store
+
+
+def _apply_chal_memory_writeback(
+    *,
+    hv_result: Any,
+    query_text: str,
+    character_id: str,
+) -> dict[str, Any]:
+    telemetry = getattr(hv_result, "telemetry", None)
+    if not isinstance(telemetry, dict):
+        return {
+            "schema": "synthesus.chal.memory_writeback_result.v1",
+            "accepted": False,
+            "reason": "missing_hypervisor_trace",
+            "target_mount": "/mnt/mem/writeback",
+        }
+    if apply_memory_writeback is None or candidate_from_hypervisor_trace is None:
+        return {
+            "schema": "synthesus.chal.memory_writeback_result.v1",
+            "accepted": False,
+            "reason": "writeback_bridge_unavailable",
+            "target_mount": "/mnt/mem/writeback",
+        }
+    memory_store = _get_chal_memory_store()
+    if memory_store is None:
+        return {
+            "schema": "synthesus.chal.memory_writeback_result.v1",
+            "accepted": False,
+            "reason": "memory_store_unavailable",
+            "target_mount": "/mnt/mem/writeback",
+        }
+
+    response = str(getattr(hv_result, "response", "") or "").strip()
+    if not response:
+        return {
+            "schema": "synthesus.chal.memory_writeback_result.v1",
+            "accepted": False,
+            "reason": "empty_response",
+            "target_mount": "/mnt/mem/writeback",
+        }
+
+    content = f"User: {query_text.strip()}\nAssistant: {response}"
+    candidate = candidate_from_hypervisor_trace(
+        trace=telemetry,
+        content=content,
+        target_memory_type="episodic",
+        importance=0.55,
+    )
+    applied = apply_memory_writeback(
+        candidate,
+        memory_store=memory_store,
+        character_id=character_id,
+    )
+    payload = applied.to_dict()
+    payload["schema"] = "synthesus.chal.memory_writeback_result.v1"
+    return payload
 
 # Amplification Plane
 _amplification_plane: Optional[AmplificationPlane] = None
@@ -1366,6 +1452,21 @@ async def query_endpoint(req: QueryRequest, auth=Depends(get_auth)):
         latency = (time.time() - t0) * 1000
         _conversations[session_id].append({"role": "user", "content": query_text})
         _conversations[session_id].append({"role": "assistant", "content": hv_result.response})
+        try:
+            hv_result.telemetry["memory_writeback"] = _apply_chal_memory_writeback(
+                hv_result=hv_result,
+                query_text=query_text,
+                character_id=char_id,
+            )
+        except Exception as exc:
+            logger.warning("CHAL memory writeback failed closed: %s", exc)
+            hv_result.telemetry["memory_writeback"] = {
+                "schema": "synthesus.chal.memory_writeback_result.v1",
+                "accepted": False,
+                "reason": "writeback_exception",
+                "target_mount": "/mnt/mem/writeback",
+                "error": str(exc),
+            }
         raw_confidence = hv_result.bridge_result.get("raw_confidence", 0.0)
         debug_data = None
         if req.include_debug:

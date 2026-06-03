@@ -2587,3 +2587,24 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - CHAL memory writeback is now a three-stage boundary: hypervisor trace extraction, critic/provenance admission, then memory-store/conscious-state application.
 - PPBRS and legacy templates still do not own normal final language. Only accepted, non-degraded, non-template-rewritten traces can become writeback candidates.
+
+## Current Session — 2026-06-03 (Agent 5 — API CHAL Memory Writeback Mount)
+
+### 📝 Summary
+- Wired explicit `/api/v1/query` `mode="chal"` and `mode="business_bot"` calls to invoke CHAL memory writeback after final Cognitive Hypervisor arbitration.
+- Added lazy API memory-store plumbing through the existing `MemoryStore`, so accepted traces write episodic records with `synthesus.chal.memory_writeback.v1` provenance metadata instead of creating a new artifact format.
+- Added typed `synthesus.chal.memory_writeback_result.v1` telemetry under `debug.cognitive_hypervisor.memory_writeback`; degraded, template-rewritten, empty, unavailable-sink, or exception paths reject/fail closed without blocking response emission.
+- Advanced Phase 7 writeback rules by selecting and validating the first production API call site for automatic reasoning-trace writeback.
+
+### ✅ Verified
+- `python -m py_compile packages/api/production_server.py tests/test_chal_api_memory_writeback.py packages/core/chal/memory_writeback.py packages/core/chal/memory_policy.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/api:/home/workspace/Synthesus_4.0/packages/knowledge:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_api_memory_writeback.py tests/test_chal_memory_policy.py` — 13 passed.
+
+### 🚧 Left Off / Next Steps
+- Select any non-API runtime call sites that should invoke `candidate_from_hypervisor_trace()` and `apply_memory_writeback()` after final critic arbitration.
+- Decide whether explicit API CHAL writeback should later stage high-confidence grounded facts into crystallized state; this run intentionally writes episodic records only.
+- Rebuild or replace the standalone Knowledge Cloud generated artifacts separately so FAISS/embedder dimensions align before golden-query health can pass.
+
+### 💡 Architectural Notes
+- `/mnt/mem/writeback` is now exercised by a production API path as a CHAL boundary, with provenance and critic/template gates preserved before storage.
+- The API writeback hook is deliberately non-fatal: KAL/KN response quality remains owned by the Cognitive Hypervisor, while memory persistence is reported as telemetry and never revives legacy fallback ownership.
