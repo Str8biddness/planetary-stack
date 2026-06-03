@@ -1,4 +1,10 @@
-from tools.evaluate_organs import OrganScorecard, TraceRecord, _chal_accelerator_coverage, evaluate_quality_gate
+from tools.evaluate_organs import (
+    OrganScorecard,
+    TraceRecord,
+    _candidate_critic_coverage,
+    _chal_accelerator_coverage,
+    evaluate_quality_gate,
+)
 
 
 def scorecard(**overrides):
@@ -15,6 +21,7 @@ def scorecard(**overrides):
         "scientific_consistency": 1.0,
         "replay_coverage": 1.0,
         "chal_accelerator_coverage": 1.0,
+        "candidate_critic_coverage": 1.0,
         "consistency_warnings": [],
         "notes": [],
     }
@@ -36,6 +43,7 @@ def test_quality_gate_passes_complete_replayable_scorecards():
         ],
         min_replay_coverage=1.0,
         min_chal_accelerator_coverage=1.0,
+        min_candidate_critic_coverage=1.0,
         min_scientific_consistency=1.0,
         fail_under_baseline=True,
         fail_missing_models=True,
@@ -67,6 +75,16 @@ def test_quality_gate_fails_missing_chal_accelerator_metadata():
     assert any("CHAL accelerator coverage" in failure for failure in result.failures)
 
 
+def test_quality_gate_fails_missing_candidate_critic_metadata():
+    result = evaluate_quality_gate(
+        [scorecard(candidate_critic_coverage=0.75)],
+        min_candidate_critic_coverage=1.0,
+    )
+
+    assert result.passed is False
+    assert any("candidate/critic coverage" in failure for failure in result.failures)
+
+
 def test_chal_accelerator_coverage_requires_matching_device_frame():
     base_record = {
         "domain": "chat",
@@ -83,7 +101,7 @@ def test_chal_accelerator_coverage_requires_matching_device_frame():
     valid = TraceRecord(
         **base_record,
         replay={
-            "generator": "organ-triad-replay-v2",
+            "generator": "organ-triad-replay-v3",
             "chal": {
                 "frameId": "chal-organ-1",
                 "parentFrameId": "chal-training-session-chat-0",
@@ -91,15 +109,73 @@ def test_chal_accelerator_coverage_requires_matching_device_frame():
                 "role": "organ_accelerator",
                 "route": "organ_training_replay",
                 "outputRef": "chat.policy_prior.planning",
+                "candidateRefs": [
+                    "chat.policy_prior.planning.candidate.0",
+                    "chat.policy_prior.planning.candidate.1",
+                ],
+                "selectedCandidateRef": "chat.policy_prior.planning.candidate.1",
+                "criticFeedback": {
+                    "source": "teacher_trace_outcome",
+                    "feedbackRef": "chat.policy_prior.planning.critic_feedback",
+                    "accepted": True,
+                    "quality": 0.91,
+                },
             }
         },
     )
     invalid = TraceRecord(
         **base_record,
-        replay={"generator": "organ-triad-replay-v2", "chal": {"device": "chal://organs/chat/attention"}},
+        replay={"generator": "organ-triad-replay-v3", "chal": {"device": "chal://organs/chat/attention"}},
     )
 
     assert _chal_accelerator_coverage([valid, invalid]) == 0.5
+
+
+def test_candidate_critic_coverage_requires_selected_candidate_and_feedback():
+    base_record = {
+        "domain": "chat",
+        "phase": "planning",
+        "organ": "policy_prior",
+        "state_features": [],
+        "action_features": [],
+        "multi_focus_weights": [],
+        "trajectory_features": [],
+        "chosen_index": 0,
+        "quality": 1.0,
+        "outcome": {},
+    }
+    valid = TraceRecord(
+        **base_record,
+        replay={
+            "generator": "organ-triad-replay-v3",
+            "chal": {
+                "candidateRefs": [
+                    "chat.policy_prior.planning.candidate.0",
+                    "chat.policy_prior.planning.candidate.1",
+                ],
+                "selectedCandidateRef": "chat.policy_prior.planning.candidate.1",
+                "criticFeedback": {
+                    "source": "teacher_trace_outcome",
+                    "feedbackRef": "chat.policy_prior.planning.critic_feedback",
+                    "accepted": True,
+                    "quality": 0.91,
+                },
+            },
+        },
+    )
+    invalid = TraceRecord(
+        **base_record,
+        replay={
+            "generator": "organ-triad-replay-v3",
+            "chal": {
+                "candidateRefs": ["chat.policy_prior.planning.candidate.0"],
+                "selectedCandidateRef": "chat.policy_prior.planning.candidate.9",
+                "criticFeedback": {"source": "teacher_trace_outcome", "accepted": True, "quality": 0.91},
+            },
+        },
+    )
+
+    assert _candidate_critic_coverage([valid, invalid]) == 0.5
 
 
 def test_quality_gate_compares_metric_direction_to_baseline():

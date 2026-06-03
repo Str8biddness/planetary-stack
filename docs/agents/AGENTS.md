@@ -167,7 +167,7 @@ This repo is currently in a validated PPBRS baseline state. Future PPBRS optimiz
 - Future organ families should keep the same registry/versioning contract and should usually start as heads on a shared representation model rather than standalone black-box networks.
 - Any future organ family added here should update the registry, bootstrap, organ config, hub routing, architecture docs, and this log together.
 - When the organ surface changes, keep `AGENT_LOG.md` and the relevant module docs in sync in the same session.
-- `tools/evaluate_organs.py` has a source-controlled quality gate for replay coverage, scientific consistency, missing trained models, and validation-vs-baseline checks; `tools/selfImprove.ts` enforces complete replay metadata, complete scientific consistency, and model presence after training.
+- `tools/evaluate_organs.py` has a source-controlled quality gate for replay coverage, CHAL accelerator frame coverage, candidate/critic feedback coverage, scientific consistency, missing trained models, and validation-vs-baseline checks; `tools/selfImprove.ts` enforces complete replay metadata, CHAL-bounded accelerator traces, candidate/critic metadata, complete scientific consistency, and model presence after training.
 
 ## Datasets Sourced
 1. **Jeopardy Questions** (JephthaT/Jeopardy_Questions) - ~216,930 Q&A pairs, diverse categories
@@ -239,10 +239,16 @@ This repo is currently in a validated PPBRS baseline state. Future PPBRS optimiz
 - Runtime artifacts remain ignored: commit the generator/evaluator source and docs, not `logs/teacher_traces.jsonl`, `logs/organ_evaluation_scorecard.*`, or `data/models/`.
 
 ### CHAL accelerator trace update (2026-06-02)
-- `tools/runTrainingSessions.ts` now emits `organ-triad-replay-v2` traces with `replay.chal` metadata on every organ trace.
-- Each current trace names its deterministic frame id, training-session parent frame id, `chal://organs/<domain>/<organ>` device, `role="organ_accelerator"`, route, and output reference.
-- `tools/evaluate_organs.py` reports CHAL accelerator frame coverage for current v2 traces, and `tools/selfImprove.ts` requires 100% coverage with `--min-chal-accelerator-coverage 1.0`.
+- `tools/runTrainingSessions.ts` added `organ-triad-replay-v2` traces with `replay.chal` metadata on every organ trace.
+- Each v2 trace names its deterministic frame id, training-session parent frame id, `chal://organs/<domain>/<organ>` device, `role="organ_accelerator"`, route, and output reference.
+- `tools/evaluate_organs.py` reports CHAL accelerator frame coverage, and `tools/selfImprove.ts` requires 100% coverage with `--min-chal-accelerator-coverage 1.0`.
 - This is the durable boundary that keeps GM/SysOps/Chat organs as CHAL accelerators under training/eval control, not independent uncontrolled brain nodes.
+
+### Candidate/critic replay update (2026-06-02)
+- `tools/runTrainingSessions.ts` now emits `organ-triad-replay-v3` traces that extend `replay.chal` with `candidateRefs`, `selectedCandidateRef`, and `criticFeedback`.
+- `tools/evaluate_organs.py` reports candidate/critic feedback coverage for current v3 traces, and `tools/selfImprove.ts` requires 100% coverage with `--min-candidate-critic-coverage 1.0`.
+- `packages/organs/tsconfig.json` uses CommonJS module semantics so the documented `cd packages/organs && npx ts-node cli.ts runTrainingSessions/selfImprove` commands resolve local TS modules.
+- Existing v2 traces remain historical replay records; the stricter candidate/critic gate applies to newly generated v3 records.
 
 ## Emergent Resonance & Consciousness Loop (2026-05-05)
 

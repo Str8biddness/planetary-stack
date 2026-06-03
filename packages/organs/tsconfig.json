@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "module": "ESNext",
+    "module": "CommonJS",
     "moduleResolution": "node",
     "strict": true,
     "jsx": "react-jsx",
@@ -19,5 +19,13 @@
       "@/*": ["./frontend/src/*"]
     }
   },
-  "include": ["frontend/src", "synthetic_core", "amplification", "domains", "utils", "tests", "scripts", "organs"]
+  "include": [
+    "*.ts",
+    "chat/**/*.ts",
+    "gm/**/*.ts",
+    "shared/**/*.ts",
+    "sysops/**/*.ts",
+    "../../tools/runTrainingSessions.ts",
+    "../../tools/selfImprove.ts"
+  ]
 }

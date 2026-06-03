@@ -11,7 +11,7 @@ function runPythonTraining(domain: string, organ: string): void {
 
 function runPythonEvaluation(): void {
   const scriptPath = path.join(__dirname, 'evaluate_organs.py');
-  const args = '--min-replay-coverage 1.0 --min-chal-accelerator-coverage 1.0 --min-scientific-consistency 1.0 --fail-missing-models';
+  const args = '--min-replay-coverage 1.0 --min-chal-accelerator-coverage 1.0 --min-candidate-critic-coverage 1.0 --min-scientific-consistency 1.0 --fail-missing-models';
   console.log(`Executing: python ${scriptPath} ${args}`);
   execSync(`python "${scriptPath}" ${args}`, { stdio: 'inherit' });
 }

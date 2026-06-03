@@ -2397,3 +2397,30 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - The Python `VQD` is now a real CHAL knowledge partition boundary for snapshot admission instead of a constant fingerprint. Snapshot restore can preserve scoped Knowledge Cloud access metadata without requiring a live Knowledge Cloud backend in the restoring kernel.
+
+## Current Session — 2026-06-02 (Agent 9 — Organ Replay Candidate/Critic Gate)
+
+### 📝 Summary
+- Upgraded organ training replay metadata from `organ-triad-replay-v2` to `organ-triad-replay-v3` with CHAL-bounded `candidateRefs`, `selectedCandidateRef`, and `criticFeedback` on every generated organ trace.
+- Added evaluator coverage accounting and a strict `--min-candidate-critic-coverage` quality gate so candidate generation and critic feedback interfaces cannot silently disappear from the GM/SysOps/Chat organ loop.
+- Updated `tools/selfImprove.ts` to require complete replay, CHAL accelerator, candidate/critic, scientific-consistency, and model-presence coverage.
+- Fixed the package-local organ CLI runtime path by switching `packages/organs/tsconfig.json` to CommonJS module semantics, preserving the documented `cd packages/organs && npx ts-node cli.ts ...` workflow.
+- Advanced Phase 7 replayable trace storage for organ-training traces; broader persistent runtime conversation trace storage remains open.
+
+### ✅ Verified
+- `python -m py_compile tools/evaluate_organs.py tests/test_organ_evaluation_quality_gate.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0 python -m pytest -q tests/test_organ_evaluation_quality_gate.py` — 7 passed.
+- `npx tsc --noEmit --skipLibCheck --target es2020 --module commonjs --moduleResolution node --esModuleInterop tools/runTrainingSessions.ts tools/selfImprove.ts packages/organs/cli.ts` — passed.
+- `npm run build --workspace packages/organs` — passed after correcting the stale organ tsconfig include list.
+- `cd packages/organs && npx ts-node cli.ts runTrainingSessions` — passed; generated ignored v3 trace records under `logs/`.
+- `python tools/evaluate_organs.py --min-replay-coverage 1.0 --min-chal-accelerator-coverage 1.0 --min-candidate-critic-coverage 1.0 --min-scientific-consistency 1.0 --fail-missing-models` — passed; all 9 organ/domain scorecards reported replay=100%, chal_accelerator=100%, candidate_critic=100%, consistency=100%.
+
+### 🚧 Left Off / Next Steps
+- Broader persistent runtime conversation trace storage remains open under Phase 7.
+- The next Agent 9 pass can improve trace diversity and consider making `--fail-under-baseline` mandatory once policy/risk/attention validation is stable across seeded trace batches.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` changes were left untouched.
+- Generated `logs/teacher_traces.jsonl`, `logs/organ_evaluation_scorecard.*`, `data/models/`, and cache artifacts remain ignored and were not staged.
+
+### 💡 Architectural Notes
+- Organs remain CHAL accelerators under the runtime, not independent uncontrolled brains. The v3 replay schema makes that boundary stronger by tying every organ decision to candidate references and critic feedback metadata that the evaluator can gate.
+- Historical v2 traces are still valid for replay history, but strict candidate/critic coverage applies to newly generated v3 traces.

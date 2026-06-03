@@ -22,7 +22,7 @@ This document is the start-to-finish handoff for the Synthesus ML organ loop.
 - `packages/organs/cli.ts selfImprove` is the top-level command.
 - `logs/organ_evaluation_scorecard.json` and `logs/organ_evaluation_scorecard.md` are runtime artifacts and are ignored by Git.
 - `tools/runTrainingSessions.ts` now emits deterministic replay metadata on each organ trace: generator version, seed, scenario ID, step, and simulated timestamp.
-- Current `organ-triad-replay-v2` traces also include CHAL accelerator frame metadata under `replay.chal`: `frameId`, `parentFrameId`, `chal://organs/<domain>/<organ>` device URI, `role="organ_accelerator"`, route, and output reference. This keeps organ traces bounded as CHAL accelerators rather than independent brains.
+- Current `organ-triad-replay-v3` traces also include CHAL accelerator frame metadata under `replay.chal`: `frameId`, `parentFrameId`, `chal://organs/<domain>/<organ>` device URI, `role="organ_accelerator"`, route, output reference, candidate references, selected candidate reference, and critic feedback reference. This keeps organ traces bounded as CHAL accelerators rather than independent brains, while exposing candidate-generation and critic-feedback interfaces to evaluation.
 - Set `SYNTHESUS_ORGAN_TRACE_SEED=<integer>` to replay the same GM/SysOps/Chat trace scenarios with a different deterministic seed.
 
 ## Fresh start to finish
@@ -111,6 +111,7 @@ Before pushing:
 - If the trace file is missing, the trainer will silently fall back to synthetic data.
 - If you change the trace schema, update this document, `AGENTS.md`, and `AGENT_LOG.md` together.
 - If replay coverage drops below 100% on newly generated traces, check that every `appendTraceEntry` call includes `replay` metadata.
+- If candidate/critic coverage drops below 100%, check that every `replay.chal` block includes `candidateRefs`, `selectedCandidateRef`, and `criticFeedback`.
 - If the evaluation scorecard shows validation below baseline, the next lever is broader trace diversity, not orchestration changes.
 
 ## Recovery checklist for another chat
@@ -130,8 +131,8 @@ Before pushing:
 - `tools/train_triad.py` now reports train/validation metrics instead of only fitting on the full trace set.
 - `tools/evaluate_organs.py` now produces a runtime scorecard after the full self-improvement loop.
 - `tools/evaluate_organs.py` now supports a quality gate for replay metadata coverage, scientific consistency, missing models, and validation-vs-baseline checks.
-- `tools/evaluate_organs.py` now reports CHAL accelerator frame coverage for current `organ-triad-replay-v2` traces and can fail when those traces lack CHAL-bounded organ metadata.
-- `tools/selfImprove.ts` runs evaluation with `--min-replay-coverage 1.0 --min-chal-accelerator-coverage 1.0 --min-scientific-consistency 1.0 --fail-missing-models` so generated traces must remain replayable, CHAL-bounded, and numerically valid.
+- `tools/evaluate_organs.py` now reports CHAL accelerator frame coverage and candidate/critic feedback coverage for current `organ-triad-replay-v3` traces, and can fail when those traces lack CHAL-bounded organ metadata.
+- `tools/selfImprove.ts` runs evaluation with `--min-replay-coverage 1.0 --min-chal-accelerator-coverage 1.0 --min-candidate-critic-coverage 1.0 --min-scientific-consistency 1.0 --fail-missing-models` so generated traces must remain replayable, CHAL-bounded, critic-visible, and numerically valid.
 - `packages/organs/cli.ts selfImprove` runs the updated loop.
 
 ## Updated next step
