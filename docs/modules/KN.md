@@ -227,7 +227,9 @@ The cache is volatile and source-only: it does not write generated artifacts int
 
 Writeback candidates use `MemoryWritebackCandidate` and are admitted by `decide_memory_writeback()`. The current gate accepts only critic-approved candidates with at least one provenance reference at confidence `>= 0.5`, then targets the volatile `/mnt/mem/writeback` CHAL boundary. Rejected candidates return typed reasons such as `critic_rejected`, `missing_provenance`, or `low_provenance_confidence`.
 
-This completes the cache-tier and TTL/provenance policy surface. The broader runtime task remains to connect accepted reasoning traces into episodic or crystallized memory writes through this gate.
+`packages/core/chal/memory_writeback.py` applies admitted candidates to runtime memory sinks. `candidate_from_hypervisor_trace()` converts accepted hypervisor traces into provenance-bearing writeback candidates, while `apply_memory_writeback()` writes accepted episodic, semantic, procedural, or working candidates through the formal memory store. Crystallized candidates require the same critic/provenance admission; when a `ConsciousState` is supplied they update `state.crystallized` and are also staged as semantic memory records tagged `crystallized` with `synthesus.chal.memory_writeback.v1` metadata.
+
+This completes the source-level cache-tier, TTL/provenance policy, and focused reasoning-trace-to-memory bridge. The broader runtime task remains to decide which production API/runtime call sites should invoke the bridge automatically after final critic arbitration.
 
 Validation:
 
@@ -236,6 +238,7 @@ python -m py_compile packages/knowledge/mount_table.py packages/knowledge/kal_ad
 PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_knowledge_mount_table.py tests/test_kal.py
 python -m py_compile packages/core/chal/memory_policy.py packages/core/chal/__init__.py tests/test_chal_memory_policy.py
 PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core python -m pytest -q tests/test_chal_memory_policy.py
+python -m py_compile packages/core/chal/memory_writeback.py
 ```
 
 ## Usage

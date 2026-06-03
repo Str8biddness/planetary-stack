@@ -129,7 +129,7 @@ Legend:
 
 - [x]  Define L1 turn cache, L2 session cache, L3 project/user cache, and L4 Knowledge Cloud cache. Session log: 2026-06-03 Knowledge Hardware Memory Policy added CHAL tier policies with mount paths, TTLs, provenance requirements, and focused tests.
 
-- [~]  Add writeback rules from reasoning traces into episodic/crystallized memory. Session log: 2026-06-03 Knowledge Hardware Memory Policy added critic/provenance admission rules targeting `/mnt/mem/writeback`; broader runtime wiring from accepted reasoning traces into episodic/crystallized stores remains.
+- [~]  Add writeback rules from reasoning traces into episodic/crystallized memory. Session log: 2026-06-03 Knowledge Hardware Memory Policy added critic/provenance admission rules targeting `/mnt/mem/writeback`; 2026-06-03 Agent 4 added a focused CHAL memory writeback bridge that converts accepted hypervisor traces into provenance-bearing candidates, writes admitted episodic/semantic/procedural/working records through the memory store, and stages/adjoins crystallized candidates through `ConsciousState`; remaining work is selecting production call sites for automatic bridge invocation after final critic arbitration.
 
 - [x]  Add memory provenance and TTL policy. Session log: 2026-06-03 Knowledge Hardware Memory Policy added typed `MemoryProvenanceRef`, L1-L4 TTL policy, and writeback rejection reasons for missing/low-confidence provenance.
 

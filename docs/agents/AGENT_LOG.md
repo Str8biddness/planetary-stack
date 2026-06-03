@@ -2565,3 +2565,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Aggregate benchmark deltas are no longer enough for Phase 8 readiness. Each comparison case now carries axis deltas so legacy-vs-Synthesus-5 quality claims are inspectable at the case level.
 - The scorecard records generated benchmark evidence, while source control only carries the harness, tests, focused-suite wiring, checklist, and handover log.
+
+## Current Session — 2026-06-03 (Agent 4 — CHAL Memory Writeback Bridge)
+
+### 📝 Summary
+- Added `packages/core/chal/memory_writeback.py` to convert accepted Cognitive Hypervisor traces into `MemoryWritebackCandidate` records and apply admitted candidates to runtime memory sinks.
+- `apply_memory_writeback()` now writes critic/provenance-approved episodic, semantic, procedural, and working candidates through the formal memory store while enriching stored metadata with `synthesus.chal.memory_writeback.v1` provenance.
+- Crystallized candidates remain gated by the same critic/provenance policy; when a `ConsciousState` is supplied, the bridge updates `state.crystallized` and stages the content as semantic memory tagged `crystallized` instead of allowing unsafe raw direct writes.
+- Advanced Phase 7 by turning the previous writeback admission policy into a focused reasoning-trace-to-memory bridge without changing PPBRS final-language ownership.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/memory_policy.py packages/core/chal/memory_writeback.py packages/core/chal/__init__.py tests/test_chal_memory_policy.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core python -m pytest -q tests/test_chal_memory_policy.py` — 11 passed.
+
+### 🚧 Left Off / Next Steps
+- Select the production runtime/API call sites that should invoke `candidate_from_hypervisor_trace()` and `apply_memory_writeback()` after final critic arbitration.
+- Keep degraded, template-rewritten, or critic-rejected traces out of memory writeback; the focused tests now enforce this boundary.
+- Rebuild or replace the standalone Knowledge Cloud generated artifacts separately so FAISS/embedder dimensions align before golden-query health can pass.
+- Pre-existing unrelated runtime root `AGENTS.md`, runtime root `README.md`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- CHAL memory writeback is now a three-stage boundary: hypervisor trace extraction, critic/provenance admission, then memory-store/conscious-state application.
+- PPBRS and legacy templates still do not own normal final language. Only accepted, non-degraded, non-template-rewritten traces can become writeback candidates.

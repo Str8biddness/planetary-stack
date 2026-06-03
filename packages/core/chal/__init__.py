@@ -40,6 +40,11 @@ from .memory_policy import (
     get_memory_tier_policy,
     memory_tier_policy_manifest,
 )
+from .memory_writeback import (
+    AppliedMemoryWriteback,
+    apply_memory_writeback,
+    candidate_from_hypervisor_trace,
+)
 from .quad_brain import (
     QuadBrainArbitration,
     QuadBrainOrchestrator,
@@ -50,6 +55,7 @@ from .quad_brain import (
 
 __all__ = [
     "CognitiveHypervisor",
+    "AppliedMemoryWriteback",
     "Checkpoint",
     "CognitiveTask",
     "ExecutionPlan",
@@ -84,6 +90,8 @@ __all__ = [
     "CognitiveFrameTelemetry",
     "PPBRSFirmwareSignal",
     "build_ppbrs_firmware_signal",
+    "apply_memory_writeback",
+    "candidate_from_hypervisor_trace",
     "decide_memory_writeback",
     "get_memory_tier_policy",
     "memory_tier_policy_manifest",
