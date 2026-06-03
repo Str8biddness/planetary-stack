@@ -1,6 +1,6 @@
 # PPBRS — Probabilistic Pattern-Based Reasoning System
 
-> Synthesus 4.1 — Left-hemisphere CHAL cognitive firmware
+> Synthesus 5 — bounded CHAL cognitive firmware
 
 ## Overview
 

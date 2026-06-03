@@ -27,7 +27,7 @@ Legend:
 
 - [x]  Update handover protocol so every session reads the blueprint and checklist first.
 
-- [x]  Create this implementation checklist as the cross-agent progress ledger.
+- [x]  Create this implementation checklist as the cross-agent progress ledger. Session log: 2026-06-03 Weekly Heavy Maintenance normalized malformed blank/escaped checklist markers after drift scan.
 
 - [x]  Ensure all scheduled automations are retargeted from Synthesus 4.1 to Synthesus 5 and restricted to Codex-class or Google/Gemini CLI/CML models.
 
@@ -35,7 +35,6 @@ Legend:
 
 ## Phase 1: CHAL Frame Contract
 
-- [ ] 
 
 - [x]  Define reusable CHAL task, plan, module message, checkpoint, telemetry, and firmware signal objects. Session log: 2026-05-30 Agent 6 PPBRS CHAL serialization.
 
@@ -95,7 +94,6 @@ Legend:
 
 ## Phase 5: Knowledge Cloud Hardware Mount
 
-- [ ] 
 
 - [x]  Define CHAL mount and partition interfaces for ROM, parameter disk, grounding corpus, provenance, cache, and writeback memory. Session log: 2026-05-31 Knowledge Hardware Complete Mount Interface; 2026-06-01 Agent 5 added artifact-free volatile cache/writeback mounts to manifest-backed boot.
 - [x]  Upgrade KAL into a CHAL memory controller. Session log: 2026-05-28 Knowledge Cloud mount table.
@@ -114,9 +112,8 @@ Legend:
 
 ## Phase 6: Legacy Template Path Removal
 
-- [ ] 
 
-- \[\~\] Convert PPBRS normal-path output into non-user-facing firmware signals. Session log: 2026-06-01 Agent 6 added fanout-aware PPBRS pattern candidate pruning so shared broad tokens no longer expand normal firmware matching to full-corpus scoring while preserving broad-token-only fallback behavior.
+- [~] Convert PPBRS normal-path output into non-user-facing firmware signals. Session log: 2026-06-01 Agent 6 added fanout-aware PPBRS pattern candidate pruning so shared broad tokens no longer expand normal firmware matching to full-corpus scoring while preserving broad-token-only fallback behavior.
 
 - [x]  Search and classify every direct fallback/template response path. Session log: 2026-05-31 Agent 6 template surface audit.
 
@@ -138,11 +135,10 @@ Legend:
 
 - [~]  Add replayable trace storage for comparison harnesses. Session log: 2026-05-30 Agent 9 added deterministic organ-training trace replay metadata and scorecard coverage; 2026-05-31 Agent 9 added an organ-evaluation quality gate for replay coverage, numeric consistency, and missing trained models; 2026-06-01 Agent 3 added compact Phase 8 runtime conversation replay JSONL records for the legacy-vs-Synthesus-5 harness; 2026-06-02 Agent 9 added CHAL accelerator frame metadata and coverage gating for current organ-training traces; 2026-06-02 Agent 9 added `organ-triad-replay-v3` candidate refs, selected-candidate refs, critic feedback refs, and a strict evaluator/selfImprove coverage gate; broader persistent runtime conversation trace storage remains.
 
-- \[\~\] Add save/load tests across CHAL memory partitions. Session log: 2026-05-27 Agent 8 AIVM snapshot integrity added default VMD snapshot/restore parity and tamper rejection; 2026-05-31 Agent 8 added per-device fingerprint manifests and restore verification across mounted AIVM devices; 2026-06-01 Agent 8 added explicit AIVM cache/writeback partition devices with snapshot restore parity and tamper rejection; 2026-06-02 Agent 8 added VQD knowledge-scope/policy lookup-trace snapshot restore and tamper rejection; broader persistent runtime trace storage remains.
+- [~] Add save/load tests across CHAL memory partitions. Session log: 2026-05-27 Agent 8 AIVM snapshot integrity added default VMD snapshot/restore parity and tamper rejection; 2026-05-31 Agent 8 added per-device fingerprint manifests and restore verification across mounted AIVM devices; 2026-06-01 Agent 8 added explicit AIVM cache/writeback partition devices with snapshot restore parity and tamper rejection; 2026-06-02 Agent 8 added VQD knowledge-scope/policy lookup-trace snapshot restore and tamper rejection; broader persistent runtime trace storage remains.
 
 ## Phase 8: GPT-4-Class Evaluation Harness
 
-- [ ] 
 
 - [x]  Add legacy-vs-CHAL conversation comparison harness. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
 
@@ -168,7 +164,7 @@ Legend:
 
 ## Phase 9: Product Runtime Polish
 
-- \[\~\] Wire Synthesus 5 path into API entrypoints. Session log: 2026-05-28 Agent 1 API CHAL mode added explicit `/api/v1/query` `mode="chal"` routing through `CognitiveHypervisor`; default `auto` cutover remains.
+- [~] Wire Synthesus 5 path into API entrypoints. Session log: 2026-05-28 Agent 1 API CHAL mode added explicit `/api/v1/query` `mode="chal"` routing through `CognitiveHypervisor`; default `auto` cutover remains.
 
 - [x]  Document the current `/api/v1/query` `mode="chal"` debug contract as `CognitiveHypervisorTrace` in OpenAPI/schema mirrors. Session log: 2026-05-29 Agent 10 hypervisor trace schema; 2026-06-02 Agent 10 documented the `business_bot` preset and canonical runtime-preset normalization in API/schema mirrors.
 

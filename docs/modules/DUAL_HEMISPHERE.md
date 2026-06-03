@@ -1,6 +1,6 @@
 # Dual-Hemisphere Architecture
 
-> Synthesus 4.1 — CHAL compute units plus bounded generation
+> Synthesus 5 — CHAL compute units inside the Quad Brain runtime
 
 ## Overview
 

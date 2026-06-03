@@ -1,6 +1,6 @@
 """
 KAL (Knowledge Abstraction Layer) — CHAL Memory Controller
-Synthesus 4.1 CHAL Line
+Synthesus 5 CHAL Line
 
 Mounts Knowledge Cloud partitions as virtual cognitive hardware.
 Routes queries to the appropriate partition based on locality, trust, and domain.
@@ -117,7 +117,7 @@ class CHALMemoryController:
                 logger.warning(f"CHAL: Failed to init KnowledgeCloud: {e}")
 
     def _init_default_mounts(self) -> None:
-        """Mount the standard Synthesus 4.1 cognitive hardware."""
+        """Mount the standard Synthesus 5 cognitive hardware."""
         # 1. ROM: Canonical World Lore
         self.mount(Mount(
             mount_path="/mnt/rom/lore",
@@ -383,7 +383,7 @@ class CHALMemoryController:
 class SynthesusAdapter:
     """
     Legacy wrapper for pre-CHAL systems. 
-    Delegates to CHALMemoryController to obey the Synthesus 4.1 Maximum Directive.
+    Delegates to CHALMemoryController to obey the Synthesus 5 CHAL blueprint.
     """
     
     def __init__(self):

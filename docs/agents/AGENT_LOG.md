@@ -2494,3 +2494,30 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Degraded CHAL states are explicit release telemetry, not a new fallback owner. Normal assistant wording remains owned by CHAL, the Cognitive Hypervisor, CGPU/generation, and critic arbitration.
 - Template quarantine, device faults, and budget exhaustion now share a single inspectable degraded-state shape for API clients and smoke validation.
+
+## Current Session — 2026-06-03 (Weekly Heavy Maintenance — Drift Hygiene)
+
+### 📝 Summary
+- Ran the weekly Synthesus 5 heavy-maintenance drift scan across the runtime control plane and Knowledge Cloud repo.
+- Fixed a checklist corruption blocker in `docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md`: removed empty `- [ ]` rows and normalized escaped in-progress markers so the ledger renders and parses correctly.
+- Retargeted active CHAL/KAL module wording from stale Synthesus 4.1 labels to Synthesus 5 in `packages/core/chal/interfaces.py`, `packages/knowledge/kal_adapter.py`, `docs/modules/DUAL_HEMISPHERE.md`, and `docs/modules/PPBRS.md`.
+- Confirmed generated-artifact hygiene: runtime and Knowledge Cloud git tracking scans did not find tracked logs, scorecards, FAISS/KNDB/model cache artifacts outside the intended Knowledge Cloud artifact/support-model boundary.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/interfaces.py packages/knowledge/kal_adapter.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_knowledge_mount_table.py` — 12 passed, 3 FAISS/SWIG deprecation warnings.
+- `python tools/audit_template_surfaces.py --fail-on-unclassified` — passed; 93 signatures, 17 classified paths, 0 unclassified hits.
+- `python -m synthesus_knowledge_cloud validate-sources --root .` — passed; 25 required paths and 7 character pattern banks.
+- `python -m synthesus_knowledge_cloud verify-source-manifest --root .` — passed; 139 source files verified.
+- `python -m synthesus_knowledge_cloud validate --root artifacts` — failed on the known generated-artifact blocker: `FAISS/embedder dim mismatch: faiss=384, embedder=128`.
+- `rg -n '^- \[ \] $|\\\[\\~\\\]|Synthesus 4\.1 CHAL Line|contracts for Synthesus 4\.1|4\.1 —' docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md packages/core/chal/interfaces.py packages/knowledge/kal_adapter.py docs/modules/DUAL_HEMISPHERE.md docs/modules/PPBRS.md` — no hits.
+- `git diff --check -- packages/core/chal/interfaces.py packages/knowledge/kal_adapter.py docs/modules/DUAL_HEMISPHERE.md docs/modules/PPBRS.md docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md` — passed.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `artifacts/faiss.index`, `artifacts/faiss_metadata.json`, and `artifacts/models/swarm_embedder.pkl` agree on the selected profile dimension.
+- After artifact regeneration, rerun `python -m synthesus_knowledge_cloud validate --root artifacts`, profile-aware `stamp-manifest`, runtime cold-start validation, and golden-query health checks before refreshing the public mirror.
+- Pre-existing unrelated runtime root `AGENTS.md`, runtime root `README.md`, and untracked `synthesus_framework/` changes were left untouched and unstaged.
+
+### 💡 Architectural Notes
+- This run fixed control-plane drift only; it did not modify generated FAISS, KNDB, model, cache, scorecard, or workflow artifacts.
+- 4.1 remains historical foundation context, but active CHAL/KAL runtime surfaces should describe themselves as Synthesus 5 unless they explicitly reference preserved historical docs.

@@ -1,6 +1,6 @@
 """
 CHAL (Cognitive Hardware Abstraction Layer) Interfaces
-Defines the core virtual hardware contracts for Synthesus 4.1.
+Defines the core virtual hardware contracts for Synthesus 5.
 """
 
 from __future__ import annotations
