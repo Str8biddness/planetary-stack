@@ -1717,6 +1717,13 @@ components:
           type: boolean
         degraded:
           type: boolean
+        degraded_state:
+          anyOf:
+          - $ref: '#/components/schemas/CHALDegradedState'
+          - type: 'null'
+          description: Typed Synthesus 5 degraded-state record emitted when a
+            CHAL device fault, budget exhaustion, or template quarantine prevents
+            normal assistant-path emission; null when the route completes cleanly.
         template_guard:
           type: object
           additionalProperties: true
@@ -1752,6 +1759,58 @@ components:
       title: CognitiveHypervisorTrace
       description: Debug trace emitted under QueryResponse.debug.cognitive_hypervisor
         for explicit mode=chal requests.
+    CHALDegradedState:
+      type: object
+      title: CHALDegradedState
+      description: Explicit non-template degraded-state payload used when the
+        Cognitive Hypervisor cannot safely emit a normal Synthesus 5 response.
+      required:
+      - schema
+      - trace_id
+      - reason
+      - route
+      - device
+      - device_status
+      - budget_exhausted
+      - normal_assistant_path
+      - legacy_template_leakage_allowed
+      - message
+      properties:
+        schema:
+          type: string
+          const: synthesus.chal.degraded_state.v1
+        trace_id:
+          type: string
+        reason:
+          type: string
+          enum:
+          - budget_exhausted
+          - device_fault
+          - legacy_template_quarantine
+        route:
+          type: string
+        device:
+          type: string
+        device_status:
+          type: string
+        budget_exhausted:
+          type: boolean
+        normal_assistant_path:
+          type: boolean
+          const: false
+        legacy_template_leakage_allowed:
+          type: boolean
+          const: false
+        message:
+          type: string
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+        matched_signatures:
+          type: array
+          items:
+            type: string
     QuadBrainStateTransition:
       type: object
       title: QuadBrainStateTransition

@@ -89,6 +89,11 @@ The typed trace contract is mirrored as `CognitiveHypervisorTrace` in
 Those schema mirrors document the canonical `runtime_preset` value after
 normalization, so trace consumers should key on `business_bot` rather than on
 request aliases.
+When a CHAL device fault, budget exhaustion, or template quarantine prevents
+normal response emission, `CognitiveHypervisorTrace.degraded_state` carries a
+typed `CHALDegradedState` payload with `normal_assistant_path=false` and
+`legacy_template_leakage_allowed=false`. This gives clients a graceful degraded
+message without reviving legacy fallback/template ownership.
 `CognitiveHypervisorTrace.knowledge_provenance` records mounted Knowledge Cloud
 provenance for grounded CHAL routes, including KAL operation, source mount,
 cache state, and artifact integrity metadata when available.
@@ -118,14 +123,15 @@ Run the focused CHAL API smoke check from the repository root:
 SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_chal_smoke.py
 ```
 
-The command uses the FastAPI app in-process and sends three public
+The command uses the FastAPI app in-process and sends four public
 `/api/v1/query` calls with `mode="chal"` or `mode="business_bot"` and
-`include_debug=true`. It fails if
+`include_debug=true`, then runs an in-process device-fault check against the
+hypervisor degraded-state contract. It fails if
 the CHAL response source is missing, hypervisor trace schema is absent, the
 expected grounded/Quad Brain/business-bot/safety route is not selected, the
 request degrades or exhausts budget, Quad Brain serial-order telemetry is
 malformed, the business preset does not expose CGPU `business_bot` mode, or a
-legacy template signature leaks into final text.
+legacy template signature leaks into final or degraded text.
 
 ### Synthesus 5 Focused Release Suite
 

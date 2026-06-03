@@ -178,7 +178,7 @@ Legend:
 
 - [x]  Add business-bot preset path. Session log: 2026-06-01 Agent 1 business-bot CHAL preset path.
 
-- [ ]  Add graceful degraded-state messaging without legacy templates.
+- [x]  Add graceful degraded-state messaging without legacy templates. Session log: 2026-06-03 Agent 1 typed CHAL degraded-state contract.
 
 ## Phase 10: Hardening And Release
 

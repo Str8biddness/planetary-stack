@@ -242,7 +242,10 @@ class CognitiveHypervisor:
                 "hemisphere_mode": decision.hemisphere_mode,
             },
         )
-        bridge_result = self._normalize_guarded_bridge_result(guarded)
+        bridge_result = self._normalize_guarded_bridge_result(
+            guarded,
+            decision=decision,
+        )
 
         response = str(bridge_result.get("response", ""))
         quad_brain_arbitration = None
@@ -267,6 +270,13 @@ class CognitiveHypervisor:
         response = template_guard_result.text
         if template_guard_result.rewritten:
             bridge_result["response"] = response
+            bridge_result.setdefault(
+                "degraded_state",
+                self._template_quarantine_degraded_state(
+                    decision=decision,
+                    template_guard_result=template_guard_result,
+                ),
+            )
         telemetry = {
             "schema": "synthesus.chal.hypervisor_trace.v1",
             "trace_id": decision.trace_id,
@@ -281,6 +291,7 @@ class CognitiveHypervisor:
             "device_isolation": guarded.to_dict(),
             "budget_exhausted": guarded.status == "timeout",
             "degraded": not guarded.ok,
+            "degraded_state": bridge_result.get("degraded_state"),
             "template_guard": template_guard_result.to_dict(),
             "quad_brain": quad_brain_arbitration.to_dict() if quad_brain_arbitration else None,
             "knowledge_provenance": knowledge_provenance,
@@ -377,6 +388,8 @@ class CognitiveHypervisor:
     def _normalize_guarded_bridge_result(
         self,
         guarded: DeviceExecutionResult,
+        *,
+        decision: HypervisorDecision,
     ) -> dict[str, Any]:
         if guarded.ok and isinstance(guarded.output, dict):
             result = dict(guarded.output)
@@ -389,12 +402,66 @@ class CognitiveHypervisor:
                 "latency_ms": guarded.latency_ms,
                 "device_status": guarded.status,
             }
+        degraded_state = self._device_degraded_state(
+            guarded=guarded,
+            decision=decision,
+        )
         return {
-            "response": "I could not complete that route within the current cognitive budget.",
+            "response": degraded_state["message"],
             "hemisphere_used": "degraded",
             "latency_ms": guarded.latency_ms,
             "device_status": guarded.status,
             "error": guarded.error,
+            "degraded_state": degraded_state,
+        }
+
+    def _device_degraded_state(
+        self,
+        *,
+        guarded: DeviceExecutionResult,
+        decision: HypervisorDecision,
+    ) -> dict[str, Any]:
+        reason = "budget_exhausted" if guarded.status == "timeout" else "device_fault"
+        message = (
+            "The CHAL route could not complete within the current cognitive budget, "
+            "so Synthesus held the response in an explicit degraded state."
+            if reason == "budget_exhausted"
+            else
+            "The CHAL route hit a cognitive device fault, so Synthesus held the response "
+            "in an explicit degraded state."
+        )
+        return {
+            "schema": "synthesus.chal.degraded_state.v1",
+            "trace_id": decision.trace_id,
+            "reason": reason,
+            "route": decision.route.value,
+            "device": "chal://hypervisor/hemisphere_bridge",
+            "device_status": guarded.status,
+            "budget_exhausted": guarded.status == "timeout",
+            "normal_assistant_path": False,
+            "legacy_template_leakage_allowed": False,
+            "message": message,
+            "error": guarded.error,
+        }
+
+    def _template_quarantine_degraded_state(
+        self,
+        *,
+        decision: HypervisorDecision,
+        template_guard_result: Any,
+    ) -> dict[str, Any]:
+        return {
+            "schema": "synthesus.chal.degraded_state.v1",
+            "trace_id": decision.trace_id,
+            "reason": "legacy_template_quarantine",
+            "route": decision.route.value,
+            "device": "chal://critic/template_guard",
+            "device_status": "quarantined",
+            "budget_exhausted": False,
+            "normal_assistant_path": False,
+            "legacy_template_leakage_allowed": False,
+            "message": template_guard_result.text,
+            "matched_signatures": list(template_guard_result.matched_signatures),
         }
 
     def _template_surface(self, decision: HypervisorDecision) -> TemplateSurface:

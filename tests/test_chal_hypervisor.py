@@ -352,7 +352,17 @@ def test_hypervisor_degrades_on_device_timeout():
     assert result.telemetry["device_isolation"]["status"] == "timeout"
     assert result.telemetry["budget_exhausted"] is True
     assert result.telemetry["degraded"] is True
-    assert result.response
+    degraded_state = result.telemetry["degraded_state"]
+    assert degraded_state["schema"] == "synthesus.chal.degraded_state.v1"
+    assert degraded_state["trace_id"] == result.decision.trace_id
+    assert degraded_state["reason"] == "budget_exhausted"
+    assert degraded_state["route"] == "fast_path"
+    assert degraded_state["device"] == "chal://hypervisor/hemisphere_bridge"
+    assert degraded_state["normal_assistant_path"] is False
+    assert degraded_state["legacy_template_leakage_allowed"] is False
+    assert result.response == degraded_state["message"]
+    assert "[fallback]" not in result.response
+    assert "response_template" not in result.response
 
 
 def test_hypervisor_degrades_on_blocking_sync_device_timeout():
@@ -362,6 +372,8 @@ def test_hypervisor_degrades_on_blocking_sync_device_timeout():
 
     assert result.bridge_result["device_status"] == "timeout"
     assert result.telemetry["budget_exhausted"] is True
+    assert result.telemetry["degraded_state"]["reason"] == "budget_exhausted"
+    assert result.bridge_result["degraded_state"] == result.telemetry["degraded_state"]
 
 
 def test_hypervisor_degrades_on_device_fault():
@@ -374,6 +386,13 @@ def test_hypervisor_degrades_on_device_fault():
     assert result.telemetry["device_isolation"]["status"] == "fault"
     assert result.telemetry["budget_exhausted"] is False
     assert result.telemetry["degraded"] is True
+    degraded_state = result.telemetry["degraded_state"]
+    assert degraded_state["schema"] == "synthesus.chal.degraded_state.v1"
+    assert degraded_state["reason"] == "device_fault"
+    assert degraded_state["device_status"] == "fault"
+    assert degraded_state["error"] == "device bus fault"
+    assert result.response == degraded_state["message"]
+    assert "Handled:" not in result.response
 
 
 def test_hypervisor_quarantines_normal_path_legacy_template_surface():
@@ -387,6 +406,11 @@ def test_hypervisor_quarantines_normal_path_legacy_template_surface():
     assert result.telemetry["template_guard"]["rewritten"] is True
     assert result.telemetry["template_guard"]["surface"] == "normal"
     assert result.telemetry["degraded"] is True
+    degraded_state = result.telemetry["degraded_state"]
+    assert degraded_state["reason"] == "legacy_template_quarantine"
+    assert degraded_state["device"] == "chal://critic/template_guard"
+    assert degraded_state["matched_signatures"] == ["[module]", "response_template", "Handled:"]
+    assert degraded_state["legacy_template_leakage_allowed"] is False
 
 
 def test_hypervisor_labels_safety_template_exception_without_normal_quarantine():

@@ -2470,3 +2470,27 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Manifest-backed CHAL mounts and KAL mount initialization are healthy; the release blocker is semantic retrieval hardware alignment, not the mount table.
 - Golden-query latency remains unmeasured by design until retrieval semantics pass, preventing invalid latency numbers from a mismatched FAISS/embedder pair.
+
+## Current Session — 2026-06-03 (Agent 1 — Typed CHAL Degraded State)
+
+### 📝 Summary
+- Added `degraded_state` telemetry to `CognitiveHypervisorTrace` so timeout, device fault, and template-quarantine paths emit a typed `synthesus.chal.degraded_state.v1` record instead of an unstructured fallback string.
+- Ensured degraded responses carry `normal_assistant_path=false` and `legacy_template_leakage_allowed=false`, preserving graceful user-visible messaging without reviving legacy template ownership.
+- Extended the public CHAL smoke command with an in-process degraded-state check and mirrored the `CHALDegradedState` schema into OpenAPI/API schema docs.
+- Advanced Synthesus 5 Phase 9: graceful degraded-state messaging without legacy templates.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/hypervisor.py tools/synthesus5_chal_smoke.py tests/test_chal_hypervisor.py packages/api/schemas.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_hypervisor.py` — 14 passed.
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed `CHALDegradedState` exists and `CognitiveHypervisorTrace.degraded_state` references it.
+- `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_chal_smoke.py` — passed; four public CHAL/API turns passed and degraded-state smoke reported `reason=budget_exhausted`, `device_status=timeout`, and no template leaks.
+- `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_focused_suite.py` — passed compile, API smoke, hypervisor/API regressions, firmware/comparison regressions, and Phase 8 latency guard; stopped at the known Knowledge Cloud cold-start blocker: `FAISS/embedder dim mismatch: faiss=384, embedder=128`.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` agree on the selected profile dimension, then rerun the full focused suite.
+- Future frontend/API trace work can render `debug.cognitive_hypervisor.degraded_state` alongside route decisions and `debug.template_surface`.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Degraded CHAL states are explicit release telemetry, not a new fallback owner. Normal assistant wording remains owned by CHAL, the Cognitive Hypervisor, CGPU/generation, and critic arbitration.
+- Template quarantine, device faults, and budget exhaustion now share a single inspectable degraded-state shape for API clients and smoke validation.

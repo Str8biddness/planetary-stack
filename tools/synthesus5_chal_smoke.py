@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import sys
@@ -30,9 +31,16 @@ os.environ.setdefault("SYNTHESUS_KNOWLEDGE_SYNC_MODE", "off")
 os.environ.setdefault("SYNTHESUS_API_KEY", "synthesus5-smoke-local")
 
 from fastapi.testclient import TestClient  # noqa: E402
+from core.chal.hypervisor import CognitiveHypervisor  # noqa: E402
 from reasoning.generation.template_guard import LEGACY_TEMPLATE_SIGNATURES  # noqa: E402
 
 import api.production_server as production_server  # noqa: E402
+
+
+class SlowBridge:
+    async def route_query(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        await asyncio.sleep(0.6)
+        return {"response": "too late", "latency_ms": 600.0}
 
 
 @dataclass(frozen=True)
@@ -160,10 +168,36 @@ def run_smoke(*, verbose: bool = False) -> dict[str, Any]:
             print(text)
             print()
 
+    degraded = _run_degraded_state_smoke()
+
     return {
         "status": "passed",
         "session_id": session_id,
         "turns": results,
+        "degraded_state": degraded,
+    }
+
+
+def _run_degraded_state_smoke() -> dict[str, Any]:
+    hypervisor = CognitiveHypervisor(bridge_factory=lambda: SlowBridge())
+    result = asyncio.run(hypervisor.process_query("simple degraded smoke"))
+    degraded_state = result.telemetry.get("degraded_state") or {}
+    leaks = _find_template_leaks(result.response)
+
+    _assert(result.telemetry.get("degraded") is True, "degraded smoke: trace was not degraded")
+    _assert(degraded_state.get("schema") == "synthesus.chal.degraded_state.v1", "degraded smoke: missing schema")
+    _assert(degraded_state.get("reason") == "budget_exhausted", "degraded smoke: wrong reason")
+    _assert(degraded_state.get("normal_assistant_path") is False, "degraded smoke: wrong assistant path flag")
+    _assert(
+        degraded_state.get("legacy_template_leakage_allowed") is False,
+        "degraded smoke: template leakage flag not disabled",
+    )
+    _assert(not leaks, f"degraded smoke: leaked legacy template signatures {leaks}")
+
+    return {
+        "reason": degraded_state.get("reason"),
+        "device_status": degraded_state.get("device_status"),
+        "template_leaks": leaks,
     }
 
 
