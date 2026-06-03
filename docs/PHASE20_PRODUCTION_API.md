@@ -101,6 +101,15 @@ CGPU device-frame schemas are documented separately as `CGPUFrame` and
 `CGPUOutputFrame`; `/api/v1/query` does not emit CGPU candidate sets as top-level
 payloads.
 
+Legacy-compatible template or fallback exceptions are mirrored as the
+`TemplateSurface` schema. When returned, the payload lives under
+`debug.template_surface` and must identify the audited boundary, such as
+`explicit_npc_script` for character compatibility or
+`legacy_api_pattern_storage` for non-user-facing stored candidate text. A labeled
+template surface is not the normal Synthesus 5 assistant path; normal assistant
+wording remains owned by CHAL, the Cognitive Hypervisor, generation, and critic
+arbitration.
+
 ### Synthesus 5 Smoke Command
 
 Run the focused CHAL API smoke check from the repository root:

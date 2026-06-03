@@ -126,7 +126,7 @@ Legend:
 
 - [x]  Add regression tests that fail on normal-path template leakage. Session log: 2026-05-28 Agent 4 template guard.
 
-- [x]  Update module docs with the safety/template exception boundary. Session log: 2026-05-28 Agent 4 template guard.
+- [x]  Update module docs with the safety/template exception boundary. Session log: 2026-05-28 Agent 4 template guard; 2026-06-02 Agent 10 mirrored legacy API `debug.template_surface` exceptions as the reusable `TemplateSurface` OpenAPI/API schema contract.
 
 ## Phase 7: Memory And Cache Hierarchy
 

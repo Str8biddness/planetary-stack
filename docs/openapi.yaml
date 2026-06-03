@@ -1152,6 +1152,59 @@ components:
       - value_type
       title: ParameterValue
       description: Single parameter value with type information
+    TemplateSurface:
+      type: object
+      title: TemplateSurface
+      description: Labeled template or fallback-surface metadata emitted under
+        QueryResponse.debug.template_surface when a legacy-compatible API path
+        returns an explicit safety/platform/identity/NPC-script exception or stores
+        non-user-facing candidate text.
+      required:
+      - surface
+      - status
+      - boundary
+      - user_facing
+      - normal_assistant_path
+      properties:
+        surface:
+          type: string
+          description: Runtime surface that produced or stored the text, such as
+            legacy_fastapi_character_router or production_api_pattern_recall.
+        status:
+          type: string
+          enum:
+          - allowed_labeled_exception
+          - non_user_facing
+          description: Classification after template-surface audit.
+        boundary:
+          type: string
+          enum:
+          - safety
+          - platform
+          - identity_rights
+          - explicit_npc_script
+          - legacy_api_pattern_storage
+          - non_user_facing_storage
+          description: Reason this surface is allowed outside the normal Synthesus
+            5 assistant path.
+        user_facing:
+          type: boolean
+          description: Whether this compatibility surface can be returned directly
+            to a caller.
+        normal_assistant_path:
+          type: boolean
+          description: Always false for labeled legacy/template exceptions; normal
+            Synthesus 5 assistant wording remains owned by CHAL, the Cognitive Hypervisor,
+            generation, and critic arbitration.
+        kind:
+          type: string
+          description: Surface-specific subtype, for example character_fallback,
+            character_pattern, pattern_recall, or pattern_ingest.
+        character:
+          type: string
+        pattern_id:
+          type: string
+      additionalProperties: true
     CGPUFrame:
       type: object
       title: CGPUFrame
@@ -1564,7 +1617,9 @@ components:
             mode=chal calls, cognitive_hypervisor follows the CognitiveHypervisorTrace
             OpenAPI component, including typed QuadBrainArbitration records when route=quad_brain_path.
             CGPU candidate-set trace records should also live here as the runtime
-            wiring expands without changing the stable response envelope.
+            wiring expands without changing the stable response envelope. Legacy-compatible
+            template exceptions are labeled under debug.template_surface using the
+            TemplateSurface schema.
       type: object
       required:
       - response

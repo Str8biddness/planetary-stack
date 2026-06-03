@@ -166,7 +166,9 @@ class QueryResponse(BaseModel):
             "CognitiveHypervisorTrace OpenAPI component, including typed "
             "QuadBrainArbitration records when route=quad_brain_path. CGPU "
             "candidate-set trace records should also live here as the runtime "
-            "wiring expands without changing the stable response envelope."
+            "wiring expands without changing the stable response envelope. "
+            "Legacy-compatible template exceptions are labeled under "
+            "debug.template_surface using the TemplateSurface schema."
         ),
     )
 

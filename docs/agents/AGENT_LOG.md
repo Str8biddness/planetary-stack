@@ -2424,3 +2424,22 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Organs remain CHAL accelerators under the runtime, not independent uncontrolled brains. The v3 replay schema makes that boundary stronger by tying every organ decision to candidate references and critic feedback metadata that the evaluator can gate.
 - Historical v2 traces are still valid for replay history, but strict candidate/critic coverage applies to newly generated v3 traces.
+
+## Current Session — 2026-06-02 (Agent 10 — TemplateSurface API Schema Contract)
+
+### 📝 Summary
+- Added reusable `TemplateSurface` component schemas to `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json` for `QueryResponse.debug.template_surface`.
+- Updated `packages/api/schemas.py` and `docs/PHASE20_PRODUCTION_API.md` so legacy-compatible template/fallback exceptions are documented as labeled safety/platform/identity/NPC-script or non-user-facing storage boundaries, not as the normal Synthesus 5 assistant path.
+- Advanced the Phase 6 docs/API contract checklist item after Agent 6 completed runtime quarantine of legacy API template surfaces.
+
+### ✅ Verified
+- `python -m py_compile packages/api/schemas.py` — passed.
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed `TemplateSurface` exists and `QueryResponse.debug` describes `debug.template_surface`.
+- `git diff --check -- packages/api/schemas.py docs/openapi.yaml docs/openapi.json docs/api_schema.json docs/PHASE20_PRODUCTION_API.md docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md` — passed.
+
+### 🚧 Left Off / Next Steps
+- Future API/frontend trace work can render `debug.template_surface` explicitly when legacy-compatible character or pattern paths are used.
+- Pre-existing root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` changes were left untouched and should stay separated from Agent 10 schema commits.
+
+### 💡 Architectural Notes
+- `TemplateSurface` is an audit/debug contract, not permission for template ownership of normal assistant responses. Normal Synthesus 5 wording remains owned by CHAL, the Cognitive Hypervisor, generation, and critic arbitration.
