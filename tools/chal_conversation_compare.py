@@ -106,6 +106,15 @@ class ReferenceExpectation:
     require_quad_brain_roles: bool = False
 
 
+@dataclass(frozen=True)
+class AxisImprovementThresholds:
+    min_overall_delta: float = 0.0
+    require_template_improvement: bool = True
+    require_naturalness_not_worse: bool = True
+    require_grounding_not_worse: bool = True
+    require_safety_not_worse: bool = True
+
+
 QUAD_BRAIN_ROLES = (
     "knowledge_grounding",
     "executive_reasoning",
@@ -605,6 +614,77 @@ def assert_reference_scorecard(scorecard: dict[str, Any]) -> None:
         raise AssertionError("\n".join(failures))
 
 
+def build_axis_improvement_scorecard(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    case_results = []
+    axes = (
+        "usefulness",
+        "grounding",
+        "naturalness",
+        "latency",
+        "template_leakage",
+        "safety",
+        "overall",
+    )
+    for row in rows:
+        legacy = row["scores"]["legacy"]
+        synth = row["scores"]["synthesus5"]
+        axis_deltas = {
+            axis: round(float(synth[axis]) - float(legacy[axis]), 3)
+            for axis in axes
+        }
+        case_results.append(
+            {
+                "case_id": row["case_id"],
+                "category": row["category"],
+                "axis_deltas": axis_deltas,
+                "legacy": {axis: legacy[axis] for axis in axes},
+                "synthesus5": {axis: synth[axis] for axis in axes},
+            }
+        )
+    return {
+        "schema": "synthesus.phase8.axis_improvement_scorecard.v1",
+        "summary": {
+            "case_count": len(case_results),
+            "cases_with_template_improvement": sum(
+                1 for case in case_results if case["axis_deltas"]["template_leakage"] > 0
+            ),
+            "cases_with_grounding_regression": sum(
+                1 for case in case_results if case["axis_deltas"]["grounding"] < 0
+            ),
+            "cases_with_naturalness_regression": sum(
+                1 for case in case_results if case["axis_deltas"]["naturalness"] < 0
+            ),
+            "cases_with_safety_regression": sum(
+                1 for case in case_results if case["axis_deltas"]["safety"] < 0
+            ),
+        },
+        "cases": case_results,
+    }
+
+
+def assert_axis_improvements(
+    scorecard: dict[str, Any],
+    thresholds: AxisImprovementThresholds = AxisImprovementThresholds(),
+) -> None:
+    failures = []
+    for case in scorecard["cases"]:
+        deltas = case["axis_deltas"]
+        if deltas["overall"] < thresholds.min_overall_delta:
+            failures.append(
+                f"{case['case_id']} overall delta {deltas['overall']} fell below {thresholds.min_overall_delta}"
+            )
+        if thresholds.require_template_improvement and deltas["template_leakage"] <= 0:
+            failures.append(f"{case['case_id']} did not improve template leakage")
+        if thresholds.require_naturalness_not_worse and deltas["naturalness"] < 0:
+            failures.append(f"{case['case_id']} regressed naturalness by {abs(deltas['naturalness'])}")
+        if thresholds.require_grounding_not_worse and deltas["grounding"] < 0:
+            failures.append(f"{case['case_id']} regressed grounding by {abs(deltas['grounding'])}")
+        if thresholds.require_safety_not_worse and deltas["safety"] < 0:
+            failures.append(f"{case['case_id']} regressed safety by {abs(deltas['safety'])}")
+    if failures:
+        raise AssertionError("\n".join(failures))
+
+
 def assert_regression_thresholds(summary: dict[str, Any], thresholds: RegressionThresholds) -> None:
     failures = []
     if thresholds.max_mean_latency_ms is not None:
@@ -704,9 +784,11 @@ async def main() -> int:
     parser.add_argument("--json", type=Path, help="Write machine-readable comparison to this path.")
     parser.add_argument("--trace-jsonl", type=Path, help="Write compact replay trace records to this JSONL path.")
     parser.add_argument("--scorecard-json", type=Path, help="Write GPT-4-class reference expectation scorecard JSON.")
+    parser.add_argument("--axis-scorecard-json", type=Path, help="Write per-case axis improvement scorecard JSON.")
     parser.add_argument("--baseline-json", type=Path, help="Write summary-only latency/quality baseline JSON.")
     parser.add_argument("--fail-on-leak", action="store_true", help="Fail if Synthesus 5 output leaks legacy surface signatures.")
     parser.add_argument("--fail-on-reference", action="store_true", help="Fail if any fixed reference expectation check fails.")
+    parser.add_argument("--fail-on-axis-regression", action="store_true", help="Fail if any case loses to legacy on required quality axes.")
     parser.add_argument("--max-mean-latency-ms", type=float, help="Fail if Synthesus 5 mean runtime exceeds this value.")
     parser.add_argument("--max-p95-latency-ms", type=float, help="Fail if Synthesus 5 p95 runtime exceeds this value.")
     parser.add_argument("--min-score-delta", type=float, help="Fail if Synthesus 5 score delta falls below this value.")
@@ -718,6 +800,9 @@ async def main() -> int:
     reference_scorecard = build_reference_scorecard(rows)
     if args.fail_on_reference:
         assert_reference_scorecard(reference_scorecard)
+    axis_scorecard = build_axis_improvement_scorecard(rows)
+    if args.fail_on_axis_regression:
+        assert_axis_improvements(axis_scorecard)
     summary = summarize(rows)
     assert_regression_thresholds(
         summary,
@@ -753,6 +838,13 @@ async def main() -> int:
             encoding="utf-8",
         )
         print(args.scorecard_json)
+    if args.axis_scorecard_json:
+        args.axis_scorecard_json.parent.mkdir(parents=True, exist_ok=True)
+        args.axis_scorecard_json.write_text(
+            json.dumps(axis_scorecard, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        print(args.axis_scorecard_json)
     if args.baseline_json:
         args.baseline_json.parent.mkdir(parents=True, exist_ok=True)
         args.baseline_json.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")

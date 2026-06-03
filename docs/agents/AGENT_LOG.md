@@ -2521,3 +2521,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - This run fixed control-plane drift only; it did not modify generated FAISS, KNDB, model, cache, scorecard, or workflow artifacts.
 - 4.1 remains historical foundation context, but active CHAL/KAL runtime surfaces should describe themselves as Synthesus 5 unless they explicitly reference preserved historical docs.
+
+## Current Session — 2026-06-03 (Agent 3 — Phase 8 Axis-Improvement Scorecard Gate)
+
+### 📝 Summary
+- Added a per-case `synthesus.phase8.axis_improvement_scorecard.v1` to `tools/chal_conversation_compare.py`.
+- Added `--fail-on-axis-regression` and `--axis-scorecard-json` so the legacy-vs-Synthesus-5 harness now fails when an individual case regresses against legacy on required axes, even if aggregate score and reference checks still pass.
+- Wired the new gate into `tools/synthesus5_focused_suite.py` and added regression tests for the pass path and deliberate per-case grounding failure path.
+- Advanced Phase 8 by strengthening the GPT-4-class comparison harness for conversation quality, grounded retrieval, NPC/persona behavior, business-bot behavior, latency, safety, and template leakage.
+
+### ✅ Verified
+- `python -m py_compile tools/chal_conversation_compare.py tools/synthesus5_focused_suite.py tests/test_chal_reasoning_firmware.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_chal_reasoning_firmware.py` — 18 passed.
+- `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/chal_conversation_compare.py --fail-on-leak --fail-on-reference --fail-on-axis-regression --max-mean-latency-ms 1000 --max-p95-latency-ms 1500 --min-score-delta 0.1 --json tools/results/synthesus5_phase8_comparison_latest.json --scorecard-json tools/results/synthesus5_phase8_reference_scorecard_latest.json --axis-scorecard-json tools/results/synthesus5_phase8_axis_scorecard_latest.json --baseline-json tools/results/synthesus5_phase8_latency_baseline_latest.json --trace-jsonl tools/results/synthesus5_phase8_replay_latest.jsonl` — passed; generated outputs remained ignored under `tools/results/`.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `artifacts/faiss.index`, `artifacts/faiss_metadata.json`, and `artifacts/models/swarm_embedder.pkl` agree on the selected profile dimension, then rerun the full focused suite.
+- Future Agent 3 passes can add larger scenario batches or external model-backed reference comparisons, but current benchmark claims remain limited to this deterministic runnable harness.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` changes were left untouched and unstaged.
+
+### 💡 Architectural Notes
+- Aggregate benchmark deltas are no longer enough for Phase 8 readiness. Each comparison case now carries axis deltas so legacy-vs-Synthesus-5 quality claims are inspectable at the case level.
+- The scorecard records generated benchmark evidence, while source control only carries the harness, tests, focused-suite wiring, checklist, and handover log.

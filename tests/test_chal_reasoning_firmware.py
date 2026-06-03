@@ -18,9 +18,11 @@ from core.chal import frames as canonical_frames
 from tools.chal_conversation_compare import (
     CASES,
     RegressionThresholds,
+    assert_axis_improvements,
     assert_chal_surfaces_are_clean,
     assert_reference_scorecard,
     assert_regression_thresholds,
+    build_axis_improvement_scorecard,
     build_reference_scorecard,
     build_replay_records,
     build_chal_rows,
@@ -336,6 +338,36 @@ def test_phase8_reference_scorecard_reports_failed_checks():
         assert f"{scorecard['cases'][0]['case_id']} failed route" in str(exc)
     else:
         raise AssertionError("reference scorecard gate must fail when a case check fails")
+
+
+def test_phase8_comparison_harness_builds_axis_improvement_scorecard():
+    rows = asyncio.run(build_chal_rows())
+    scorecard = build_axis_improvement_scorecard(rows)
+
+    assert scorecard["schema"] == "synthesus.phase8.axis_improvement_scorecard.v1"
+    assert scorecard["summary"]["case_count"] == len(rows)
+    assert scorecard["summary"]["cases_with_template_improvement"] == len(rows)
+    assert scorecard["summary"]["cases_with_grounding_regression"] == 0
+    assert scorecard["summary"]["cases_with_naturalness_regression"] == 0
+    assert scorecard["summary"]["cases_with_safety_regression"] == 0
+    assert_axis_improvements(scorecard)
+
+    business_case = next(case for case in scorecard["cases"] if case["case_id"] == "business_bot_task")
+    assert business_case["axis_deltas"]["template_leakage"] == 1.0
+    assert business_case["axis_deltas"]["naturalness"] > 0
+
+
+def test_phase8_axis_improvement_scorecard_reports_case_regressions():
+    rows = asyncio.run(build_chal_rows())
+    scorecard = build_axis_improvement_scorecard(rows)
+    scorecard["cases"][0]["axis_deltas"]["grounding"] = -0.25
+
+    try:
+        assert_axis_improvements(scorecard)
+    except AssertionError as exc:
+        assert f"{scorecard['cases'][0]['case_id']} regressed grounding" in str(exc)
+    else:
+        raise AssertionError("axis improvement gate must fail when a case regresses")
 
 
 def test_phase8_comparison_harness_enforces_latency_regression_thresholds():
