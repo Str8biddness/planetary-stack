@@ -11,6 +11,16 @@ from synthesus_knowledge_cloud.manifest import build_manifest, write_manifest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
+def _write_current_source_manifest(repo: Path) -> None:
+    sources = repo / "sources"
+    manifests = repo / "manifests"
+    sources.mkdir()
+    manifests.mkdir()
+    (sources / "sample.yaml").write_text("id: sample\n", encoding="utf-8")
+    source_manifest = build_manifest(repo, ["sources"], kind="synthesus-knowledge-source-plane")
+    write_manifest(source_manifest, manifests / "source_manifest.json")
+
+
 def test_plan_build_derives_sample_sizes() -> None:
     plan = plan_build(REPO_ROOT / "profiles" / "public-base.yaml", repo_root=REPO_ROOT)
     assert plan.profile_name == "public-base"
@@ -28,6 +38,7 @@ def test_run_build_dry_run() -> None:
 
 
 def test_stamp_manifest_rejects_runtime_semantic_mismatch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _write_current_source_manifest(tmp_path)
     artifacts = tmp_path / "artifacts"
     (artifacts / "models").mkdir(parents=True)
     (artifacts / "faiss.index").write_bytes(b"fake-index")
@@ -53,6 +64,7 @@ def test_stamp_manifest_rejects_profile_embed_dim_mismatch(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _write_current_source_manifest(tmp_path)
     artifacts = tmp_path / "artifacts"
     (artifacts / "models").mkdir(parents=True)
     (artifacts / "faiss.index").write_bytes(b"fake-index")
@@ -98,3 +110,19 @@ def test_stamp_manifest_rejects_profile_embed_dim_mismatch(
         )
         == 1
     )
+
+
+def test_stamp_manifest_rejects_stale_source_manifest(tmp_path: Path) -> None:
+    _write_current_source_manifest(tmp_path)
+    (tmp_path / "sources" / "sample.yaml").write_text("id: changed\n", encoding="utf-8")
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    (artifacts / "sample.txt").write_text("hello", encoding="utf-8")
+    original_manifest = build_manifest(artifacts, ["."], kind="test")
+    write_manifest(original_manifest, artifacts / "manifest.json")
+
+    with pytest.raises(RuntimeError, match="source manifest validation failed"):
+        stamp_existing_manifest(repo_root=tmp_path, artifact_root=artifacts)
+    assert "build" not in (artifacts / "manifest.json").read_text(encoding="utf-8")
+
+    assert main(["stamp-manifest", "--repo-root", str(tmp_path), "--artifact-root", str(artifacts)]) == 1

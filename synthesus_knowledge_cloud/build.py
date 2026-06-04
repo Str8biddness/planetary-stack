@@ -19,7 +19,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .manifest import DEFAULT_SOURCE_ROOTS, build_manifest, validate_runtime_bundle_semantics, write_manifest
+from .manifest import (
+    DEFAULT_SOURCE_ROOTS,
+    build_manifest,
+    validate_runtime_bundle_semantics,
+    verify_source_manifest,
+    write_manifest,
+)
 from .profiles import load_profile
 from .provenance import capture_provenance, stamp_manifest
 from .source_planes import validate_source_planes
@@ -137,6 +143,13 @@ def _require_runtime_bundle_semantics(plan: BuildPlan, *, require_profile_dim: b
         raise RuntimeError(f"runtime bundle semantic validation failed: {failures}")
 
 
+def _require_source_manifest_current(repo_root: Path) -> None:
+    validation = verify_source_manifest(repo_root)
+    if not validation.ok:
+        failures = "; ".join(validation.failures)
+        raise RuntimeError(f"source manifest validation failed: {failures}")
+
+
 def stamp_existing_manifest(
     *,
     repo_root: str | Path = ".",
@@ -160,6 +173,7 @@ def stamp_existing_manifest(
             sources=[],
         )
 
+    _require_source_manifest_current(repo)
     _require_runtime_bundle_semantics(plan, require_profile_dim=profile_path is not None)
 
     # Preserve original bundle generated_at if a previous manifest exists.
@@ -222,6 +236,19 @@ def run_build(
             provenance=None,
             stdout_tail=None,
             stderr_tail="; ".join(validation.errors),
+        )
+    try:
+        _require_source_manifest_current(plan.repo_root)
+    except RuntimeError as exc:
+        return BuildReport(
+            plan=plan,
+            executed=False,
+            exit_code=None,
+            manifest_path=None,
+            artifact_count=0,
+            provenance=None,
+            stdout_tail=None,
+            stderr_tail=str(exc),
         )
 
     if not execute:
