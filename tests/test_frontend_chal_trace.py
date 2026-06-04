@@ -12,6 +12,12 @@ def test_chat_frontend_exposes_chal_modes_and_trace_panel():
 
     assert '<option value="chal">Synthesus 5 CHAL</option>' in app
     assert '<option value="business_bot">Business Bot</option>' in app
+    assert "synthesus5NpcRuntime" in app
+    assert "const effectiveMode = synthesus5NpcRuntime ? 'chal' : mode;" in app
+    assert "mode: effectiveMode" in app
+    assert 'className="npc-runtime-toggle"' in app
+    assert '<span>NPC S5</span>' in app
+    assert "disabled={synthesus5NpcRuntime}" in app
 
     assert "interface CHALTelemetry" in types
     assert "cognitive_hypervisor" in chat_window
@@ -23,3 +29,4 @@ def test_chat_frontend_exposes_chal_modes_and_trace_panel():
 
     assert ".chal-trace-panel" in styles
     assert ".chal-route-pill.degraded" in styles
+    assert ".npc-runtime-toggle" in styles

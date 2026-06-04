@@ -17,6 +17,7 @@ function App() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState('auto');
+  const [synthesus5NpcRuntime, setSynthesus5NpcRuntime] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('chat');
   const [error, setError] = useState<string | null>(null);
 
@@ -32,10 +33,11 @@ function App() {
     setError(null);
 
     try {
+      const effectiveMode = synthesus5NpcRuntime ? 'chal' : mode;
       const body: Record<string, unknown> = {
         query: text,
         character: selectedCharacter,
-        mode,
+        mode: effectiveMode,
         include_debug: true,
       };
       if (sessionId) body.session_id = sessionId;
@@ -101,7 +103,7 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCharacter, sessionId, mode]);
+  }, [selectedCharacter, sessionId, mode, synthesus5NpcRuntime]);
 
   // Handle multimodal response
   const handleMultimodalResponse = useCallback((response: { text: string; amplificationInfo?: any }) => {
@@ -153,8 +155,9 @@ function App() {
             <select
               id="mode-select"
               value={mode}
+              disabled={synthesus5NpcRuntime}
               onChange={(e) => setMode(e.target.value)}
-              title="Processing mode"
+              title={synthesus5NpcRuntime ? 'NPC runtime is routing through Synthesus 5 CHAL' : 'Processing mode'}
             >
               <option value="auto">Auto</option>
               <option value="chal">Synthesus 5 CHAL</option>
@@ -163,6 +166,15 @@ function App() {
               <option value="rag">RAG</option>
               <option value="pattern">Pattern</option>
             </select>
+
+            <label className="npc-runtime-toggle" title="Route selected character turns through Synthesus 5 CHAL">
+              <input
+                type="checkbox"
+                checked={synthesus5NpcRuntime}
+                onChange={(e) => setSynthesus5NpcRuntime(e.target.checked)}
+              />
+              <span>NPC S5</span>
+            </label>
 
             <div className="view-toggle">
               <button

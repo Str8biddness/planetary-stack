@@ -172,7 +172,7 @@ Legend:
 
 - [x]  Add frontend control/trace view for CHAL route decisions. Session log: 2026-06-04 Agent 1 frontend CHAL trace view added selectable Synthesus 5 CHAL/business-bot modes and an expandable route-decision telemetry panel for Cognitive Hypervisor responses.
 
-- [ ]  Add NPC runtime toggle for Synthesus 5 path.
+- [x]  Add NPC runtime toggle for Synthesus 5 path. Session log: 2026-06-04 Agent 1 frontend NPC Synthesus 5 runtime toggle.
 
 - [x]  Add business-bot preset path. Session log: 2026-06-01 Agent 1 business-bot CHAL preset path.
 

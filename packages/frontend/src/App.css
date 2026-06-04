@@ -258,6 +258,42 @@
   border-color: var(--accent-primary);
 }
 
+.chat-header-controls select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.npc-runtime-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.npc-runtime-toggle:hover,
+.npc-runtime-toggle:focus-within {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.npc-runtime-toggle input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent-primary);
+}
+
 .session-indicator {
   font-size: 12px;
   color: var(--status-success);

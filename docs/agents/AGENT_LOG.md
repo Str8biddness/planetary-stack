@@ -2751,3 +2751,24 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The frontend trace panel is an operator/debug surface only. It does not change CHAL routing, final language ownership, template quarantine rules, memory writeback admission, or API behavior.
 - `debug.cognitive_hypervisor` remains the single source of truth for route decisions; the UI now renders that telemetry without inventing a parallel trace format.
+
+## Current Session — 2026-06-04 (Agent 1 — Frontend NPC Synthesus 5 Runtime Toggle)
+
+### 📝 Summary
+- Added an explicit NPC Synthesus 5 runtime toggle to the chat header.
+- When enabled, selected-character chat requests now compute `effectiveMode = "chal"`, disable the generic processing selector, and send `/api/v1/query` payloads through the existing Cognitive Hypervisor character-context path.
+- Extended the focused frontend regression test to guard the toggle, forced CHAL payload mode, selector disabling, and styling hook.
+- Advanced Phase 9 by completing the NPC runtime toggle checklist item without changing backend routing semantics.
+
+### ✅ Verified
+- `python -m py_compile tests/test_frontend_chal_trace.py && python -m pytest -q tests/test_frontend_chal_trace.py` — passed, 1 test.
+- `npm run build` in `packages/frontend` — passed TypeScript/Vite production build; Vite reported the existing large-chunk warning.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` agree on the selected profile dimension, then rerun the runtime release gate.
+- Prepare a taggable Synthesus 5 release candidate only after `python tools/synthesus5_release_gate.py --run-runtime --fail-on-blocker` passes.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `package.json`, release-packaging docs/scripts/tests/package metadata, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- The toggle is an operator-facing control for selected-character/NPC turns. It uses the already implemented `mode="chal"` API path, so final language remains owned by the Cognitive Hypervisor, Quad Brain arbitration, CGPU rendering, and critic/template guard.
+- No generated build output, Knowledge Cloud artifact, cache, workflow, or runtime data was committed.
