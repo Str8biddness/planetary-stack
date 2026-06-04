@@ -8,7 +8,7 @@ It is deterministic and source-controlled. Generated scorecards are written unde
 
 ## Coverage
 
-The harness currently evaluates six fixed cases:
+The harness currently evaluates six fixed single-turn cases:
 
 - conversation quality
 - cross-domain reasoning
@@ -18,6 +18,14 @@ The harness currently evaluates six fixed cases:
 - safety boundary handling
 
 Each case compares a legacy template-style output against the Synthesus 5 `CognitiveHypervisor` path. The Synthesus 5 path uses the existing `HemisphereBridge` with seeded left-firmware routes and a deterministic right-hemisphere handler so scheduled agents can run the benchmark without external model calls. The business-bot case explicitly runs the `runtime_preset="business_bot"` CHAL preset so public preset routing, CGPU business rendering, and critic-owned final emission stay covered by the comparison harness.
+
+The harness also evaluates three fixed multi-turn continuity sequences:
+
+- NPC/persona continuity
+- business-bot invoice follow-up continuity
+- safety secret-handling follow-up continuity
+
+Each continuity sequence runs at least two turns, compares legacy template output against Synthesus 5, and checks that the final Synthesus 5 turn preserves required continuity terms, route selection, runtime preset telemetry where applicable, Quad Brain role evidence where applicable, and zero template leakage.
 
 ## Scoring
 
@@ -34,6 +42,8 @@ The overall score is the mean of those axes. Template leakage is checked against
 
 The harness also builds a deterministic GPT-4-class reference scorecard. This is not an external model judge. It checks each case against fixed expectations for route selection, minimum score, grounding coverage, term coverage, latency, template leakage, required decision reasons, runtime preset telemetry, and Quad Brain role evidence where applicable.
 
+It also builds a deterministic continuity scorecard. This checks each multi-turn sequence for turn count, final route, final score, continuity-term coverage, all-turn template cleanliness, expected legacy leakage baseline, runtime preset telemetry, decision reasons, and Quad Brain role coverage where required.
+
 ## Commands
 
 Run the harness and fail on Synthesus 5 template leakage:
@@ -45,7 +55,7 @@ python tools/chal_conversation_compare.py --fail-on-leak
 Run the stricter Phase 8 gate:
 
 ```bash
-python tools/chal_conversation_compare.py --fail-on-leak --fail-on-reference
+python tools/chal_conversation_compare.py --fail-on-leak --fail-on-reference --fail-on-continuity
 ```
 
 Write ignored benchmark artifacts:
@@ -57,12 +67,17 @@ python tools/chal_conversation_compare.py \
   --write tools/results/synthesus5_chal_comparison_YYYY-MM-DD.md \
   --json tools/results/synthesus5_chal_comparison_YYYY-MM-DD.json \
   --trace-jsonl tools/results/synthesus5_chal_replay_YYYY-MM-DD.jsonl \
-  --scorecard-json tools/results/synthesus5_chal_reference_scorecard_YYYY-MM-DD.json
+  --scorecard-json tools/results/synthesus5_chal_reference_scorecard_YYYY-MM-DD.json \
+  --continuity-json tools/results/synthesus5_chal_continuity_YYYY-MM-DD.json \
+  --continuity-scorecard-json tools/results/synthesus5_chal_continuity_scorecard_YYYY-MM-DD.json \
+  --continuity-markdown tools/results/synthesus5_chal_continuity_YYYY-MM-DD.md
 ```
 
-`--trace-jsonl` writes compact replay records with case id, category, trace id, route, runtime preset, score metadata, latency metadata, template-leak flags, and Quad Brain state-contract references when present. It intentionally omits full response text so runtime comparison traces can be stored and diffed without committing bulky generated scorecards.
+`--trace-jsonl` writes compact replay records for both single-turn and continuity cases with case id, category, trace id, route, runtime preset, score metadata, latency metadata, template-leak flags, and Quad Brain state-contract references when present. It intentionally omits full response text so runtime comparison traces can be stored and diffed without committing bulky generated scorecards.
 
 `--scorecard-json` writes the compact reference expectation scorecard. `--fail-on-reference` fails the run if any fixed expectation check fails, even when aggregate scores remain above threshold.
+
+`--continuity-scorecard-json` writes the compact continuity scorecard. `--fail-on-continuity` fails the run if any fixed multi-turn sequence fails its continuity, routing, preset, role, latency, or template-cleanliness checks.
 
 Run the regression tests:
 

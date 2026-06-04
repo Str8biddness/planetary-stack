@@ -17,15 +17,20 @@ from reasoning.chal import (
 from core.chal import frames as canonical_frames
 from tools.chal_conversation_compare import (
     CASES,
+    CONTINUITY_SEQUENCES,
     RegressionThresholds,
     assert_axis_improvements,
     assert_chal_surfaces_are_clean,
+    assert_continuity_scorecard,
     assert_reference_scorecard,
     assert_regression_thresholds,
     build_axis_improvement_scorecard,
+    build_continuity_rows,
+    build_continuity_scorecard,
     build_reference_scorecard,
     build_replay_records,
     build_chal_rows,
+    flatten_continuity_rows,
     summarize,
 )
 
@@ -293,9 +298,11 @@ def test_phase8_comparison_harness_exercises_business_bot_preset():
 
 def test_phase8_comparison_harness_builds_replay_trace_records():
     rows = asyncio.run(build_chal_rows())
-    records = build_replay_records(rows)
+    continuity_rows = asyncio.run(build_continuity_rows())
+    continuity_flat_rows = flatten_continuity_rows(continuity_rows)
+    records = build_replay_records(rows + continuity_flat_rows)
 
-    assert len(records) == len(rows)
+    assert len(records) == len(rows) + len(continuity_flat_rows)
     assert {record["schema"] for record in records} == {"synthesus.phase8.replay_trace.v1"}
     assert all(record["trace_id"] for record in records)
     assert all("response" not in record["legacy"] for record in records)
@@ -303,6 +310,9 @@ def test_phase8_comparison_harness_builds_replay_trace_records():
     business_record = next(record for record in records if record["case_id"] == "business_bot_task")
     assert business_record["runtime_preset"] == "business_bot"
     assert business_record["route"] == "quad_brain_path"
+    continuity_record = next(record for record in records if record["case_id"] == "business_bot_followup_turn2")
+    assert continuity_record["runtime_preset"] == "business_bot"
+    assert continuity_record["route"] == "quad_brain_path"
 
 
 def test_phase8_comparison_harness_builds_reference_scorecard():
@@ -368,6 +378,53 @@ def test_phase8_axis_improvement_scorecard_reports_case_regressions():
         assert f"{scorecard['cases'][0]['case_id']} regressed grounding" in str(exc)
     else:
         raise AssertionError("axis improvement gate must fail when a case regresses")
+
+
+def test_phase8_comparison_harness_builds_continuity_scorecard():
+    continuity_rows = asyncio.run(build_continuity_rows())
+    flat_rows = flatten_continuity_rows(continuity_rows)
+    scorecard = build_continuity_scorecard(continuity_rows)
+
+    assert len(continuity_rows) == len(CONTINUITY_SEQUENCES)
+    assert len(flat_rows) == sum(len(sequence.turns) for sequence in CONTINUITY_SEQUENCES)
+    assert scorecard["schema"] == "synthesus.phase8.continuity_scorecard.v1"
+    assert scorecard["summary"]["sequence_count"] == len(CONTINUITY_SEQUENCES)
+    assert scorecard["summary"]["turn_count"] == len(flat_rows)
+    assert scorecard["summary"]["failed_sequences"] == 0
+    assert scorecard["summary"]["synthesus5_template_leaks"] == 0
+    assert_continuity_scorecard(scorecard)
+
+    sequence_ids = {case["sequence_id"] for case in scorecard["cases"]}
+    assert {
+        "npc_persona_continuity",
+        "business_bot_followup",
+        "safety_secret_followup",
+    }.issubset(sequence_ids)
+
+    business_case = next(case for case in scorecard["cases"] if case["sequence_id"] == "business_bot_followup")
+    assert business_case["observed_final_route"] == "quad_brain_path"
+    assert business_case["runtime_preset"] == "business_bot"
+    assert business_case["continuity_term_coverage"] >= 0.66
+    assert set(business_case["quad_brain_roles"]) == {
+        "knowledge_grounding",
+        "executive_reasoning",
+        "cgpu_rendering",
+        "critic_metacognition",
+    }
+
+
+def test_phase8_continuity_scorecard_reports_sequence_failures():
+    continuity_rows = asyncio.run(build_continuity_rows())
+    scorecard = build_continuity_scorecard(continuity_rows)
+    scorecard["cases"][0]["checks"]["continuity_term_coverage"] = False
+    scorecard["cases"][0]["passed"] = False
+
+    try:
+        assert_continuity_scorecard(scorecard)
+    except AssertionError as exc:
+        assert f"{scorecard['cases'][0]['sequence_id']} failed continuity_term_coverage" in str(exc)
+    else:
+        raise AssertionError("continuity scorecard gate must fail when a sequence check fails")
 
 
 def test_phase8_comparison_harness_enforces_latency_regression_thresholds():

@@ -2772,3 +2772,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The toggle is an operator-facing control for selected-character/NPC turns. It uses the already implemented `mode="chal"` API path, so final language remains owned by the Cognitive Hypervisor, Quad Brain arbitration, CGPU rendering, and critic/template guard.
 - No generated build output, Knowledge Cloud artifact, cache, workflow, or runtime data was committed.
+
+## Current Session — 2026-06-04 (Agent 3 — Phase 8 Multi-Turn Continuity Scorecard)
+
+### 📝 Summary
+- Added three deterministic multi-turn continuity sequences to `tools/chal_conversation_compare.py` for NPC/persona behavior, business-bot invoice follow-up, and safety secret-handling follow-up.
+- Added `synthesus.phase8.continuity_scorecard.v1`, `--fail-on-continuity`, continuity JSON/Markdown outputs, and replay JSONL coverage for continuity turns while keeping generated benchmark artifacts under ignored `tools/results/`.
+- Updated the focused Synthesus 5 suite and evaluation harness docs so Phase 8 gates now catch continuity-term loss, route drift, runtime-preset drift, Quad Brain role loss, and template leakage across follow-up turns.
+- Advanced Phase 8 GPT-4-class evaluation harness coverage beyond single-turn prompts into multi-turn continuity comparison.
+
+### ✅ Verified
+- `python -m py_compile tools/chal_conversation_compare.py tools/synthesus5_focused_suite.py tests/test_chal_reasoning_firmware.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_reasoning_firmware.py` — 20 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/chal_conversation_compare.py --fail-on-leak --fail-on-reference --fail-on-axis-regression --fail-on-continuity --max-mean-latency-ms 1000 --max-p95-latency-ms 1500 --min-score-delta 0.1 --json tools/results/synthesus5_phase8_comparison_latest.json --scorecard-json tools/results/synthesus5_phase8_reference_scorecard_latest.json --axis-scorecard-json tools/results/synthesus5_phase8_axis_scorecard_latest.json --continuity-json tools/results/synthesus5_phase8_continuity_latest.json --continuity-scorecard-json tools/results/synthesus5_phase8_continuity_scorecard_latest.json --continuity-markdown tools/results/synthesus5_phase8_continuity_latest.md --baseline-json tools/results/synthesus5_phase8_latency_baseline_latest.json --trace-jsonl tools/results/synthesus5_phase8_replay_latest.jsonl` — passed; single-turn summary remained 6 cases, Synthesus 5 mean score 0.939 vs legacy 0.424, score delta +0.515, mean latency 4.124ms, p95 latency 5.521ms, 0 Synthesus 5 template leaks. Continuity scorecard passed 3/3 sequences across 6 turns, score delta +0.564, Synthesus 5 mean latency 2.607ms, p95 latency 3.272ms, and 0 Synthesus 5 template leaks.
+
+### 🚧 Left Off / Next Steps
+- Add model-backed or recorded-human reference judging only after the deterministic Phase 8 gates stay stable; current continuity coverage is deterministic and source-controlled, not an external GPT-4 judge.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `package.json`, release-packaging docs/scripts/tests/package metadata, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- The continuity scorecard treats follow-up quality as a CHAL-visible route and trace contract, not just aggregate text quality: final turns must preserve expected continuity terms and required telemetry while remaining template-clean.
+- Replay JSONL now includes continuity turns but still omits full response text, keeping generated benchmark outputs compact and ignored.
