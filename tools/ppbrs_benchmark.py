@@ -10,6 +10,7 @@ from typing import Dict, List
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from ppbrs.pattern_classifier import PatternClassifier, Pattern
+from ppbrs.reasoning_chain import WeightedRuleEvaluator
 from ppbrs.rule_to_action import RuleToActionMapper, Action, ActionType
 from ppbrs.multi_step_reasoning import MultiStepReasoningChain, Hypothesis, ReasoningNode
 
@@ -71,6 +72,32 @@ def benchmark_rule_evaluation(n_rules=500, n_evals=100):
         "avg": np.mean(latencies) * 1000
     }
 
+def benchmark_weighted_top_rule(n_rules=500, n_evals=100):
+    print(f"Baselining Weighted Top Rule ({n_rules} rules, {n_evals} evals)...")
+    evaluator = WeightedRuleEvaluator()
+
+    for i in range(n_rules):
+        evaluator.add_rule(
+            condition=lambda ctx, i=i: ctx.get("key") == i,
+            consequence=lambda ctx, i=i: f"result_{i}",
+            weight=float(n_rules - i),
+            tags=[f"tag_{i % 10}"],
+            trigger_values={"key": i},
+        )
+
+    latencies = []
+    for i in range(n_evals):
+        ctx = {"key": i % n_rules, "tags": [f"tag_{i % 10}"]}
+        start = time.perf_counter()
+        evaluator.apply_top_rule(ctx)
+        latencies.append(time.perf_counter() - start)
+
+    return {
+        "p50": np.percentile(latencies, 50) * 1000,
+        "p95": np.percentile(latencies, 95) * 1000,
+        "avg": np.mean(latencies) * 1000
+    }
+
 def benchmark_graph_traversal(n_nodes=100, n_edges=300, n_walks=50):
     print(f"Baselining Graph Traversal ({n_nodes} nodes, {n_edges} edges)...")
     chain = MultiStepReasoningChain()
@@ -112,6 +139,7 @@ if __name__ == "__main__":
     
     results["metrics"]["pattern_matching"] = benchmark_pattern_matching()
     results["metrics"]["rule_evaluation"] = benchmark_rule_evaluation()
+    results["metrics"]["weighted_top_rule"] = benchmark_weighted_top_rule()
     results["metrics"]["graph_traversal"] = benchmark_graph_traversal()
     
     print("\nBenchmark Results (ms):")

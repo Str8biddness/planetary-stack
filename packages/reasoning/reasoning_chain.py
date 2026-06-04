@@ -399,6 +399,30 @@ class WeightedRuleEvaluator:
         
         activated.sort(key=lambda x: x['weight'], reverse=True)
         return activated
+
+    def evaluate_top_rule(self, context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Evaluates candidate rules only until the highest-weight match is known."""
+        candidates = sorted(
+            self._candidate_rules(context),
+            key=lambda rule: rule['weight'],
+            reverse=True,
+        )
+
+        for rule in candidates:
+            if rule['weight'] < self.activation_threshold:
+                break
+            try:
+                if rule['condition'](context):
+                    rule['activation_count'] += 1
+                    return {
+                        'rule': rule,
+                        'weight': rule['weight'],
+                        'tags': rule['tags']
+                    }
+            except Exception as e:
+                print(f"Rule evaluation error: {e}")
+
+        return None
     
     def apply_top_rule(self, context: Dict[str, Any]) -> Optional[Any]:
         """Selects and executes the highest-weighted triggered rule.
@@ -409,11 +433,11 @@ class WeightedRuleEvaluator:
         Returns:
             The output of the triggered rule's consequence, or None.
         """
-        activated = self.evaluate(context)
-        if not activated:
+        top_match = self.evaluate_top_rule(context)
+        if not top_match:
             return None
         
-        top_rule = activated[0]['rule']
+        top_rule = top_match['rule']
         return top_rule['consequence'](context)
     
     def apply_fallback(self, context: Dict[str, Any], 
@@ -427,9 +451,9 @@ class WeightedRuleEvaluator:
         Returns:
             Output from either a rule consequence or the fallback function.
         """
-        activated = self.evaluate(context)
-        if activated:
-            return activated[0]['rule']['consequence'](context)
+        top_match = self.evaluate_top_rule(context)
+        if top_match:
+            return top_match['rule']['consequence'](context)
         return fallback_func(context)
 
 

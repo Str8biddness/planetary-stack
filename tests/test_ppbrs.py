@@ -194,6 +194,28 @@ class TestWeightedRuleEvaluator:
         result = evaluator.apply_fallback({}, lambda ctx: fallback_called.append(True) or "fallback")
         assert result == "fallback"
 
+    def test_apply_top_rule_short_circuits_lower_weight_candidates(self):
+        evaluator = WeightedRuleEvaluator()
+        calls = []
+        evaluator.add_rule(lambda ctx: calls.append("low") or True, lambda ctx: "low", weight=0.5)
+        evaluator.add_rule(lambda ctx: calls.append("high") or True, lambda ctx: "high", weight=2.0)
+        evaluator.add_rule(lambda ctx: calls.append("middle") or True, lambda ctx: "middle", weight=1.0)
+
+        result = evaluator.apply_top_rule({})
+
+        assert result == "high"
+        assert calls == ["high"]
+
+    def test_apply_fallback_uses_threshold_when_no_rule_can_activate(self):
+        evaluator = WeightedRuleEvaluator(activation_threshold=0.75)
+        calls = []
+        evaluator.add_rule(lambda ctx: calls.append("low") or True, lambda ctx: "low", weight=0.5)
+
+        result = evaluator.apply_fallback({}, lambda ctx: "fallback")
+
+        assert result == "fallback"
+        assert calls == []
+
 
 class TestContextAwareReasoningPipeline:
     """Tests for ContextAwareReasoningPipeline."""

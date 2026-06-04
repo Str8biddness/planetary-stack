@@ -535,3 +535,29 @@ Same-run rule comparison:
 - `python -m py_compile packages/reasoning/reasoning_chain.py packages/reasoning/rule_to_action.py tests/test_ppbrs.py tools/ppbrs_benchmark.py`
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 116 passed.
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py`
+
+## Daily Entry: 2026-06-04 (Agent 4 — Weighted Top-Rule Short-Circuit)
+
+### Actions Performed
+
+1. Added `WeightedRuleEvaluator.evaluate_top_rule()` so single-winner PPBRS firmware paths scan indexed candidates by descending weight and stop after the highest-weight threshold-qualified match.
+2. Routed `apply_top_rule()` and `apply_fallback()` through the short-circuiting path while preserving full `evaluate()` fanout behavior for callers that need every activated rule.
+3. Added regression coverage proving lower-weight candidates are not evaluated after a higher-weight match and below-threshold rules do not execute.
+4. Added a `weighted_top_rule` metric to `tools/ppbrs_benchmark.py`.
+
+### Benchmark Run
+
+PPBRS micro-benchmark after top-rule short-circuiting:
+
+| Component | p50 (ms) | p95 (ms) | Avg (ms) |
+|---|---:|---:|---:|
+| pattern_matching | 0.3193 | 0.3555 | 0.2721 |
+| rule_evaluation | 0.0227 | 0.0270 | 0.0233 |
+| weighted_top_rule | 0.0316 | 0.0358 | 0.0321 |
+| graph_traversal | 0.0165 | 0.0197 | 0.0171 |
+
+### Verified
+
+- `python -m py_compile packages/reasoning/reasoning_chain.py tests/test_ppbrs.py tools/ppbrs_benchmark.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 118 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py`

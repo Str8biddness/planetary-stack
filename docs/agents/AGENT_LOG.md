@@ -2794,3 +2794,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The continuity scorecard treats follow-up quality as a CHAL-visible route and trace contract, not just aggregate text quality: final turns must preserve expected continuity terms and required telemetry while remaining template-clean.
 - Replay JSONL now includes continuity turns but still omits full response text, keeping generated benchmark outputs compact and ignored.
+
+## Current Session — 2026-06-04 (Agent 4 — PPBRS Weighted Top-Rule Short-Circuit)
+
+### 📝 Summary
+- Added `WeightedRuleEvaluator.evaluate_top_rule()` so single-winner PPBRS firmware paths scan indexed candidates by descending weight and stop after the highest-weight threshold-qualified match.
+- Routed `apply_top_rule()` and `apply_fallback()` through the short-circuiting path while keeping `evaluate()` as the full fanout API for callers that need every activated rule.
+- Added regression coverage for lower-weight candidate suppression and below-threshold fallback behavior.
+- Advanced Phase 6 by tightening PPBRS firmware routing without letting PPBRS own normal-path final language.
+
+### ✅ Verified
+- `python -m py_compile packages/reasoning/reasoning_chain.py tests/test_ppbrs.py tools/ppbrs_benchmark.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 118 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py` — passed; weighted top-rule p50 0.0316ms, p95 0.0358ms, avg 0.0321ms.
+
+### 🚧 Left Off / Next Steps
+- Consider extending short-circuiting into `RuleToActionMapper.map_to_action()` only if a stable upper-bound score can be proven for priority plus tag scoring.
+- Continue keeping PPBRS outputs as CHAL firmware signals and route any remaining normal user-facing wording through generation/critic boundaries.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `package.json`, release-packaging docs/scripts/tests/package metadata, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Full rule fanout and single-winner rule execution are now separate PPBRS paths. This keeps broad telemetry/evaluation available while bounding hot-path firmware routing for normal single-action decisions.
+- The activation threshold now affects top-rule execution directly; full `evaluate()` remains unchanged for compatibility.

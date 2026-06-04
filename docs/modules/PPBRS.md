@@ -70,6 +70,7 @@ The repository is currently in a validated PPBRS baseline state. Significant opt
 - **Adjacency Maps**: Replaced linear edge scans with constant-time adjacency lookups in `multi_step_reasoning`.
 - **Cached Topology**: Pre-computed reasoning graph structures for zero-overhead traversal.
 - **Rule Tag + Trigger Indexing**: Rule evaluators prefilter by context tags, trigger keys, and exact trigger values before evaluating conditions.
+- **Top-Rule Short-Circuiting**: Single-winner weighted-rule execution scans indexed candidates by descending weight and stops once the best threshold-qualified firmware rule is known, while full `evaluate()` calls still return all activated rules for callers that need fanout.
 
 ## Optimization Upgrade Path
 
