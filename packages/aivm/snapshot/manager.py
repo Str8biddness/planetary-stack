@@ -15,6 +15,21 @@ class SnapshotManager:
     """
     
     CONTRACT_VERSION = 1
+    REPLAY_TRACE_VERSION = "aivm.snapshot_replay.v1"
+    CANONICAL_TICK_SEQUENCE = [
+        "admission",
+        "perception",
+        "plan",
+        "route",
+        "knowledge",
+        "recall",
+        "coherence_pre",
+        "generate",
+        "coherence_post",
+        "memory_write",
+        "emit",
+        "close",
+    ]
 
     @staticmethod
     def _fingerprint_payload(payload: Dict[str, Any]) -> str:
@@ -22,6 +37,58 @@ class SnapshotManager:
         unsigned.pop("footer", None)
         json_payload = json.dumps(unsigned, sort_keys=True)
         return hashlib.sha256(json_payload.encode()).hexdigest()
+
+    @staticmethod
+    def _fingerprint_replay_events(events: list[dict[str, Any]]) -> str:
+        json_payload = json.dumps(events, sort_keys=True)
+        return hashlib.sha256(json_payload.encode()).hexdigest()
+
+    @staticmethod
+    def build_replay_trace(npc: NPC) -> dict[str, Any]:
+        """
+        Build a compact, replay-oriented tick trace without storing full prompt
+        or response text.
+        """
+        audit_entries = [entry for entry in npc.audit_stream if entry.step != "spawn"]
+        events = [
+            {
+                "index": index,
+                "timestamp": entry.timestamp,
+                "step": entry.step,
+                "details": dict(entry.details),
+            }
+            for index, entry in enumerate(audit_entries)
+        ]
+        steps = [event["step"] for event in events]
+        emit_hashes = [
+            event["details"].get("hash")
+            for event in events
+            if event["step"] == "emit" and event["details"].get("hash")
+        ]
+        canonical_start = SnapshotManager.CANONICAL_TICK_SEQUENCE
+
+        return {
+            "version": SnapshotManager.REPLAY_TRACE_VERSION,
+            "npc_id": npc.identity.id,
+            "scheduler_class": npc.scheduler_class.value,
+            "event_count": len(events),
+            "steps": steps,
+            "canonical_tick_sequence": canonical_start,
+            "canonical_sequence_observed": steps[:len(canonical_start)] == canonical_start,
+            "emit_hashes": emit_hashes,
+            "events": events,
+            "events_hash": SnapshotManager._fingerprint_replay_events(events),
+        }
+
+    @staticmethod
+    def _verify_replay_trace(replay_trace: dict[str, Any]) -> None:
+        if not replay_trace:
+            return
+        events = list(replay_trace.get("events", []))
+        expected_hash = replay_trace.get("events_hash")
+        actual_hash = SnapshotManager._fingerprint_replay_events(events)
+        if expected_hash != actual_hash:
+            raise ValueError("Snapshot replay trace fingerprint mismatch")
 
     @staticmethod
     def capture(npc: NPC) -> bytes:
@@ -53,6 +120,7 @@ class SnapshotManager:
             "header": header,
             "devices": device_blobs,
             "device_fingerprints": device_fingerprints,
+            "replay_trace": SnapshotManager.build_replay_trace(npc),
             "identity": {
                 "name": npc.identity.name,
                 "archetype": npc.identity.archetype,
@@ -119,5 +187,7 @@ class SnapshotManager:
             if device.fingerprint() != expected:
                 raise ValueError(f"Snapshot device fingerprint mismatch: {name}")
 
+        SnapshotManager._verify_replay_trace(data.get("replay_trace", {}))
+        npc.snapshot_replay_trace = dict(data.get("replay_trace", {}))
         npc.add_audit("restore", {"fingerprint": data["footer"]["fingerprint"]})
         return npc

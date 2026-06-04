@@ -16,6 +16,7 @@ class NPC:
     permission_level: PermissionLevel = PermissionLevel.GUEST
     mounted_devices: Dict[str, Device] = field(default_factory=dict)
     audit_stream: List[AuditEntry] = field(default_factory=list)
+    snapshot_replay_trace: Dict[str, Any] = field(default_factory=dict)
 
     def add_audit(self, step: str, details: Dict[str, Any]):
         from datetime import datetime, timezone

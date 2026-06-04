@@ -2906,3 +2906,27 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Quad Brain replay records are trace metadata only: they preserve state-contract evidence, serial arbitration, and critic handoff, but do not create new brain workers or change final language ownership.
 - The replay contract stores selected-response SHA-256 and character length instead of raw text so future comparison harnesses can detect output drift without bloating trace artifacts.
+
+## Current Session — 2026-06-04 (Agent 8 — AIVM Snapshot Replay Trace)
+
+### 📝 Summary
+- Added `aivm.snapshot_replay.v1` metadata to AIVM snapshots so canonical kernel tick audit streams are saved as compact replay records with ordered steps, compact event details, emit hashes, canonical-sequence status, scheduler class, and an internal SHA-256 event hash.
+- Restore now verifies the replay trace event hash before admitting the snapshot and exposes the sealed record on `NPC.snapshot_replay_trace`, while keeping the restored live audit stream limited to spawn/restore events.
+- Added focused regression coverage for replay trace save/load, omission of raw generated response text, and resealed snapshot rejection when replay events are forged.
+- Advanced Phase 7 save/load tests across CHAL memory partitions without changing generated Knowledge Cloud artifacts or claiming hardware behavior beyond the validated AIVM/kernel smoke checks.
+
+### ✅ Verified
+- `python -m py_compile packages/aivm/snapshot/manager.py packages/aivm/kernel/npc.py tests/aivm/test_snapshot_integrity.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/aivm/test_snapshot_integrity.py tests/aivm/test_tick_sequence.py` — passed, 11 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/kernel SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_kernel_pybind_vpd.py tests/test_kernel_bridge.py` — passed, 46 tests.
+- `cmake .. -DBUILD_PYBIND=ON && cmake --build . -j2` in `packages/kernel/build` — passed; `_synthesus_kernel` target built.
+
+### 🚧 Left Off / Next Steps
+- Persist these compact AIVM snapshot replay traces into the broader runtime comparison/replay artifact path once the production storage boundary is selected.
+- Continue the Phase 7 trace-storage work outside the AIVM snapshot boundary; the checklist item remains in progress because broader persistent runtime trace storage is still open.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `package.json`, root `pyproject.toml`, release-packaging docs/scripts/tests/package metadata, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- AIVM snapshots now carry a replayable trace boundary parallel to device fingerprints: device blobs remain verified by per-device fingerprints, and replay events are verified by `events_hash`.
+- The replay record is trace metadata only. It preserves tick ordering and output hashes without persisting raw generated response text or mutating restored device state.
