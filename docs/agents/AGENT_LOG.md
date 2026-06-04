@@ -2681,6 +2681,31 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - API memory writeback remains post-arbitration telemetry and fail-closed persistence plumbing. It does not own final language, does not bypass critic/template gates, and targets the `/mnt/mem/writeback` CHAL boundary only after Cognitive Hypervisor arbitration.
 
+## Current Session — 2026-06-04 (Daily Knowledge Hardware Health Check)
+
+### 📝 Summary
+- Ran the fast Synthesus 5 Knowledge Cloud-as-hardware health path across source validation, source-manifest verification, bundle manifest hashes, cold-start semantic validation, KAL/KN mount health, and fast health reporting.
+- Confirmed manifest hashes are intact and FAISS/metadata counts align at 501,819 records, but retrieval semantics still fail because `faiss.index` is 384-dimensional while `models/swarm_embedder.pkl` persists `dim=128`.
+- Left generated artifacts untouched; the only project-state change is this checklist/log validation record for the continuing Phase 10 golden-query blocker.
+
+### ✅ Verified
+- `python -m synthesus_knowledge_cloud validate-sources --root .` — passed; 25 required paths and 7 character pattern banks.
+- `python -m synthesus_knowledge_cloud verify-source-manifest --root .` — passed; 139 source files verified.
+- Direct manifest hash audit over `synthesus-knowledge-cloud/artifacts/manifest.json` — passed.
+- `python -m synthesus_knowledge_cloud validate --root artifacts` — failed on the known generated-artifact blocker: `FAISS/embedder dim mismatch: faiss=384, embedder=128`.
+- `python tools/validate_knowledge_cold_start.py --root /home/workspace/synthesus-knowledge-cloud/artifacts` — failed on the same semantic integrity gate before declaring cold-start hardware ready.
+- KAL mount probe via `CHALMemoryController().get_mounts()` — passed; 4 active mounts across ROM, PARAMETER_DISK, WRITEBACK_MEMORY, and GROUNDING_CORPUS.
+- `python packages/knowledge/health_check.py --artifact-root /home/workspace/synthesus-knowledge-cloud/artifacts --report-path /tmp/synthesus_knowledge_health_report_2026-06-04.json` — failed only on `FAISS/embedder dim mismatch: faiss=384, embedder=128`; stats reported 501,819 FAISS vectors, 501,819 metadata records, 4 KAL mounts, and no golden-query latency because semantic retrieval is blocked.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `artifacts/faiss.index`, `artifacts/faiss_metadata.json`, and `artifacts/models/swarm_embedder.pkl` agree on the selected profile dimension.
+- After artifact regeneration, rerun `python -m synthesus_knowledge_cloud validate --root artifacts`, `python tools/validate_knowledge_cold_start.py --root /home/workspace/synthesus-knowledge-cloud/artifacts`, and `python packages/knowledge/health_check.py --artifact-root /home/workspace/synthesus-knowledge-cloud/artifacts`.
+- Refresh the public mirror with `zopub sync synthesus-knowledge artifacts` only after the regenerated bundle validates.
+- Pre-existing unrelated runtime root `AGENTS.md`, runtime root `README.md`, release-packaging docs/scripts/tests/package metadata, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Manifest-backed bundle integrity, source provenance validation, and KAL mount initialization remain healthy; the release blocker is semantic retrieval hardware alignment.
+- Golden-query latency should remain unmeasured until FAISS/embedder dimensions match, so health reports do not publish misleading latency from an invalid retrieval stack.
 
 ## Current Session — 2026-06-04 (Knowledge Hardware Source-Manifest Freshness Gate)
 
