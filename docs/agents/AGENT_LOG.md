@@ -2680,3 +2680,28 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - API memory writeback remains post-arbitration telemetry and fail-closed persistence plumbing. It does not own final language, does not bypass critic/template gates, and targets the `/mnt/mem/writeback` CHAL boundary only after Cognitive Hypervisor arbitration.
+
+
+## Current Session — 2026-06-04 (Knowledge Hardware Source-Manifest Freshness Gate)
+
+### 📝 Summary
+- Added a source-only Knowledge Cloud build/stamp gate in `synthesus-knowledge-cloud` so profile builds and `stamp-manifest` re-hash `manifests/source_manifest.json` before provenance is attached to runtime artifacts.
+- `stamp-manifest` now refuses stale source-plane manifests before checking FAISS/embedder semantics, preventing a bundle from advertising a `build.source_manifest` fingerprint that no longer matches the rebuild substrate.
+- Added focused regression coverage for stale source manifests while preserving the existing FAISS/embedder and profile-dimension mismatch checks.
+- Advanced Synthesus 5 Phase 5 source-plane license/provenance validation for mounted Knowledge Cloud hardware manifests.
+
+### ✅ Verified
+- `python -m py_compile synthesus_knowledge_cloud/build.py tests/test_build.py` in `synthesus-knowledge-cloud` — passed.
+- `python -m pytest -q tests/test_build.py tests/test_cli.py tests/test_provenance.py` in `synthesus-knowledge-cloud` — 17 passed.
+- `python -m synthesus_knowledge_cloud validate-sources --root .` in `synthesus-knowledge-cloud` — passed; 25 required paths and 7 character pattern banks.
+- `python -m synthesus_knowledge_cloud verify-source-manifest --root .` in `synthesus-knowledge-cloud` — passed; 139 source files verified.
+- `python -m synthesus_knowledge_cloud build profiles/public-base.yaml` in `synthesus-knowledge-cloud` — passed as dry run and now exercises the source-manifest freshness gate.
+- `git diff --check -- synthesus_knowledge_cloud/build.py tests/test_build.py` in `synthesus-knowledge-cloud` — passed.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `artifacts/faiss.index`, `artifacts/faiss_metadata.json`, and `artifacts/models/swarm_embedder.pkl` agree on the selected profile dimension, then rerun bundle validation, runtime cold-start validation, and golden-query health.
+- Keep committing source/docs/tests only; do not commit generated FAISS, KNDB, model, cache, scorecard, log, or workflow artifacts from maintenance runs.
+- Pre-existing unrelated runtime root `AGENTS.md`, runtime root `README.md`, release-packaging docs/scripts/tests/package metadata, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Knowledge Cloud provenance now has two gates before stamping: source-plane structure/licensing and source-manifest freshness. Hash fingerprints in `build.source_manifest` can be trusted as an exact rebuild-substrate identity only after both gates pass.

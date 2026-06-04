@@ -108,7 +108,7 @@ Legend:
 
 - [x]  Add tests for mounted Knowledge Cloud partitions. Session log: 2026-05-28 Knowledge Cloud mount table; 2026-06-01 Agent 5 validated volatile cache/writeback boundaries stay active and artifact-free; 2026-06-02 Agent 5 validated manifest coverage telemetry for missing optional and complete known artifact partitions.
 
-- [x]  Add source-plane license/provenance validation for Knowledge Cloud hardware manifests before public sources can be treated as mounted CHAL substrate. Session log: 2026-06-01 Knowledge Cloud Source Provenance Gate; 2026-06-02 Knowledge Hardware Source-Manifest Fingerprint added `build.source_manifest` provenance fingerprints so stamped runtime bundles point back to the exact source-plane hash set; 2026-06-02 Knowledge Hardware Profile-Dim Gate made profile-aware build/stamp refuse internally aligned retrieval bundles whose persisted embedder dimension disagrees with the selected build profile.
+- [x]  Add source-plane license/provenance validation for Knowledge Cloud hardware manifests before public sources can be treated as mounted CHAL substrate. Session log: 2026-06-01 Knowledge Cloud Source Provenance Gate; 2026-06-02 Knowledge Hardware Source-Manifest Fingerprint added `build.source_manifest` provenance fingerprints so stamped runtime bundles point back to the exact source-plane hash set; 2026-06-02 Knowledge Hardware Profile-Dim Gate made profile-aware build/stamp refuse internally aligned retrieval bundles whose persisted embedder dimension disagrees with the selected build profile; 2026-06-04 Knowledge Hardware Source-Manifest Freshness Gate made build/stamp refuse stale source-plane manifests before provenance can be attached to mounted hardware artifacts.
 
 ## Phase 6: Legacy Template Path Removal
 
