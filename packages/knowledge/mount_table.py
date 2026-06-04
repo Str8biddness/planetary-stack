@@ -296,6 +296,12 @@ class KnowledgeCloudMountTable:
             spec = self._artifact_specs.get(relative_path)
             if not relative_path or spec is None:
                 continue
+            if relative_path in mounted_artifacts:
+                if strict:
+                    raise ValueError(
+                        f"Duplicate Knowledge Cloud artifact mount entry: {relative_path}"
+                    )
+                continue
 
             mount_path, mount_type, namespace, read_only, locality = spec
             report = self._verify_artifact(root, relative_path, mount_path, item)

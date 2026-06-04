@@ -154,6 +154,8 @@ Boot reports now include manifest coverage metadata for every known Knowledge Cl
 
 The cache and writeback mounts are CHAL boundaries rather than generated Knowledge Cloud files. They are always marked `volatile=true` and `artifact_backed=false`, so cold-start validation can verify the ROM/parameter/corpus/provenance partitions without encouraging agents to commit runtime cache or memory artifacts.
 
+Strict mount-table boot also rejects duplicate manifest entries for known mounted artifacts. This keeps each Knowledge Cloud partition identity unambiguous: a bundle cannot declare two competing artifact records for the same CHAL mount, such as `/mnt/corpus/faiss` or `/mnt/params/swarm_embedder`, during cold-start validation. Non-strict boot ignores duplicate known entries after the first validated mount so runtime fallback cannot accidentally overwrite an active partition with a later duplicate record.
+
 ### Core CHAL Interface Metadata
 
 The legacy mount-controller records in `packages/core/chal/interfaces.py` now carry the same minimum scheduling metadata expected by the Synthesus 5 frame contract:

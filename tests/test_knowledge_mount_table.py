@@ -230,6 +230,35 @@ def test_mount_table_strict_mode_rejects_failed_integrity(tmp_path: Path):
         KnowledgeCloudMountTable().boot(tmp_path, strict=True)
 
 
+def test_mount_table_strict_mode_rejects_duplicate_mounted_artifacts(tmp_path: Path):
+    item = _write_artifact(tmp_path, "faiss.index", b"index-bytes")
+    duplicate = dict(item)
+    _write_manifest(tmp_path, [item, duplicate])
+
+    with pytest.raises(
+        ValueError,
+        match="Duplicate Knowledge Cloud artifact mount entry: faiss.index",
+    ):
+        KnowledgeCloudMountTable().boot(tmp_path, strict=True)
+
+
+def test_mount_table_ignores_duplicate_mounted_artifacts_without_strict_mode(tmp_path: Path):
+    item = _write_artifact(tmp_path, "faiss.index", b"index-bytes")
+    duplicate = dict(item)
+    duplicate["sha256"] = "0" * 64
+    _write_manifest(tmp_path, [item, duplicate])
+
+    report = KnowledgeCloudMountTable().boot(tmp_path, strict=False)
+    faiss_mounts = [
+        mount for mount in report.mounts if mount.mount_path == "/mnt/corpus/faiss"
+    ]
+
+    assert report.ok is True
+    assert len(faiss_mounts) == 1
+    assert faiss_mounts[0].is_active is True
+    assert faiss_mounts[0].partition.metadata["actual_sha256"] == item["sha256"]
+
+
 def test_mount_table_validates_cold_start_required_mounts(tmp_path: Path):
     artifacts = [
         _write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n'),

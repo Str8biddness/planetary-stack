@@ -2817,3 +2817,24 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Full rule fanout and single-winner rule execution are now separate PPBRS paths. This keeps broad telemetry/evaluation available while bounding hot-path firmware routing for normal single-action decisions.
 - The activation threshold now affects top-rule execution directly; full `evaluate()` remains unchanged for compatibility.
+
+## Current Session — 2026-06-04 (Agent 5 — Knowledge Hardware Duplicate Mount Guard)
+
+### 📝 Summary
+- Added a duplicate mounted-artifact guard to `KnowledgeCloudMountTable.boot()` so strict Knowledge Cloud mount-table boot refuses manifests with two known entries for the same CHAL hardware partition.
+- Non-strict boot now ignores duplicate known mounted artifacts after the first validated record, preventing a later duplicate from overwriting an active partition in `CHALMemoryController`.
+- Added focused regression coverage for strict duplicate rejection and non-strict duplicate isolation.
+- Advanced Phase 5 partition integrity and mounted Knowledge Cloud partition test coverage without touching generated FAISS, KNDB, model, cache, or runtime artifacts.
+
+### ✅ Verified
+- `python -m py_compile packages/knowledge/mount_table.py packages/knowledge/kal_adapter.py tests/test_knowledge_mount_table.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_knowledge_mount_table.py tests/test_kal.py` — passed, 43 tests.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` align before release gates and golden-query health can pass.
+- Consider adding manifest schema validation for duplicate unknown artifact paths in the standalone Knowledge Cloud repo after the current generated artifact blocker is cleared.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `package.json`, root `pyproject.toml`, release-packaging docs/scripts/tests/package metadata, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Mounted Knowledge Cloud partition identity is now single-writer at manifest boot: each known artifact path may define at most one CHAL mount record in strict cold-start validation.
+- This is a source-only integrity guard; it does not mutate artifact manifests, rebuild data bundles, or change the public mirror.

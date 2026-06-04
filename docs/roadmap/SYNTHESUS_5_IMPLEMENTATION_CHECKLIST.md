@@ -100,13 +100,13 @@ Legend:
 
 - [x]  Add mount table boot sequence. Session log: 2026-05-28 Knowledge Cloud mount table; 2026-06-01 Agent 5 extended manifest-backed boot with `/mnt/cache/hot_context` and `/mnt/mem/writeback` CHAL boundaries; 2026-06-02 Agent 5 added manifest coverage reporting for known-but-absent Knowledge Cloud hardware partitions.
 
-- [x]  Add partition integrity checks against Knowledge Cloud manifests. Session log: 2026-05-28 Knowledge Cloud mount table added runtime manifest SHA-256/size verification; 2026-05-28 Daily Knowledge Hardware Health Check tracked a current standalone artifact FAISS/embedder dim mismatch separately; 2026-06-01 Agent 5 added runtime cold-start retrieval-semantic integrity checks for FAISS/metadata counts and FAISS/embedder dimensions.
+- [x]  Add partition integrity checks against Knowledge Cloud manifests. Session log: 2026-05-28 Knowledge Cloud mount table added runtime manifest SHA-256/size verification; 2026-05-28 Daily Knowledge Hardware Health Check tracked a current standalone artifact FAISS/embedder dim mismatch separately; 2026-06-01 Agent 5 added runtime cold-start retrieval-semantic integrity checks for FAISS/metadata counts and FAISS/embedder dimensions; 2026-06-04 Agent 5 added duplicate mounted-artifact rejection so strict cold-start boot refuses ambiguous manifest records for the same CHAL partition.
 
 - [x]  Add cache locality and hot-context retrieval. Session log: 2026-05-30 Knowledge Hardware Hot-Context Validation.
 
 - [x]  Add provenance traces to final response metadata. Session log: 2026-05-31 Knowledge Hardware Provenance Trace.
 
-- [x]  Add tests for mounted Knowledge Cloud partitions. Session log: 2026-05-28 Knowledge Cloud mount table; 2026-06-01 Agent 5 validated volatile cache/writeback boundaries stay active and artifact-free; 2026-06-02 Agent 5 validated manifest coverage telemetry for missing optional and complete known artifact partitions.
+- [x]  Add tests for mounted Knowledge Cloud partitions. Session log: 2026-05-28 Knowledge Cloud mount table; 2026-06-01 Agent 5 validated volatile cache/writeback boundaries stay active and artifact-free; 2026-06-02 Agent 5 validated manifest coverage telemetry for missing optional and complete known artifact partitions; 2026-06-04 Agent 5 added focused duplicate-manifest partition identity tests for strict and non-strict boot.
 
 - [x]  Add source-plane license/provenance validation for Knowledge Cloud hardware manifests before public sources can be treated as mounted CHAL substrate. Session log: 2026-06-01 Knowledge Cloud Source Provenance Gate; 2026-06-02 Knowledge Hardware Source-Manifest Fingerprint added `build.source_manifest` provenance fingerprints so stamped runtime bundles point back to the exact source-plane hash set; 2026-06-02 Knowledge Hardware Profile-Dim Gate made profile-aware build/stamp refuse internally aligned retrieval bundles whose persisted embedder dimension disagrees with the selected build profile; 2026-06-04 Knowledge Hardware Source-Manifest Freshness Gate made build/stamp refuse stale source-plane manifests before provenance can be attached to mounted hardware artifacts.
 
