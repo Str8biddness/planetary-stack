@@ -218,6 +218,7 @@ class RuleToActionMapper:
                 condition: Callable[[Dict], bool],
                 actions: List[Action],
                 weight: float = 1.0,
+                priority: int = 0,
                 tags: Optional[List[str]] = None,
                 metadata: Optional[Dict[str, Any]] = None) -> None:
         """Constructs and registers a new rule.
@@ -228,6 +229,7 @@ class RuleToActionMapper:
             condition: Callable that evaluates if the rule should trigger.
             actions: List of actions associated with this rule.
             weight: Relative importance of the rule. Defaults to 1.0.
+            priority: Rule priority for ordering. Defaults to 0.
             tags: Optional classification tags for the rule.
         """
         rule = Rule(
@@ -236,6 +238,7 @@ class RuleToActionMapper:
             condition=condition,
             actions=actions,
             weight=weight,
+            priority=priority,
             tags=tags or [],
             metadata=metadata or {}
         )
@@ -295,6 +298,43 @@ class RuleToActionMapper:
             tag_matches = len(context_tags & rule_tags) / len(rule_tags)
         
         return base_score * rule.weight * (1 + tag_matches)
+
+    def _max_rule_score(self, rule: Rule, context: Dict) -> float:
+        if context.get('tags') and rule.tags:
+            return rule.weight * 2
+        return rule.weight
+
+    def evaluate_top_rule(self, context: Dict[str, Any]) -> Optional[tuple]:
+        """Evaluates candidate rules only until the best single rule is known."""
+        candidates = sorted(
+            self._candidate_rules(context),
+            key=lambda rule: (rule.priority, self._max_rule_score(rule, context)),
+            reverse=True,
+        )
+        best = None
+        best_score = float("-inf")
+
+        for rule in candidates:
+            if not rule.active:
+                continue
+
+            if best is not None:
+                if rule.priority < best[0].priority:
+                    break
+                if rule.priority == best[0].priority and best_score >= self._max_rule_score(rule, context):
+                    break
+
+            try:
+                condition_met = rule.condition(context)
+                if condition_met:
+                    score = self._calculate_rule_score(rule, context)
+                    if best is None or (rule.priority, score) > (best[0].priority, best_score):
+                        best = (rule, score)
+                        best_score = score
+            except Exception as e:
+                print(f"Rule evaluation error for {rule.rule_id}: {e}")
+
+        return best
     
     def execute_action(self, action: Action, context: Dict) -> MappingResult:
         """Executes a single action and records the result.
@@ -341,12 +381,12 @@ class RuleToActionMapper:
         Returns:
             The MappingResult of the executed action, or None if no rules matched.
         """
-        evaluated = self.evaluate_rules(context)
-        
-        if not evaluated:
+        best_match = self.evaluate_top_rule(context)
+
+        if not best_match:
             return None
         
-        best_rule, _ = evaluated[0]
+        best_rule, _ = best_match
         context['current_rule'] = best_rule.rule_id
         
         if best_rule.actions:

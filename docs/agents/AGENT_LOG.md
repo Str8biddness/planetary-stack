@@ -2838,3 +2838,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Mounted Knowledge Cloud partition identity is now single-writer at manifest boot: each known artifact path may define at most one CHAL mount record in strict cold-start validation.
 - This is a source-only integrity guard; it does not mutate artifact manifests, rebuild data bundles, or change the public mirror.
+
+## Current Session — 2026-06-04 (Agent 6 — PPBRS Action Mapping Short-Circuit)
+
+### 📝 Summary
+- Added `RuleToActionMapper.evaluate_top_rule()` so `map_to_action()` uses priority-first, score-upper-bound single-winner evaluation instead of full rule fanout.
+- Kept `evaluate_rules()` unchanged for telemetry and multi-action sequence callers while bounding the normal single-action firmware path.
+- Added regression tests for lower-priority candidate suppression and same-priority upper-bound suppression, plus an `action_mapping` benchmark metric.
+- Advanced Phase 6 PPBRS firmware conversion by tightening action-rule hot paths without giving PPBRS ownership of normal final language.
+
+### ✅ Verified
+- `python -m py_compile packages/reasoning/rule_to_action.py tests/test_ppbrs.py tools/ppbrs_benchmark.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 120 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py` — passed; action_mapping p50 0.0246ms, p95 0.0269ms, avg 0.0253ms.
+
+### 🚧 Left Off / Next Steps
+- Continue keeping PPBRS and action rules as firmware/signal infrastructure; any normal user-facing wording must stay behind generation/critic or labeled safety/platform/NPC-script boundaries.
+- Consider adding a direct pre/post comparison harness for action-mapping fanout if future rule corpora grow beyond the current micro-benchmark scale.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `package.json`, root `pyproject.toml`, release-packaging docs/scripts/tests/package metadata, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Single-action and full-fanout action mapping are now separate PPBRS paths. `map_to_action()` is bounded for normal one-action firmware routing; `evaluate_rules()` remains available when callers need every activated rule.
+- The short-circuit is safe because rule priority dominates score, and same-priority remaining candidates use a conservative tag-boosted score upper bound before evaluation is skipped.

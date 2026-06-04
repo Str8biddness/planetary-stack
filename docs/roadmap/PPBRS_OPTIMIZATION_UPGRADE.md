@@ -45,7 +45,7 @@ Record:
 - average reasoning graph size
 - current test pass/fail state
 
-Output should be written to `logs/ppbrs_dev_log.md` and any dedicated benchmark artifact.
+Output should be written to `tools/ppbrs_dev_log.md` and any dedicated ignored benchmark artifact.
 
 ### Phase 1 — Candidate Reduction in Pattern Classification
 
@@ -72,7 +72,7 @@ Target files:
 - `ppbrs/reasoning_chain.py`
 - `ppbrs/rule_to_action.py`
 
-Status 2026-06-04: implemented tag and trigger indexes for `WeightedRuleEvaluator` and `RuleToActionMapper`. Tagged contexts now evaluate matching tagged rules plus untagged shared rules, and contexts with indexed trigger keys or exact trigger values skip unrelated rule conditions before scoring. `WeightedRuleEvaluator.apply_top_rule()` and `apply_fallback()` now use a short-circuiting top-rule scan so single-winner firmware paths stop after the highest-weight qualifying rule is known.
+Status 2026-06-04: implemented tag and trigger indexes for `WeightedRuleEvaluator` and `RuleToActionMapper`. Tagged contexts now evaluate matching tagged rules plus untagged shared rules, and contexts with indexed trigger keys or exact trigger values skip unrelated rule conditions before scoring. `WeightedRuleEvaluator.apply_top_rule()` and `apply_fallback()` now use a short-circuiting top-rule scan so single-winner firmware paths stop after the highest-weight qualifying rule is known. `RuleToActionMapper.map_to_action()` now uses priority-first, score-upper-bound single-winner evaluation instead of full fanout when only one action will execute.
 
 Implementation order:
 1. Add tag-based and trigger-based indexing for rules.
@@ -155,7 +155,7 @@ After implementation:
 2. Update `AGENTS.md` with any new operational contract.
 3. Update `docs/modules/PPBRS.md` with module-level notes.
 4. Update `README.md` if the user-facing positioning changes.
-5. Append a progress entry to `logs/ppbrs_dev_log.md`.
+5. Append a progress entry to `tools/ppbrs_dev_log.md`.
 
 ## Success Criteria
 
@@ -189,7 +189,7 @@ Documentation:
 - `docs/modules/PPBRS.md`
 - `README.md`
 - this file
-- `logs/ppbrs_dev_log.md`
+- `tools/ppbrs_dev_log.md`
 
 ## Recommended Implementation Order
 

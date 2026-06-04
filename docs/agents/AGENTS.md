@@ -118,7 +118,7 @@ This repo is currently in a validated PPBRS baseline state. Future PPBRS optimiz
 5. Keep `ppbrs/confidence_scoring.py` cheap and explicit; do not add hidden work to the scoring path.
 6. Offload the high-volume match path to the C++ kernel only after the Python hot path is understood and benchmarked.
 7. Re-run the full PPBRS test set and compare latency deltas before merging.
-8. Record the result in `logs/ppbrs_dev_log.md`.
+8. Record the result in `tools/ppbrs_dev_log.md`.
 
 ### Required documentation updates for any PPBRS upgrade
 - Update `docs/PPBRS_OPTIMIZATION_UPGRADE.md` if the execution order or architecture changes.

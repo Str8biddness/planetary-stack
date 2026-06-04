@@ -412,6 +412,60 @@ class TestRuleToActionMapper:
         result = mapper.map_to_action({})
         assert result is not None
         assert result.success is True
+
+    def test_map_to_action_short_circuits_lower_priority_candidates(self):
+        mapper = RuleToActionMapper()
+        calls = []
+        mapper.add_rule(
+            "low",
+            "Low priority",
+            lambda ctx: calls.append("low") or True,
+            [Action("low_action", ActionType.RESPONSE, lambda ctx: "low")],
+            priority=1,
+            weight=10.0,
+        )
+        mapper.add_rule(
+            "high",
+            "High priority",
+            lambda ctx: calls.append("high") or True,
+            [Action("high_action", ActionType.RESPONSE, lambda ctx: "high")],
+            priority=5,
+            weight=0.1,
+        )
+
+        result = mapper.map_to_action({})
+
+        assert result is not None
+        assert result.rule_id == "high"
+        assert result.output == "high"
+        assert calls == ["high"]
+
+    def test_map_to_action_uses_score_upper_bound_within_priority(self):
+        mapper = RuleToActionMapper()
+        calls = []
+        mapper.add_rule(
+            "best",
+            "Best score",
+            lambda ctx: calls.append("best") or True,
+            [Action("best_action", ActionType.RESPONSE, lambda ctx: "best")],
+            weight=2.0,
+            tags=["ops"],
+        )
+        mapper.add_rule(
+            "impossible_to_beat",
+            "Impossible to beat",
+            lambda ctx: calls.append("impossible_to_beat") or True,
+            [Action("impossible_action", ActionType.RESPONSE, lambda ctx: "impossible")],
+            weight=1.0,
+            tags=["ops"],
+        )
+
+        result = mapper.map_to_action({"tags": ["ops"]})
+
+        assert result is not None
+        assert result.rule_id == "best"
+        assert result.output == "best"
+        assert calls == ["best"]
     
     def test_get_statistics(self):
         mapper = RuleToActionMapper()

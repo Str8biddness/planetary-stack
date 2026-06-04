@@ -72,6 +72,39 @@ def benchmark_rule_evaluation(n_rules=500, n_evals=100):
         "avg": np.mean(latencies) * 1000
     }
 
+def benchmark_action_mapping(n_rules=500, n_evals=100):
+    print(f"Baselining Action Mapping ({n_rules} rules, {n_evals} evals)...")
+    mapper = RuleToActionMapper()
+
+    for i in range(n_rules):
+        action = Action(
+            action_id=f"action_{i}",
+            action_type=ActionType.RESPONSE,
+            handler=lambda ctx, i=i: f"result_{i}",
+        )
+        mapper.add_rule(
+            rule_id=f"rule_{i}",
+            name=f"rule_{i}",
+            condition=lambda ctx, i=i: ctx.get("key") == i,
+            actions=[action],
+            weight=float(n_rules - i),
+            tags=[f"tag_{i % 10}"],
+            metadata={"trigger_values": {"key": i}},
+        )
+
+    latencies = []
+    for i in range(n_evals):
+        ctx = {"key": i % n_rules, "tags": [f"tag_{i % 10}"]}
+        start = time.perf_counter()
+        mapper.map_to_action(ctx)
+        latencies.append(time.perf_counter() - start)
+
+    return {
+        "p50": np.percentile(latencies, 50) * 1000,
+        "p95": np.percentile(latencies, 95) * 1000,
+        "avg": np.mean(latencies) * 1000
+    }
+
 def benchmark_weighted_top_rule(n_rules=500, n_evals=100):
     print(f"Baselining Weighted Top Rule ({n_rules} rules, {n_evals} evals)...")
     evaluator = WeightedRuleEvaluator()
@@ -139,6 +172,7 @@ if __name__ == "__main__":
     
     results["metrics"]["pattern_matching"] = benchmark_pattern_matching()
     results["metrics"]["rule_evaluation"] = benchmark_rule_evaluation()
+    results["metrics"]["action_mapping"] = benchmark_action_mapping()
     results["metrics"]["weighted_top_rule"] = benchmark_weighted_top_rule()
     results["metrics"]["graph_traversal"] = benchmark_graph_traversal()
     
@@ -146,8 +180,7 @@ if __name__ == "__main__":
     print(json.dumps(results, indent=2))
     
     # Save to logs
-    log_path = Path("logs/ppbrs_dev_log.md")
-    os.makedirs("logs", exist_ok=True)
+    log_path = Path("tools/ppbrs_dev_log.md")
     
     with open(log_path, "a") as f:
         if os.path.getsize(log_path) == 0:

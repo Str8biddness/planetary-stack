@@ -71,6 +71,7 @@ The repository is currently in a validated PPBRS baseline state. Significant opt
 - **Cached Topology**: Pre-computed reasoning graph structures for zero-overhead traversal.
 - **Rule Tag + Trigger Indexing**: Rule evaluators prefilter by context tags, trigger keys, and exact trigger values before evaluating conditions.
 - **Top-Rule Short-Circuiting**: Single-winner weighted-rule execution scans indexed candidates by descending weight and stops once the best threshold-qualified firmware rule is known, while full `evaluate()` calls still return all activated rules for callers that need fanout.
+- **Action Mapping Short-Circuiting**: `RuleToActionMapper.map_to_action()` now uses single-winner evaluation. It stops when rule priority makes lower-priority candidates irrelevant, or when the current same-priority score cannot be beaten by any remaining tag-boosted weight upper bound. Full `evaluate_rules()` still returns fanout for action-sequence callers.
 
 ## Optimization Upgrade Path
 
@@ -100,7 +101,7 @@ Every upgrade pass should:
 - run `tests/test_ppbrs.py`
 - run `tests/test_ppbrs_extended.py`
 - run `tests/test_ppbrs_integration.py`
-- append a note to `logs/ppbrs_dev_log.md`
+- append a note to `tools/ppbrs_dev_log.md`
 - update the canonical plan at `docs/PPBRS_OPTIMIZATION_UPGRADE.md` if the architecture changed
 
 For the authoritative start-to-finish implementation plan, see `docs/PPBRS_OPTIMIZATION_UPGRADE.md`.

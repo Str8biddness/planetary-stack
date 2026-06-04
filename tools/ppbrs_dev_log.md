@@ -561,3 +561,29 @@ PPBRS micro-benchmark after top-rule short-circuiting:
 - `python -m py_compile packages/reasoning/reasoning_chain.py tests/test_ppbrs.py tools/ppbrs_benchmark.py`
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 118 passed.
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py`
+## Daily Entry: 2026-06-04 (Agent 6 — Action Mapping Short-Circuit)
+
+### Actions Performed
+
+1. Added `RuleToActionMapper.evaluate_top_rule()` so `map_to_action()` no longer runs full fanout when only one action can execute.
+2. Preserved full `evaluate_rules()` behavior for action-sequence and telemetry callers while single-action mapping short-circuits by rule priority and same-priority score upper bounds.
+3. Added regression coverage proving lower-priority action rules and same-priority rules that cannot beat the current score are not evaluated.
+4. Added an `action_mapping` metric to `tools/ppbrs_benchmark.py` and corrected benchmark log output to the tracked PPBRS dev log.
+
+### Benchmark Run
+
+PPBRS micro-benchmark after action-mapping short-circuiting:
+
+| Component | p50 (ms) | p95 (ms) | Avg (ms) |
+|---|---:|---:|---:|
+| pattern_matching | 0.3786 | 0.4175 | 0.3514 |
+| rule_evaluation | 0.0220 | 0.0251 | 0.0226 |
+| action_mapping | 0.0246 | 0.0269 | 0.0253 |
+| weighted_top_rule | 0.0299 | 0.0338 | 0.0306 |
+| graph_traversal | 0.0193 | 0.0233 | 0.0199 |
+
+### Verified
+
+- `python -m py_compile packages/reasoning/rule_to_action.py tests/test_ppbrs.py tools/ppbrs_benchmark.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 120 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py`
