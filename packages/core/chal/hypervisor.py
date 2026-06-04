@@ -249,6 +249,7 @@ class CognitiveHypervisor:
 
         response = str(bridge_result.get("response", ""))
         quad_brain_arbitration = None
+        quad_brain_replay = None
         if guarded.ok and decision.route == HypervisorRoute.QUAD_BRAIN_PATH:
             quad_brain_arbitration = self._get_quad_brain_orchestrator().arbitrate(
                 query=query,
@@ -262,6 +263,11 @@ class CognitiveHypervisor:
                 surface=self._template_surface(decision),
             )
             bridge_result["quad_brain_arbitration"] = quad_brain_arbitration.to_dict()
+            quad_brain_replay = quad_brain_arbitration.to_replay_record(
+                prompt_ref="hypervisor.query",
+                runtime_preset=preset,
+            )
+            bridge_result["quad_brain_replay"] = quad_brain_replay
             response = quad_brain_arbitration.selected_response
         template_guard_result = self._template_guard.inspect(
             response,
@@ -294,6 +300,7 @@ class CognitiveHypervisor:
             "degraded_state": bridge_result.get("degraded_state"),
             "template_guard": template_guard_result.to_dict(),
             "quad_brain": quad_brain_arbitration.to_dict() if quad_brain_arbitration else None,
+            "quad_brain_replay": quad_brain_replay,
             "knowledge_provenance": knowledge_provenance,
         }
         if template_guard_result.rewritten:

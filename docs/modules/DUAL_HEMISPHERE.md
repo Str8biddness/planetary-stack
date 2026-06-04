@@ -199,3 +199,18 @@ The contract also exposes `required_roles`, `critic_input_ref=cgpu.selected_cand
 `QuadBrainArbitration.state_contract.integrity` now carries a compact pass/fail proof for the serialized four-brain handoff chain. The verifier checks that all required roles are present in fixed order, transition records match the serial order, each role output mirrors its state transition, the Critic/Metacognition brain reviewed the selected CGPU candidate id, and final output ownership stayed with `critic_metacognition`.
 
 This is intentionally trace metadata, not a new brain or parallel worker. It strengthens the existing serialized arbitration contract so API/frontend trace consumers can reject malformed Quad Brain traces without inferring the handoff chain from loose fields.
+
+### Quad Brain Replay Record Update (2026-06-04)
+
+`QuadBrainArbitration.to_replay_record()` now emits a compact replay/storage record for the Cognitive Hypervisor trace under `telemetry.quad_brain_replay` and `bridge_result.quad_brain_replay`.
+
+The replay record preserves:
+
+- the fixed four-role serial order
+- role devices and confidence values
+- `state_contract.state_transitions`
+- critic handoff refs and reviewed CGPU candidate id
+- final-output ownership and integrity checks
+- selected-response SHA-256 and character length
+
+It intentionally omits full response text. This keeps replay artifacts suitable for comparison harnesses and runtime trace storage while preserving enough state-contract evidence to verify that Knowledge/Grounding, Executive Reasoning, CGPU Rendering, and Critic/Metacognition stayed serialized and inspectable.

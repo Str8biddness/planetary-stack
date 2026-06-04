@@ -251,6 +251,37 @@ def test_quad_brain_trace_records_serial_state_transitions():
     }
 
 
+def test_quad_brain_trace_emits_compact_replay_record_without_response_text():
+    bridge = PersonaBridge()
+    hypervisor = CognitiveHypervisor(bridge_factory=lambda: bridge)
+
+    result = asyncio.run(
+        hypervisor.process_query(
+            "Render Archivist dialogue about the sealed gate",
+            character_context={"character_id": "Archivist", "stance": "cautious"},
+        )
+    )
+
+    replay = result.telemetry["quad_brain_replay"]
+    state_contract = replay["state_contract"]
+
+    assert replay == result.bridge_result["quad_brain_replay"]
+    assert replay["schema"] == "synthesus.chal.quad_brain_replay.v1"
+    assert replay["trace_id"] == result.decision.trace_id
+    assert replay["prompt_ref"] == "hypervisor.query"
+    assert replay["serial_order"] == [role.value for role in QuadBrainRole]
+    assert replay["output_roles"] == [role.value for role in QuadBrainRole]
+    assert replay["output_devices"]["knowledge_grounding"] == "chal://knowledge/grounding"
+    assert state_contract["serialized_arbitration"] is True
+    assert state_contract["parallel_brain_spawn"] is False
+    assert state_contract["final_output_owner"] == "critic_metacognition"
+    assert state_contract["integrity"]["status"] == "passed"
+    assert replay["selected_response_chars"] == len(result.response)
+    assert len(replay["selected_response_sha256"]) == 64
+    assert "selected_response" not in replay
+    assert result.response not in str(replay)
+
+
 def test_quad_brain_dispatch_preserves_grounding_and_improves_persona_surface_over_dual_hemi():
     bridge = PersonaBridge()
     legacy_dual_hemi = asyncio.run(

@@ -2861,3 +2861,48 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Single-action and full-fanout action mapping are now separate PPBRS paths. `map_to_action()` is bounded for normal one-action firmware routing; `evaluate_rules()` remains available when callers need every activated rule.
 - The short-circuit is safe because rule priority dominates score, and same-priority remaining candidates use a conservative tag-boosted score upper bound before evaluation is skipped.
+
+## Current Session — 2026-06-04 (Knowledge Hardware Manifest Duplicate Path Gate)
+
+### 📝 Summary
+- Added a source-only manifest duplicate-path guard in `synthesus-knowledge-cloud` so both runtime artifact validation and source-manifest verification reject duplicate `artifacts[].path` records.
+- Added focused regression tests for duplicate runtime artifact paths and duplicate source-plane manifest paths.
+- Updated Knowledge Cloud provenance/data-model docs to make duplicate path rejection part of the CHAL hardware identity contract.
+- Advanced Phase 5 source-plane license/provenance validation for mounted Knowledge Cloud hardware manifests without touching generated FAISS, KNDB, model, cache, mirror, or workflow artifacts.
+
+### ✅ Verified
+- `python -m py_compile synthesus_knowledge_cloud/manifest.py tests/test_cli.py tests/test_build.py` in `synthesus-knowledge-cloud` — passed.
+- `python -m pytest -q tests/test_cli.py tests/test_build.py tests/test_provenance.py` in `synthesus-knowledge-cloud` — 19 passed.
+- `python -m synthesus_knowledge_cloud validate-sources --root .` in `synthesus-knowledge-cloud` — passed; 25 required paths and 7 character pattern banks.
+- `python -m synthesus_knowledge_cloud verify-source-manifest --root .` in `synthesus-knowledge-cloud` — passed; 139 source files verified.
+- `python -m synthesus_knowledge_cloud build profiles/public-base.yaml` in `synthesus-knowledge-cloud` — dry-run passed and preserved `executed=false`.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `artifacts/faiss.index`, `artifacts/faiss_metadata.json`, and `artifacts/models/swarm_embedder.pkl` agree on the selected profile dimension, then rerun bundle validation, runtime cold-start validation, golden-query health, and the runtime release gate.
+- Consider adding explicit duplicate-path examples to the package CLI docs if future operators need more troubleshooting detail.
+- Pre-existing unrelated runtime root `AGENTS.md`, root `README.md`, root `package.json`, root `pyproject.toml`, release-packaging docs/scripts/tests/package metadata, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- A Knowledge Cloud manifest path is now a single-writer identity in both the generated runtime artifact plane and the source rebuild plane. Duplicate entries are treated as ambiguous provenance because two records can claim the same mounted CHAL hardware file identity with competing size/hash metadata.
+- This guard complements the runtime mount-table duplicate mounted-artifact guard: the runtime refuses duplicate known partitions, and the standalone data plane now refuses duplicate manifest paths before publication or stamping validation.
+
+## Current Session — 2026-06-04 (Agent 7 — Quad Brain Replay Trace Contract)
+
+### 📝 Summary
+- Added `QuadBrainArbitration.to_replay_record()` so serialized four-brain arbitration can emit compact replay/storage metadata without persisting full response text.
+- Wired the replay record into Cognitive Hypervisor Quad Brain telemetry as `quad_brain_replay` and mirrored it in `bridge_result.quad_brain_replay`.
+- Added focused regression coverage that verifies the replay record preserves fixed role order, role devices, state transitions, critic ownership, integrity status, response hash/length, and no raw response body.
+- Advanced Phase 7 replayable trace storage while preserving Phase 3 serialized arbitration and avoiding new agents or uncontrolled brain sprawl.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/quad_brain.py packages/core/chal/hypervisor.py tests/test_chal_hypervisor.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_hypervisor.py` — 15 passed.
+
+### 🚧 Left Off / Next Steps
+- Extend persistent runtime conversation trace storage to write these compact Quad Brain replay records into the broader comparison/replay artifact path when a production storage boundary is selected.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `package.json`, root `pyproject.toml`, release-packaging docs/scripts/tests/package metadata, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Quad Brain replay records are trace metadata only: they preserve state-contract evidence, serial arbitration, and critic handoff, but do not create new brain workers or change final language ownership.
+- The replay contract stores selected-response SHA-256 and character length instead of raw text so future comparison harnesses can detect output drift without bloating trace artifacts.

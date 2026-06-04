@@ -6,6 +6,7 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from enum import Enum
+from hashlib import sha256
 from typing import Any, Mapping
 
 try:
@@ -85,6 +86,49 @@ class QuadBrainArbitration:
             "outputs": [output.to_dict() for output in self.outputs],
             "serial_order": list(self.serial_order),
             "state_contract": dict(self.state_contract),
+            "latency_ms": self.latency_ms,
+        }
+
+    def to_replay_record(
+        self,
+        *,
+        prompt_ref: str | None = None,
+        runtime_preset: str | None = None,
+    ) -> dict[str, Any]:
+        output_roles = [output.role.value for output in self.outputs]
+        output_devices = {output.role.value: output.device for output in self.outputs}
+        output_confidence = {
+            output.role.value: round(float(output.confidence), 6)
+            for output in self.outputs
+        }
+        return {
+            "schema": "synthesus.chal.quad_brain_replay.v1",
+            "trace_id": self.trace_id,
+            "prompt_ref": prompt_ref,
+            "runtime_preset": runtime_preset,
+            "selected_source": self.selected_source,
+            "selected_response_sha256": sha256(
+                self.selected_response.encode("utf-8")
+            ).hexdigest(),
+            "selected_response_chars": len(self.selected_response),
+            "serial_order": list(self.serial_order),
+            "output_roles": output_roles,
+            "output_devices": output_devices,
+            "output_confidence": output_confidence,
+            "state_contract": {
+                "topology": self.state_contract.get("topology"),
+                "parallel_brain_spawn": self.state_contract.get("parallel_brain_spawn"),
+                "serialized_arbitration": self.state_contract.get("serialized_arbitration"),
+                "required_roles": list(self.state_contract.get("required_roles", [])),
+                "state_transitions": list(self.state_contract.get("state_transitions", [])),
+                "critic_input_ref": self.state_contract.get("critic_input_ref"),
+                "critic_reviewed_candidate_id": self.state_contract.get(
+                    "critic_reviewed_candidate_id"
+                ),
+                "final_output_ref": self.state_contract.get("final_output_ref"),
+                "final_output_owner": self.state_contract.get("final_output_owner"),
+                "integrity": dict(self.state_contract.get("integrity", {})),
+            },
             "latency_ms": self.latency_ms,
         }
 
