@@ -2730,3 +2730,24 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - Knowledge Cloud provenance now has two gates before stamping: source-plane structure/licensing and source-manifest freshness. Hash fingerprints in `build.source_manifest` can be trusted as an exact rebuild-substrate identity only after both gates pass.
+
+## Current Session — 2026-06-04 (Agent 1 — Frontend CHAL Trace View)
+
+### 📝 Summary
+- Added a Synthesus 5 CHAL trace panel to the React chat timeline so assistant responses with `debug.cognitive_hypervisor` expose route, trace ID, mode, latency, budget status, device isolation, template guard, Quad Brain arbitration, degraded-state, and memory-writeback telemetry.
+- Exposed `mode="chal"` and `mode="business_bot"` in the frontend processing selector so operators can deliberately exercise the Cognitive Hypervisor and business-bot preset from the chat UI.
+- Added `CHALTelemetry` frontend types and a focused regression test that guards the mode options and route-decision panel from accidental removal.
+- Advanced Phase 9 by completing the frontend control/trace view for CHAL route decisions.
+
+### ✅ Verified
+- `python -m py_compile tests/test_frontend_chal_trace.py && python -m pytest -q tests/test_frontend_chal_trace.py` — passed, 1 test.
+- `npm run build` in `packages/frontend` — passed TypeScript/Vite production build; Vite reported the existing large-chunk warning for the bundled app.
+
+### 🚧 Left Off / Next Steps
+- Add the NPC runtime toggle for the Synthesus 5 path.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` agree on the selected profile dimension, then rerun the runtime release gate.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `package.json`, release-packaging docs/scripts/tests/package metadata, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- The frontend trace panel is an operator/debug surface only. It does not change CHAL routing, final language ownership, template quarantine rules, memory writeback admission, or API behavior.
+- `debug.cognitive_hypervisor` remains the single source of truth for route decisions; the UI now renders that telemetry without inventing a parallel trace format.

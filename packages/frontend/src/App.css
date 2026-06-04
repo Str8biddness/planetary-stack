@@ -419,6 +419,128 @@
   font-family: var(--font-mono);
 }
 
+/* ─── Synthesus 5 CHAL Trace Panel ───────────────────────────────── */
+.chal-trace-panel {
+  margin-top: 8px;
+  border: 1px solid rgba(0, 240, 160, 0.16);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 240, 160, 0.04);
+  overflow: hidden;
+}
+
+.chal-trace-panel summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.chal-trace-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.chal-route-pill {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: rgba(0, 200, 255, 0.08);
+  border: 1px solid rgba(0, 200, 255, 0.18);
+  color: var(--accent-secondary);
+  text-transform: none;
+}
+
+.chal-route-pill.degraded {
+  background: rgba(255, 170, 34, 0.1);
+  border-color: rgba(255, 170, 34, 0.22);
+  color: var(--status-warning);
+}
+
+.chal-trace-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
+.chal-trace-stat,
+.chal-trace-section {
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.chal-trace-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 8px;
+}
+
+.chal-trace-label,
+.chal-trace-section-title {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.chal-trace-value {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chal-trace-section {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0 10px 10px;
+  padding: 8px;
+}
+
+.chal-trace-section.warning {
+  border-color: rgba(255, 170, 34, 0.22);
+  background: rgba(255, 170, 34, 0.06);
+}
+
+.chal-trace-chips,
+.chal-trace-order {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chal-trace-chips span,
+.chal-trace-order span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.chal-trace-order {
+  padding-top: 2px;
+}
+
 /* ─── Typing Indicator ────────────────────────────────────────────── */
 .typing-indicator {
   display: inline-flex;

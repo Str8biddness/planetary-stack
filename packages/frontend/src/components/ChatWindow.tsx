@@ -1,9 +1,131 @@
 import { useEffect, useRef } from 'react';
-import type { ChatMessage } from '../types';
+import type { CHALTelemetry, ChatMessage } from '../types';
 
 interface ChatWindowProps {
   messages: ChatMessage[];
   loading: boolean;
+}
+
+function getCHALTelemetry(message: ChatMessage): CHALTelemetry | null {
+  const telemetry = message.debug?.cognitive_hypervisor;
+  if (!telemetry || typeof telemetry !== 'object') return null;
+  return telemetry as CHALTelemetry;
+}
+
+function formatNumber(value: unknown, suffix = '') {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? `${value.toFixed(1)}${suffix}`
+    : 'n/a';
+}
+
+function formatToken(value: string | undefined | null) {
+  return value ? value.replaceAll('_', ' ') : 'n/a';
+}
+
+function TraceStat({ label, value }: { label: string; value: string | number | boolean }) {
+  return (
+    <div className="chal-trace-stat">
+      <span className="chal-trace-label">{label}</span>
+      <span className="chal-trace-value">{String(value)}</span>
+    </div>
+  );
+}
+
+function CHALTracePanel({ telemetry }: { telemetry: CHALTelemetry }) {
+  const budget = telemetry.budget ?? {};
+  const device = telemetry.device_isolation ?? {};
+  const degraded = telemetry.degraded_state ?? null;
+  const guard = telemetry.template_guard;
+  const quadBrain = telemetry.quad_brain;
+  const writeback = telemetry.memory_writeback;
+  const writebackDecision = writeback?.decision;
+  const writebackAccepted = writebackDecision?.accepted ?? writeback?.accepted;
+  const writebackReason = writebackDecision?.reason ?? writeback?.reason;
+  const writebackMount = writebackDecision?.target_mount ?? writeback?.target_mount;
+
+  return (
+    <details className="chal-trace-panel">
+      <summary>
+        <span>CHAL Trace</span>
+        <span className={`chal-route-pill ${telemetry.degraded ? 'degraded' : ''}`}>
+          {formatToken(telemetry.route)}
+        </span>
+      </summary>
+
+      <div className="chal-trace-grid">
+        <TraceStat label="Trace" value={telemetry.trace_id ?? 'n/a'} />
+        <TraceStat label="Mode" value={formatToken(telemetry.hemisphere_mode)} />
+        <TraceStat label="Preset" value={formatToken(telemetry.runtime_preset)} />
+        <TraceStat label="Latency" value={formatNumber(telemetry.latency_ms, 'ms')} />
+        <TraceStat label="Device" value={formatToken(device.status)} />
+        <TraceStat label="Budget" value={telemetry.budget_exhausted ? 'exhausted' : 'ok'} />
+        <TraceStat label="Template Guard" value={guard?.rewritten ? 'rewritten' : guard?.allowed === false ? 'blocked' : 'clear'} />
+        <TraceStat label="Writeback" value={writebackAccepted ? 'accepted' : writebackReason ?? 'not reported'} />
+      </div>
+
+      <div className="chal-trace-section">
+        <span className="chal-trace-section-title">Budget</span>
+        <div className="chal-trace-chips">
+          <span>{formatNumber(budget.latency_ms, 'ms')}</span>
+          <span>{budget.retrieval_depth ?? 0} retrieval</span>
+          <span>{budget.candidate_count ?? 0} candidates</span>
+          <span>{budget.critic_passes ?? 0} critic</span>
+        </div>
+      </div>
+
+      {telemetry.reasons && telemetry.reasons.length > 0 && (
+        <div className="chal-trace-section">
+          <span className="chal-trace-section-title">Route Reasons</span>
+          <div className="chal-trace-chips">
+            {telemetry.reasons.map((reason) => (
+              <span key={reason}>{formatToken(reason)}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {quadBrain && (
+        <div className="chal-trace-section">
+          <span className="chal-trace-section-title">Quad Brain</span>
+          <div className="chal-trace-chips">
+            <span>{formatToken(quadBrain.state_contract?.topology)}</span>
+            <span>{formatToken(quadBrain.selected_source)}</span>
+            <span>{quadBrain.state_contract?.integrity?.ok === false ? 'integrity warning' : 'integrity ok'}</span>
+            <span>{formatNumber(quadBrain.latency_ms, 'ms')}</span>
+          </div>
+          {quadBrain.serial_order && (
+            <div className="chal-trace-order">
+              {quadBrain.serial_order.map((role) => (
+                <span key={role}>{formatToken(role)}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {degraded && (
+        <div className="chal-trace-section warning">
+          <span className="chal-trace-section-title">Degraded State</span>
+          <div className="chal-trace-chips">
+            <span>{formatToken(degraded.reason)}</span>
+            <span>{formatToken(degraded.device_status)}</span>
+            <span>template leak: {degraded.legacy_template_leakage_allowed ? 'allowed' : 'blocked'}</span>
+          </div>
+        </div>
+      )}
+
+      {writeback && (
+        <div className="chal-trace-section">
+          <span className="chal-trace-section-title">Memory Writeback</span>
+          <div className="chal-trace-chips">
+            <span>{writebackAccepted ? 'accepted' : 'rejected'}</span>
+            <span>{formatToken(writebackReason)}</span>
+            <span>{writebackMount ?? '/mnt/mem/writeback'}</span>
+          </div>
+        </div>
+      )}
+    </details>
+  );
 }
 
 export default function ChatWindow({ messages, loading }: ChatWindowProps) {
@@ -57,6 +179,9 @@ export default function ChatWindow({ messages, loading }: ChatWindowProps) {
               <div className="chat-msg-meta">
                 {msg.latency_ms.toFixed(1)}ms
               </div>
+            )}
+            {msg.role === 'assistant' && getCHALTelemetry(msg) && (
+              <CHALTracePanel telemetry={getCHALTelemetry(msg)!} />
             )}
             
             {/* KAL & Generative Diagnostics */}

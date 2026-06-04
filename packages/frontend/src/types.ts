@@ -22,6 +22,74 @@ export interface ChatMessage {
   };
 }
 
+export interface CHALTelemetry {
+  schema?: string;
+  trace_id?: string;
+  route?: string;
+  hemisphere_mode?: string;
+  runtime_preset?: string | null;
+  latency_ms?: number;
+  bridge_latency_ms?: number;
+  budget_exhausted?: boolean;
+  degraded?: boolean;
+  budget?: {
+    latency_ms?: number;
+    retrieval_depth?: number;
+    candidate_count?: number;
+    critic_passes?: number;
+  };
+  reasons?: string[];
+  constraints?: string[];
+  device_isolation?: {
+    device?: string;
+    status?: string;
+    latency_ms?: number;
+    timeout_ms?: number;
+    error?: string;
+  };
+  degraded_state?: {
+    reason?: string;
+    message?: string;
+    device?: string;
+    device_status?: string;
+    budget_exhausted?: boolean;
+    legacy_template_leakage_allowed?: boolean;
+    normal_assistant_path?: boolean;
+  } | null;
+  template_guard?: {
+    allowed?: boolean;
+    rewritten?: boolean;
+    surface?: string;
+    matched_signatures?: string[];
+  };
+  quad_brain?: {
+    schema?: string;
+    selected_source?: string;
+    serial_order?: string[];
+    latency_ms?: number;
+    state_contract?: {
+      topology?: string;
+      serialized_arbitration?: boolean;
+      final_output_owner?: string;
+      integrity?: {
+        ok?: boolean;
+        errors?: string[];
+      };
+    };
+  } | null;
+  memory_writeback?: {
+    schema?: string;
+    accepted?: boolean;
+    reason?: string;
+    target_mount?: string;
+    decision?: {
+      accepted?: boolean;
+      reason?: string;
+      target_mount?: string;
+    };
+  };
+}
+
 export interface QueryRequest {
   query: string;
   character: string;

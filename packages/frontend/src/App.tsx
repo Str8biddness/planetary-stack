@@ -157,6 +157,8 @@ function App() {
               title="Processing mode"
             >
               <option value="auto">Auto</option>
+              <option value="chal">Synthesus 5 CHAL</option>
+              <option value="business_bot">Business Bot</option>
               <option value="cognitive">Cognitive</option>
               <option value="rag">RAG</option>
               <option value="pattern">Pattern</option>

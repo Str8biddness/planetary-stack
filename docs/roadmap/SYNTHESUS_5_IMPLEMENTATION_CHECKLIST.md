@@ -170,7 +170,7 @@ Legend:
 
 - [x]  Document the current `/api/v1/query` `mode="chal"` debug contract as `CognitiveHypervisorTrace` in OpenAPI/schema mirrors. Session log: 2026-05-29 Agent 10 hypervisor trace schema; 2026-06-02 Agent 10 documented the `business_bot` preset and canonical runtime-preset normalization in API/schema mirrors; 2026-06-04 Agent 10 mirrored API CHAL memory-writeback telemetry as `CHALMemoryWritebackResult` and `CHALMemoryWritebackDecision`.
 
-- [ ]  Add frontend control/trace view for CHAL route decisions.
+- [x]  Add frontend control/trace view for CHAL route decisions. Session log: 2026-06-04 Agent 1 frontend CHAL trace view added selectable Synthesus 5 CHAL/business-bot modes and an expandable route-decision telemetry panel for Cognitive Hypervisor responses.
 
 - [ ]  Add NPC runtime toggle for Synthesus 5 path.
 
@@ -197,7 +197,6 @@ Legend:
 ## Current Priority Queue
 
 1. Rebuild or replace generated Knowledge Cloud artifacts so FAISS, metadata, and embedder dimensions align, then rerun the runtime release gate.
-2. Add frontend control/trace view for CHAL route decisions.
-3. Add NPC runtime toggle for the Synthesus 5 path.
-4. Prepare a taggable Synthesus 5 release candidate only after `python tools/synthesus5_release_gate.py --run-runtime --fail-on-blocker` passes.
-5. Keep commercial packaging limited to bounded NPC, business-bot, managed Knowledge Cloud, and enterprise AIVM surfaces until paid-launch blockers are cleared.
+2. Add NPC runtime toggle for the Synthesus 5 path.
+3. Prepare a taggable Synthesus 5 release candidate only after `python tools/synthesus5_release_gate.py --run-runtime --fail-on-blocker` passes.
+4. Keep commercial packaging limited to bounded NPC, business-bot, managed Knowledge Cloud, and enterprise AIVM surfaces until paid-launch blockers are cleared.
