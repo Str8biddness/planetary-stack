@@ -119,6 +119,7 @@ def validate_manifest(
     root_path = Path(root).resolve()
     manifest = load_manifest(root_path / manifest_name)
     failures: list[str] = []
+    failures.extend(_validate_unique_artifact_paths(manifest))
     checked = 0
     for item in manifest.get("artifacts", []):
         checked += 1
@@ -136,6 +137,18 @@ def validate_manifest(
             failures.append(f"sha256 mismatch {rel}")
     failures.extend(_validate_runtime_bundle_semantics(root_path, expected_embed_dim=expected_embed_dim))
     return ValidationResult(checked=checked, failures=tuple(failures))
+
+
+def _validate_unique_artifact_paths(manifest: dict) -> list[str]:
+    seen: set[str] = set()
+    failures: list[str] = []
+    for item in manifest.get("artifacts", []):
+        rel = str(item.get("path", "")).replace("\\", "/")
+        if rel in seen:
+            failures.append(f"duplicate artifact path: {rel}")
+        else:
+            seen.add(rel)
+    return failures
 
 
 def validate_runtime_bundle_semantics(root: str | Path, *, expected_embed_dim: int | None = None) -> ValidationResult:
@@ -212,6 +225,7 @@ def verify_source_manifest(
     root_path = Path(repo_root).resolve()
     manifest = load_manifest(root_path / manifest_path)
     failures: list[str] = []
+    failures.extend(_validate_unique_artifact_paths(manifest))
     checked = 0
     for item in manifest.get("artifacts", []):
         checked += 1

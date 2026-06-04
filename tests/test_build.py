@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -5,7 +6,7 @@ import pytest
 
 from synthesus_knowledge_cloud.__main__ import main
 from synthesus_knowledge_cloud.build import plan_build, run_build, stamp_existing_manifest
-from synthesus_knowledge_cloud.manifest import build_manifest, write_manifest
+from synthesus_knowledge_cloud.manifest import build_manifest, verify_source_manifest, write_manifest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -126,3 +127,16 @@ def test_stamp_manifest_rejects_stale_source_manifest(tmp_path: Path) -> None:
     assert "build" not in (artifacts / "manifest.json").read_text(encoding="utf-8")
 
     assert main(["stamp-manifest", "--repo-root", str(tmp_path), "--artifact-root", str(artifacts)]) == 1
+
+
+def test_verify_source_manifest_rejects_duplicate_artifact_paths(tmp_path: Path) -> None:
+    _write_current_source_manifest(tmp_path)
+    manifest_path = tmp_path / "manifests" / "source_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifacts"].append(dict(manifest["artifacts"][0]))
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+    result = verify_source_manifest(tmp_path)
+
+    assert not result.ok
+    assert result.failures[0] == "duplicate artifact path: sources/sample.yaml"

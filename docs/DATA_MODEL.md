@@ -84,5 +84,6 @@ Small support artifacts that are not the FAISS query embedder but still support 
 
 - `artifacts/manifest.json` validates runtime downloads.
 - `manifests/source_manifest.json` validates source/pipeline/pattern/synthetic/support planes.
+- Both manifest types reject duplicate artifact paths so one file identity cannot carry competing provenance or integrity records.
 - Runtime clients should use the artifact manifest.
 - Rebuild/audit tools should use both manifests.

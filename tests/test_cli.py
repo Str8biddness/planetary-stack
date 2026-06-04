@@ -34,6 +34,18 @@ def test_manifest_validate_rejects_faiss_embedder_dim_mismatch(tmp_path, monkeyp
     assert main(["validate", "--root", str(data)]) == 1
 
 
+def test_manifest_validate_rejects_duplicate_artifact_paths(tmp_path):
+    data = tmp_path / "artifacts"
+    data.mkdir()
+    sample = data / "sample.txt"
+    sample.write_text("hello", encoding="utf-8")
+    manifest = build_manifest(data, ["."], kind="test")
+    manifest["artifacts"].append(dict(manifest["artifacts"][0]))
+    write_manifest(manifest, data / "manifest.json")
+
+    assert main(["validate", "--root", str(data)]) == 1
+
+
 def test_profiles_load():
     profile = load_profile(Path("profiles/public-base.yaml"))
     summary = summarize_profile(profile)

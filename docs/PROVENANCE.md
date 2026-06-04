@@ -63,4 +63,6 @@
 
 Before an executed build or profile-aware manual re-stamp writes `manifest.json`, the CLI validates runtime bundle semantics that hashes alone cannot prove. FAISS vector count must match `faiss_metadata.json`, FAISS dimensionality must match `models/swarm_embedder.pkl`, and the persisted swarm embedder dimension must match the selected profile's `embedding.dim`. A mismatch aborts stamping so provenance cannot accidentally legitimize incompatible generated retrieval artifacts.
 
+Artifact and source manifests also reject duplicate `artifacts[].path` entries. A duplicate path is ambiguous provenance because two records can claim the same mounted file identity with different size/hash metadata, so validation fails before the bundle or source plane can be treated as CHAL hardware.
+
 `build.source_manifest` is captured from `manifests/source_manifest.json` when present. Rebuild operators should run `synthesus-kc build-source-manifest --root .` and `synthesus-kc verify-source-manifest --root .` before stamping so the runtime artifact manifest points at a current source-plane hash set.
