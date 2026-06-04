@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Synthesus 5 CHAL API",
-    "description": "Legacy-compatible Synthesus query and control API for the active Synthesus 5 CHAL runtime. The public query path currently exposes explicit Cognitive Hypervisor routing through mode=chal, the business_bot CHAL preset, plus generation-spine, cognitive, RAG, kernel, and amplification telemetry. CognitiveHypervisorTrace documents debug.cognitive_hypervisor for CHAL requests, including QuadBrainArbitration when route=quad_brain_path; CGPU traces are documented as CHAL contracts until candidate-set payloads are surfaced by this endpoint.",
+    "description": "Legacy-compatible Synthesus query and control API for the active Synthesus 5 CHAL runtime. The public query path currently exposes explicit Cognitive Hypervisor routing through mode=chal, the business_bot CHAL preset, plus generation-spine, cognitive, RAG, kernel, and amplification telemetry. CognitiveHypervisorTrace documents debug.cognitive_hypervisor for CHAL requests, including QuadBrainArbitration when route=quad_brain_path and memory-writeback telemetry after API arbitration; CGPU traces are documented as CHAL contracts until candidate-set payloads are surfaced by this endpoint.",
     "version": "5.0.0"
   },
   "paths": {
@@ -2397,7 +2397,7 @@
               }
             ],
             "title": "Debug",
-            "description": "Optional implementation telemetry returned only when include_debug is true. Current keys include kernel_triggered, symbolic_triggered, trace, rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. For explicit mode=chal calls, cognitive_hypervisor follows the CognitiveHypervisorTrace OpenAPI component, including typed QuadBrainArbitration records when route=quad_brain_path. CGPU candidate-set trace records should also live here as the runtime wiring expands without changing the stable response envelope. Legacy-compatible template exceptions are labeled under debug.template_surface using the TemplateSurface schema."
+            "description": "Optional implementation telemetry returned only when include_debug is true. Current keys include kernel_triggered, symbolic_triggered, trace, rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. For explicit mode=chal calls, cognitive_hypervisor follows the CognitiveHypervisorTrace OpenAPI component, including typed QuadBrainArbitration records when route=quad_brain_path and CHALMemoryWritebackResult records when the API attempts post-arbitration memory writeback. CGPU candidate-set trace records should also live here as the runtime wiring expands without changing the stable response envelope. Legacy-compatible template exceptions are labeled under debug.template_surface using the TemplateSurface schema."
           }
         },
         "type": "object",
@@ -2576,6 +2576,17 @@
               }
             ],
             "description": "Typed Synthesus 5 degraded-state record emitted when a CHAL device fault, budget exhaustion, or template quarantine prevents normal assistant-path emission; null when the route completes cleanly."
+          },
+          "memory_writeback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CHALMemoryWritebackResult"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Post-arbitration CHAL memory writeback telemetry for explicit API CHAL/business-bot calls; null or absent when the endpoint does not attempt writeback."
           }
         },
         "type": "object",
@@ -2709,6 +2720,121 @@
             }
           }
         }
+      },
+      "CHALMemoryWritebackDecision": {
+        "type": "object",
+        "title": "CHALMemoryWritebackDecision",
+        "description": "Decision returned by the CHAL memory writeback admission policy before any memory-store mutation.",
+        "required": [
+          "accepted",
+          "reason",
+          "target_mount"
+        ],
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Admission or fail-closed reason, for example critic_and_provenance_validated, critic_rejected, missing_provenance, low_provenance_confidence, memory_store_unavailable, empty_response, writeback_bridge_unavailable, missing_hypervisor_trace, or writeback_exception."
+          },
+          "target_mount": {
+            "type": "string",
+            "const": "/mnt/mem/writeback",
+            "description": "CHAL memory writeback mount targeted by the API hook."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Trace, provenance, stored-memory, and target-memory metadata when available."
+          }
+        },
+        "additionalProperties": true
+      },
+      "CHALMemoryWritebackResult": {
+        "type": "object",
+        "title": "CHALMemoryWritebackResult",
+        "description": "Telemetry emitted at debug.cognitive_hypervisor.memory_writeback for explicit mode=chal and business_bot API calls after final Cognitive Hypervisor arbitration. Accepted traces write through /mnt/mem/writeback; degraded, template-rewritten, unavailable-sink, empty, or exception paths fail closed and do not block response emission.",
+        "required": [
+          "schema"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "synthesus.chal.memory_writeback_result.v1"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CHALMemoryWritebackDecision"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nested admission decision returned by apply_memory_writeback when the bridge reaches the policy layer."
+          },
+          "accepted": {
+            "type": "boolean",
+            "description": "Flat fail-closed admission flag used by early API exits before a MemoryWritebackDecision can be created."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Flat fail-closed reason used by early API exits before a MemoryWritebackDecision can be created."
+          },
+          "target_mount": {
+            "type": "string",
+            "const": "/mnt/mem/writeback"
+          },
+          "stored_memory_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Memory-store record id when an accepted writeback was persisted."
+          },
+          "target_memory_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "episodic",
+                  "semantic",
+                  "procedural",
+                  "working",
+                  "crystallized"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conscious_state_updated": {
+            "type": "boolean"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Stored CHAL writeback metadata, including trace id, provenance refs, TTL, importance, and crystallized staging flags when present."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Exception text when the API writeback hook fails closed."
+          }
+        },
+        "additionalProperties": true
       }
     }
   }

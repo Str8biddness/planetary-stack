@@ -231,6 +231,8 @@ Writeback candidates use `MemoryWritebackCandidate` and are admitted by `decide_
 
 `packages/api/production_server.py` now invokes the writeback bridge for explicit `mode="chal"` and `mode="business_bot"` API calls after final Cognitive Hypervisor arbitration and before response emission. The endpoint records the result under `debug.cognitive_hypervisor.memory_writeback` when debug telemetry is requested. Accepted traces become episodic memory records with CHAL provenance metadata; degraded, template-rewritten, empty, or unavailable-sink paths fail closed with a typed `synthesus.chal.memory_writeback_result.v1` rejection and do not block the user response.
 
+The public API contract is mirrored as `CHALMemoryWritebackResult` and `CHALMemoryWritebackDecision` in `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`. The current API result shape intentionally documents both the nested `decision` payload produced after the bridge reaches the admission policy and the flat fail-closed fields emitted by early unavailable-sink or exception exits.
+
 This completes the source-level cache-tier, TTL/provenance policy, focused reasoning-trace-to-memory bridge, and first production API writeback call site. Remaining runtime work is to select non-API and crystallized-state call sites that should receive automatic writeback after final critic arbitration.
 
 Validation:

@@ -2588,6 +2588,32 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 - CHAL memory writeback is now a three-stage boundary: hypervisor trace extraction, critic/provenance admission, then memory-store/conscious-state application.
 - PPBRS and legacy templates still do not own normal final language. Only accepted, non-degraded, non-template-rewritten traces can become writeback candidates.
 
+## Current Session — 2026-06-03 (Commercial Release Packaging Gate)
+
+### 📝 Summary
+- Added `tools/synthesus5_release_gate.py` as a commercial release-readiness gate that emits `synthesus.release_gate.v1` JSON and separates controlled demo, limited private beta, and paid consumer launch status.
+- Added `docs/release/SYNTHESUS_5_RC1_RELEASE_NOTES.md` and `docs/product/COMMERCIAL_PACKAGING.md` so Synthesus 5 packages as bounded NPC runtime, business-bot API, managed Knowledge Cloud bundle, and enterprise AIVM runtime instead of vague AGI positioning.
+- Added `tests/test_synthesus5_release_gate.py`, package scripts (`release:gate`, `release:gate:runtime`, `release:focused`, `smoke:chal`), and updated Python package metadata to describe the active Synthesus 5 CHAL target.
+- Advanced Phase 10 by completing the release-notes/limitations checklist item while leaving release-candidate tagging blocked until paid-launch gates pass.
+
+### ✅ Verified
+- `python -m py_compile tools/synthesus5_release_gate.py tests/test_synthesus5_release_gate.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/tools python -m pytest -q tests/test_synthesus5_release_gate.py` — 3 passed.
+- `python tools/synthesus5_release_gate.py` — passed static packaging gate; demo ready, private beta needs runtime gate, paid launch blocked until runtime evidence.
+- `python tools/synthesus5_release_gate.py --run-runtime` — CHAL API smoke passed with no template leaks; report marked demo ready, private beta limited, and paid consumer launch blocked by Knowledge Cloud cold-start integrity.
+- `python` metadata parse for `package.json` and `pyproject.toml` — passed.
+- `git diff --check -- tools/synthesus5_release_gate.py tests/test_synthesus5_release_gate.py docs/release/SYNTHESUS_5_RC1_RELEASE_NOTES.md docs/product/COMMERCIAL_PACKAGING.md package.json pyproject.toml` — passed.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` agree on the selected profile dimension.
+- Rerun `python tools/synthesus5_release_gate.py --run-runtime --fail-on-blocker`; paid consumer launch stays blocked until the Knowledge Cloud cold-start check passes.
+- Build the frontend CHAL trace/control view and NPC runtime toggle before tagging a public release candidate.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Monetization should package bounded, inspectable surfaces: NPC runtime API, business-bot API, managed Knowledge Cloud, character packs, and enterprise AIVM runtime.
+- The commercial gate treats Knowledge Cloud semantic integrity as a paid-launch blocker, not as a reason to hide the already-working controlled CHAL/business-bot demo surface.
+
 ## Current Session — 2026-06-03 (Agent 5 — API CHAL Memory Writeback Mount)
 
 ### 📝 Summary
@@ -2604,6 +2630,7 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 - Select any non-API runtime call sites that should invoke `candidate_from_hypervisor_trace()` and `apply_memory_writeback()` after final critic arbitration.
 - Decide whether explicit API CHAL writeback should later stage high-confidence grounded facts into crystallized state; this run intentionally writes episodic records only.
 - Rebuild or replace the standalone Knowledge Cloud generated artifacts separately so FAISS/embedder dimensions align before golden-query health can pass.
+- Pre-existing unrelated runtime root `AGENTS.md`, root `README.md`, release-packaging docs/scripts/tests/package metadata, and untracked `synthesus_framework/` changes were left untouched.
 
 ### 💡 Architectural Notes
 - `/mnt/mem/writeback` is now exercised by a production API path as a CHAL boundary, with provenance and critic/template gates preserved before storage.
@@ -2631,3 +2658,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - PPBRS rule/action matching now uses structured context signals as firmware routing hints instead of executing every potentially unrelated condition.
 - Trigger metadata is optional and backwards compatible; rules without trigger metadata remain shared candidates.
+
+## Current Session — 2026-06-04 (Agent 10 — API CHAL Memory Writeback Schema)
+
+### 📝 Summary
+- Mirrored the implemented `/api/v1/query` CHAL/business-bot memory-writeback telemetry into `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`.
+- Added `CHALMemoryWritebackResult` and `CHALMemoryWritebackDecision` schema components and wired `CognitiveHypervisorTrace.memory_writeback` to the typed result.
+- Updated the `QueryResponse.debug` description and `docs/modules/KN.md` to name the current post-arbitration writeback contract, including the nested admission-policy payload and flat fail-closed early-exit payloads.
+- Advanced Phase 9 API/debug-contract documentation for the existing CHAL memory writeback runtime surface without changing runtime behavior.
+
+### ✅ Verified
+- `python -m py_compile packages/api/schemas.py` — passed.
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed `CHALMemoryWritebackResult`, `CHALMemoryWritebackDecision`, and `CognitiveHypervisorTrace.memory_writeback` are present in all mirrors.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/api:/home/workspace/Synthesus_4.0/packages/knowledge:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_chal_api_memory_writeback.py tests/test_chal_memory_policy.py` — passed, 13 tests.
+- `git diff --check -- packages/api/schemas.py docs/openapi.yaml docs/openapi.json docs/api_schema.json docs/modules/KN.md docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md docs/agents/AGENT_LOG.md` — passed.
+
+### 🚧 Left Off / Next Steps
+- Consider normalizing early API memory-writeback fail-closed exits to always nest a `decision` object in a future runtime patch; the schema currently documents both shapes because both are implemented.
+- Rebuild or replace the standalone Knowledge Cloud generated artifacts separately so FAISS/embedder dimensions align before golden-query health and paid-launch gates can pass.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, release-packaging docs/scripts/tests/package metadata, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- API memory writeback remains post-arbitration telemetry and fail-closed persistence plumbing. It does not own final language, does not bypass critic/template gates, and targets the `/mnt/mem/writeback` CHAL boundary only after Cognitive Hypervisor arbitration.

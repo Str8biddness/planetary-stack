@@ -168,7 +168,7 @@ Legend:
 
 - [~] Wire Synthesus 5 path into API entrypoints. Session log: 2026-05-28 Agent 1 API CHAL mode added explicit `/api/v1/query` `mode="chal"` routing through `CognitiveHypervisor`; default `auto` cutover remains.
 
-- [x]  Document the current `/api/v1/query` `mode="chal"` debug contract as `CognitiveHypervisorTrace` in OpenAPI/schema mirrors. Session log: 2026-05-29 Agent 10 hypervisor trace schema; 2026-06-02 Agent 10 documented the `business_bot` preset and canonical runtime-preset normalization in API/schema mirrors.
+- [x]  Document the current `/api/v1/query` `mode="chal"` debug contract as `CognitiveHypervisorTrace` in OpenAPI/schema mirrors. Session log: 2026-05-29 Agent 10 hypervisor trace schema; 2026-06-02 Agent 10 documented the `business_bot` preset and canonical runtime-preset normalization in API/schema mirrors; 2026-06-04 Agent 10 mirrored API CHAL memory-writeback telemetry as `CHALMemoryWritebackResult` and `CHALMemoryWritebackDecision`.
 
 - [ ]  Add frontend control/trace view for CHAL route decisions.
 
@@ -190,14 +190,14 @@ Legend:
 
 - [~]  Restore Knowledge Cloud golden-query health after artifact rebuild. Blocker note: 2026-06-01 Daily Knowledge Hardware Health Check confirmed manifest/source/bootstrap/cold-start mount validation passes, but golden-query retrieval fails because the current `synthesus-knowledge-cloud/artifacts/faiss.index` is 384-dimensional while `artifacts/models/swarm_embedder.pkl` persists `dim=128`; fix requires regenerating aligned generated artifacts, not a runtime source edit. Session log: 2026-06-01 Knowledge Cloud Provenance Stamp Guard added a source-only hardening gate so `synthesus-kc build --execute` and `synthesus-kc stamp-manifest` refuse to stamp provenance over that semantic mismatch; 2026-06-01 Agent 5 upgraded the Synthesus runtime cold-start gate to fail the same mismatch before declaring mounted Knowledge Cloud hardware ready; 2026-06-02 Daily Knowledge Hardware Health Check aligned the fast health check with the mount-table semantic gate so golden queries are skipped until FAISS/embedder dimensions match; 2026-06-03 Daily Knowledge Hardware Health Check reconfirmed source validation and KAL/mount health pass, while bundle/golden-query health remains blocked by the same FAISS/embedder mismatch and the live artifact manifest is not yet re-stamped with `build.source_manifest`.
 
-- [ ]  Publish release notes describing Synthesus 5 behavior and limitations.
+- [x]  Publish release notes describing Synthesus 5 behavior and limitations. Session log: 2026-06-03 Commercial Release Packaging Gate added RC1 release notes, commercial packaging docs, package scripts, and a runtime release gate that separates demo/private-beta readiness from paid-launch blockers.
 
 - [ ]  Tag a Synthesus 5 release candidate.
 
 ## Current Priority Queue
 
-1. Wire `CognitiveHypervisor` into a public runtime/API entrypoint.
-2. Connect Quad Brain dispatch to CHAL frames and CGPU rendering.
-3. Add a mount table boot sequence with Knowledge Cloud manifest integrity checks.
-4. Upgrade the comparison harness from 4.1 CHAL to explicit Synthesus 5 mode.
-5. Complete the legacy template path audit and regression guard.
+1. Rebuild or replace generated Knowledge Cloud artifacts so FAISS, metadata, and embedder dimensions align, then rerun the runtime release gate.
+2. Add frontend control/trace view for CHAL route decisions.
+3. Add NPC runtime toggle for the Synthesus 5 path.
+4. Prepare a taggable Synthesus 5 release candidate only after `python tools/synthesus5_release_gate.py --run-runtime --fail-on-blocker` passes.
+5. Keep commercial packaging limited to bounded NPC, business-bot, managed Knowledge Cloud, and enterprise AIVM surfaces until paid-launch blockers are cleared.
