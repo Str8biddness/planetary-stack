@@ -72,6 +72,7 @@ The repository is currently in a validated PPBRS baseline state. Significant opt
 - **Rule Tag + Trigger Indexing**: Rule evaluators prefilter by context tags, trigger keys, and exact trigger values before evaluating conditions.
 - **Top-Rule Short-Circuiting**: Single-winner weighted-rule execution scans indexed candidates by descending weight and stops once the best threshold-qualified firmware rule is known, while full `evaluate()` calls still return all activated rules for callers that need fanout.
 - **Action Mapping Short-Circuiting**: `RuleToActionMapper.map_to_action()` now uses single-winner evaluation. It stops when rule priority makes lower-priority candidates irrelevant, or when the current same-priority score cannot be beaten by any remaining tag-boosted weight upper bound. Full `evaluate_rules()` still returns fanout for action-sequence callers.
+- **Confidence Scoring Single-Pass Accumulation**: `ConfidenceScorer.calculate()` now accumulates weighted totals, context totals, and chain averages while building components, preserving the existing `ConfidenceScore` shape while avoiding redundant scoring-path passes.
 
 ## Optimization Upgrade Path
 
@@ -82,7 +83,7 @@ The current PPBRS implementation is functionally complete, but the next performa
 - `pattern_classifier` still does pattern scoring in a mostly linear candidate set.
 - `reasoning_chain` and `rule_to_action` can benefit from tag and trigger indexes.
 - `multi_step_reasoning` can be made faster by replacing repeated edge scans with adjacency maps and cached traversal structures.
-- `confidence_scoring` is already light, but it should remain explicit and avoid hidden overhead.
+- `confidence_scoring` is already light and now uses single-pass accumulation; future work should preserve the explicit component/factor contract.
 - The C++ kernel should remain the long-term hot path for high-volume matching.
 
 ### Recommended implementation order

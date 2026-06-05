@@ -561,6 +561,7 @@ PPBRS micro-benchmark after top-rule short-circuiting:
 - `python -m py_compile packages/reasoning/reasoning_chain.py tests/test_ppbrs.py tools/ppbrs_benchmark.py`
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 118 passed.
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py`
+
 ## Daily Entry: 2026-06-04 (Agent 6 — Action Mapping Short-Circuit)
 
 ### Actions Performed
@@ -586,4 +587,39 @@ PPBRS micro-benchmark after action-mapping short-circuiting:
 
 - `python -m py_compile packages/reasoning/rule_to_action.py tests/test_ppbrs.py tools/ppbrs_benchmark.py`
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 120 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py`
+
+## Daily Entry: 2026-06-05 (Agent 6 — Confidence Scoring Tightening)
+
+### Actions Performed
+
+1. Tightened `ConfidenceScorer.calculate()` so weighted totals, context totals, and chain averages are accumulated while components are built instead of re-walking the component and factor lists.
+2. Preserved the existing `ConfidenceScore` component/factor shape for CHAL firmware scoring callers.
+3. Added regression coverage for the component ordering and factor values emitted by the single-pass confidence path.
+4. Added a `confidence_scoring` metric to `tools/ppbrs_benchmark.py`.
+
+### Benchmark Run
+
+Direct old-vs-new confidence-scoring micro-benchmark with 20,000 scored contexts:
+
+| Version | p50 (ms) | p95 (ms) | Avg (ms) |
+|---|---:|---:|---:|
+| previous `HEAD` | 0.0060 | 0.0061 | 0.0061 |
+| single-pass accumulation | 0.0051 | 0.0052 | 0.0052 |
+
+Full PPBRS micro-benchmark after adding the confidence metric:
+
+| Component | p50 (ms) | p95 (ms) | Avg (ms) |
+| --- | --- | --- | --- |
+| pattern_matching | 0.3606 | 0.3978 | 0.3343 |
+| rule_evaluation | 0.0231 | 0.0257 | 0.0237 |
+| action_mapping | 0.0248 | 0.0284 | 0.0255 |
+| weighted_top_rule | 0.0317 | 0.0351 | 0.0322 |
+| confidence_scoring | 0.0051 | 0.0052 | 0.0052 |
+| graph_traversal | 0.0167 | 0.0195 | 0.0174 |
+
+### Verified
+
+- `python -m py_compile packages/reasoning/confidence_scoring.py tests/test_ppbrs.py tools/ppbrs_benchmark.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 121 passed.
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py`

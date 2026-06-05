@@ -108,6 +108,8 @@ Expected effect:
 
 Target file: `ppbrs/confidence_scoring.py`
 
+Status 2026-06-05: implemented single-pass accumulation in `ConfidenceScorer.calculate()`. The scorer now builds the emitted `ConfidenceComponent` list while accumulating weighted totals, context averages, and chain averages, preserving the existing `ConfidenceScore` output shape while removing redundant scoring-path passes. `tools/ppbrs_benchmark.py` now tracks a `confidence_scoring` micro-benchmark.
+
 Implementation order:
 1. Keep the score composition explicit and cheap.
 2. Skip components that are not present.

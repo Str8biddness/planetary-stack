@@ -91,9 +91,11 @@ class ConfidenceScorer:
         """
         context_factors = context_factors or {}
         chain_confidences = chain_confidences or []
-        
+
         components = []
-        
+        weighted_sum = 0.0
+        total_weight = 0.0
+
         pattern_component = ConfidenceComponent(
             source=ConfidenceSource.PATTERN_MATCH,
             value=pattern_confidence,
@@ -101,34 +103,46 @@ class ConfidenceScorer:
             metadata={'primary': True}
         )
         components.append(pattern_component)
-        
+        weighted_sum += pattern_component.value * pattern_component.weight
+        total_weight += pattern_component.weight
+
+        context_total = 0.0
         for factor_name, factor_value in context_factors.items():
-            components.append(ConfidenceComponent(
+            component = ConfidenceComponent(
                 source=ConfidenceSource.CONTEXTUAL,
                 value=factor_value,
                 weight=0.8,
                 metadata={'factor': factor_name}
-            ))
-        
+            )
+            components.append(component)
+            weighted_sum += component.value * component.weight
+            total_weight += component.weight
+            context_total += factor_value
+
+        chain_avg = 0.0
         if chain_confidences:
             chain_avg = sum(chain_confidences) / len(chain_confidences)
-            components.append(ConfidenceComponent(
+            component = ConfidenceComponent(
                 source=ConfidenceSource.CHAIN_INFERENCE,
                 value=chain_avg,
                 weight=1.2,
                 metadata={'chain_count': len(chain_confidences)}
-            ))
-        
+            )
+            components.append(component)
+            weighted_sum += component.value * component.weight
+            total_weight += component.weight
+
         if evidence_boost > 0:
-            components.append(ConfidenceComponent(
+            component = ConfidenceComponent(
                 source=ConfidenceSource.EVIDENCE,
                 value=evidence_boost,
                 weight=0.5,
                 metadata={'boost': True}
-            ))
-        
-        weighted_sum = sum(c.value * c.weight for c in components)
-        total_weight = sum(c.weight for c in components)
+            )
+            components.append(component)
+            weighted_sum += component.value * component.weight
+            total_weight += component.weight
+
         overall = weighted_sum / total_weight if total_weight > 0 else 0.0
         
         overall = self._apply_temporal_decay(overall)
@@ -138,8 +152,8 @@ class ConfidenceScorer:
         
         factors = {
             'pattern': pattern_confidence,
-            'context_avg': sum(context_factors.values()) / len(context_factors) if context_factors else 0.0,
-            'chain_avg': sum(chain_confidences) / len(chain_confidences) if chain_confidences else 0.0,
+            'context_avg': context_total / len(context_factors) if context_factors else 0.0,
+            'chain_avg': chain_avg,
             'evidence_boost': evidence_boost
         }
         

@@ -3112,3 +3112,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Profile dimension is now part of the CHAL hardware identity for retrieval mounts: the ROM/parameter/corpus partitions must be hash-valid, mutually compatible, and compatible with the profile contract that stamped the bundle.
 - This keeps source-only release gates from declaring mounted Knowledge Cloud hardware ready when generated artifacts are internally stale against the selected build profile.
+
+## Current Session — 2026-06-05 (Agent 6 — PPBRS Confidence Scoring Tightening)
+
+### 📝 Summary
+- Tightened `ConfidenceScorer.calculate()` so PPBRS firmware confidence scoring accumulates weighted totals, context totals, and chain averages while building the emitted component list, instead of re-walking components and factor lists.
+- Added regression coverage that preserves the existing `ConfidenceScore` component ordering and factor output shape for CHAL firmware callers.
+- Added `confidence_scoring` to `tools/ppbrs_benchmark.py`, updated the PPBRS module docs, optimization roadmap, checklist, and tracked PPBRS dev log.
+- Advanced Phase 6 PPBRS firmware-signal conversion/hot-path work without changing final-language ownership or allowing template output.
+
+### ✅ Verified
+- `python -m py_compile packages/reasoning/confidence_scoring.py tests/test_ppbrs.py tools/ppbrs_benchmark.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — passed, 121 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py` — passed; confidence scoring measured p50 0.0051 ms, p95 0.0052 ms, avg 0.0052 ms.
+- Direct old-vs-new confidence micro-benchmark over 20,000 scored contexts improved avg latency from 0.0061 ms to 0.0052 ms on the same workload.
+
+### 🚧 Left Off / Next Steps
+- Next Agent 6 run can start Phase 5 kernel-offload protocol design for mature hot-path matching, or add a full-pipeline PPBRS firmware benchmark that includes classifier, chain, rules, action mapping, and confidence scoring together.
+- Broader release remains blocked by the generated Knowledge Cloud FAISS/embedder/profile dimension mismatch documented in Phase 10; this run did not touch generated artifacts.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Confidence scoring remains a PPBRS firmware scoring device, not a final-language owner. The optimization keeps score composition explicit, cheap, and inspectable for CHAL telemetry and downstream generation/critic boundaries.

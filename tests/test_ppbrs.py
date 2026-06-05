@@ -318,6 +318,27 @@ class TestConfidenceScorer:
         merged = scorer.merge_scores([score1, score2])
         assert merged.overall == (score1.overall + score2.overall) / 2
 
+    def test_calculate_preserves_component_shape_with_single_pass_factors(self):
+        scorer = ConfidenceScorer()
+        score = scorer.calculate(
+            0.6,
+            context_factors={"grounding": 0.8, "recency": 0.4},
+            chain_confidences=[0.5, 0.7],
+            evidence_boost=0.2,
+        )
+
+        assert [component.source for component in score.components] == [
+            ConfidenceSource.PATTERN_MATCH,
+            ConfidenceSource.CONTEXTUAL,
+            ConfidenceSource.CONTEXTUAL,
+            ConfidenceSource.CHAIN_INFERENCE,
+            ConfidenceSource.EVIDENCE,
+        ]
+        assert score.factors["pattern"] == 0.6
+        assert score.factors["context_avg"] == pytest.approx(0.6)
+        assert score.factors["chain_avg"] == pytest.approx(0.6)
+        assert score.factors["evidence_boost"] == 0.2
+
 
 class TestBayesianConfidenceUpdater:
     """Tests for BayesianConfidenceUpdater."""

@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from ppbrs.pattern_classifier import PatternClassifier, Pattern
 from ppbrs.reasoning_chain import WeightedRuleEvaluator
 from ppbrs.rule_to_action import RuleToActionMapper, Action, ActionType
+from ppbrs.confidence_scoring import ConfidenceScorer
 from ppbrs.multi_step_reasoning import MultiStepReasoningChain, Hypothesis, ReasoningNode
 
 def benchmark_pattern_matching(n_patterns=1000, n_queries=100):
@@ -131,6 +132,35 @@ def benchmark_weighted_top_rule(n_rules=500, n_evals=100):
         "avg": np.mean(latencies) * 1000
     }
 
+def benchmark_confidence_scoring(n_scores=5000):
+    print(f"Baselining Confidence Scoring ({n_scores} scores)...")
+    scorer = ConfidenceScorer()
+    context_factors = {
+        "relevance": 0.82,
+        "recency": 0.72,
+        "coherence": 0.91,
+        "grounding": 0.77,
+    }
+    chain_confidences = [0.67, 0.79, 0.84]
+
+    latencies = []
+    for i in range(n_scores):
+        pattern_confidence = 0.45 + ((i % 50) / 100)
+        start = time.perf_counter()
+        scorer.calculate(
+            pattern_confidence,
+            context_factors=context_factors,
+            chain_confidences=chain_confidences,
+            evidence_boost=0.15,
+        )
+        latencies.append(time.perf_counter() - start)
+
+    return {
+        "p50": np.percentile(latencies, 50) * 1000,
+        "p95": np.percentile(latencies, 95) * 1000,
+        "avg": np.mean(latencies) * 1000
+    }
+
 def benchmark_graph_traversal(n_nodes=100, n_edges=300, n_walks=50):
     print(f"Baselining Graph Traversal ({n_nodes} nodes, {n_edges} edges)...")
     chain = MultiStepReasoningChain()
@@ -174,6 +204,7 @@ if __name__ == "__main__":
     results["metrics"]["rule_evaluation"] = benchmark_rule_evaluation()
     results["metrics"]["action_mapping"] = benchmark_action_mapping()
     results["metrics"]["weighted_top_rule"] = benchmark_weighted_top_rule()
+    results["metrics"]["confidence_scoring"] = benchmark_confidence_scoring()
     results["metrics"]["graph_traversal"] = benchmark_graph_traversal()
     
     print("\nBenchmark Results (ms):")
