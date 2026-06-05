@@ -2974,3 +2974,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - `QuadBrainReplayRecord` is trace metadata, not a new user-facing payload or brain worker. It stores role/device identity, state-contract evidence, selected-response SHA-256, selected-response character length, and latency while intentionally omitting raw response text.
+
+## Current Session — 2026-06-05 (Knowledge Hardware Pending-License Notes Gate)
+
+### 📝 Summary
+- Tightened `synthesus-knowledge-cloud` source-plane validation so planned `pending[]` Kaggle/Hugging Face dataset entries require both `license.spdx` and non-empty `license.notes`.
+- Added focused regression coverage for pending entries that declare SPDX but omit license notes.
+- Updated the current Kaggle pending TriviaQA entry and regenerated `manifests/source_manifest.json` so the source-plane hash set reflects the provenance note.
+- Advanced Phase 5 source-plane license/provenance validation for future public Knowledge Cloud hardware expansion without touching generated FAISS, KNDB, model, cache, mirror, or workflow artifacts.
+
+### ✅ Verified
+- `python -m py_compile synthesus_knowledge_cloud/source_planes.py tests/test_cli.py` in `synthesus-knowledge-cloud` — passed.
+- `python -m pytest -q tests/test_cli.py tests/test_build.py tests/test_provenance.py` in `synthesus-knowledge-cloud` — 20 passed.
+- `python -m synthesus_knowledge_cloud validate-sources --root .` in `synthesus-knowledge-cloud` — passed; 25 required paths and 7 character pattern banks.
+- `python -m synthesus_knowledge_cloud verify-source-manifest --root .` in `synthesus-knowledge-cloud` — passed after regenerating the source manifest; 139 source files verified.
+- `python -m synthesus_knowledge_cloud build profiles/public-base.yaml` in `synthesus-knowledge-cloud` — dry-run passed and preserved `executed=false`.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `artifacts/faiss.index`, `artifacts/faiss_metadata.json`, and `artifacts/models/swarm_embedder.pkl` agree on the selected profile dimension, then rerun bundle validation, runtime cold-start validation, golden-query health, and the runtime release gate.
+- Consider adding dataset revision/split pins to planned Kaggle and Hugging Face pending entries before enabling either aggregate source.
+- Pre-existing unrelated runtime root `AGENTS.md`, root `README.md`, root `package.json`, root `pyproject.toml`, release-packaging docs/scripts/tests/package metadata, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Pending public datasets are now provenance-complete before enablement: SPDX identifies the declared license class, and notes capture redistribution or packaging constraints that matter before the source can become mounted CHAL rebuild substrate.
