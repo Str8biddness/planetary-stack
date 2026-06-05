@@ -192,7 +192,7 @@ Legend:
 
 - [~]  Restore Knowledge Cloud golden-query health after artifact rebuild. Blocker note: 2026-06-01 Daily Knowledge Hardware Health Check confirmed manifest/source/bootstrap/cold-start mount validation passes, but golden-query retrieval fails because the current `synthesus-knowledge-cloud/artifacts/faiss.index` is 384-dimensional while `artifacts/models/swarm_embedder.pkl` persists `dim=128`; fix requires regenerating aligned generated artifacts, not a runtime source edit. Session log: 2026-06-01 Knowledge Cloud Provenance Stamp Guard added a source-only hardening gate so `synthesus-kc build --execute` and `synthesus-kc stamp-manifest` refuse to stamp provenance over that semantic mismatch; 2026-06-01 Agent 5 upgraded the Synthesus runtime cold-start gate to fail the same mismatch before declaring mounted Knowledge Cloud hardware ready; 2026-06-02 Daily Knowledge Hardware Health Check aligned the fast health check with the mount-table semantic gate so golden queries are skipped until FAISS/embedder dimensions match; 2026-06-03 Daily Knowledge Hardware Health Check reconfirmed source validation and KAL/mount health pass, while bundle/golden-query health remains blocked by the same FAISS/embedder mismatch and the live artifact manifest is not yet re-stamped with `build.source_manifest`; 2026-06-04 Daily Knowledge Hardware Health Check reconfirmed source-plane validation, source-manifest verification, manifest hashes, FAISS/metadata count alignment, cold-start semantic gate, KAL mount health, and fast health reporting. Golden queries remain intentionally skipped because retrieval semantics still fail with `faiss=384`, `embedder=128`.
 
-- [x]  Publish release notes describing Synthesus 5 behavior and limitations. Session log: 2026-06-03 Commercial Release Packaging Gate added RC1 release notes, commercial packaging docs, package scripts, and a runtime release gate that separates demo/private-beta readiness from paid-launch blockers.
+- [x]  Publish release notes describing Synthesus 5 behavior and limitations. Session log: 2026-06-03 Commercial Release Packaging Gate added RC1 release notes, commercial packaging docs, package scripts, and a runtime release gate that separates demo/private-beta readiness from paid-launch blockers; 2026-06-05 Agent 1 hardened the runtime release gate so focused-suite evidence is an explicit critical check before RC tagging.
 
 - [ ]  Tag a Synthesus 5 release candidate.
 
@@ -200,5 +200,5 @@ Legend:
 
 1. Rebuild or replace generated Knowledge Cloud artifacts so FAISS, metadata, and embedder dimensions align, then rerun the runtime release gate.
 2. Add NPC runtime toggle for the Synthesus 5 path.
-3. Prepare a taggable Synthesus 5 release candidate only after `python tools/synthesus5_release_gate.py --run-runtime --fail-on-blocker` passes.
+3. Prepare a taggable Synthesus 5 release candidate only after `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker` passes.
 4. Keep commercial packaging limited to bounded NPC, business-bot, managed Knowledge Cloud, and enterprise AIVM surfaces until paid-launch blockers are cleared.

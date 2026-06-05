@@ -2997,3 +2997,28 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - Pending public datasets are now provenance-complete before enablement: SPDX identifies the declared license class, and notes capture redistribution or packaging constraints that matter before the source can become mounted CHAL rebuild substrate.
+
+## Current Session — 2026-06-05 (Agent 1 — Release Gate Focused-Suite Hardening)
+
+### 📝 Summary
+- Hardened `tools/synthesus5_release_gate.py` so the focused Synthesus 5 release suite is an explicit critical release-gate check via `--run-focused-suite`.
+- Updated `release:gate:runtime`, commercial packaging docs, RC1 release notes, and the Phase 10 checklist so taggable RC evidence requires `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker`.
+- Fixed release-tier evaluation so static docs/tooling checks can mark controlled demos ready while private beta and paid launch remain blocked until focused/runtime/Knowledge Cloud evidence is present.
+- Advanced Phase 10 release hardening without touching workflow files or generated Knowledge Cloud artifacts.
+
+### ✅ Verified
+- `python -m py_compile tools/synthesus5_release_gate.py tests/test_synthesus5_release_gate.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0 python -m pytest -q tests/test_synthesus5_release_gate.py` — passed, 3 tests.
+- `python tools/synthesus5_release_gate.py --output tools/results/synthesus5_release_gate_latest.json` — passed; static report now shows `demo=ready`, `private_beta=needs-runtime-gate`, and `paid_consumer_launch=blocked`.
+- `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --output tools/results/synthesus5_release_gate_runtime_latest.json` — completed and produced a blocked release report: CHAL API smoke passed, focused suite reached the Knowledge Cloud step, and both focused-suite/cold-start gates remain blocked by `FAISS/embedder dim mismatch: faiss=384, embedder=128`.
+- `git diff --check -- tools/synthesus5_release_gate.py tests/test_synthesus5_release_gate.py package.json docs/product/COMMERCIAL_PACKAGING.md docs/release/SYNTHESUS_5_RC1_RELEASE_NOTES.md docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md` — passed.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` align, then rerun `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker`.
+- Do not tag Synthesus 5 RC1 until the stricter release gate has zero critical blockers.
+- Generated reports under `tools/results/` were produced for validation evidence and should remain uncommitted/ignored.
+- Pre-existing unrelated untracked `synthesus_framework/` content was left untouched.
+
+### 💡 Architectural Notes
+- The release gate now treats focused-suite evidence as a first-class RC control-plane requirement instead of a separate optional command.
+- Static demo readiness is intentionally separated from private-beta and paid-launch readiness: demo can be ready with docs/tooling present, but private beta requires runtime evidence and paid launch requires Knowledge Cloud cold-start integrity.

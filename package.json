@@ -8,6 +8,10 @@
   ],
   "scripts": {
     "build:kernel": "cd packages/kernel && mkdir -p build && cd build && cmake .. -DBUILD_PYBIND=ON && make -j4",
+    "release:gate": "python tools/synthesus5_release_gate.py",
+    "release:gate:runtime": "python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker",
+    "release:focused": "python tools/synthesus5_focused_suite.py",
+    "smoke:chal": "python tools/synthesus5_chal_smoke.py",
     "test:all": "npm run test --workspaces",
     "start:aios": "python3 packages/api/aios_server.py"
   }
