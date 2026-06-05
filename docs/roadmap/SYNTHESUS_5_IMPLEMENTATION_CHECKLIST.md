@@ -56,7 +56,7 @@ Legend:
 
 - [x]  Add per-device isolation and timeout handling. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation.
 
-- [x]  Emit trace records for route decisions and budget exhaustion. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation.
+- [x]  Emit trace records for route decisions and budget exhaustion. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation; 2026-06-05 Agent 4 added CHAL verifier/reranker telemetry so route traces expose grounded-context selection, verifier status, and critic-budget revision pressure.
 
 - [x]  Add focused tests for route selection and timeout degradation. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation.
 

@@ -88,6 +88,8 @@ class CognitiveHypervisor:
         template_guard: TemplateLeakageGuard | None = None,
         quad_brain_orchestrator: Any | None = None,
         knowledge_controller: Any | None = None,
+        answer_verifier: Any | None = None,
+        context_reranker: Any | None = None,
     ):
         self._bridge_factory = bridge_factory
         self._bridge: Any | None = None
@@ -95,6 +97,8 @@ class CognitiveHypervisor:
         self._template_guard = template_guard or TemplateLeakageGuard()
         self._quad_brain_orchestrator = quad_brain_orchestrator
         self._knowledge_controller = knowledge_controller
+        self._answer_verifier = answer_verifier
+        self._context_reranker = context_reranker
 
     def plan(
         self,
@@ -225,6 +229,12 @@ class CognitiveHypervisor:
                 trace_id=decision.trace_id,
                 rag_context=rag_context,
             )
+        effective_rag_context, reranker_trace = self._rerank_grounding_context(
+            query=query,
+            trace_id=decision.trace_id,
+            rag_context=effective_rag_context,
+            top_k=decision.budget.retrieval_depth,
+        )
         bridge = self._get_bridge()
         guarded = await self._execution_guard.run(
             "chal://hypervisor/hemisphere_bridge",
@@ -283,6 +293,13 @@ class CognitiveHypervisor:
                     template_guard_result=template_guard_result,
                 ),
             )
+        verifier_trace = self._verify_surface_response(
+            query=query,
+            response=response,
+            trace_id=decision.trace_id,
+            rag_context=effective_rag_context,
+            decision=decision,
+        )
         telemetry = {
             "schema": "synthesus.chal.hypervisor_trace.v1",
             "trace_id": decision.trace_id,
@@ -299,6 +316,8 @@ class CognitiveHypervisor:
             "degraded": not guarded.ok,
             "degraded_state": bridge_result.get("degraded_state"),
             "template_guard": template_guard_result.to_dict(),
+            "reasoning_quality": verifier_trace,
+            "grounding_reranker": reranker_trace,
             "quad_brain": quad_brain_arbitration.to_dict() if quad_brain_arbitration else None,
             "quad_brain_replay": quad_brain_replay,
             "knowledge_provenance": knowledge_provenance,
@@ -335,6 +354,130 @@ class CognitiveHypervisor:
 
             self._knowledge_controller = CHALMemoryController()
         return self._knowledge_controller
+
+    def _get_answer_verifier(self) -> Any:
+        if self._answer_verifier is None:
+            try:
+                from reasoning.verifier import AnswerVerifier
+            except ModuleNotFoundError:  # pragma: no cover
+                from packages.reasoning.verifier import AnswerVerifier
+
+            self._answer_verifier = AnswerVerifier()
+        return self._answer_verifier
+
+    def _get_context_reranker(self) -> Any:
+        if self._context_reranker is None:
+            try:
+                from reasoning.reranker import CrossEncoderReranker
+            except ModuleNotFoundError:  # pragma: no cover
+                from packages.reasoning.reranker import CrossEncoderReranker
+
+            self._context_reranker = CrossEncoderReranker()
+        return self._context_reranker
+
+    def _split_grounding_context(self, rag_context: str) -> list[str]:
+        chunks = [chunk.strip() for chunk in rag_context.split("\n\n") if chunk.strip()]
+        return chunks or ([rag_context.strip()] if rag_context.strip() else [])
+
+    def _rerank_grounding_context(
+        self,
+        *,
+        query: str,
+        trace_id: str,
+        rag_context: str,
+        top_k: int,
+    ) -> tuple[str, dict[str, Any] | None]:
+        chunks = self._split_grounding_context(rag_context)
+        if not chunks:
+            return rag_context, None
+
+        try:
+            ranked = self._get_context_reranker().rerank(
+                query,
+                chunks,
+                top_k=max(1, top_k),
+            )
+        except Exception as exc:
+            return rag_context, {
+                "schema": "synthesus.chal.grounding_reranker.v1",
+                "trace_id": trace_id,
+                "device": "chal://reasoning/reranker",
+                "status": "fault",
+                "input_chunks": len(chunks),
+                "selected_chunks": len(chunks),
+                "selected_indices": list(range(len(chunks))),
+                "scores": [],
+                "error": str(exc),
+            }
+
+        selected_chunks = [str(item.get("chunk", "")) for item in ranked if item.get("chunk")]
+        if not selected_chunks:
+            selected_chunks = chunks
+        return "\n\n".join(selected_chunks), {
+            "schema": "synthesus.chal.grounding_reranker.v1",
+            "trace_id": trace_id,
+            "device": "chal://reasoning/reranker",
+            "status": "ok",
+            "input_chunks": len(chunks),
+            "selected_chunks": len(selected_chunks),
+            "selected_indices": [int(item.get("index", -1)) for item in ranked],
+            "scores": [float(item.get("score", 0.0)) for item in ranked],
+        }
+
+    def _verify_surface_response(
+        self,
+        *,
+        query: str,
+        response: str,
+        trace_id: str,
+        rag_context: str,
+        decision: HypervisorDecision,
+    ) -> dict[str, Any]:
+        context = self._split_grounding_context(rag_context)
+        try:
+            result = self._get_answer_verifier().verify(
+                response,
+                query,
+                context=context or None,
+            )
+        except Exception as exc:
+            return {
+                "schema": "synthesus.chal.reasoning_quality.v1",
+                "trace_id": trace_id,
+                "device": "chal://critic/verifier",
+                "status": "fault",
+                "score": 0.0,
+                "issues": [],
+                "context_chunks": len(context),
+                "critic_passes_budgeted": decision.budget.critic_passes,
+                "critic_revision_required": False,
+                "error": str(exc),
+            }
+
+        status = getattr(result.status, "value", str(result.status))
+        issues = [
+            {
+                "issue_id": issue.issue_id,
+                "severity": issue.severity,
+                "category": issue.category,
+                "description": issue.description,
+                "suggestion": issue.suggestion,
+            }
+            for issue in getattr(result, "issues", [])
+        ]
+        revision_required = status in {"failed", "needs_revision", "uncertain"}
+        return {
+            "schema": "synthesus.chal.reasoning_quality.v1",
+            "trace_id": trace_id,
+            "device": "chal://critic/verifier",
+            "status": status,
+            "score": float(getattr(result, "score", 0.0)),
+            "issues": issues,
+            "metadata": dict(getattr(result, "metadata", {}) or {}),
+            "context_chunks": len(context),
+            "critic_passes_budgeted": decision.budget.critic_passes,
+            "critic_revision_required": revision_required and decision.budget.critic_passes > 0,
+        }
 
     def _resolve_grounding_context(
         self,

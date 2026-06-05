@@ -218,6 +218,15 @@ Legacy import paths are preserved through thin compatibility packages:
 - `ppbrs.*` -> `packages/reasoning/*`
 - `core.reasoning.*` -> `packages/reasoning/*`
 
+### Hypervisor Verifier / Reranker Boundary (2026-06-05)
+
+`CognitiveHypervisor` now wires existing reasoning quality devices into the CHAL control plane:
+
+- `CrossEncoderReranker` shapes grounded context before the hemisphere bridge sees it and records compact `synthesus.chal.grounding_reranker.v1` telemetry with chunk counts, selected indices, and scores.
+- `AnswerVerifier` audits the final post-template-guard surface and records `synthesus.chal.reasoning_quality.v1` telemetry with status, score, issues, metadata, context count, and whether the current critic budget requires revision pressure.
+
+These devices do not own final language and do not restore PPBRS template emission. They are routing/audit devices behind `chal://reasoning/reranker` and `chal://critic/verifier`; CGPU, critic arbitration, or the generation spine remain responsible for any future rewrite.
+
 ### NPC Response-Compositor Boundary (2026-06-01)
 
 `packages/core/cognitive/response_compositor.py` is no longer classified as an unlabeled legacy template emitter. It exposes `ResponseCompositor.compose_labeled()`, which returns text plus Synthesus 5 surface metadata:

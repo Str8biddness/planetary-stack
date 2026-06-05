@@ -3049,6 +3049,28 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 - Checklist priority state is part of release control-plane hygiene: completed Phase 9 product polish should not remain in the active Phase 10 blocking queue.
 - The current release blocker is still mounted Knowledge Cloud retrieval semantics, where the artifact bundle must be regenerated rather than patched through runtime source code.
 
+## Current Session — 2026-06-05 (Agent 4 — CHAL Verifier/Reranker Hypervisor Trace)
+
+### 📝 Summary
+- Wired `CognitiveHypervisor` to treat the existing reranker and answer verifier as CHAL control-plane devices instead of standalone reasoning helpers.
+- Grounded routes now rerank selected context before bridge dispatch and emit compact `synthesus.chal.grounding_reranker.v1` telemetry with selected chunk indices and scores.
+- Final post-template-guard surfaces now receive verifier telemetry as `synthesus.chal.reasoning_quality.v1`, including status, score, issues, context count, and whether the current critic budget requires revision pressure.
+- Advanced Phase 2 route trace records and budget visibility while preserving the Phase 6 rule that PPBRS/verifier/reranker do not own normal-path final language.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/hypervisor.py tests/test_chal_hypervisor.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_hypervisor.py` — passed, 17 tests.
+
+### 🚧 Left Off / Next Steps
+- Future CGPU/critic work can consume `reasoning_quality.critic_revision_required` to perform an explicit rewrite pass; this session only exposed the bounded telemetry and did not let verifier output become final language.
+- Broader persistent runtime conversation trace storage remains open.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Verifier/reranker integration belongs at the hypervisor boundary: reranker selects evidence fed into bridge execution, verifier audits the final surface after template quarantine, and neither device emits user-facing prose.
+- This keeps Synthesus 5 inspectable: route decisions now include context-selection evidence and revision pressure without converting PPBRS or verifier output into a hidden template path.
+
 ## Current Session — 2026-06-05 (Agent 3 — Phase 8 Replay Integrity Gate)
 
 ### 📝 Summary

@@ -1,5 +1,6 @@
 import asyncio
 import time
+from dataclasses import dataclass
 
 from core.chal.hypervisor import CognitiveHypervisor, HypervisorRoute
 from core.chal.quad_brain import QuadBrainRole
@@ -101,6 +102,70 @@ class FakeKnowledgeController:
                     ],
                 },
             ),
+        )
+
+
+class FakeReranker:
+    def rerank(self, query, chunks, top_k=10):
+        ranked = sorted(
+            enumerate(chunks),
+            key=lambda item: (0 if "manifest" in item[1].lower() else 1, item[0]),
+        )
+        return [
+            {
+                "chunk": chunk,
+                "score": 1.0 if rank == 1 else 0.25,
+                "rank": rank,
+                "index": index,
+            }
+            for rank, (index, chunk) in enumerate(ranked[:top_k], start=1)
+        ]
+
+
+@dataclass
+class FakeVerificationStatus:
+    value: str
+
+
+@dataclass
+class FakeVerificationIssue:
+    issue_id: str
+    severity: int
+    category: str
+    description: str
+    suggestion: str = ""
+
+
+@dataclass
+class FakeVerificationResult:
+    status: FakeVerificationStatus
+    score: float
+    issues: list[FakeVerificationIssue]
+    metadata: dict
+
+
+class FakeAnswerVerifier:
+    def verify(self, answer, query, context=None, revision_count=0):
+        if context and "mounted fact" not in answer:
+            return FakeVerificationResult(
+                status=FakeVerificationStatus("needs_revision"),
+                score=0.42,
+                issues=[
+                    FakeVerificationIssue(
+                        issue_id="grounding_low",
+                        severity=2,
+                        category="factual",
+                        description="Answer drifted from mounted context",
+                        suggestion="Rewrite against the selected CHAL grounding chunk",
+                    )
+                ],
+                metadata={"overlap": 0.11},
+            )
+        return FakeVerificationResult(
+            status=FakeVerificationStatus("passed"),
+            score=0.91,
+            issues=[],
+            metadata={"overlap": 0.8 if context else None},
         )
 
 
@@ -355,6 +420,58 @@ def test_grounded_hypervisor_trace_includes_knowledge_mount_provenance():
     assert provenance["source"] == "rom_mount:kc_knowledge_cloud_world_lore_json"
     assert provenance["mounts"][0]["mount_path"] == "/mnt/rom/world_lore"
     assert provenance["mounts"][0]["artifact"]["integrity_ok"] is True
+
+
+def test_grounded_hypervisor_reranks_context_before_bridge_dispatch():
+    bridge = StubBridge()
+    hypervisor = CognitiveHypervisor(
+        bridge_factory=lambda: bridge,
+        context_reranker=FakeReranker(),
+    )
+
+    result = asyncio.run(
+        hypervisor.process_query(
+            "Check the Knowledge Cloud manifest",
+            rag_context="unrelated weather note\n\nmanifest integrity record",
+        )
+    )
+
+    reranker_trace = result.telemetry["grounding_reranker"]
+
+    assert bridge.calls[0]["rag_context"] == "manifest integrity record\n\nunrelated weather note"
+    assert reranker_trace["schema"] == "synthesus.chal.grounding_reranker.v1"
+    assert reranker_trace["device"] == "chal://reasoning/reranker"
+    assert reranker_trace["status"] == "ok"
+    assert reranker_trace["input_chunks"] == 2
+    assert reranker_trace["selected_indices"] == [1, 0]
+    assert "manifest integrity record" not in str(reranker_trace["scores"])
+
+
+def test_hypervisor_verifier_marks_revision_need_as_critic_budget_signal():
+    bridge = StubBridge()
+    hypervisor = CognitiveHypervisor(
+        bridge_factory=lambda: bridge,
+        answer_verifier=FakeAnswerVerifier(),
+    )
+
+    result = asyncio.run(
+        hypervisor.process_query(
+            "Check the Knowledge Cloud manifest",
+            rag_context="mounted fact: manifest hash is valid",
+        )
+    )
+
+    quality = result.telemetry["reasoning_quality"]
+
+    assert quality["schema"] == "synthesus.chal.reasoning_quality.v1"
+    assert quality["device"] == "chal://critic/verifier"
+    assert quality["status"] == "needs_revision"
+    assert quality["score"] == 0.42
+    assert quality["context_chunks"] == 1
+    assert quality["critic_passes_budgeted"] == 1
+    assert quality["critic_revision_required"] is True
+    assert quality["issues"][0]["issue_id"] == "grounding_low"
+    assert result.response == "routed through auto"
 
 
 def test_hypervisor_routes_safety_constraints_to_safety_path():
