@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import copy
+import hashlib
 import json
 import statistics
 import sys
@@ -648,6 +649,20 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _stable_json(data: dict[str, Any]) -> str:
+    return json.dumps(data, sort_keys=True, separators=(",", ":"))
+
+
+def _sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _replay_record_hash(record: dict[str, Any]) -> str:
+    hashable = copy.deepcopy(record)
+    hashable.pop("record_hash", None)
+    return _sha256_text(_stable_json(hashable))
+
+
 def build_replay_records(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     summary = summarize(rows)
     records = []
@@ -671,12 +686,16 @@ def build_replay_records(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "runtime_ms": row["legacy"]["runtime_ms"],
                 "overall_score": row["scores"]["legacy"]["overall"],
                 "template_leak": row["scores"]["legacy"]["template_leakage"] == 0.0,
+                "response_sha256": _sha256_text(row["legacy"]["response"]),
+                "response_chars": len(row["legacy"]["response"]),
             },
             "synthesus5": {
                 "runtime_ms": synth["runtime_ms"],
                 "overall_score": row["scores"]["synthesus5"]["overall"],
                 "template_leak": row["scores"]["synthesus5"]["template_leakage"] == 0.0,
                 "hemisphere_used": synth["bridge_result"].get("hemisphere_used"),
+                "response_sha256": _sha256_text(synth["response"]),
+                "response_chars": len(synth["response"]),
             },
             "summary": {
                 "score_delta": summary["score_delta"],
@@ -691,8 +710,61 @@ def build_replay_records(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "required_roles": state_contract.get("required_roles", []),
                 "final_output_ref": state_contract.get("final_output_ref"),
             }
+        record["record_hash"] = _replay_record_hash(record)
         records.append(record)
     return records
+
+
+def build_replay_integrity_scorecard(records: list[dict[str, Any]]) -> dict[str, Any]:
+    cases = []
+    for record in records:
+        expected_hash = _replay_record_hash(record)
+        legacy = record.get("legacy", {})
+        synth = record.get("synthesus5", {})
+        checks = {
+            "record_hash": record.get("record_hash") == expected_hash,
+            "trace_id": bool(record.get("trace_id")),
+            "route": bool(record.get("route")),
+            "legacy_response_hash": bool(legacy.get("response_sha256")) and legacy.get("response_chars", 0) > 0,
+            "synthesus5_response_hash": bool(synth.get("response_sha256")) and synth.get("response_chars", 0) > 0,
+            "no_raw_response_text": "response" not in legacy and "response" not in synth,
+            "template_leak_flags": isinstance(legacy.get("template_leak"), bool)
+            and isinstance(synth.get("template_leak"), bool),
+        }
+        cases.append(
+            {
+                "case_id": record.get("case_id"),
+                "category": record.get("category"),
+                "turn": record.get("turn"),
+                "route": record.get("route"),
+                "record_hash": record.get("record_hash"),
+                "expected_hash": expected_hash,
+                "checks": checks,
+                "passed": all(checks.values()),
+            }
+        )
+    return {
+        "schema": "synthesus.phase8.replay_integrity_scorecard.v1",
+        "summary": {
+            "record_count": len(records),
+            "passed_records": sum(1 for case in cases if case["passed"]),
+            "failed_records": sum(1 for case in cases if not case["passed"]),
+            "records_with_synthesus5_response_hash": sum(
+                1 for record in records if record.get("synthesus5", {}).get("response_sha256")
+            ),
+        },
+        "cases": cases,
+    }
+
+
+def assert_replay_integrity_scorecard(scorecard: dict[str, Any]) -> None:
+    failures = []
+    for case in scorecard["cases"]:
+        for check, passed in case["checks"].items():
+            if not passed:
+                failures.append(f"{case['case_id']} failed {check}")
+    if failures:
+        raise AssertionError("\n".join(failures))
 
 
 async def build_continuity_rows(
@@ -1088,6 +1160,7 @@ async def main() -> int:
     parser.add_argument("--write", type=Path, help="Write markdown comparison to this path.")
     parser.add_argument("--json", type=Path, help="Write machine-readable comparison to this path.")
     parser.add_argument("--trace-jsonl", type=Path, help="Write compact replay trace records to this JSONL path.")
+    parser.add_argument("--replay-scorecard-json", type=Path, help="Write compact replay integrity scorecard JSON.")
     parser.add_argument("--scorecard-json", type=Path, help="Write GPT-4-class reference expectation scorecard JSON.")
     parser.add_argument("--axis-scorecard-json", type=Path, help="Write per-case axis improvement scorecard JSON.")
     parser.add_argument("--continuity-json", type=Path, help="Write multi-turn continuity comparison JSON.")
@@ -1098,6 +1171,7 @@ async def main() -> int:
     parser.add_argument("--fail-on-reference", action="store_true", help="Fail if any fixed reference expectation check fails.")
     parser.add_argument("--fail-on-axis-regression", action="store_true", help="Fail if any case loses to legacy on required quality axes.")
     parser.add_argument("--fail-on-continuity", action="store_true", help="Fail if any multi-turn continuity sequence fails.")
+    parser.add_argument("--fail-on-replay-integrity", action="store_true", help="Fail if compact replay records are malformed or tampered.")
     parser.add_argument("--max-mean-latency-ms", type=float, help="Fail if Synthesus 5 mean runtime exceeds this value.")
     parser.add_argument("--max-p95-latency-ms", type=float, help="Fail if Synthesus 5 p95 runtime exceeds this value.")
     parser.add_argument("--min-score-delta", type=float, help="Fail if Synthesus 5 score delta falls below this value.")
@@ -1118,6 +1192,10 @@ async def main() -> int:
     continuity_scorecard = build_continuity_scorecard(continuity_rows)
     if args.fail_on_continuity:
         assert_continuity_scorecard(continuity_scorecard)
+    replay_records = build_replay_records(rows + continuity_flat_rows)
+    replay_scorecard = build_replay_integrity_scorecard(replay_records)
+    if args.fail_on_replay_integrity:
+        assert_replay_integrity_scorecard(replay_scorecard)
     summary = summarize(rows)
     assert_regression_thresholds(
         summary,
@@ -1148,12 +1226,19 @@ async def main() -> int:
         args.trace_jsonl.write_text(
             "\n".join(
                 json.dumps(record, sort_keys=True)
-                for record in build_replay_records(rows + continuity_flat_rows)
+                for record in replay_records
             )
             + "\n",
             encoding="utf-8",
         )
         print(args.trace_jsonl)
+    if args.replay_scorecard_json:
+        args.replay_scorecard_json.parent.mkdir(parents=True, exist_ok=True)
+        args.replay_scorecard_json.write_text(
+            json.dumps(replay_scorecard, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        print(args.replay_scorecard_json)
     if args.scorecard_json:
         args.scorecard_json.parent.mkdir(parents=True, exist_ok=True)
         args.scorecard_json.write_text(

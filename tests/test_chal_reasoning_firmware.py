@@ -24,10 +24,12 @@ from tools.chal_conversation_compare import (
     assert_continuity_scorecard,
     assert_reference_scorecard,
     assert_regression_thresholds,
+    assert_replay_integrity_scorecard,
     build_axis_improvement_scorecard,
     build_continuity_rows,
     build_continuity_scorecard,
     build_reference_scorecard,
+    build_replay_integrity_scorecard,
     build_replay_records,
     build_chal_rows,
     flatten_continuity_rows,
@@ -307,12 +309,45 @@ def test_phase8_comparison_harness_builds_replay_trace_records():
     assert all(record["trace_id"] for record in records)
     assert all("response" not in record["legacy"] for record in records)
     assert all("response" not in record["synthesus5"] for record in records)
+    assert all(record["record_hash"] for record in records)
+    assert all(record["legacy"]["response_sha256"] for record in records)
+    assert all(record["synthesus5"]["response_sha256"] for record in records)
+    assert all(record["legacy"]["response_chars"] > 0 for record in records)
+    assert all(record["synthesus5"]["response_chars"] > 0 for record in records)
     business_record = next(record for record in records if record["case_id"] == "business_bot_task")
     assert business_record["runtime_preset"] == "business_bot"
     assert business_record["route"] == "quad_brain_path"
     continuity_record = next(record for record in records if record["case_id"] == "business_bot_followup_turn2")
     assert continuity_record["runtime_preset"] == "business_bot"
     assert continuity_record["route"] == "quad_brain_path"
+
+
+def test_phase8_comparison_harness_builds_replay_integrity_scorecard():
+    rows = asyncio.run(build_chal_rows())
+    continuity_rows = asyncio.run(build_continuity_rows())
+    continuity_flat_rows = flatten_continuity_rows(continuity_rows)
+    records = build_replay_records(rows + continuity_flat_rows)
+    scorecard = build_replay_integrity_scorecard(records)
+
+    assert scorecard["schema"] == "synthesus.phase8.replay_integrity_scorecard.v1"
+    assert scorecard["summary"]["record_count"] == len(records)
+    assert scorecard["summary"]["failed_records"] == 0
+    assert scorecard["summary"]["records_with_synthesus5_response_hash"] == len(records)
+    assert_replay_integrity_scorecard(scorecard)
+
+
+def test_phase8_replay_integrity_scorecard_reports_tampering():
+    rows = asyncio.run(build_chal_rows())
+    records = build_replay_records(rows)
+    records[0]["synthesus5"]["overall_score"] = 0.0
+    scorecard = build_replay_integrity_scorecard(records)
+
+    try:
+        assert_replay_integrity_scorecard(scorecard)
+    except AssertionError as exc:
+        assert f"{records[0]['case_id']} failed record_hash" in str(exc)
+    else:
+        raise AssertionError("replay integrity gate must fail when a record is tampered")
 
 
 def test_phase8_comparison_harness_builds_reference_scorecard():

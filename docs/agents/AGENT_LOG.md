@@ -3022,3 +3022,50 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The release gate now treats focused-suite evidence as a first-class RC control-plane requirement instead of a separate optional command.
 - Static demo readiness is intentionally separated from private-beta and paid-launch readiness: demo can be ready with docs/tooling present, but private beta requires runtime evidence and paid launch requires Knowledge Cloud cold-start integrity.
+
+## Current Session — 2026-06-05 (Knowledge Hardware Release Queue Hygiene)
+
+### 📝 Summary
+- Re-read the Synthesus 5 blueprint, checklist, agent operating contract, handover protocol, and recent agent log entries before changing repository state.
+- Validated the Phase 9 NPC runtime toggle ledger state against the current checklist and recent log history, then removed the stale completed NPC-toggle task from the active priority queue.
+- Reconfirmed the active Phase 10 blocker remains generated Knowledge Cloud artifact alignment, not missing frontend runtime-toggle work.
+- Advanced Phase 10 release hygiene by keeping the checklist priority queue aligned with implemented and validated checklist items.
+
+### ✅ Verified
+- `rg -n "NPC runtime toggle|Synthesus 5 runtime toggle|runtime toggle" docs packages apps tests -g '!data/**' -g '!logs/**' -g '!tools/results/**'` — confirmed the checklist marks the NPC runtime toggle complete and recent agent log entries record the implementation.
+- `python -m py_compile tools/synthesus5_release_gate.py tests/test_synthesus5_release_gate.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0 python -m pytest -q tests/test_synthesus5_release_gate.py` — passed, 3 tests.
+- `python tools/synthesus5_release_gate.py --output /tmp/synthesus5_release_gate_queue_hygiene_2026-06-05.json` — passed; static report shows `demo=ready`, `private_beta=needs-runtime-gate`, and `paid_consumer_launch=blocked` because runtime checks are intentionally skipped by default.
+- `python tools/validate_knowledge_cold_start.py --root /home/workspace/synthesus-knowledge-cloud/artifacts` — failed on the known generated-artifact blocker: `FAISS/embedder dim mismatch: faiss=384, embedder=128`.
+- `python tools/synthesus5_release_gate.py --run-runtime --output /tmp/synthesus5_release_gate_runtime_queue_hygiene_2026-06-05.json` — passed as a report generator; CHAL API smoke passed, focused suite remained skipped because `--run-focused-suite` was not requested, and cold-start integrity was blocked by the same FAISS/embedder mismatch.
+- `git diff --check -- docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md docs/agents/AGENT_LOG.md` — passed before the final validation-result edit.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` align, then rerun `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker`.
+- Do not tag Synthesus 5 RC1 until the stricter release gate has zero critical blockers.
+- Leave generated reports under `tools/results/`, generated Knowledge Cloud artifacts, workflow files, and pre-existing unrelated runtime repo changes untouched.
+
+### 💡 Architectural Notes
+- Checklist priority state is part of release control-plane hygiene: completed Phase 9 product polish should not remain in the active Phase 10 blocking queue.
+- The current release blocker is still mounted Knowledge Cloud retrieval semantics, where the artifact bundle must be regenerated rather than patched through runtime source code.
+
+## Current Session — 2026-06-05 (Agent 3 — Phase 8 Replay Integrity Gate)
+
+### 📝 Summary
+- Added hash-stable compact replay identity to `tools/chal_conversation_compare.py`: legacy and Synthesus 5 replay payloads now include response SHA-256, response character counts, and a per-record integrity hash while continuing to omit raw response text.
+- Added a replay integrity scorecard plus `--replay-scorecard-json` and `--fail-on-replay-integrity` so the Phase 8 harness fails on malformed, tampered, route-less, trace-less, raw-response-bearing, or hash-missing replay records.
+- Added focused regression coverage for valid replay integrity records and tamper detection, and updated the evaluation harness docs and Phase 7/8 checklist entries.
+- Advanced Phase 8 GPT-4-class evaluation harnesses and Phase 7 replayable trace storage without committing generated benchmark outputs.
+
+### ✅ Verified
+- `python -m py_compile tools/chal_conversation_compare.py tests/test_chal_reasoning_firmware.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_reasoning_firmware.py` — passed, 22 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/chal_conversation_compare.py --fail-on-leak --fail-on-reference --fail-on-axis-regression --fail-on-continuity --fail-on-replay-integrity --write tools/results/synthesus5_phase8_replay_integrity_latest.md --json tools/results/synthesus5_phase8_replay_integrity_latest.json --trace-jsonl tools/results/synthesus5_phase8_replay_integrity_latest.jsonl --replay-scorecard-json tools/results/synthesus5_phase8_replay_integrity_scorecard_latest.json --scorecard-json tools/results/synthesus5_phase8_reference_latest.json --axis-scorecard-json tools/results/synthesus5_phase8_axis_scorecard_latest.json --continuity-json tools/results/synthesus5_phase8_continuity_latest.json --continuity-scorecard-json tools/results/synthesus5_phase8_continuity_scorecard_latest.json --continuity-markdown tools/results/synthesus5_phase8_continuity_latest.md` — passed; generated ignored artifacts reported 6 single-turn cases, 0 Synthesus 5 template leaks, and 12/12 replay-integrity records passed.
+
+### 🚧 Left Off / Next Steps
+- Broader persistent runtime conversation trace storage remains open; this run hardens the Phase 8 comparison artifact boundary but does not select or implement a production trace-store write path.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Phase 8 replay records can now be used as compact drift/tamper evidence: they preserve trace identity, route identity, scoring metadata, template-leak flags, response hashes, and Quad Brain refs without storing final response bodies.
