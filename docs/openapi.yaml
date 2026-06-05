@@ -6,9 +6,9 @@ info:
     routing through mode=chal, the business_bot CHAL preset, plus generation-spine,
     cognitive, RAG, kernel, and amplification telemetry. CognitiveHypervisorTrace
     documents debug.cognitive_hypervisor for CHAL requests, including QuadBrainArbitration
-    when route=quad_brain_path and memory-writeback telemetry after API arbitration;
-    CGPU traces are documented as CHAL contracts until candidate-set payloads are
-    surfaced by this endpoint.
+    and QuadBrainReplayRecord when route=quad_brain_path, plus memory-writeback
+    telemetry after API arbitration; CGPU traces are documented as CHAL contracts
+    until candidate-set payloads are surfaced by this endpoint.
   version: 5.0.0
 paths:
   /parameter-cloud/v2/fetch-batch:
@@ -1509,6 +1509,133 @@ components:
           additionalProperties: true
         latency_ms:
           type: number
+    QuadBrainReplayRecord:
+      type: object
+      title: QuadBrainReplayRecord
+      description: Compact replay/storage metadata emitted inside CognitiveHypervisorTrace.quad_brain_replay
+        and bridge_result.quad_brain_replay for quad_brain_path traces. It stores
+        response hashes, role/device identity, state-contract evidence, and latency
+        without persisting raw response text.
+      required:
+      - schema
+      - trace_id
+      - selected_source
+      - selected_response_sha256
+      - selected_response_chars
+      - serial_order
+      - output_roles
+      - output_devices
+      - output_confidence
+      - state_contract
+      - latency_ms
+      properties:
+        schema:
+          type: string
+          const: synthesus.chal.quad_brain_replay.v1
+        trace_id:
+          type: string
+        prompt_ref:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Runtime prompt reference used to create the replay record,
+            such as hypervisor.query.
+        runtime_preset:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Active Synthesus 5 runtime preset after normalization.
+        selected_source:
+          type: string
+          enum:
+          - critic_metacognition
+          - hemisphere_bridge_fallback
+        selected_response_sha256:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          description: SHA-256 hash of the selected response. The replay record
+            intentionally omits raw response text.
+        selected_response_chars:
+          type: integer
+          minimum: 0
+        serial_order:
+          type: array
+          items:
+            type: string
+            enum: *id001
+        output_roles:
+          type: array
+          items:
+            type: string
+            enum: *id001
+        output_devices:
+          type: object
+          additionalProperties:
+            type: string
+          description: Mapping from Quad Brain role to CHAL device URI.
+        output_confidence:
+          type: object
+          additionalProperties:
+            type: number
+          description: Mapping from Quad Brain role to rounded output confidence.
+        state_contract:
+          type: object
+          required:
+          - topology
+          - parallel_brain_spawn
+          - serialized_arbitration
+          - required_roles
+          - state_transitions
+          - critic_input_ref
+          - final_output_ref
+          - final_output_owner
+          - integrity
+          properties:
+            topology:
+              type: string
+              const: knowledge->executive->cgpu->critic
+            parallel_brain_spawn:
+              type: boolean
+              const: false
+            serialized_arbitration:
+              type: boolean
+              const: true
+            required_roles:
+              type: array
+              items:
+                type: string
+                enum: *id001
+            state_transitions:
+              type: array
+              items:
+                $ref: '#/components/schemas/QuadBrainStateTransition'
+              minItems: 4
+              maxItems: 4
+            critic_input_ref:
+              anyOf:
+              - type: string
+              - type: 'null'
+              description: State reference reviewed by Critic/Metacognition before
+                final response ownership.
+            critic_reviewed_candidate_id:
+              anyOf:
+              - type: string
+              - type: 'null'
+            final_output_ref:
+              anyOf:
+              - type: string
+              - type: 'null'
+            final_output_owner:
+              anyOf:
+              - type: string
+              - type: 'null'
+              description: Runtime source that supplied the selected response.
+            integrity:
+              type: object
+              additionalProperties: true
+          additionalProperties: true
+        latency_ms:
+          type: number
     QueryRequest:
       properties:
         query:
@@ -1617,7 +1744,8 @@ components:
             rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. For explicit
             mode=chal calls, cognitive_hypervisor follows the CognitiveHypervisorTrace
             OpenAPI component, including typed QuadBrainArbitration records when route=quad_brain_path
-            and CHALMemoryWritebackResult records when the API attempts post-arbitration
+            and QuadBrainReplayRecord metadata for compact replay/storage traces,
+            plus CHALMemoryWritebackResult records when the API attempts post-arbitration
             memory writeback. CGPU candidate-set trace records should also live here
             as the runtime wiring expands without changing the stable response envelope.
             Legacy-compatible template exceptions are labeled under debug.template_surface
@@ -1744,6 +1872,13 @@ components:
           - type: 'null'
           description: Serialized Quad Brain arbitration trace when route is quad_brain_path;
             null otherwise.
+        quad_brain_replay:
+          anyOf:
+          - $ref: '#/components/schemas/QuadBrainReplayRecord'
+          - type: 'null'
+          description: Compact Quad Brain replay record emitted when route is quad_brain_path;
+            null otherwise. It mirrors telemetry.quad_brain_replay and omits raw
+            response text.
         memory_writeback:
           anyOf:
           - $ref: '#/components/schemas/CHALMemoryWritebackResult'

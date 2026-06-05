@@ -2953,3 +2953,24 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Organ replay traces are now hash-identifiable compact records: comparison harnesses can detect drift or tampering in candidate/critic routing metadata without persisting raw candidate bodies.
 - Organs remain CHAL accelerators under the bounded runtime; the new record verifies accelerator identity and trace integrity rather than creating independent reasoning agents.
+
+## Current Session — 2026-06-05 (Agent 10 — Quad Brain Replay API Schema)
+
+### 📝 Summary
+- Mirrored the implemented `debug.cognitive_hypervisor.quad_brain_replay` telemetry as a reusable `QuadBrainReplayRecord` in `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`.
+- Wired `CognitiveHypervisorTrace.quad_brain_replay` to the new replay schema and updated the query debug description to name both `QuadBrainArbitration` and compact replay metadata for `route=quad_brain_path`.
+- Updated the production API note, dual-hemisphere module doc, API source description, and Phase 7 checklist entry so replay contract claims map to `QuadBrainArbitration.to_replay_record()` and `CognitiveHypervisor` telemetry.
+- Advanced Phase 7 replayable trace storage documentation/API-contract coverage without changing runtime behavior or generated Knowledge Cloud artifacts.
+
+### ✅ Verified
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed the JSON mirrors match the YAML source, `QuadBrainReplayRecord` is present, `CognitiveHypervisorTrace.quad_brain_replay` references it, and the replay schema constant is `synthesus.chal.quad_brain_replay.v1`.
+- `python -m py_compile packages/api/schemas.py` — passed.
+- `git diff --check -- packages/api/schemas.py docs/openapi.yaml docs/openapi.json docs/api_schema.json docs/PHASE20_PRODUCTION_API.md docs/modules/DUAL_HEMISPHERE.md docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md` — passed.
+
+### 🚧 Left Off / Next Steps
+- Broader persistent runtime conversation trace storage remains open; this run only documented the current compact Quad Brain replay telemetry already emitted by the hypervisor.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `package.json`, root `pyproject.toml`, release-packaging docs/scripts/tests/package metadata, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- `QuadBrainReplayRecord` is trace metadata, not a new user-facing payload or brain worker. It stores role/device identity, state-contract evidence, selected-response SHA-256, selected-response character length, and latency while intentionally omitting raw response text.
