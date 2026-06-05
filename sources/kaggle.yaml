@@ -16,6 +16,7 @@ pending:
     repo: trivia-qa
     license:
       spdx: "Apache-2.0"
+      notes: Public TriviaQA release; verify Kaggle packaging terms before enabling automated ingest.
 loader: pipelines/ingest/kaggle_api_loader.py::load_kaggle
 notes:
   - Requires KAGGLE_USERNAME and KAGGLE_KEY in environment.

@@ -110,8 +110,11 @@ def _validate_source_manifest_yaml(path: Path, root_path: Path, errors: list[str
             errors.append(f"pending source entry missing license block: {rel}[{index}]")
             continue
         spdx = entry_license.get("spdx")
+        notes = entry_license.get("notes")
         if not isinstance(spdx, str) or not spdx.strip():
             errors.append(f"pending source entry missing license.spdx: {rel}[{index}]")
+        if not isinstance(notes, str) or not notes.strip():
+            errors.append(f"pending source entry missing license.notes: {rel}[{index}]")
 
 
 def validate_source_planes(root: str | Path = ".") -> SourcePlaneValidation:

@@ -1,7 +1,7 @@
 {
   "version": "1",
   "kind": "synthesus-knowledge-source-plane",
-  "generated_at": "2026-06-01T18:06:11.727188+00:00",
+  "generated_at": "2026-06-05T14:04:19.730466+00:00",
   "roots": [
     "sources",
     "pipelines",
@@ -34,8 +34,8 @@
     },
     {
       "path": "sources/kaggle.yaml",
-      "size": 713,
-      "sha256": "42fda4f3185356c0591cb945a98348e65bb9d14074180d836461d29fe87f6da5"
+      "size": 815,
+      "sha256": "e39e4731146e2e5e2b6e4835a4a65c464058976e9e1bfc65973f94e8ac7f1337"
     },
     {
       "path": "pipelines/__init__.py",
