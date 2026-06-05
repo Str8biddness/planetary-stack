@@ -195,6 +195,8 @@ The command boots the Knowledge Cloud artifact manifest through `KnowledgeCloudM
 
 The tool also validates retrieval-semantic compatibility across the mounted FAISS corpus, FAISS metadata, and persisted swarm embedder. A bundle is not cold-start ready if `faiss.index` and `models/swarm_embedder.pkl` disagree on vector dimension, or if `faiss_metadata.json` does not contain the same record count as the FAISS index. This catches hash-valid but retrieval-incompatible mounted hardware before the runtime reaches golden-query health checks.
 
+Cold-start retrieval validation also compares the FAISS index dimension and persisted embedder dimension against `build.extra.embed_dim` when the Knowledge Cloud manifest declares a build profile dimension. This prevents a profile-stamped bundle from mounting as ready when the parameter disk and grounding corpus are internally aligned but no longer match the selected profile contract.
+
 By default, the command uses `SYNTHESUS_KNOWLEDGE_ROOT` when set, then the companion `synthesus-knowledge-cloud/artifacts` checkout when present, and finally the runtime `data/` directory. It is also part of `tools/synthesus5_focused_suite.py`, so the source-only Synthesus 5 release gate now fails if the mounted Knowledge Cloud bundle cannot cold boot.
 
 ## Synthesus 5 Hot-Context Cache

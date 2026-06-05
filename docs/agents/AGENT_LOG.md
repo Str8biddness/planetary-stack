@@ -3091,3 +3091,24 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - Phase 8 replay records can now be used as compact drift/tamper evidence: they preserve trace identity, route identity, scoring metadata, template-leak flags, response hashes, and Quad Brain refs without storing final response bodies.
+
+## Current Session — 2026-06-05 (Agent 5 — Knowledge Hardware Profile-Dim Runtime Gate)
+
+### 📝 Summary
+- Added runtime cold-start validation that compares mounted FAISS and persisted swarm embedder dimensions against `build.extra.embed_dim` when the Knowledge Cloud artifact manifest declares a build profile dimension.
+- Extended focused mount-table coverage so profile-aligned bundles report `profile_embedder_dim`, and profile-drifted bundles fail before they can be treated as CHAL-mounted Knowledge Cloud hardware.
+- Updated the KN module doc and Phase 5/10 checklist entries without touching generated FAISS, KNDB, model, cache, mirror, or workflow artifacts.
+
+### ✅ Verified
+- `python -m py_compile packages/knowledge/mount_table.py tests/test_knowledge_mount_table.py tools/validate_knowledge_cold_start.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_knowledge_mount_table.py` — passed, 15 tests.
+- `python tools/validate_knowledge_cold_start.py --root /home/workspace/synthesus-knowledge-cloud/artifacts` — failed on the known generated-artifact blocker, now with explicit profile evidence: `FAISS/embedder dim mismatch: faiss=384, embedder=128; FAISS/profile dim mismatch: faiss=384, profile=128`.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align, then rerun cold-start validation, golden-query health, and `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker`.
+- Do not patch around the mismatch in runtime source; the mounted hardware bundle must be regenerated with a coherent profile.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Profile dimension is now part of the CHAL hardware identity for retrieval mounts: the ROM/parameter/corpus partitions must be hash-valid, mutually compatible, and compatible with the profile contract that stamped the bundle.
+- This keeps source-only release gates from declaring mounted Knowledge Cloud hardware ready when generated artifacts are internally stale against the selected build profile.

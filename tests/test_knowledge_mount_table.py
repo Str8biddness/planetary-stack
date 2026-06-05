@@ -48,15 +48,24 @@ def _record_existing_artifact(root: Path, relative_path: str) -> dict:
     }
 
 
-def _write_manifest(root: Path, artifacts: list[dict]) -> None:
+def _write_manifest(
+    root: Path,
+    artifacts: list[dict],
+    *,
+    profile_embedder_dim: int | None = None,
+) -> None:
+    manifest = {
+        "version": "1",
+        "generated_at": "2026-05-28T00:00:00+00:00",
+        "artifacts": artifacts,
+    }
+    if profile_embedder_dim is not None:
+        manifest["build"] = {
+            "profile": "test-profile",
+            "extra": {"embed_dim": profile_embedder_dim},
+        }
     (root / "manifest.json").write_text(
-        json.dumps(
-            {
-                "version": "1",
-                "generated_at": "2026-05-28T00:00:00+00:00",
-                "artifacts": artifacts,
-            }
-        ),
+        json.dumps(manifest),
         encoding="utf-8",
     )
 
@@ -67,6 +76,7 @@ def _write_required_bundle_with_retrieval_semantics(
     faiss_dim: int = 3,
     embedder_dim: int = 3,
     metadata_records: int = 2,
+    profile_embedder_dim: int | None = 3,
 ) -> None:
     import faiss
     import joblib
@@ -104,7 +114,7 @@ def _write_required_bundle_with_retrieval_semantics(
             _record_existing_artifact(root, "faiss_metadata.json"),
         ]
     )
-    _write_manifest(root, artifacts)
+    _write_manifest(root, artifacts, profile_embedder_dim=profile_embedder_dim)
 
 
 def test_mount_table_boots_manifest_artifacts_as_chal_mounts(tmp_path: Path):
@@ -312,6 +322,8 @@ def test_mount_table_validates_retrieval_semantic_integrity(tmp_path: Path):
     assert report.retrieval_semantics.metadata_records == 2
     assert report.retrieval_semantics.faiss_dim == 3
     assert report.retrieval_semantics.embedder_dim == 3
+    assert report.retrieval_semantics.profile_embedder_dim == 3
+    assert report.retrieval_semantics.as_metadata()["profile_embedder_dim"] == 3
     assert report.retrieval_semantics.errors == ()
     assert report.coverage is not None
     assert "/mnt/rom/evolution" in report.coverage.missing_mount_paths
@@ -325,6 +337,21 @@ def test_mount_table_rejects_retrieval_semantic_dimension_mismatch(tmp_path: Pat
     )
 
     with pytest.raises(ValueError, match="FAISS/embedder dim mismatch: faiss=3, embedder=2"):
+        KnowledgeCloudMountTable().validate_cold_start_bundle(
+            tmp_path,
+            validate_retrieval_semantics=True,
+        )
+
+
+def test_mount_table_rejects_retrieval_semantic_profile_dimension_mismatch(tmp_path: Path):
+    _write_required_bundle_with_retrieval_semantics(
+        tmp_path,
+        faiss_dim=3,
+        embedder_dim=3,
+        profile_embedder_dim=2,
+    )
+
+    with pytest.raises(ValueError, match="FAISS/profile dim mismatch: faiss=3, profile=2"):
         KnowledgeCloudMountTable().validate_cold_start_bundle(
             tmp_path,
             validate_retrieval_semantics=True,

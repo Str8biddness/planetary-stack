@@ -182,6 +182,7 @@ class RetrievalSemanticReport:
     faiss_dim: int | None
     metadata_records: int | None
     embedder_dim: int | None
+    profile_embedder_dim: int | None = None
     errors: tuple[str, ...] = ()
 
     @property
@@ -194,6 +195,7 @@ class RetrievalSemanticReport:
             "faiss_dim": self.faiss_dim,
             "metadata_records": self.metadata_records,
             "embedder_dim": self.embedder_dim,
+            "profile_embedder_dim": self.profile_embedder_dim,
             "semantic_integrity_ok": self.ok,
             "errors": list(self.errors),
         }
@@ -366,6 +368,19 @@ class KnowledgeCloudMountTable:
         faiss_dim: int | None = None
         metadata_records: int | None = None
         embedder_dim: int | None = None
+        profile_embedder_dim: int | None = None
+
+        try:
+            manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+            declared_dim = (
+                manifest.get("build", {})
+                .get("extra", {})
+                .get("embed_dim")
+            )
+            if declared_dim is not None:
+                profile_embedder_dim = int(declared_dim)
+        except Exception as exc:
+            errors.append(f"Knowledge Cloud manifest profile load failed: {exc}")
 
         try:
             import faiss  # type: ignore
@@ -408,12 +423,31 @@ class KnowledgeCloudMountTable:
             )
         if faiss_dim is not None and embedder_dim is not None and faiss_dim != embedder_dim:
             errors.append(f"FAISS/embedder dim mismatch: faiss={faiss_dim}, embedder={embedder_dim}")
+        if (
+            faiss_dim is not None
+            and profile_embedder_dim is not None
+            and faiss_dim != profile_embedder_dim
+        ):
+            errors.append(
+                "FAISS/profile dim mismatch: "
+                f"faiss={faiss_dim}, profile={profile_embedder_dim}"
+            )
+        if (
+            embedder_dim is not None
+            and profile_embedder_dim is not None
+            and embedder_dim != profile_embedder_dim
+        ):
+            errors.append(
+                "Embedder/profile dim mismatch: "
+                f"embedder={embedder_dim}, profile={profile_embedder_dim}"
+            )
 
         return RetrievalSemanticReport(
             faiss_vectors=faiss_vectors,
             faiss_dim=faiss_dim,
             metadata_records=metadata_records,
             embedder_dim=embedder_dim,
+            profile_embedder_dim=profile_embedder_dim,
             errors=tuple(errors),
         )
 
