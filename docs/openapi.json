@@ -2266,7 +2266,8 @@
           "output_devices",
           "output_confidence",
           "state_contract",
-          "latency_ms"
+          "latency_ms",
+          "record_hash"
         ],
         "properties": {
           "schema": {
@@ -2449,6 +2450,11 @@
           },
           "latency_ms": {
             "type": "number"
+          },
+          "record_hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "SHA-256 hash over the canonical replay record excluding record_hash itself, used to detect trace-storage drift or tampering."
           }
         }
       },

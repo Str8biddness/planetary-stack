@@ -105,7 +105,8 @@ and the `final_output_ref=critic.selected_response` contract.
 `CognitiveHypervisorTrace.quad_brain_replay` references `QuadBrainReplayRecord`
 for the compact replay metadata emitted by the same route. That record preserves
 role/device identity, state-contract evidence, selected-response hash, character
-length, and latency without exposing the raw response text.
+length, latency, and a canonical `record_hash` seal without exposing the raw
+response text.
 CGPU device-frame schemas are documented separately as `CGPUFrame` and
 `CGPUOutputFrame`; `/api/v1/query` does not emit CGPU candidate sets as top-level
 payloads.

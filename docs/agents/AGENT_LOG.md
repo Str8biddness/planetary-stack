@@ -3159,3 +3159,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - Confidence scoring remains a PPBRS firmware scoring device, not a final-language owner. The optimization keeps score composition explicit, cheap, and inspectable for CHAL telemetry and downstream generation/critic boundaries.
+
+## Current Session — 2026-06-05 (Agent 7 — Quad Brain Replay Record Seal)
+
+### 📝 Summary
+- Added a canonical `record_hash` seal to `QuadBrainArbitration.to_replay_record()` so runtime Quad Brain replay records can be stored and tamper-checked without persisting raw response text.
+- Added focused regression coverage proving the replay hash validates the emitted record and changes when replay identity fields are tampered.
+- Updated the Dual Hemisphere/API docs, OpenAPI/API schema mirrors, and Phase 7 checklist entry for the sealed replay contract.
+- Advanced the Quad Brain replay/state-contract storage boundary while preserving fixed four-role serialized arbitration and `parallel_brain_spawn=false`.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/quad_brain.py tests/test_chal_hypervisor.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_hypervisor.py` — passed, 17 tests.
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed both JSON mirrors match YAML and `QuadBrainReplayRecord.required` includes `record_hash`.
+
+### 🚧 Left Off / Next Steps
+- Broader persistent runtime conversation trace storage remains open; this run sealed the runtime Quad Brain replay payload but did not choose a production trace-store write path.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, staged Knowledge Cloud log/checklist work, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- The sealed replay record is metadata only: it hashes response text, state-contract evidence, role/device identity, and latency while omitting raw response text.
+- Quad Brain remains a bounded four-role topology. The seal makes serialized arbitration evidence more suitable for storage/replay gates without creating another agent or execution node.

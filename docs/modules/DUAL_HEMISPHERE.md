@@ -212,6 +212,8 @@ The replay record preserves:
 - critic handoff refs and reviewed CGPU candidate id
 - final-output ownership and integrity checks
 - selected-response SHA-256 and character length
+- `record_hash`, a SHA-256 seal over the canonical replay record excluding the
+  seal itself
 
 The public debug contract is mirrored as `QuadBrainReplayRecord` in `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`, and is referenced from `CognitiveHypervisorTrace.quad_brain_replay`. The schema preserves selected-response hash/length instead of raw response text.
 

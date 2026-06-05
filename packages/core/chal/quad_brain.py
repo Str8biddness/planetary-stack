@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 import uuid
+import json
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from hashlib import sha256
@@ -101,7 +102,7 @@ class QuadBrainArbitration:
             output.role.value: round(float(output.confidence), 6)
             for output in self.outputs
         }
-        return {
+        record = {
             "schema": "synthesus.chal.quad_brain_replay.v1",
             "trace_id": self.trace_id,
             "prompt_ref": prompt_ref,
@@ -131,6 +132,23 @@ class QuadBrainArbitration:
             },
             "latency_ms": self.latency_ms,
         }
+        record["record_hash"] = self.replay_record_hash(record)
+        return record
+
+    @staticmethod
+    def replay_record_hash(record: Mapping[str, Any]) -> str:
+        canonical = {
+            key: value
+            for key, value in record.items()
+            if key != "record_hash"
+        }
+        encoded = json.dumps(
+            canonical,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+        return sha256(encoded).hexdigest()
 
 
 class QuadBrainOrchestrator:

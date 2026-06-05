@@ -3,7 +3,7 @@ import time
 from dataclasses import dataclass
 
 from core.chal.hypervisor import CognitiveHypervisor, HypervisorRoute
-from core.chal.quad_brain import QuadBrainRole
+from core.chal.quad_brain import QuadBrainArbitration, QuadBrainRole
 
 
 class StubBridge:
@@ -343,8 +343,14 @@ def test_quad_brain_trace_emits_compact_replay_record_without_response_text():
     assert state_contract["integrity"]["status"] == "passed"
     assert replay["selected_response_chars"] == len(result.response)
     assert len(replay["selected_response_sha256"]) == 64
+    assert len(replay["record_hash"]) == 64
+    assert replay["record_hash"] == QuadBrainArbitration.replay_record_hash(replay)
     assert "selected_response" not in replay
     assert result.response not in str(replay)
+
+    tampered = dict(replay)
+    tampered["selected_response_chars"] += 1
+    assert tampered["record_hash"] != QuadBrainArbitration.replay_record_hash(tampered)
 
 
 def test_quad_brain_dispatch_preserves_grounding_and_improves_persona_surface_over_dual_hemi():
