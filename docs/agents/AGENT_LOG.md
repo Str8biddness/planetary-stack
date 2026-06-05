@@ -3113,6 +3113,31 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 - Profile dimension is now part of the CHAL hardware identity for retrieval mounts: the ROM/parameter/corpus partitions must be hash-valid, mutually compatible, and compatible with the profile contract that stamped the bundle.
 - This keeps source-only release gates from declaring mounted Knowledge Cloud hardware ready when generated artifacts are internally stale against the selected build profile.
 
+## Current Session — 2026-06-05 (Knowledge Hardware Pending-License Notes Validator)
+
+### 📝 Summary
+- Closed a standalone Knowledge Cloud provenance gap where `pending[]` Kaggle/Hugging Face entries were required by checklist to carry `license.notes`, but `validate_source_planes()` only enforced `license.spdx`.
+- Updated the planned Kaggle `trivia_qa` declaration with non-empty license notes and documented the pending-entry SPDX + notes contract.
+- Regenerated `manifests/source_manifest.json` so the source-plane fingerprint reflects the validator, docs, and planned-source changes.
+- Advanced the Phase 5 Knowledge Cloud hardware source-plane license/provenance gate without touching generated runtime artifacts or workflow files.
+
+### ✅ Verified
+- `python -m py_compile synthesus_knowledge_cloud/source_planes.py tests/test_cli.py` — passed in `synthesus-knowledge-cloud`.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m pytest -q tests/test_cli.py` — passed, 8 tests.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud validate-sources --root /home/workspace/synthesus-knowledge-cloud` — passed, 25 required paths and 7 character pattern banks.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud build-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — regenerated 139-file source manifest.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud verify-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — passed, 139 source files.
+- `git diff --check` — passed in `synthesus-knowledge-cloud`.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align, then rerun cold-start validation, golden-query health, and `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker`.
+- Do not patch around the generated-artifact dimension mismatch in runtime source; regenerate coherent mounted hardware instead.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes in `Synthesus_4.0` were left untouched.
+
+### 💡 Architectural Notes
+- Pending public datasets are part of the future Knowledge Cloud writeback/rebuild substrate even while disabled. Their license metadata must therefore be provenance-complete before a later operator can flip them into mounted CHAL hardware.
+- The validator now rejects SPDX-only pending declarations because SPDX alone does not capture redistribution caveats, dataset owner/version pinning, credential requirements, or embargo notes needed for public-source expansion.
+
 ## Current Session — 2026-06-05 (Agent 6 — PPBRS Confidence Scoring Tightening)
 
 ### 📝 Summary
