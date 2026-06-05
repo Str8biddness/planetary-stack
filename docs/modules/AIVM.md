@@ -201,7 +201,7 @@ Snapshots also carry a per-device fingerprint manifest. Restore replays each mou
 
 `VQD` snapshotting now captures the mounted knowledge scope, retrieval policy, lookup count, last lookup trace, and last backend error. This makes the Virtual Knowledge Device replayable across AIVM snapshot/restore even when the restored kernel has no Knowledge Cloud backend mounted, and it lets the per-device fingerprint manifest reject forged knowledge-scope payloads before NPC admission.
 
-Snapshots now include `replay_trace` metadata for the canonical AIVM tick audit stream. The record uses `aivm.snapshot_replay.v1` and stores the ordered tick steps, compact audit event details, canonical-sequence status, emit hashes, scheduler class, and a SHA-256 `events_hash`. It does not store raw prompt text or raw generated response text. Restore verifies `events_hash` before admitting the snapshot and exposes the sealed record on `NPC.snapshot_replay_trace`, while the restored live audit stream remains limited to the new spawn/restore events.
+Snapshots now include `replay_trace` metadata for the canonical AIVM tick audit stream. The record uses `aivm.snapshot_replay.v1` and stores the ordered tick steps, compact audit event details, canonical-sequence status, emit hashes, scheduler class, a SHA-256 `events_hash`, and a canonical `record_hash` over the compact replay identity. It does not store raw prompt text or raw generated response text. Restore verifies both `events_hash` and `record_hash` before admitting the snapshot and exposes the sealed record on `NPC.snapshot_replay_trace`, while the restored live audit stream remains limited to the new spawn/restore events.
 
 ## VPD Pybind Inspection Surface
 

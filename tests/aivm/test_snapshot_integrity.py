@@ -195,6 +195,7 @@ async def test_snapshot_records_compact_replay_trace_without_response_text():
     assert len(replay_trace["events"]) == 12
     assert replay_trace["events"][0]["step"] == "admission"
     assert replay_trace["events_hash"] == SnapshotManager.build_replay_trace(npc)["events_hash"]
+    assert replay_trace["record_hash"] == SnapshotManager.build_replay_trace(npc)["record_hash"]
     assert "Generated response from AIVM VGD." not in json.dumps(replay_trace)
 
     restored = AIVMKernel(enable_scheduler=False).restore_npc(SnapshotManager.capture(npc))
@@ -213,4 +214,18 @@ async def test_snapshot_restore_rejects_replay_trace_event_mismatch_with_valid_o
     data["footer"]["fingerprint"] = SnapshotManager._fingerprint_payload(data)
 
     with pytest.raises(ValueError, match="replay trace fingerprint mismatch"):
+        AIVMKernel(enable_scheduler=False).restore_npc(json.dumps(data, sort_keys=True).encode())
+
+
+@pytest.mark.asyncio
+async def test_snapshot_restore_rejects_replay_trace_record_mismatch_with_valid_event_hash():
+    kernel = AIVMKernel(enable_scheduler=False)
+    npc = kernel.spawn_npc(PersonaIdentity(id="replay_record_tamper_npc", name="Replay Record Tamper", archetype="scribe"))
+
+    await kernel.tick("replay_record_tamper_npc", {"input": "seal replay metadata too"})
+    data = json.loads(SnapshotManager.capture(npc).decode())
+    data["replay_trace"]["scheduler_class"] = "batch"
+    data["footer"]["fingerprint"] = SnapshotManager._fingerprint_payload(data)
+
+    with pytest.raises(ValueError, match="replay trace record fingerprint mismatch"):
         AIVMKernel(enable_scheduler=False).restore_npc(json.dumps(data, sort_keys=True).encode())

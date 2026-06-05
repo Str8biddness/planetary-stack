@@ -44,6 +44,13 @@ class SnapshotManager:
         return hashlib.sha256(json_payload.encode()).hexdigest()
 
     @staticmethod
+    def _fingerprint_replay_record(record: dict[str, Any]) -> str:
+        unsigned = dict(record)
+        unsigned.pop("record_hash", None)
+        json_payload = json.dumps(unsigned, sort_keys=True)
+        return hashlib.sha256(json_payload.encode()).hexdigest()
+
+    @staticmethod
     def build_replay_trace(npc: NPC) -> dict[str, Any]:
         """
         Build a compact, replay-oriented tick trace without storing full prompt
@@ -67,7 +74,7 @@ class SnapshotManager:
         ]
         canonical_start = SnapshotManager.CANONICAL_TICK_SEQUENCE
 
-        return {
+        record = {
             "version": SnapshotManager.REPLAY_TRACE_VERSION,
             "npc_id": npc.identity.id,
             "scheduler_class": npc.scheduler_class.value,
@@ -79,16 +86,24 @@ class SnapshotManager:
             "events": events,
             "events_hash": SnapshotManager._fingerprint_replay_events(events),
         }
+        record["record_hash"] = SnapshotManager._fingerprint_replay_record(record)
+        return record
 
     @staticmethod
     def _verify_replay_trace(replay_trace: dict[str, Any]) -> None:
         if not replay_trace:
             return
+        if replay_trace.get("version") != SnapshotManager.REPLAY_TRACE_VERSION:
+            raise ValueError("Snapshot replay trace version mismatch")
         events = list(replay_trace.get("events", []))
         expected_hash = replay_trace.get("events_hash")
         actual_hash = SnapshotManager._fingerprint_replay_events(events)
         if expected_hash != actual_hash:
             raise ValueError("Snapshot replay trace fingerprint mismatch")
+        expected_record_hash = replay_trace.get("record_hash")
+        actual_record_hash = SnapshotManager._fingerprint_replay_record(replay_trace)
+        if expected_record_hash != actual_record_hash:
+            raise ValueError("Snapshot replay trace record fingerprint mismatch")
 
     @staticmethod
     def capture(npc: NPC) -> bytes:

@@ -3181,3 +3181,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The sealed replay record is metadata only: it hashes response text, state-contract evidence, role/device identity, and latency while omitting raw response text.
 - Quad Brain remains a bounded four-role topology. The seal makes serialized arbitration evidence more suitable for storage/replay gates without creating another agent or execution node.
+
+## Current Session — 2026-06-05 (Agent 8 — AIVM Snapshot Replay Record Seal)
+
+### 📝 Summary
+- Added a canonical `record_hash` seal to `SnapshotManager.build_replay_trace()` so AIVM snapshot replay traces protect replay identity metadata in addition to ordered audit events.
+- Restore now verifies the replay trace version, `events_hash`, and `record_hash` before admitting a restored NPC, rejecting event-preserving metadata tampering.
+- Added focused snapshot coverage for valid replay seals and for replay metadata tampering that keeps the event hash intact.
+- Updated the AIVM module doc and Phase 7 checklist entries for replayable trace storage and CHAL memory partition save/load tests.
+
+### ✅ Verified
+- `python -m py_compile packages/aivm/snapshot/manager.py tests/aivm/test_snapshot_integrity.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/aivm/test_snapshot_integrity.py` — passed, 11 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/kernel/build python -m pytest -q tests/test_kernel_pybind_vpd.py` — passed, 1 test.
+- `cmake --build packages/kernel/build -j2` — passed; `synthesus_kernel`, `test_vmm`, `test_emul`, and `_synthesus_kernel` targets built.
+
+### 🚧 Left Off / Next Steps
+- Broader persistent runtime conversation trace storage remains open; this run sealed the AIVM snapshot replay payload but did not choose a production trace-store write path.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- AIVM snapshot replay records are compact metadata: they preserve tick step order, event details, emit hashes, scheduler identity, and integrity hashes while omitting raw prompt and generated response text.
+- The new `record_hash` closes the gap where a valid `events_hash` could still accompany forged replay identity fields inside a validly resealed outer snapshot.
