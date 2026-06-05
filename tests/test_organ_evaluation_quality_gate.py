@@ -1,8 +1,12 @@
+import hashlib
+import json
+
 from tools.evaluate_organs import (
     OrganScorecard,
     TraceRecord,
     _candidate_critic_coverage,
     _chal_accelerator_coverage,
+    _replay_identity_coverage,
     evaluate_quality_gate,
 )
 
@@ -20,6 +24,7 @@ def scorecard(**overrides):
         "metric_name": "accuracy",
         "scientific_consistency": 1.0,
         "replay_coverage": 1.0,
+        "replay_identity_coverage": 1.0,
         "chal_accelerator_coverage": 1.0,
         "candidate_critic_coverage": 1.0,
         "consistency_warnings": [],
@@ -27,6 +32,31 @@ def scorecard(**overrides):
     }
     defaults.update(overrides)
     return OrganScorecard(**defaults)
+
+
+def replay_record(**overrides):
+    record = {
+        "schema": "organ_training_replay.v1",
+        "generator": "organ-triad-replay-v3",
+        "seed": 950907,
+        "scenarioId": "chat-0-policy-prior",
+        "step": 1,
+        "domain": "chat",
+        "organ": "policy_prior",
+        "phase": "planning",
+        "device": "chal://organs/chat/policy_prior",
+        "route": "organ_training_replay",
+        "candidateRefs": [
+            "chat.policy_prior.planning.candidate.0",
+            "chat.policy_prior.planning.candidate.1",
+        ],
+        "selectedCandidateRef": "chat.policy_prior.planning.candidate.1",
+        "accepted": True,
+        "quality": 0.91,
+    }
+    record.update(overrides)
+    record["recordHash"] = hashlib.sha256(json.dumps(record, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+    return record
 
 
 def test_quality_gate_passes_complete_replayable_scorecards():
@@ -42,6 +72,7 @@ def test_quality_gate_passes_complete_replayable_scorecards():
             ),
         ],
         min_replay_coverage=1.0,
+        min_replay_identity_coverage=1.0,
         min_chal_accelerator_coverage=1.0,
         min_candidate_critic_coverage=1.0,
         min_scientific_consistency=1.0,
@@ -63,6 +94,16 @@ def test_quality_gate_fails_low_replay_and_consistency():
     assert result.passed is False
     assert any("replay coverage" in failure for failure in result.failures)
     assert any("scientific consistency" in failure for failure in result.failures)
+
+
+def test_quality_gate_fails_low_replay_identity():
+    result = evaluate_quality_gate(
+        [scorecard(replay_identity_coverage=0.75)],
+        min_replay_identity_coverage=1.0,
+    )
+
+    assert result.passed is False
+    assert any("replay identity coverage" in failure for failure in result.failures)
 
 
 def test_quality_gate_fails_missing_chal_accelerator_metadata():
@@ -176,6 +217,40 @@ def test_candidate_critic_coverage_requires_selected_candidate_and_feedback():
     )
 
     assert _candidate_critic_coverage([valid, invalid]) == 0.5
+
+
+def test_replay_identity_coverage_requires_matching_hash_and_compact_record():
+    base_record = {
+        "domain": "chat",
+        "phase": "planning",
+        "organ": "policy_prior",
+        "state_features": [],
+        "action_features": [],
+        "multi_focus_weights": [],
+        "trajectory_features": [],
+        "chosen_index": 0,
+        "quality": 1.0,
+        "outcome": {},
+    }
+    valid = TraceRecord(
+        **base_record,
+        replay={
+            "generator": "organ-triad-replay-v3",
+            "record": replay_record(),
+        },
+    )
+    tampered = TraceRecord(
+        **base_record,
+        replay={
+            "generator": "organ-triad-replay-v3",
+            "record": {
+                **replay_record(),
+                "selectedCandidateRef": "chat.policy_prior.planning.candidate.0",
+            },
+        },
+    )
+
+    assert _replay_identity_coverage([valid, tampered]) == 0.5
 
 
 def test_quality_gate_compares_metric_direction_to_baseline():

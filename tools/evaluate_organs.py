@@ -13,6 +13,7 @@ consistent.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import math
@@ -73,6 +74,7 @@ class OrganScorecard:
     metric_name: str
     scientific_consistency: float
     replay_coverage: float
+    replay_identity_coverage: float
     chal_accelerator_coverage: float
     candidate_critic_coverage: float
     consistency_warnings: list[str]
@@ -84,6 +86,7 @@ class QualityGateResult:
     passed: bool
     failures: list[str]
     min_replay_coverage: float | None
+    min_replay_identity_coverage: float | None
     min_chal_accelerator_coverage: float | None
     min_candidate_critic_coverage: float | None
     min_scientific_consistency: float | None
@@ -348,6 +351,50 @@ def _replay_coverage(records: Iterable[TraceRecord]) -> float:
     return (replayable / total) if total else 0.0
 
 
+def _stable_json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+def _replay_identity_coverage(records: Iterable[TraceRecord]) -> float:
+    total = 0
+    covered = 0
+    for rec in records:
+        replay = rec.replay
+        if replay.get("generator") != CHAL_ACCELERATOR_GENERATOR:
+            continue
+        total += 1
+        record = replay.get("record")
+        if not isinstance(record, dict):
+            continue
+        record_hash = record.get("recordHash")
+        record_without_hash = {key: value for key, value in record.items() if key != "recordHash"}
+        expected_hash = hashlib.sha256(_stable_json(record_without_hash).encode("utf-8")).hexdigest()
+        candidate_refs = record_without_hash.get("candidateRefs")
+        selected_ref = record_without_hash.get("selectedCandidateRef")
+        quality = record_without_hash.get("quality")
+        if (
+            record_without_hash.get("schema") == "organ_training_replay.v1"
+            and record_without_hash.get("generator") == CHAL_ACCELERATOR_GENERATOR
+            and record_without_hash.get("domain") == rec.domain
+            and record_without_hash.get("organ") == rec.organ
+            and record_without_hash.get("phase") == rec.phase
+            and record_without_hash.get("device") == f"chal://organs/{rec.domain}/{rec.organ}"
+            and record_without_hash.get("route") == "organ_training_replay"
+            and isinstance(candidate_refs, list)
+            and bool(candidate_refs)
+            and all(isinstance(ref, str) and ref for ref in candidate_refs)
+            and isinstance(selected_ref, str)
+            and selected_ref in candidate_refs
+            and isinstance(record_without_hash.get("accepted"), bool)
+            and isinstance(quality, (int, float))
+            and math.isfinite(float(quality))
+            and isinstance(record_hash, str)
+            and record_hash == expected_hash
+        ):
+            covered += 1
+    return (covered / total) if total else 0.0
+
+
 def _chal_accelerator_coverage(records: Iterable[TraceRecord]) -> float:
     total = 0
     bounded = 0
@@ -417,6 +464,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
     metric_name = _metric_name(organ)
     sci_consistency, warnings = _consistency_check(records)
     replay_coverage = _replay_coverage(records)
+    replay_identity_coverage = _replay_identity_coverage(records)
     chal_accelerator_coverage = _chal_accelerator_coverage(records)
     candidate_critic_coverage = _candidate_critic_coverage(records)
     notes: list[str] = []
@@ -434,6 +482,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
             metric_name=metric_name,
             scientific_consistency=sci_consistency,
             replay_coverage=replay_coverage,
+            replay_identity_coverage=replay_identity_coverage,
             chal_accelerator_coverage=chal_accelerator_coverage,
             candidate_critic_coverage=candidate_critic_coverage,
             consistency_warnings=warnings,
@@ -454,6 +503,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
             metric_name=metric_name,
             scientific_consistency=sci_consistency,
             replay_coverage=replay_coverage,
+            replay_identity_coverage=replay_identity_coverage,
             chal_accelerator_coverage=chal_accelerator_coverage,
             candidate_critic_coverage=candidate_critic_coverage,
             consistency_warnings=warnings,
@@ -488,6 +538,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
             metric_name=metric_name,
             scientific_consistency=sci_consistency,
             replay_coverage=replay_coverage,
+            replay_identity_coverage=replay_identity_coverage,
             chal_accelerator_coverage=chal_accelerator_coverage,
             candidate_critic_coverage=candidate_critic_coverage,
             consistency_warnings=warnings,
@@ -518,6 +569,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
             metric_name=metric_name,
             scientific_consistency=sci_consistency,
             replay_coverage=replay_coverage,
+            replay_identity_coverage=replay_identity_coverage,
             chal_accelerator_coverage=chal_accelerator_coverage,
             candidate_critic_coverage=candidate_critic_coverage,
             consistency_warnings=warnings,
@@ -546,6 +598,7 @@ def evaluate_organ(domain: str, organ: str) -> OrganScorecard:
         metric_name=metric_name,
         scientific_consistency=sci_consistency,
         replay_coverage=replay_coverage,
+        replay_identity_coverage=replay_identity_coverage,
         chal_accelerator_coverage=chal_accelerator_coverage,
         candidate_critic_coverage=candidate_critic_coverage,
         consistency_warnings=warnings,
@@ -563,12 +616,12 @@ def render_markdown(scorecards: list[OrganScorecard]) -> str:
         "",
         "Fictional narrative traces are acceptable input as long as scientific/math fields are numeric, bounded, and internally consistent.",
         "",
-        "| Domain | Organ | Traces | Metric | Train | Validation | Baseline | Consistency | Replay / CHAL / Candidate-Critic |",
+        "| Domain | Organ | Traces | Metric | Train | Validation | Baseline | Consistency | Replay / Identity / CHAL / Candidate-Critic |",
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for s in scorecards:
         lines.append(
-            f"| {s.domain} | {s.organ} | {s.trace_count} | {s.metric_name} | {_format_metric(s.train_metric)} | {_format_metric(s.validation_metric)} | {_format_metric(s.baseline_metric)} | {s.scientific_consistency:.2%} | {s.replay_coverage:.2%} / CHAL {s.chal_accelerator_coverage:.2%} / CC {s.candidate_critic_coverage:.2%} |"
+            f"| {s.domain} | {s.organ} | {s.trace_count} | {s.metric_name} | {_format_metric(s.train_metric)} | {_format_metric(s.validation_metric)} | {_format_metric(s.baseline_metric)} | {s.scientific_consistency:.2%} | {s.replay_coverage:.2%} / ID {s.replay_identity_coverage:.2%} / CHAL {s.chal_accelerator_coverage:.2%} / CC {s.candidate_critic_coverage:.2%} |"
         )
     lines.append("")
     for s in scorecards:
@@ -577,6 +630,7 @@ def render_markdown(scorecards: list[OrganScorecard]) -> str:
         lines.append(f"- Model exists: {'yes' if s.model_exists else 'no'}")
         lines.append(f"- Scientific consistency: {s.scientific_consistency:.2%}")
         lines.append(f"- Replay metadata coverage: {s.replay_coverage:.2%}")
+        lines.append(f"- Replay identity coverage: {s.replay_identity_coverage:.2%}")
         lines.append(f"- CHAL accelerator frame coverage: {s.chal_accelerator_coverage:.2%}")
         lines.append(f"- Candidate/critic feedback coverage: {s.candidate_critic_coverage:.2%}")
         if s.consistency_warnings:
@@ -595,6 +649,7 @@ def evaluate_quality_gate(
     scorecards: list[OrganScorecard],
     *,
     min_replay_coverage: float | None = None,
+    min_replay_identity_coverage: float | None = None,
     min_chal_accelerator_coverage: float | None = None,
     min_candidate_critic_coverage: float | None = None,
     min_scientific_consistency: float | None = None,
@@ -612,6 +667,14 @@ def evaluate_quality_gate(
         if min_replay_coverage is not None and scorecard.replay_coverage < min_replay_coverage:
             failures.append(
                 f"{label} replay coverage {scorecard.replay_coverage:.2%} is below required {min_replay_coverage:.2%}"
+            )
+
+        if (
+            min_replay_identity_coverage is not None
+            and scorecard.replay_identity_coverage < min_replay_identity_coverage
+        ):
+            failures.append(
+                f"{label} replay identity coverage {scorecard.replay_identity_coverage:.2%} is below required {min_replay_identity_coverage:.2%}"
             )
 
         if (
@@ -653,6 +716,7 @@ def evaluate_quality_gate(
         passed=not failures,
         failures=failures,
         min_replay_coverage=min_replay_coverage,
+        min_replay_identity_coverage=min_replay_identity_coverage,
         min_chal_accelerator_coverage=min_chal_accelerator_coverage,
         min_candidate_critic_coverage=min_candidate_critic_coverage,
         min_scientific_consistency=min_scientific_consistency,
@@ -667,6 +731,7 @@ def main() -> int:
     parser.add_argument("--write-json", action="store_true", default=True, help="Write JSON scorecard")
     parser.add_argument("--write-md", action="store_true", default=True, help="Write Markdown scorecard")
     parser.add_argument("--min-replay-coverage", type=float, default=None, help="Fail if any organ replay metadata coverage is below this 0.0-1.0 threshold")
+    parser.add_argument("--min-replay-identity-coverage", type=float, default=None, help="Fail if any organ replay trace lacks a valid compact identity hash")
     parser.add_argument("--min-chal-accelerator-coverage", type=float, default=None, help="Fail if any organ replay trace lacks CHAL accelerator frame metadata")
     parser.add_argument("--min-candidate-critic-coverage", type=float, default=None, help="Fail if any CHAL organ replay trace lacks candidate references and critic feedback metadata")
     parser.add_argument("--min-scientific-consistency", type=float, default=None, help="Fail if any organ numeric consistency is below this 0.0-1.0 threshold")
@@ -696,6 +761,7 @@ def main() -> int:
     quality_gate = evaluate_quality_gate(
         scorecards,
         min_replay_coverage=args.min_replay_coverage,
+        min_replay_identity_coverage=args.min_replay_identity_coverage,
         min_chal_accelerator_coverage=args.min_chal_accelerator_coverage,
         min_candidate_critic_coverage=args.min_candidate_critic_coverage,
         min_scientific_consistency=args.min_scientific_consistency,
@@ -713,7 +779,7 @@ def main() -> int:
     logger.info(f"Wrote {REPORT_MD}")
     for s in scorecards:
         logger.info(
-            f"{s.domain}/{s.organ}: train={_format_metric(s.train_metric)} validation={_format_metric(s.validation_metric)} baseline={_format_metric(s.baseline_metric)} consistency={s.scientific_consistency:.2%} replay={s.replay_coverage:.2%} chal_accelerator={s.chal_accelerator_coverage:.2%} candidate_critic={s.candidate_critic_coverage:.2%}"
+            f"{s.domain}/{s.organ}: train={_format_metric(s.train_metric)} validation={_format_metric(s.validation_metric)} baseline={_format_metric(s.baseline_metric)} consistency={s.scientific_consistency:.2%} replay={s.replay_coverage:.2%} replay_identity={s.replay_identity_coverage:.2%} chal_accelerator={s.chal_accelerator_coverage:.2%} candidate_critic={s.candidate_critic_coverage:.2%}"
         )
     if not quality_gate.passed:
         for failure in quality_gate.failures:

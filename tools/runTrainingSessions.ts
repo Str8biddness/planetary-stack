@@ -1,6 +1,4 @@
-// scripts/runTrainingSessions.ts
-// Script to run amplified sessions in GM, SysOps, Chat domains and emit diverse training traces
-
+import { createHash } from 'crypto';
 import { SynthesusCoreStub, CoreInput } from '../packages/core/synthetic_core/index';
 import { SynthesusCoreSysOps } from '../packages/core/synthetic_core/synthesusCoreSysOps';
 import { SynthesusCoreChat } from '../packages/core/synthetic_core/synthesusCoreChat';
@@ -17,6 +15,23 @@ const DEFAULT_TRACE_SEED = 950907;
 const BASE_TIME_MS = Date.UTC(2026, 4, 30, 12, 0, 0);
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableJson).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableJson(entry)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function sha256(value: unknown): string {
+  return createHash('sha256').update(stableJson(value)).digest('hex');
+}
 
 class SeededRng {
   private state: number;
@@ -65,12 +80,32 @@ function replay(
   const frameStem = `${runtime.seed}-${runtime.step}-${scenarioId}`.replace(/[^a-zA-Z0-9_-]/g, '-');
   const candidateRefs = Array.from({ length: candidateCount }, (_, idx) => `${domain}.${organ}.${phase}.candidate.${idx}`);
   const selectedCandidateRef = candidateRefs[chosenIndex] ?? candidateRefs[0] ?? `${domain}.${organ}.${phase}.candidate.0`;
+  const compactRecord = {
+    schema: 'organ_training_replay.v1',
+    generator: GENERATOR_VERSION,
+    seed: runtime.seed,
+    scenarioId,
+    step: runtime.step,
+    domain,
+    organ,
+    phase,
+    device: `chal://organs/${domain}/${organ}`,
+    route: 'organ_training_replay',
+    candidateRefs,
+    selectedCandidateRef,
+    accepted: quality >= 0.5,
+    quality: Number(quality.toFixed(6)),
+  };
   return {
     generator: GENERATOR_VERSION,
     seed: runtime.seed,
     scenarioId,
     step: runtime.step,
     simulatedTime: timestamp(sessionIndex).toISOString(),
+    record: {
+      ...compactRecord,
+      recordHash: sha256(compactRecord),
+    },
     chal: {
       frameId: `chal-organ-${frameStem}`,
       parentFrameId: `chal-training-session-${domain}-${sessionIndex}`,

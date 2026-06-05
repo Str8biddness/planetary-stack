@@ -2930,3 +2930,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - AIVM snapshots now carry a replayable trace boundary parallel to device fingerprints: device blobs remain verified by per-device fingerprints, and replay events are verified by `events_hash`.
 - The replay record is trace metadata only. It preserves tick ordering and output hashes without persisting raw generated response text or mutating restored device state.
+
+## Current Session — 2026-06-05 (Agent 9 — Organ Replay Identity Gate)
+
+### 📝 Summary
+- Added compact `organ_training_replay.v1` identity records to `organ-triad-replay-v3` organ training traces, including deterministic candidate refs, selected candidate ref, accept/quality fields, CHAL organ device identity, and a SHA-256 `recordHash`.
+- Extended `tools/evaluate_organs.py` with replay identity coverage, Markdown/JSON scorecard reporting, and a `--min-replay-identity-coverage` quality gate.
+- Tightened `tools/selfImprove.ts` so the full organ loop now requires 100% replay metadata, replay identity, CHAL accelerator, candidate/critic, and scientific-consistency coverage.
+- Updated the ML organ training guide and Phase 7 checklist entry. Generated traces, models, and scorecards were not committed or intentionally modified.
+
+### ✅ Verified
+- `python -m py_compile tools/evaluate_organs.py tests/test_organ_evaluation_quality_gate.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0 python -m pytest -q tests/test_organ_evaluation_quality_gate.py` — 9 passed.
+- `npx tsc --noEmit --pretty false --esModuleInterop tools/runTrainingSessions.ts tools/selfImprove.ts` — passed.
+- `cd packages/organs && bun test` — no Bun-discoverable test files; exited before running tests.
+
+### 🚧 Left Off / Next Steps
+- Broader persistent runtime conversation trace storage remains open for Phase 7; this run only hardened the organ-training replay boundary.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, and `models/swarm_embedder.pkl` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `package.json`, root `pyproject.toml`, release-packaging docs/scripts/tests/package metadata, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Organ replay traces are now hash-identifiable compact records: comparison harnesses can detect drift or tampering in candidate/critic routing metadata without persisting raw candidate bodies.
+- Organs remain CHAL accelerators under the bounded runtime; the new record verifies accelerator identity and trace integrity rather than creating independent reasoning agents.
