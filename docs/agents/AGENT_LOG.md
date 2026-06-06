@@ -3350,3 +3350,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - Pending public datasets are disabled today, but they still represent future Knowledge Cloud hardware rebuild substrate. Requiring `rebuild_command` keeps license metadata, dataset identity, and regeneration route bound together before an operator can promote the source into mounted CHAL hardware.
+
+## Current Session — 2026-06-06 (Agent 3 — Phase 8 Trace Storage Gate)
+
+### 📝 Summary
+- Added prompt-scrubbed Phase 8 replay storage records to `tools/chal_conversation_compare.py`, preserving case/category/turn, route, trace, preset, score, latency, template-leak flags, prompt hashes, response hashes, source replay hashes, and Quad Brain refs without storing raw prompts or raw responses.
+- Added `synthesus.phase8.replay_storage_scorecard.v1` plus `--trace-store-jsonl`, `--trace-store-scorecard-json`, and `--fail-on-trace-storage` so comparison batches fail on incomplete storage coverage, missing route/trace identity, prompt/response hash gaps, missing category/continuity coverage, or raw text leakage.
+- Wired the new storage gate into `tools/synthesus5_focused_suite.py` and added focused regression coverage for valid storage batches and tamper detection.
+- Updated the Phase 7/8 checklist ledger and evaluation harness docs without committing generated benchmark outputs.
+
+### ✅ Verified
+- `python -m py_compile tools/chal_conversation_compare.py tools/synthesus5_focused_suite.py tests/test_chal_reasoning_firmware.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_reasoning_firmware.py` — passed, 24 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/chal_conversation_compare.py --fail-on-leak --fail-on-reference --fail-on-axis-regression --fail-on-continuity --fail-on-replay-integrity --fail-on-trace-storage --max-mean-latency-ms 1000 --max-p95-latency-ms 1500 --min-score-delta 0.1 --write tools/results/synthesus5_phase8_trace_storage_latest.md --json tools/results/synthesus5_phase8_trace_storage_latest.json --trace-jsonl tools/results/synthesus5_phase8_trace_storage_replay_latest.jsonl --replay-scorecard-json tools/results/synthesus5_phase8_trace_storage_replay_scorecard_latest.json --trace-store-jsonl tools/results/synthesus5_phase8_trace_store_latest.jsonl --trace-store-scorecard-json tools/results/synthesus5_phase8_trace_storage_scorecard_latest.json --scorecard-json tools/results/synthesus5_phase8_reference_scorecard_latest.json --axis-scorecard-json tools/results/synthesus5_phase8_axis_scorecard_latest.json --continuity-json tools/results/synthesus5_phase8_continuity_latest.json --continuity-scorecard-json tools/results/synthesus5_phase8_continuity_scorecard_latest.json --continuity-markdown tools/results/synthesus5_phase8_continuity_latest.md --baseline-json tools/results/synthesus5_phase8_latency_baseline_latest.json` — passed; storage scorecard reported 12/12 records passed, all required categories covered, continuity turns covered, one batch ID, and no failed records.
+
+### 🚧 Left Off / Next Steps
+- Broader production API trace-store write-path selection remains open; this run adds the prompt-scrubbed storage artifact and gate for the Phase 8 comparison harness.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, prior Knowledge Hardware log/checklist edits, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Phase 8 runtime comparison storage is now metadata-only: it stores prompt hashes and response hashes, not prompt text or final response text.
+- The storage scorecard treats trace persistence as a CHAL-visible batch contract: every stored comparison record must map back to a source replay hash and preserve route/trace identity, category coverage, continuity coverage, and tamper evidence.

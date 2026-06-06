@@ -660,6 +660,7 @@ def _sha256_text(text: str) -> str:
 def _replay_record_hash(record: dict[str, Any]) -> str:
     hashable = copy.deepcopy(record)
     hashable.pop("record_hash", None)
+    hashable.pop("storage_record_hash", None)
     return _sha256_text(_stable_json(hashable))
 
 
@@ -759,6 +760,122 @@ def build_replay_integrity_scorecard(records: list[dict[str, Any]]) -> dict[str,
 
 def assert_replay_integrity_scorecard(scorecard: dict[str, Any]) -> None:
     failures = []
+    for case in scorecard["cases"]:
+        for check, passed in case["checks"].items():
+            if not passed:
+                failures.append(f"{case['case_id']} failed {check}")
+    if failures:
+        raise AssertionError("\n".join(failures))
+
+
+def build_replay_storage_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    batch_seed = {
+        "schema": "synthesus.phase8.replay_storage_batch.v1",
+        "record_hashes": [record.get("record_hash") for record in records],
+    }
+    batch_id = _sha256_text(_stable_json(batch_seed))
+    storage_records = []
+    for record in records:
+        storage_record = {
+            "schema": "synthesus.phase8.replay_storage_record.v1",
+            "batch_id": batch_id,
+            "source_schema": record.get("schema"),
+            "source_record_hash": record.get("record_hash"),
+            "case_id": record.get("case_id"),
+            "category": record.get("category"),
+            "turn": record.get("turn"),
+            "runtime_preset": record.get("runtime_preset"),
+            "trace_id": record.get("trace_id"),
+            "route": record.get("route"),
+            "decision_reasons": record.get("decision_reasons", []),
+            "constraints": record.get("constraints", []),
+            "prompt_sha256": _sha256_text(str(record.get("prompt", ""))),
+            "prompt_chars": len(str(record.get("prompt", ""))),
+            "legacy": copy.deepcopy(record.get("legacy", {})),
+            "synthesus5": copy.deepcopy(record.get("synthesus5", {})),
+            "summary": copy.deepcopy(record.get("summary", {})),
+        }
+        if isinstance(record.get("quad_brain"), dict):
+            storage_record["quad_brain"] = copy.deepcopy(record["quad_brain"])
+        storage_record["storage_record_hash"] = _replay_record_hash(storage_record)
+        storage_records.append(storage_record)
+    return storage_records
+
+
+def build_replay_storage_scorecard(
+    records: list[dict[str, Any]],
+    storage_records: list[dict[str, Any]],
+) -> dict[str, Any]:
+    source_hashes = {record.get("record_hash") for record in records}
+    storage_source_hashes = {record.get("source_record_hash") for record in storage_records}
+    cases = []
+    for record in storage_records:
+        expected_hash = _replay_record_hash(record)
+        legacy = record.get("legacy", {})
+        synth = record.get("synthesus5", {})
+        checks = {
+            "storage_record_hash": record.get("storage_record_hash") == expected_hash,
+            "source_record_hash": record.get("source_record_hash") in source_hashes,
+            "trace_id": bool(record.get("trace_id")),
+            "route": bool(record.get("route")),
+            "prompt_hash": bool(record.get("prompt_sha256")) and record.get("prompt_chars", 0) > 0,
+            "legacy_response_hash": bool(legacy.get("response_sha256")) and legacy.get("response_chars", 0) > 0,
+            "synthesus5_response_hash": bool(synth.get("response_sha256")) and synth.get("response_chars", 0) > 0,
+            "no_raw_prompt_text": "prompt" not in record,
+            "no_raw_response_text": "response" not in legacy and "response" not in synth,
+            "template_leak_flags": isinstance(legacy.get("template_leak"), bool)
+            and isinstance(synth.get("template_leak"), bool),
+        }
+        cases.append(
+            {
+                "case_id": record.get("case_id"),
+                "category": record.get("category"),
+                "turn": record.get("turn"),
+                "route": record.get("route"),
+                "source_record_hash": record.get("source_record_hash"),
+                "storage_record_hash": record.get("storage_record_hash"),
+                "expected_hash": expected_hash,
+                "checks": checks,
+                "passed": all(checks.values()),
+            }
+        )
+    categories = sorted({record.get("category") for record in storage_records if record.get("category")})
+    batch_ids = sorted({record.get("batch_id") for record in storage_records if record.get("batch_id")})
+    batch_checks = {
+        "record_count": len(storage_records) == len(records),
+        "source_hash_coverage": source_hashes == storage_source_hashes,
+        "single_batch": len(batch_ids) == 1 if storage_records else True,
+        "required_categories": {
+            "conversation_quality",
+            "cross_domain_reasoning",
+            "grounded_retrieval",
+            "npc_persona_behavior",
+            "business_bot_task",
+            "safety",
+        }.issubset(set(categories)),
+        "continuity_turns": any(str(record.get("case_id", "")).endswith("_turn2") for record in storage_records),
+    }
+    return {
+        "schema": "synthesus.phase8.replay_storage_scorecard.v1",
+        "summary": {
+            "source_record_count": len(records),
+            "storage_record_count": len(storage_records),
+            "passed_records": sum(1 for case in cases if case["passed"]),
+            "failed_records": sum(1 for case in cases if not case["passed"]),
+            "batch_ids": batch_ids,
+            "categories": categories,
+            "batch_checks": batch_checks,
+            "passed": all(batch_checks.values()) and all(case["passed"] for case in cases),
+        },
+        "cases": cases,
+    }
+
+
+def assert_replay_storage_scorecard(scorecard: dict[str, Any]) -> None:
+    failures = []
+    for check, passed in scorecard["summary"]["batch_checks"].items():
+        if not passed:
+            failures.append(f"batch failed {check}")
     for case in scorecard["cases"]:
         for check, passed in case["checks"].items():
             if not passed:
@@ -1161,6 +1278,8 @@ async def main() -> int:
     parser.add_argument("--json", type=Path, help="Write machine-readable comparison to this path.")
     parser.add_argument("--trace-jsonl", type=Path, help="Write compact replay trace records to this JSONL path.")
     parser.add_argument("--replay-scorecard-json", type=Path, help="Write compact replay integrity scorecard JSON.")
+    parser.add_argument("--trace-store-jsonl", type=Path, help="Write prompt-scrubbed replay storage records to this JSONL path.")
+    parser.add_argument("--trace-store-scorecard-json", type=Path, help="Write replay storage completeness scorecard JSON.")
     parser.add_argument("--scorecard-json", type=Path, help="Write GPT-4-class reference expectation scorecard JSON.")
     parser.add_argument("--axis-scorecard-json", type=Path, help="Write per-case axis improvement scorecard JSON.")
     parser.add_argument("--continuity-json", type=Path, help="Write multi-turn continuity comparison JSON.")
@@ -1172,6 +1291,7 @@ async def main() -> int:
     parser.add_argument("--fail-on-axis-regression", action="store_true", help="Fail if any case loses to legacy on required quality axes.")
     parser.add_argument("--fail-on-continuity", action="store_true", help="Fail if any multi-turn continuity sequence fails.")
     parser.add_argument("--fail-on-replay-integrity", action="store_true", help="Fail if compact replay records are malformed or tampered.")
+    parser.add_argument("--fail-on-trace-storage", action="store_true", help="Fail if prompt-scrubbed replay storage records are incomplete or malformed.")
     parser.add_argument("--max-mean-latency-ms", type=float, help="Fail if Synthesus 5 mean runtime exceeds this value.")
     parser.add_argument("--max-p95-latency-ms", type=float, help="Fail if Synthesus 5 p95 runtime exceeds this value.")
     parser.add_argument("--min-score-delta", type=float, help="Fail if Synthesus 5 score delta falls below this value.")
@@ -1196,6 +1316,10 @@ async def main() -> int:
     replay_scorecard = build_replay_integrity_scorecard(replay_records)
     if args.fail_on_replay_integrity:
         assert_replay_integrity_scorecard(replay_scorecard)
+    replay_storage_records = build_replay_storage_records(replay_records)
+    replay_storage_scorecard = build_replay_storage_scorecard(replay_records, replay_storage_records)
+    if args.fail_on_trace_storage:
+        assert_replay_storage_scorecard(replay_storage_scorecard)
     summary = summarize(rows)
     assert_regression_thresholds(
         summary,
@@ -1239,6 +1363,24 @@ async def main() -> int:
             encoding="utf-8",
         )
         print(args.replay_scorecard_json)
+    if args.trace_store_jsonl:
+        args.trace_store_jsonl.parent.mkdir(parents=True, exist_ok=True)
+        args.trace_store_jsonl.write_text(
+            "\n".join(
+                json.dumps(record, sort_keys=True)
+                for record in replay_storage_records
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        print(args.trace_store_jsonl)
+    if args.trace_store_scorecard_json:
+        args.trace_store_scorecard_json.parent.mkdir(parents=True, exist_ok=True)
+        args.trace_store_scorecard_json.write_text(
+            json.dumps(replay_storage_scorecard, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        print(args.trace_store_scorecard_json)
     if args.scorecard_json:
         args.scorecard_json.parent.mkdir(parents=True, exist_ok=True)
         args.scorecard_json.write_text(

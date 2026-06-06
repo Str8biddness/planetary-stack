@@ -25,12 +25,15 @@ from tools.chal_conversation_compare import (
     assert_reference_scorecard,
     assert_regression_thresholds,
     assert_replay_integrity_scorecard,
+    assert_replay_storage_scorecard,
     build_axis_improvement_scorecard,
     build_continuity_rows,
     build_continuity_scorecard,
     build_reference_scorecard,
     build_replay_integrity_scorecard,
     build_replay_records,
+    build_replay_storage_records,
+    build_replay_storage_scorecard,
     build_chal_rows,
     flatten_continuity_rows,
     summarize,
@@ -348,6 +351,47 @@ def test_phase8_replay_integrity_scorecard_reports_tampering():
         assert f"{records[0]['case_id']} failed record_hash" in str(exc)
     else:
         raise AssertionError("replay integrity gate must fail when a record is tampered")
+
+
+def test_phase8_comparison_harness_builds_prompt_scrubbed_replay_storage_records():
+    rows = asyncio.run(build_chal_rows())
+    continuity_rows = asyncio.run(build_continuity_rows())
+    continuity_flat_rows = flatten_continuity_rows(continuity_rows)
+    replay_records = build_replay_records(rows + continuity_flat_rows)
+    storage_records = build_replay_storage_records(replay_records)
+    scorecard = build_replay_storage_scorecard(replay_records, storage_records)
+
+    assert len(storage_records) == len(replay_records)
+    assert {record["schema"] for record in storage_records} == {"synthesus.phase8.replay_storage_record.v1"}
+    assert len({record["batch_id"] for record in storage_records}) == 1
+    assert all("prompt" not in record for record in storage_records)
+    assert all(record["prompt_sha256"] for record in storage_records)
+    assert all(record["prompt_chars"] > 0 for record in storage_records)
+    assert all("response" not in record["legacy"] for record in storage_records)
+    assert all("response" not in record["synthesus5"] for record in storage_records)
+    assert all(record["source_record_hash"] for record in storage_records)
+    assert all(record["storage_record_hash"] for record in storage_records)
+    assert scorecard["schema"] == "synthesus.phase8.replay_storage_scorecard.v1"
+    assert scorecard["summary"]["storage_record_count"] == len(replay_records)
+    assert scorecard["summary"]["failed_records"] == 0
+    assert scorecard["summary"]["batch_checks"]["source_hash_coverage"] is True
+    assert scorecard["summary"]["batch_checks"]["continuity_turns"] is True
+    assert_replay_storage_scorecard(scorecard)
+
+
+def test_phase8_replay_storage_scorecard_reports_tampering():
+    rows = asyncio.run(build_chal_rows())
+    replay_records = build_replay_records(rows)
+    storage_records = build_replay_storage_records(replay_records)
+    storage_records[0]["prompt_sha256"] = "tampered"
+    scorecard = build_replay_storage_scorecard(replay_records, storage_records)
+
+    try:
+        assert_replay_storage_scorecard(scorecard)
+    except AssertionError as exc:
+        assert f"{storage_records[0]['case_id']} failed storage_record_hash" in str(exc)
+    else:
+        raise AssertionError("replay storage gate must fail when a storage record is tampered")
 
 
 def test_phase8_comparison_harness_builds_reference_scorecard():
