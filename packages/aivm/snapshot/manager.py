@@ -16,6 +16,7 @@ class SnapshotManager:
     
     CONTRACT_VERSION = 1
     REPLAY_TRACE_VERSION = "aivm.snapshot_replay.v1"
+    DEVICE_MANIFEST_VERSION = "aivm.device_manifest.v1"
     CANONICAL_TICK_SEQUENCE = [
         "admission",
         "perception",
@@ -49,6 +50,23 @@ class SnapshotManager:
         unsigned.pop("record_hash", None)
         json_payload = json.dumps(unsigned, sort_keys=True)
         return hashlib.sha256(json_payload.encode()).hexdigest()
+
+    @staticmethod
+    def _fingerprint_device_manifest(manifest: dict[str, Any]) -> str:
+        unsigned = dict(manifest)
+        unsigned.pop("manifest_hash", None)
+        json_payload = json.dumps(unsigned, sort_keys=True)
+        return hashlib.sha256(json_payload.encode()).hexdigest()
+
+    @staticmethod
+    def build_device_manifest(device_blobs: dict[str, str], device_fingerprints: dict[str, str]) -> dict[str, Any]:
+        manifest = {
+            "version": SnapshotManager.DEVICE_MANIFEST_VERSION,
+            "devices": sorted(device_blobs),
+            "fingerprints": {name: device_fingerprints[name] for name in sorted(device_fingerprints)},
+        }
+        manifest["manifest_hash"] = SnapshotManager._fingerprint_device_manifest(manifest)
+        return manifest
 
     @staticmethod
     def build_replay_trace(npc: NPC) -> dict[str, Any]:
@@ -106,6 +124,25 @@ class SnapshotManager:
             raise ValueError("Snapshot replay trace record fingerprint mismatch")
 
     @staticmethod
+    def _verify_device_manifest(
+        device_manifest: dict[str, Any],
+        device_blobs: dict[str, str],
+        device_fingerprints: dict[str, str],
+    ) -> None:
+        if not device_manifest:
+            return
+        if device_manifest.get("version") != SnapshotManager.DEVICE_MANIFEST_VERSION:
+            raise ValueError("Snapshot device manifest version mismatch")
+        expected_hash = device_manifest.get("manifest_hash")
+        actual_hash = SnapshotManager._fingerprint_device_manifest(device_manifest)
+        if expected_hash != actual_hash:
+            raise ValueError("Snapshot device manifest fingerprint mismatch")
+        if sorted(device_blobs) != list(device_manifest.get("devices", [])):
+            raise ValueError("Snapshot device manifest device set mismatch")
+        if device_fingerprints != device_manifest.get("fingerprints", {}):
+            raise ValueError("Snapshot device manifest fingerprint set mismatch")
+
+    @staticmethod
     def capture(npc: NPC) -> bytes:
         """
         Snapshot all mounted devices and kernel state into a sealed blob.
@@ -135,6 +172,7 @@ class SnapshotManager:
             "header": header,
             "devices": device_blobs,
             "device_fingerprints": device_fingerprints,
+            "device_manifest": SnapshotManager.build_device_manifest(device_blobs, device_fingerprints),
             "replay_trace": SnapshotManager.build_replay_trace(npc),
             "identity": {
                 "name": npc.identity.name,
@@ -195,6 +233,11 @@ class SnapshotManager:
                 npc.mounted_devices[name].restore(bytes.fromhex(device_hex))
 
         expected_fingerprints = data.get("device_fingerprints", {})
+        SnapshotManager._verify_device_manifest(
+            data.get("device_manifest", {}),
+            data.get("devices", {}),
+            expected_fingerprints,
+        )
         for name, expected in expected_fingerprints.items():
             device = npc.mounted_devices.get(name)
             if device is None:

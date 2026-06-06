@@ -3493,3 +3493,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Pending public datasets are not mounted hardware yet, but they are part of the future Knowledge Cloud rebuild substrate. They now need a stable dataset locator, license evidence, and rebuild command before they can pass source-plane validation.
 - Runtime artifact provenance is stronger when `build.source_manifest` fingerprints the validators and docs that define source admission, not only corpus payloads and pipeline inputs.
+
+## Current Session — 2026-06-06 (Agent 8 — AIVM Device Manifest Seal)
+
+### 📝 Summary
+- Added `aivm.device_manifest.v1` snapshot metadata that seals the sorted mounted-device set and per-device fingerprint table with a canonical `manifest_hash`.
+- Restore now verifies the device manifest hash, mounted-device set, and fingerprint table before per-device replay checks admit an NPC back into the AIVM kernel.
+- Added regression coverage for validly resealed snapshots that alter the expected fingerprint table or drop a mounted CHAL device blob.
+- Advanced Phase 7 CHAL memory partition save/load integrity without touching generated Knowledge Cloud artifacts or claiming hardware behavior beyond the validated AIVM/kernel smoke checks.
+
+### ✅ Verified
+- `python -m py_compile packages/aivm/snapshot/manager.py tests/aivm/test_snapshot_integrity.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/aivm/test_snapshot_integrity.py` — passed, 13 tests.
+- `cmake --build packages/kernel/build -j2` — passed; `synthesus_kernel`, `test_vmm`, `test_emul`, and `_synthesus_kernel` targets built.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/kernel/build SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_kernel_pybind_vpd.py tests/test_kernel_bridge.py` — passed, 46 tests.
+
+### 🚧 Left Off / Next Steps
+- Broader persistent runtime conversation trace storage remains open; this run sealed AIVM snapshot device identity but did not choose a production trace-store write path.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- AIVM snapshot admission now has two compact sealed metadata layers: `aivm.snapshot_replay.v1` for canonical tick replay identity and `aivm.device_manifest.v1` for mounted CHAL partition identity.
+- The manifest seal is intentionally source/runtime metadata, not a hardware acceleration claim. It makes Python AIVM snapshot restore stricter before kernel admission.

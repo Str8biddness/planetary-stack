@@ -68,6 +68,13 @@ def test_snapshot_records_and_verifies_device_fingerprints():
     assert data["device_fingerprints"]["VQD"] == npc.mounted_devices["VQD"].fingerprint()
     assert data["device_fingerprints"]["VCD"] == npc.mounted_devices["VCD"].fingerprint()
     assert data["device_fingerprints"]["VWD"] == npc.mounted_devices["VWD"].fingerprint()
+    assert data["device_manifest"]["version"] == SnapshotManager.DEVICE_MANIFEST_VERSION
+    assert data["device_manifest"]["devices"] == sorted(data["devices"])
+    assert data["device_manifest"]["fingerprints"] == data["device_fingerprints"]
+    assert (
+        data["device_manifest"]["manifest_hash"]
+        == SnapshotManager.build_device_manifest(data["devices"], data["device_fingerprints"])["manifest_hash"]
+    )
 
     restored = AIVMKernel(enable_scheduler=False).restore_npc(blob)
     assert restored.mounted_devices["VCD"].get("turn-plan") == {"route": "quad_brain_path"}
@@ -81,6 +88,30 @@ def test_snapshot_records_and_verifies_device_fingerprints():
     ]
     for name, expected in data["device_fingerprints"].items():
         assert restored.mounted_devices[name].fingerprint() == expected
+
+
+def test_snapshot_restore_rejects_device_manifest_fingerprint_set_mismatch_with_valid_outer_seal():
+    kernel = AIVMKernel(enable_scheduler=False)
+    npc = kernel.spawn_npc(PersonaIdentity(id="manifest_tamper_npc", name="Manifest Tamper", archetype="scribe"))
+
+    data = json.loads(SnapshotManager.capture(npc).decode())
+    data["device_fingerprints"]["VMD"] = "forged"
+    data["footer"]["fingerprint"] = SnapshotManager._fingerprint_payload(data)
+
+    with pytest.raises(ValueError, match="device manifest fingerprint set mismatch"):
+        AIVMKernel(enable_scheduler=False).restore_npc(json.dumps(data, sort_keys=True).encode())
+
+
+def test_snapshot_restore_rejects_device_manifest_missing_device_with_valid_outer_seal():
+    kernel = AIVMKernel(enable_scheduler=False)
+    npc = kernel.spawn_npc(PersonaIdentity(id="manifest_missing_npc", name="Manifest Missing", archetype="scribe"))
+
+    data = json.loads(SnapshotManager.capture(npc).decode())
+    del data["devices"]["VQD"]
+    data["footer"]["fingerprint"] = SnapshotManager._fingerprint_payload(data)
+
+    with pytest.raises(ValueError, match="device manifest device set mismatch"):
+        AIVMKernel(enable_scheduler=False).restore_npc(json.dumps(data, sort_keys=True).encode())
 
 
 def test_snapshot_restore_preserves_vqd_scope_policy_and_lookup_trace():
