@@ -130,6 +130,13 @@ def _validate_source_manifest_yaml(
         rebuild_command = item.get("rebuild_command")
         if not isinstance(rebuild_command, str) or not rebuild_command.strip():
             errors.append(f"pending source entry missing rebuild_command: {rel}[{index}]")
+        has_pending_locator = any(
+            isinstance(item.get(key), str) and item.get(key, "").strip()
+            for key in ("repo", "url", "repository", "dataset")
+        )
+        has_pending_files = isinstance(item.get("files"), list) and bool(item.get("files"))
+        if not has_pending_locator and not has_pending_files:
+            errors.append(f"pending source entry missing upstream locator: {rel}[{index}]")
 
 
 def validate_source_planes(root: str | Path = ".") -> SourcePlaneValidation:

@@ -12,7 +12,9 @@ from typing import Iterable, Sequence
 
 DEFAULT_SOURCE_ROOTS = [
     "sources",
+    "synthesus_knowledge_cloud",
     "pipelines",
+    "docs",
     "patterns",
     "synthetic",
     "grounding_corpus",
@@ -47,6 +49,8 @@ def iter_manifest_files(root: Path, include_roots: Sequence[str], exclude: Itera
             for path in sorted(base.rglob("*")):
                 if not path.is_file():
                     continue
+                if "__pycache__" in path.parts or path.suffix in {".pyc", ".pyo"}:
+                    continue
                 rel = path.relative_to(root).as_posix()
                 if rel in excluded:
                     continue
@@ -57,6 +61,8 @@ def iter_manifest_files(root: Path, include_roots: Sequence[str], exclude: Itera
             continue
         for path in sorted(base.rglob("*")):
             if not path.is_file():
+                continue
+            if "__pycache__" in path.parts or path.suffix in {".pyc", ".pyo"}:
                 continue
             rel = path.relative_to(root).as_posix()
             if rel in excluded:

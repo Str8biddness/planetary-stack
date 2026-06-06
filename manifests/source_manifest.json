@@ -1,10 +1,12 @@
 {
   "version": "1",
   "kind": "synthesus-knowledge-source-plane",
-  "generated_at": "2026-06-06T18:06:57.591018+00:00",
+  "generated_at": "2026-06-06T22:06:45.573912+00:00",
   "roots": [
     "sources",
+    "synthesus_knowledge_cloud",
     "pipelines",
+    "docs",
     "patterns",
     "synthetic",
     "grounding_corpus",
@@ -38,34 +40,74 @@
       "sha256": "98665d819bcc983ab2d29828b3cd8c9f23495bf3a684f92bb8ca4849da1364ee"
     },
     {
+      "path": "synthesus_knowledge_cloud/__init__.py",
+      "size": 752,
+      "sha256": "8b39ffa876310b43abc7cc85a15e9802a224b124151cad04b2eb34e57887da24"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/__main__.py",
+      "size": 12554,
+      "sha256": "b6fb7d16b6ba18f3a0e5ffa6e66bebaf432da6d92ac257cdd6f001a43f2d7e9a"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/bootstrap.py",
+      "size": 3069,
+      "sha256": "b96558d789b01ead7af20313b2536dc5cf88110fe111a629c3397a5a05e7c1af"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/build.py",
+      "size": 9804,
+      "sha256": "c41a013872fcb4ca207a6aefc735d8950d71edf2f18fd81736c51bcb0e02a95b"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/manifest.py",
+      "size": 10345,
+      "sha256": "69d0436ee9d4b6e25312e7fd5edf62a66e215f917835e2efa79e53bbba440f79"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/mirrors.py",
+      "size": 2314,
+      "sha256": "edf6a687e61a34f93ed15e18fd8493c50cc300582ca01cd8b72752ef7740a4a7"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/profiles.py",
+      "size": 852,
+      "sha256": "68ad0e351fca41b9451a0c2c4b53550c0048b86e1d6879b4fb87207a4882f8de"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/provenance.py",
+      "size": 6335,
+      "sha256": "a01ee92555a4d461b5ee0b6ffcce473e8ce1bf3a3a8b202ce23457c64a0dc81a"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/serve.py",
+      "size": 1092,
+      "sha256": "1d7ee4b2623685fd31103139f93200333e8cd0fcb6ba1bd1d18cc1761ff452c0"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/source_planes.py",
+      "size": 7096,
+      "sha256": "651b2a198080906983fe6696592cff9f82c9d4ae447f56d96e155d236bda6b3b"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/status.py",
+      "size": 4952,
+      "sha256": "5dfd7cfd003853f09f0bd0177b957915d69caee5fb23412cc06b4a802db7c61d"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/sync.py",
+      "size": 10543,
+      "sha256": "08efc128f4711cbd0da52e11e793147d5b9b2f32d5faa74b9a0c85f45c69aea7"
+    },
+    {
       "path": "pipelines/__init__.py",
       "size": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "path": "pipelines/__pycache__/__init__.cpython-312.pyc",
-      "size": 160,
-      "sha256": "2253d14053cb7406295acd3db6ef94ccd4c3d76d09cb67e9c50774dfb71f765d"
-    },
-    {
       "path": "pipelines/build/__init__.py",
       "size": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    {
-      "path": "pipelines/build/__pycache__/kn_populator.cpython-312.pyc",
-      "size": 23521,
-      "sha256": "ec2ce2258ac704765c5082572252b269a4004b582e054fe374128fb233029724"
-    },
-    {
-      "path": "pipelines/build/__pycache__/run_population.cpython-312.pyc",
-      "size": 7620,
-      "sha256": "57fbaaa3c1cc41b7f04738682787f6060136f3c6eb3c3d3b4f2e495f23bcbbab"
-    },
-    {
-      "path": "pipelines/build/__pycache__/swarm_embedder.cpython-312.pyc",
-      "size": 8255,
-      "sha256": "af85eb312960ece2f47df43db14ad99f19192968b51ff8d819573b0100982d4d"
     },
     {
       "path": "pipelines/build/kn_populator.py",
@@ -88,11 +130,6 @@
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "path": "pipelines/ingest/__pycache__/kaggle_loader.cpython-312.pyc",
-      "size": 16586,
-      "sha256": "c4828aba857c650ed4a56d6823cedd9de92819952b0a13c735510229e393fff2"
-    },
-    {
       "path": "pipelines/ingest/kaggle_loader.py",
       "size": 14704,
       "sha256": "af8507cbf17d713e85c0ad1cef48ed85775344675c57dc0a3d00e95da0f08c87"
@@ -101,31 +138,6 @@
       "path": "pipelines/ingest_corpus/__init__.py",
       "size": 62,
       "sha256": "db762ccfae94a09d0788cec1237060da0bedff877ede63af2dbc78c31fdab247"
-    },
-    {
-      "path": "pipelines/ingest_corpus/__pycache__/__init__.cpython-312.pyc",
-      "size": 244,
-      "sha256": "7200bb343db3bb978419b2ae9593db8c700bcab1155fd8b6efea672dc18f4eb3"
-    },
-    {
-      "path": "pipelines/ingest_corpus/__pycache__/arxiv_fetcher.cpython-312.pyc",
-      "size": 9169,
-      "sha256": "88c794062a958caf8adb045ead16547c3673b7963f2863cb34d51bf3bb0d61f1"
-    },
-    {
-      "path": "pipelines/ingest_corpus/__pycache__/corpus_loader.cpython-312.pyc",
-      "size": 7155,
-      "sha256": "62326940cbb23934d484bc666516d730838ff641184d20c43faebbbe35a5a5ad"
-    },
-    {
-      "path": "pipelines/ingest_corpus/__pycache__/papers_fetcher.cpython-312.pyc",
-      "size": 9726,
-      "sha256": "38c907c1c2a9bfa76645a17dd3b63fe8e1c3e3bb4fd0031d91fa0c8d96138b6d"
-    },
-    {
-      "path": "pipelines/ingest_corpus/__pycache__/wikipedia_fetcher.cpython-312.pyc",
-      "size": 10124,
-      "sha256": "404774e37a97e5dba5ab18d8d22d93dcf4fd7ca2022abae574b6c0276bde7714"
     },
     {
       "path": "pipelines/ingest_corpus/arxiv_fetcher.py",
@@ -166,6 +178,56 @@
       "path": "pipelines/publish/manifest_manager.py",
       "size": 3267,
       "sha256": "3dea969f013253fe9734ff07e37fea660588181a3cd61c10b586cb475e8b5803"
+    },
+    {
+      "path": "docs/BOOTSTRAP.md",
+      "size": 1607,
+      "sha256": "75a20584fbdb1754929d47a84710dfd137d95e6efb196631bf100683cbe5eff9"
+    },
+    {
+      "path": "docs/BUILD.md",
+      "size": 2745,
+      "sha256": "14e439a0e98e3bcae5d64c52bcc82a03d8589449f2bf9dbbf905337e110970c5"
+    },
+    {
+      "path": "docs/DATA_MODEL.md",
+      "size": 3066,
+      "sha256": "6677978144104c8803e05012b9e389629290d6ae67cac114b4c92f1185e7e33a"
+    },
+    {
+      "path": "docs/INTEGRATION.md",
+      "size": 1609,
+      "sha256": "e5c0d27cf3c19958433a6da763fa8d708dc18973d32e632ef59bfa6aafea62ae"
+    },
+    {
+      "path": "docs/MIRRORS.md",
+      "size": 1723,
+      "sha256": "16f3a71b2728481aaf7c942b2977ff32a9d3c1309d8ee2aac25447ad8ce96266"
+    },
+    {
+      "path": "docs/PACKAGE_CLI.md",
+      "size": 1075,
+      "sha256": "0be6f92d0a018494df652af9c927e2279473f1277977c4a538d451cf04577fef"
+    },
+    {
+      "path": "docs/PIPELINE_ROADMAP.md",
+      "size": 1109,
+      "sha256": "ac16f158c7f9a12e9b8ab333c29dc2c9f4b5fcd001d93a8b25f4a6a6507462d6"
+    },
+    {
+      "path": "docs/PROVENANCE.md",
+      "size": 4191,
+      "sha256": "cc86247bc4747d480b435b768cf8965d77e7d171340ea7046c560a943f4d41e5"
+    },
+    {
+      "path": "docs/REBUILDING.md",
+      "size": 1774,
+      "sha256": "47a0d0586920143c3632ae6ff6de240376edfe0db8bb9977732ef00259df2ae2"
+    },
+    {
+      "path": "docs/SOURCES.md",
+      "size": 2284,
+      "sha256": "39c99eda61a3d9b695a7780d1496cbc5129af613a874fa0266d8cf86bc458587"
     },
     {
       "path": "patterns/characters/computress/bio.json",

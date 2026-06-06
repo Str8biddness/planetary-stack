@@ -33,8 +33,8 @@
       "size": 25100,
       "kind": "synthesus-knowledge-source-plane",
       "generated_at": "<ISO timestamp>",
-      "roots": ["sources", "pipelines", "patterns", "synthetic", "grounding_corpus", "support_models", "corpus"],
-      "artifact_count": 139
+      "roots": ["sources", "synthesus_knowledge_cloud", "pipelines", "docs", "patterns", "synthetic", "grounding_corpus", "support_models", "corpus"],
+      "artifact_count": 151
     },
     "datasets": {
       "jeopardy": {"version": "1", "id": "jeopardy_clue_dataset", "license": "..."},
@@ -52,7 +52,7 @@
 - **Reproducibility** — anyone can know which profile + git sha + embedder produced the bundle.
 - **Inspectability** — local Synthesus runtimes can refuse to load a bundle when the embedder fingerprint disagrees with the FAISS index expectation.
 - **Auditability** — license fields per source make later distribution decisions reviewable.
-- **Source-plane integrity** — the source-manifest fingerprint ties a stamped runtime bundle back to the exact hash set that admitted sources, pipelines, patterns, synthetic corpora, support models, and hardware/emulation corpora into the rebuild plane.
+- **Source-plane integrity** — the source-manifest fingerprint ties a stamped runtime bundle back to the exact hash set that admitted sources, validation package code, pipelines, provenance docs, patterns, synthetic corpora, support models, and hardware/emulation corpora into the rebuild plane.
 - **Drift detection** — `manifest_revised_at` separates "bundle generated" from "manifest re-stamped".
 
 ## How it's produced

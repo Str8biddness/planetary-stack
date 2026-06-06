@@ -2,7 +2,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from synthesus_knowledge_cloud.__main__ import main
-from synthesus_knowledge_cloud.manifest import build_manifest, write_manifest
+from synthesus_knowledge_cloud.manifest import DEFAULT_SOURCE_ROOTS, build_manifest, write_manifest
 from synthesus_knowledge_cloud.provenance import capture_provenance, stamp_manifest
 from synthesus_knowledge_cloud.profiles import load_profile, summarize_profile
 from synthesus_knowledge_cloud.source_planes import validate_source_planes
@@ -74,6 +74,24 @@ def test_manifest_validate_accepts_stamped_source_manifest_provenance(tmp_path):
     write_manifest(stamp_manifest(manifest, provenance), artifacts / "manifest.json")
 
     assert main(["validate", "--root", str(artifacts)]) == 0
+
+
+def test_source_manifest_default_roots_cover_validator_and_docs_without_pycache(tmp_path):
+    root = tmp_path
+    (root / "sources").mkdir()
+    (root / "synthesus_knowledge_cloud" / "__pycache__").mkdir(parents=True)
+    (root / "docs").mkdir()
+    (root / "sources" / "sample.yaml").write_text("id: sample\n", encoding="utf-8")
+    (root / "synthesus_knowledge_cloud" / "source_planes.py").write_text("x = 1\n", encoding="utf-8")
+    (root / "synthesus_knowledge_cloud" / "__pycache__" / "source_planes.cpython-312.pyc").write_bytes(b"cache")
+    (root / "docs" / "SOURCES.md").write_text("# Sources\n", encoding="utf-8")
+
+    manifest = build_manifest(root, DEFAULT_SOURCE_ROOTS, kind="synthesus-knowledge-source-plane")
+    paths = {item["path"] for item in manifest["artifacts"]}
+
+    assert "synthesus_knowledge_cloud/source_planes.py" in paths
+    assert "docs/SOURCES.md" in paths
+    assert "synthesus_knowledge_cloud/__pycache__/source_planes.cpython-312.pyc" not in paths
 
 
 def test_profiles_load():
@@ -258,3 +276,38 @@ def test_source_planes_rejects_pending_dataset_without_rebuild_command(tmp_path)
 
     assert not result.ok
     assert "pending source entry missing rebuild_command: sources/planned.yaml[0]" in result.errors
+
+
+def test_source_planes_rejects_pending_dataset_without_upstream_locator(tmp_path):
+    root = tmp_path
+    sources = root / "sources"
+    sources.mkdir()
+    (sources / "datasets.yaml").write_text('version: "1"\nname: datasets\n', encoding="utf-8")
+    (sources / "planned.yaml").write_text(
+        "\n".join(
+            [
+                'version: "1"',
+                "id: planned_source",
+                "name: Planned Source",
+                "source_type: huggingface_datasets",
+                "license:",
+                '  spdx: "MIXED"',
+                "  notes: Per-dataset licenses are required.",
+                "default_enabled: false",
+                "pending:",
+                "  - id: weak_dataset",
+                "    rebuild_command: synthesus-kc build profiles/public-base.yaml",
+                "    license:",
+                '      spdx: "MIT"',
+                "      notes: Redistributable test fixture.",
+                "loader: pipelines/ingest/huggingface_loader.py::load_dataset",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = validate_source_planes(root)
+
+    assert not result.ok
+    assert "pending source entry missing upstream locator: sources/planned.yaml[0]" in result.errors
