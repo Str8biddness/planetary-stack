@@ -51,7 +51,7 @@ Output should be written to `tools/ppbrs_dev_log.md` and any dedicated ignored b
 
 Target file: `ppbrs/pattern_classifier.py`
 
-Status 2026-06-01: implemented an inverted token index and fanout-aware broad-token pruning in `PatternClassifier`. Queries with a selective token plus a shared trigger now score only selective candidates; broad-token-only queries still evaluate the broad candidate set for compatibility.
+Status 2026-06-06: implemented an inverted token index, fanout-aware broad-token pruning, cached normalized token forms, and exact-match short-circuiting in `PatternClassifier`. Queries with a selective token plus a shared trigger now score only selective candidates; broad-token-only queries still evaluate the broad candidate set for compatibility. Candidate scoring reuses normalized forms and avoids fuzzy distance checks when exact token/form matches already prove the match.
 
 Implementation order:
 1. Build an inverted index from normalized token -> pattern IDs.
@@ -60,6 +60,7 @@ Implementation order:
 4. Score only the candidate set.
 5. Run fuzzy matching only on the reduced set.
 6. Keep exact-match or high-confidence early exits.
+7. Cache normalized token forms so candidate scoring does not rebuild cleaned variants on every request.
 
 Expected effect:
 - lower average match latency

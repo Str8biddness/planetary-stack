@@ -3418,3 +3418,27 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - `build.source_manifest` is now a data-plane validation requirement, not just runtime release metadata. That keeps public Knowledge Cloud bundles from validating as mounted CHAL hardware unless their generated artifacts can be traced to the exact source-plane rebuild hash set.
+
+## Current Session — 2026-06-06 (Agent 6 — Pattern Exact-Match Fast Path)
+
+### 📝 Summary
+- Added cached normalized token forms to `PatternClassifier` so candidate scoring reuses cleaned token variants instead of rebuilding them for every exact-match pass.
+- Short-circuited exact token/form matches before Levenshtein fuzzy checks, keeping fuzzy distance work out of common PPBRS firmware matches while preserving fuzzy behavior for unmatched forms.
+- Added regression coverage proving exact matches do not invoke fuzzy distance and legacy PPBRS template signatures remain non-user-facing firmware context routed to the generation spine.
+- Advanced Phase 6 PPBRS firmware conversion/hot-path optimization without changing the public classifier or pipeline response contract.
+
+### ✅ Verified
+- `python -m py_compile packages/reasoning/pattern_classifier.py tests/test_ppbrs.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — passed, 123 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/ppbrs_benchmark.py` — passed; pattern matching p50 0.1932 ms, p95 0.2670 ms, avg 0.1870 ms.
+- `git diff --check -- packages/reasoning/pattern_classifier.py tests/test_ppbrs.py docs/modules/PPBRS.md docs/roadmap/PPBRS_OPTIMIZATION_UPGRADE.md docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md docs/agents/AGENT_LOG.md tools/ppbrs_dev_log.md` — passed.
+
+### 🚧 Left Off / Next Steps
+- The next Agent 6 slice can define the Python-to-kernel protocol for high-frequency PPBRS match requests, then compare kernel and Python firmware-signal equivalence before enabling offload.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align.
+- Restamp `synthesus-knowledge-cloud/artifacts/manifest.json` with `build.source_manifest` after the coherent rebuild, then rerun `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker`.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- PPBRS remains firmware: pattern matches can carry legacy template strings only as non-user-facing `template_context` inside the CHAL firmware signal.
+- The classifier hot path now treats exact token overlap as a bounded firmware signal decision and reserves fuzzy edit-distance work for genuinely inexact matches.

@@ -83,6 +83,24 @@ class TestPatternClassifier:
         assert len(results) == 2
         assert results[0].confidence >= results[1].confidence
 
+    def test_exact_match_scoring_skips_fuzzy_distance(self, monkeypatch):
+        classifier = PatternClassifier(threshold=0.1, use_fuzzy=True)
+        classifier.add_pattern(Pattern(id="exact", tokens=["hello!", "world"], weight=1.0))
+        calls = []
+
+        def fail_if_called(*args):
+            calls.append(args)
+            raise AssertionError("exact-token scoring should not call fuzzy distance")
+
+        monkeypatch.setattr(classifier, "_levenshtein_similarity", fail_if_called)
+
+        result = classifier.get_best_match("hello world")
+
+        assert result is not None
+        assert result.pattern_id == "exact"
+        assert result.matched_tokens == ["hello!", "world"]
+        assert calls == []
+
     def test_broad_tokens_do_not_expand_specific_candidate_set(self):
         classifier = PatternClassifier(threshold=0.1)
         for i in range(120):
@@ -245,6 +263,27 @@ class TestContextAwareReasoningPipeline:
         assert result['user_facing'] is False
         assert result['chal_firmware_signal']['module_message']['payload']['template_context'] == "Matched!"
         assert result['chal_firmware_signal']['constraints']
+
+    def test_process_with_legacy_template_signature_stays_non_user_facing(self):
+        classifier = PatternClassifier()
+        classifier.add_pattern(Pattern(
+            id="legacy",
+            tokens=["legacy"],
+            weight=1.0,
+            response_template="[module] Handled: legacy path via response_template"
+        ))
+        pipeline = ContextAwareReasoningPipeline(classifier=classifier)
+
+        result = pipeline.process("legacy signal")
+
+        assert result['status'] == 'success'
+        assert result['response'] == ''
+        assert result['user_facing'] is False
+        assert '[module]' not in result['response']
+        assert 'response_template' not in result['response']
+        assert result['chal_firmware_signal']['module_message']['target'] == 'generation_spine'
+        assert 'do_not_emit_ppbrs_template' in result['chal_firmware_signal']['constraints']
+        assert result['chal_firmware_signal']['module_message']['payload']['template_context'].startswith("[module]")
 
     def test_weighted_rules_use_tag_index(self):
         evaluator = WeightedRuleEvaluator()

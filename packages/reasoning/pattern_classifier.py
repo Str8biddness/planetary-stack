@@ -85,6 +85,7 @@ class PatternClassifier:
         self.threshold = threshold
         self.use_fuzzy = use_fuzzy
         self._token_cache: Dict[str, set] = {}
+        self._token_form_cache: Dict[str, List[Tuple[str, set]]] = {}
         self._inverted_index: Dict[str, set] = {}
         self._max_broad_token_fanout = 64
         
@@ -97,6 +98,10 @@ class PatternClassifier:
         self.patterns[pattern.id] = pattern
         normalized = self._normalize_tokens(pattern.tokens)
         self._token_cache[pattern.id] = normalized
+        self._token_form_cache[pattern.id] = [
+            (token, self._normalize_token_forms(token))
+            for token in pattern.tokens
+        ]
         
         # Update inverted index
         for token in normalized:
@@ -118,6 +123,11 @@ class PatternClassifier:
             normalized.add(tok.lower().strip())
             normalized.add(re.sub(r'[^\w\s]', '', tok.lower().strip()))
         return normalized
+
+    def _normalize_token_forms(self, token: str) -> set:
+        normalized = token.lower().strip()
+        cleaned = re.sub(r'[^\w\s]', '', normalized)
+        return {form for form in (normalized, cleaned) if form}
     
     def _fuzzy_match(self, token: str, input_tokens: set) -> bool:
         """Checks if a token matches any input tokens using fuzzy similarity logic.
@@ -207,28 +217,28 @@ class PatternClassifier:
         """
         if input_tokens is None:
             input_tokens = self._tokenize_input(input_str)
-        pattern_normalized = self._token_cache.get(pattern.id, set())
-        
         matched = []
         unmatched = []
-        
-        for tok in pattern.tokens:
-            tok_normalized = tok.lower().strip()
-            tok_clean = re.sub(r'[^\w\s]', '', tok_normalized)
-            
-            found = False
-            for inp_tok in input_tokens:
-                if tok_normalized == inp_tok or tok_clean == inp_tok:
-                    matched.append(tok)
-                    found = True
-                    break
-                if self.use_fuzzy and self._levenshtein_similarity(tok_normalized, inp_tok) > 0.8:
-                    matched.append(tok)
-                    found = True
-                    break
-            
-            if not found:
-                unmatched.append(tok)
+
+        token_forms = self._token_form_cache.get(pattern.id)
+        if token_forms is None:
+            token_forms = [(token, self._normalize_token_forms(token)) for token in pattern.tokens]
+            self._token_form_cache[pattern.id] = token_forms
+
+        for raw_token, normalized_forms in token_forms:
+            if normalized_forms & input_tokens:
+                matched.append(raw_token)
+                continue
+
+            if self.use_fuzzy and any(
+                self._levenshtein_similarity(form, inp_tok) > 0.8
+                for form in normalized_forms
+                for inp_tok in input_tokens
+            ):
+                matched.append(raw_token)
+                continue
+
+            unmatched.append(raw_token)
         
         if not pattern.tokens:
             return 0.0, [], []

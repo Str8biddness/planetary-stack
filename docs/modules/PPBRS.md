@@ -67,6 +67,7 @@ The repository is currently in a validated PPBRS baseline state. Significant opt
 ### Key Optimizations
 - **Token Indexing**: Reduced candidate volume in `PatternClassifier` using inverted token indexes.
 - **Fanout-Aware Candidate Pruning**: Shared high-frequency trigger tokens are treated as broad evidence and ignored when more selective query tokens are available. If a query only contains broad tokens, PPBRS still evaluates those broad candidates so compatibility and fallback behavior remain intact.
+- **Exact-Match Scoring Cache**: `PatternClassifier` caches normalized token forms per pattern and short-circuits exact token/form matches before fuzzy distance checks, keeping Levenshtein work out of the common exact-match firmware path.
 - **Adjacency Maps**: Replaced linear edge scans with constant-time adjacency lookups in `multi_step_reasoning`.
 - **Cached Topology**: Pre-computed reasoning graph structures for zero-overhead traversal.
 - **Rule Tag + Trigger Indexing**: Rule evaluators prefilter by context tags, trigger keys, and exact trigger values before evaluating conditions.

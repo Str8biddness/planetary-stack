@@ -623,3 +623,30 @@ Full PPBRS micro-benchmark after adding the confidence metric:
 - `python -m py_compile packages/reasoning/confidence_scoring.py tests/test_ppbrs.py tools/ppbrs_benchmark.py`
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 121 passed.
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel python tools/ppbrs_benchmark.py`
+
+## Daily Entry: 2026-06-06 (Agent 6 — Pattern Exact-Match Fast Path)
+
+### Actions Performed
+
+1. Added cached normalized token forms to `PatternClassifier` so exact scoring no longer rebuilds cleaned token variants for every candidate.
+2. Short-circuited exact token/form matches before fuzzy Levenshtein checks, keeping fuzzy matching only for still-unmatched token forms.
+3. Added regression coverage proving exact matches do not call fuzzy distance and legacy PPBRS template signatures remain non-user-facing firmware context.
+
+### Benchmark Run
+
+PPBRS micro-benchmark after exact-match scoring cache:
+
+| Component | p50 (ms) | p95 (ms) | Avg (ms) |
+| --- | --- | --- | --- |
+| pattern_matching | 0.1932 | 0.2670 | 0.1870 |
+| rule_evaluation | 0.0225 | 0.0384 | 0.0248 |
+| action_mapping | 0.0267 | 0.0388 | 0.0279 |
+| weighted_top_rule | 0.0291 | 0.0405 | 0.0304 |
+| confidence_scoring | 0.0055 | 0.0057 | 0.0057 |
+| graph_traversal | 0.0158 | 0.0195 | 0.0169 |
+
+### Verified
+
+- `python -m py_compile packages/reasoning/pattern_classifier.py tests/test_ppbrs.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 123 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/ppbrs_benchmark.py`
