@@ -120,6 +120,7 @@ def validate_manifest(
     manifest = load_manifest(root_path / manifest_name)
     failures: list[str] = []
     failures.extend(_validate_unique_artifact_paths(manifest))
+    failures.extend(_validate_source_manifest_provenance(manifest))
     checked = 0
     for item in manifest.get("artifacts", []):
         checked += 1
@@ -148,6 +149,34 @@ def _validate_unique_artifact_paths(manifest: dict) -> list[str]:
             failures.append(f"duplicate artifact path: {rel}")
         else:
             seen.add(rel)
+    return failures
+
+
+def _validate_source_manifest_provenance(manifest: dict) -> list[str]:
+    if manifest.get("kind") != "synthesus-knowledge-artifacts":
+        return []
+    build = manifest.get("build")
+    if not isinstance(build, dict):
+        return ["manifest missing build provenance block"]
+    source_manifest = build.get("source_manifest")
+    if not isinstance(source_manifest, dict):
+        return ["manifest build.source_manifest fingerprint is missing"]
+
+    failures: list[str] = []
+    for field in ("path", "sha256", "kind", "generated_at"):
+        value = source_manifest.get(field)
+        if not isinstance(value, str) or not value.strip():
+            failures.append(f"manifest build.source_manifest missing {field}")
+    sha256 = source_manifest.get("sha256")
+    if isinstance(sha256, str) and (len(sha256) != 64 or any(c not in "0123456789abcdef" for c in sha256.lower())):
+        failures.append("manifest build.source_manifest sha256 is not 64 hex characters")
+    for field in ("size", "artifact_count"):
+        value = source_manifest.get(field)
+        if not isinstance(value, int) or value <= 0:
+            failures.append(f"manifest build.source_manifest missing positive {field}")
+    roots = source_manifest.get("roots")
+    if not isinstance(roots, list) or not all(isinstance(item, str) and item.strip() for item in roots):
+        failures.append("manifest build.source_manifest missing roots")
     return failures
 
 

@@ -82,7 +82,7 @@ Small support artifacts that are not the FAISS query embedder but still support 
 
 ## Integrity contracts
 
-- `artifacts/manifest.json` validates runtime downloads.
+- `artifacts/manifest.json` validates runtime downloads and, for production `synthesus-knowledge-artifacts` bundles, must carry `build.source_manifest` provenance.
 - `manifests/source_manifest.json` validates source/pipeline/pattern/synthetic/support planes.
 - Both manifest types reject duplicate artifact paths so one file identity cannot carry competing provenance or integrity records.
 - Runtime clients should use the artifact manifest.

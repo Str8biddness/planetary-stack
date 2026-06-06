@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 from synthesus_knowledge_cloud.__main__ import main
 from synthesus_knowledge_cloud.manifest import build_manifest, write_manifest
+from synthesus_knowledge_cloud.provenance import capture_provenance, stamp_manifest
 from synthesus_knowledge_cloud.profiles import load_profile, summarize_profile
 from synthesus_knowledge_cloud.source_planes import validate_source_planes
 
@@ -44,6 +45,35 @@ def test_manifest_validate_rejects_duplicate_artifact_paths(tmp_path):
     write_manifest(manifest, data / "manifest.json")
 
     assert main(["validate", "--root", str(data)]) == 1
+
+
+def test_manifest_validate_rejects_production_manifest_without_source_manifest(tmp_path):
+    data = tmp_path / "artifacts"
+    data.mkdir()
+    (data / "sample.txt").write_text("hello", encoding="utf-8")
+    manifest = build_manifest(data, ["."], kind="synthesus-knowledge-artifacts")
+    write_manifest(manifest, data / "manifest.json")
+
+    assert main(["validate", "--root", str(data)]) == 1
+
+
+def test_manifest_validate_accepts_stamped_source_manifest_provenance(tmp_path):
+    repo = tmp_path
+    sources = repo / "sources"
+    artifacts = repo / "artifacts"
+    manifests = repo / "manifests"
+    sources.mkdir()
+    artifacts.mkdir()
+    manifests.mkdir()
+    (sources / "sample.yaml").write_text("id: sample\n", encoding="utf-8")
+    (artifacts / "sample.txt").write_text("hello", encoding="utf-8")
+    source_manifest = build_manifest(repo, ["sources"], kind="synthesus-knowledge-source-plane")
+    write_manifest(source_manifest, manifests / "source_manifest.json")
+    manifest = build_manifest(artifacts, ["."], kind="synthesus-knowledge-artifacts")
+    provenance = capture_provenance(repo, artifact_root=artifacts, profile="public-base")
+    write_manifest(stamp_manifest(manifest, provenance), artifacts / "manifest.json")
+
+    assert main(["validate", "--root", str(artifacts)]) == 0
 
 
 def test_profiles_load():
