@@ -127,6 +127,9 @@ def _validate_source_manifest_yaml(
             errors.append(f"pending source entry missing license.spdx: {rel}[{index}]")
         if not isinstance(notes, str) or not notes.strip():
             errors.append(f"pending source entry missing license.notes: {rel}[{index}]")
+        rebuild_command = item.get("rebuild_command")
+        if not isinstance(rebuild_command, str) or not rebuild_command.strip():
+            errors.append(f"pending source entry missing rebuild_command: {rel}[{index}]")
 
 
 def validate_source_planes(root: str | Path = ".") -> SourcePlaneValidation:

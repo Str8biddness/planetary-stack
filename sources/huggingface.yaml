@@ -14,11 +14,13 @@ default_enabled: false
 pending:
   - id: metamath
     repo: meta-math/MetaMathQA
+    rebuild_command: "synthesus-kc build profiles/public-base.yaml"
     license:
       spdx: MIT
       notes: Mathematical reasoning grounding.
   - id: opencharacter
     repo: opencharacter/opencharacter-dialogues
+    rebuild_command: "synthesus-kc build profiles/public-base.yaml"
     license:
       spdx: "Apache-2.0"
       notes: Character dialogue grounding.

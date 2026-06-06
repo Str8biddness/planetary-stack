@@ -106,6 +106,7 @@ def test_source_planes_rejects_pending_dataset_without_spdx(tmp_path):
                 "pending:",
                 "  - id: weak_dataset",
                 "    repo: weak/dataset",
+                "    rebuild_command: synthesus-kc build profiles/public-base.yaml",
                 "    license:",
                 "      notes: Missing SPDX should fail.",
                 "loader: pipelines/ingest/huggingface_loader.py::load_dataset",
@@ -140,6 +141,7 @@ def test_source_planes_rejects_pending_dataset_without_license_notes(tmp_path):
                 "pending:",
                 "  - id: weak_dataset",
                 "    repo: weak/dataset",
+                "    rebuild_command: synthesus-kc build profiles/public-base.yaml",
                 "    license:",
                 '      spdx: "MIT"',
                 "loader: pipelines/ingest/kaggle_loader.py::load_dataset",
@@ -173,6 +175,7 @@ def test_source_planes_rejects_duplicate_pending_dataset_ids(tmp_path):
             "pending:",
             "  - id: duplicate_dataset",
             "    repo: owner/dataset",
+            "    rebuild_command: synthesus-kc build profiles/public-base.yaml",
             "    license:",
             '      spdx: "MIT"',
             "      notes: Redistributable test fixture.",
@@ -190,3 +193,38 @@ def test_source_planes_rejects_duplicate_pending_dataset_ids(tmp_path):
         "duplicate pending source id: duplicate_dataset in sources/b.yaml[0] "
         "already declared in sources/a.yaml[0]"
     ) in result.errors
+
+
+def test_source_planes_rejects_pending_dataset_without_rebuild_command(tmp_path):
+    root = tmp_path
+    sources = root / "sources"
+    sources.mkdir()
+    (sources / "datasets.yaml").write_text('version: "1"\nname: datasets\n', encoding="utf-8")
+    (sources / "planned.yaml").write_text(
+        "\n".join(
+            [
+                'version: "1"',
+                "id: planned_source",
+                "name: Planned Source",
+                "source_type: huggingface_datasets",
+                "license:",
+                '  spdx: "MIXED"',
+                "  notes: Per-dataset licenses are required.",
+                "default_enabled: false",
+                "pending:",
+                "  - id: weak_dataset",
+                "    repo: weak/dataset",
+                "    license:",
+                '      spdx: "MIT"',
+                "      notes: Redistributable test fixture.",
+                "loader: pipelines/ingest/huggingface_loader.py::load_dataset",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = validate_source_planes(root)
+
+    assert not result.ok
+    assert "pending source entry missing rebuild_command: sources/planned.yaml[0]" in result.errors

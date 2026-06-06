@@ -14,6 +14,7 @@ default_enabled: false
 pending:
   - id: trivia_qa
     repo: trivia-qa
+    rebuild_command: "synthesus-kc build profiles/public-base.yaml"
     license:
       spdx: "Apache-2.0"
       notes: Public TriviaQA release; verify Kaggle packaging terms before enabling automated ingest.
