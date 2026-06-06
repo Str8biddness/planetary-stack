@@ -61,7 +61,12 @@ def _validate_license_block(data: dict, rel: str, errors: list[str]) -> None:
         errors.append(f"source manifest missing license.notes: {rel}")
 
 
-def _validate_source_manifest_yaml(path: Path, root_path: Path, errors: list[str]) -> None:
+def _validate_source_manifest_yaml(
+    path: Path,
+    root_path: Path,
+    errors: list[str],
+    pending_ids: dict[str, str],
+) -> None:
     rel = path.relative_to(root_path).as_posix()
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -105,6 +110,13 @@ def _validate_source_manifest_yaml(path: Path, root_path: Path, errors: list[str
         entry_id = item.get("id")
         if not isinstance(entry_id, str) or not entry_id.strip():
             errors.append(f"pending source entry missing id: {rel}[{index}]")
+        else:
+            previous = pending_ids.setdefault(entry_id, f"{rel}[{index}]")
+            if previous != f"{rel}[{index}]":
+                errors.append(
+                    f"duplicate pending source id: {entry_id} in {rel}[{index}] "
+                    f"already declared in {previous}"
+                )
         entry_license = item.get("license")
         if not isinstance(entry_license, dict):
             errors.append(f"pending source entry missing license block: {rel}[{index}]")
@@ -136,9 +148,10 @@ def validate_source_planes(root: str | Path = ".") -> SourcePlaneValidation:
                 errors.append(f"invalid json {rel}: {exc}")
 
     sources_dir = root_path / "sources"
+    pending_ids: dict[str, str] = {}
     if sources_dir.exists():
         for path in sorted(sources_dir.glob("*.yaml")):
-            _validate_source_manifest_yaml(path, root_path, errors)
+            _validate_source_manifest_yaml(path, root_path, errors, pending_ids)
 
     char_dir = root_path / "patterns/characters"
     pattern_files = sorted(char_dir.glob("*/patterns.json")) if char_dir.exists() else []

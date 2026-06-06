@@ -153,3 +153,40 @@ def test_source_planes_rejects_pending_dataset_without_license_notes(tmp_path):
 
     assert not result.ok
     assert "pending source entry missing license.notes: sources/planned.yaml[0]" in result.errors
+
+
+def test_source_planes_rejects_duplicate_pending_dataset_ids(tmp_path):
+    root = tmp_path
+    sources = root / "sources"
+    sources.mkdir()
+    (sources / "datasets.yaml").write_text('version: "1"\nname: datasets\n', encoding="utf-8")
+    manifest = "\n".join(
+        [
+            'version: "1"',
+            "id: planned_source",
+            "name: Planned Source",
+            "source_type: huggingface_datasets",
+            "license:",
+            '  spdx: "MIXED"',
+            "  notes: Per-dataset licenses are required.",
+            "default_enabled: false",
+            "pending:",
+            "  - id: duplicate_dataset",
+            "    repo: owner/dataset",
+            "    license:",
+            '      spdx: "MIT"',
+            "      notes: Redistributable test fixture.",
+            "loader: pipelines/ingest/huggingface_loader.py::load_dataset",
+            "",
+        ]
+    )
+    (sources / "a.yaml").write_text(manifest, encoding="utf-8")
+    (sources / "b.yaml").write_text(manifest.replace("planned_source", "other_source"), encoding="utf-8")
+
+    result = validate_source_planes(root)
+
+    assert not result.ok
+    assert (
+        "duplicate pending source id: duplicate_dataset in sources/b.yaml[0] "
+        "already declared in sources/a.yaml[0]"
+    ) in result.errors

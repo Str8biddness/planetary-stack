@@ -53,4 +53,4 @@ Do not commit Kaggle credentials or raw archives without checking redistribution
 - a `loader` value in `module.py::function` form
 - an upstream locator (`url`, `repository`, `files`, or `docs`) for enabled sources
 
-Planned aggregate manifests such as Hugging Face or Kaggle may stay `default_enabled: false`, but every `pending[]` dataset still needs its own `license.spdx` and non-empty `license.notes`. This keeps future Knowledge Cloud expansion provenance-clean before a source can become mounted CHAL hardware.
+Planned aggregate manifests such as Hugging Face or Kaggle may stay `default_enabled: false`, but every `pending[]` dataset still needs its own unique `id`, `license.spdx`, and non-empty `license.notes`. Duplicate pending IDs are rejected across all source manifests so a future public dataset cannot enter the rebuild substrate with ambiguous source identity. This keeps future Knowledge Cloud expansion provenance-clean before a source can become mounted CHAL hardware.
