@@ -3276,3 +3276,30 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - Pending public datasets are not runtime artifacts yet, but they are part of the future CHAL hardware rebuild substrate. Their IDs must be globally unique across planned source manifests so later enablement cannot ambiguously map one dataset identity to competing provenance or license records.
+
+## Current Session — 2026-06-06 (Daily Knowledge Hardware Health Check)
+
+### 📝 Summary
+- Ran the fast Synthesus 5 Knowledge Cloud-as-hardware health check across source-plane validation, source-manifest verification, sampled manifest hashes, retrieval semantic integrity, KAL/runtime bootstrap, CHAL smoke, and focused Knowledge Cloud health/mount tests.
+- Fixed a real KAL bootstrap defect where `packages/core/ml/swarm_embedder.py` was a one-line stub that could shadow the real Knowledge Cloud embedder and produce `SwarmEmbedder() takes no arguments` during runtime initialization.
+- Added regression coverage that imports `ml.swarm_embedder` through the core path and verifies it instantiates the real Knowledge Cloud `SwarmEmbedder` contract.
+- Updated the Phase 10 golden-query blocker ledger without touching generated FAISS, KNDB, model, cache, mirror, or workflow artifacts.
+
+### ✅ Verified
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud validate-sources --root /home/workspace/synthesus-knowledge-cloud` — passed, 25 required paths and 7 character pattern banks.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud verify-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — passed, 139 source files.
+- Manifest size scan confirmed 10 artifact records have matching on-disk sizes; sampled SHA-256 checks passed for `knowledge.kndb`, `knowledge_cloud/world_lore.json`, and `models/swarm_embedder.pkl`.
+- Retrieval semantic probe reported the known blocker: `FAISS/embedder dim mismatch: faiss=384, embedder=128` and `FAISS/profile dim mismatch: faiss=384, profile=128`; FAISS and metadata counts both remain 501,819.
+- `python -m py_compile packages/core/ml/swarm_embedder.py tests/test_knowledge_health_check.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_knowledge_health_check.py tests/test_knowledge_mount_table.py` — passed, 17 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_chal_smoke.py` — passed; KAL now initializes `KnowledgeCloud: SwarmEmbedder ready` and no longer logs the constructor failure.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align, then rerun cold-start validation, golden-query health, and `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker`.
+- Restamp the runtime artifact manifest with `build.source_manifest` after the coherent rebuild; the current live artifact manifest still lacks that provenance pointer.
+- Full `synthesus-kc validate`, `packages/knowledge/health_check.py`, and `tools/validate_knowledge_cold_start.py` runs were stopped after hanging on large generated artifact loading/hashing in this environment; bounded probes covered source validation, source-manifest integrity, artifact size records, sampled hashes, FAISS/metadata count alignment, retrieval semantic mismatch, KAL bootstrap, and CHAL smoke.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- The `ml.swarm_embedder` import path is shared by legacy core modules and Knowledge Cloud runtime modules. The core-path compatibility export now preserves that legacy import while routing to the real CHAL Knowledge Cloud embedder implementation.
+- This is source-side bootstrap hygiene only; it does not paper over the generated hardware bundle mismatch. Golden queries must remain skipped until FAISS, embedder, profile, and provenance manifest identity are rebuilt coherently.

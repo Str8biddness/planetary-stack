@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -80,3 +82,28 @@ def test_health_check_reports_semantic_mismatch_before_golden_queries(
     assert report["errors"] == ["FAISS/embedder dim mismatch: faiss=3, embedder=2"]
     assert report["stats"]["faiss_vectors"] == 2
     assert report["stats"]["metadata_records"] == 2
+
+
+def test_core_ml_swarm_embedder_reexports_real_knowledge_embedder():
+    repo_root = Path(__file__).resolve().parents[1]
+    command = [
+        sys.executable,
+        "-c",
+        (
+            "from ml.swarm_embedder import SwarmEmbedder; "
+            "embedder = SwarmEmbedder(dim=2); "
+            "assert embedder.dim == 2"
+        ),
+    ]
+
+    completed = subprocess.run(
+        command,
+        cwd=repo_root,
+        env={"PYTHONPATH": str(repo_root / "packages" / "core")},
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
