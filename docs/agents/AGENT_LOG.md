@@ -3442,3 +3442,54 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - PPBRS remains firmware: pattern matches can carry legacy template strings only as non-user-facing `template_context` inside the CHAL firmware signal.
 - The classifier hot path now treats exact token overlap as a bounded firmware signal decision and reserves fuzzy edit-distance work for genuinely inexact matches.
+
+## Current Session — 2026-06-06 (Agent 7 — Quad Brain Trace-Storage Sink)
+
+### 📝 Summary
+- Added an optional mounted Quad Brain replay trace recorder to `CognitiveHypervisor`.
+- The new `quad_brain_trace_storage` telemetry reports skipped/stored/fault status for `chal://telemetry/quad_brain_replay_store`, passes only the compact `QuadBrainReplayRecord` plus route/runtime identity to the recorder, and asserts `raw_prompt_stored=false` / `raw_response_stored=false`.
+- Added focused tests for stored, skipped, and recorder-fault paths, including a no-raw-response invariant and proof that recorder faults do not alter `final_output_owner=critic_metacognition`.
+- Mirrored the new `QuadBrainTraceStorage` debug contract in OpenAPI/API schema docs and updated the Dual Hemisphere module doc.
+- Advanced Phase 7 replayable trace storage while preserving Phase 3 serialized four-brain arbitration and avoiding uncontrolled brain/agent sprawl.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/hypervisor.py packages/core/chal/quad_brain.py packages/api/schemas.py tests/test_chal_hypervisor.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_hypervisor.py` — passed, 22 tests.
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed JSON mirrors match YAML and `QuadBrainTraceStorage` is referenced from `CognitiveHypervisorTrace.quad_brain_trace_storage`.
+- `git diff --check -- packages/core/chal/hypervisor.py tests/test_chal_hypervisor.py packages/api/schemas.py docs/openapi.yaml docs/openapi.json docs/api_schema.json docs/PHASE20_PRODUCTION_API.md docs/modules/DUAL_HEMISPHERE.md docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md docs/agents/AGENT_LOG.md` — passed.
+
+### 🚧 Left Off / Next Steps
+- Wire a concrete production persistence backend to the mounted trace-recorder interface when the API/runtime storage boundary is selected.
+- Broader non-Quad-Brain runtime trace-store write-path selection remains open.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- The recorder is a CHAL telemetry device, not another brain. It receives sealed replay metadata after serialized Knowledge/Grounding -> Executive -> CGPU -> Critic arbitration completes.
+- Recorder failure is intentionally non-blocking trace metadata: it cannot bypass the Critic/Metacognition owner, mutate the selected response, or store raw prompt/response text through the hypervisor boundary.
+
+## Current Session — 2026-06-06 (Knowledge Hardware Pending-Locator Gate)
+
+### 📝 Summary
+- Added a standalone Knowledge Cloud source-plane validation gate that rejects planned public-source `pending[]` entries without a pinned upstream locator (`repo`, `url`, `repository`, `dataset`, or non-empty `files`).
+- Expanded `manifests/source_manifest.json` default coverage to include `synthesus_knowledge_cloud/` validator package code and `docs/` provenance/source documentation while excluding Python cache artifacts.
+- Updated Knowledge Cloud source/provenance/data-model docs and regenerated the source manifest so future stamped runtime bundles can fingerprint both admitted sources and the validation contract that admitted them.
+- Advanced the Phase 5 Knowledge Cloud hardware license/provenance validation checklist item without touching generated FAISS, KNDB, model, cache, mirror, or workflow artifacts.
+
+### ✅ Verified
+- `python -m py_compile synthesus_knowledge_cloud/manifest.py synthesus_knowledge_cloud/source_planes.py tests/test_cli.py` — passed in `synthesus-knowledge-cloud`.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m pytest -q tests/test_cli.py tests/test_build.py tests/test_provenance.py` — passed, 26 tests.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud validate-sources --root /home/workspace/synthesus-knowledge-cloud` — passed, 25 required paths and 7 character pattern banks.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud build-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — regenerated 151-file source manifest.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud verify-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — passed, 151 source files.
+- `git diff --check` — passed in `synthesus-knowledge-cloud`.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align.
+- Restamp `synthesus-knowledge-cloud/artifacts/manifest.json` with the expanded `build.source_manifest` after the coherent rebuild, then rerun `synthesus-kc validate` and `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker`.
+- Do not patch around the generated-artifact dimension mismatch in runtime source; regenerate coherent mounted hardware instead.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes in `Synthesus_4.0` were left untouched.
+
+### 💡 Architectural Notes
+- Pending public datasets are not mounted hardware yet, but they are part of the future Knowledge Cloud rebuild substrate. They now need a stable dataset locator, license evidence, and rebuild command before they can pass source-plane validation.
+- Runtime artifact provenance is stronger when `build.source_manifest` fingerprints the validators and docs that define source admission, not only corpus payloads and pipeline inputs.

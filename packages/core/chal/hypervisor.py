@@ -90,6 +90,7 @@ class CognitiveHypervisor:
         knowledge_controller: Any | None = None,
         answer_verifier: Any | None = None,
         context_reranker: Any | None = None,
+        trace_recorder: Any | None = None,
     ):
         self._bridge_factory = bridge_factory
         self._bridge: Any | None = None
@@ -99,6 +100,7 @@ class CognitiveHypervisor:
         self._knowledge_controller = knowledge_controller
         self._answer_verifier = answer_verifier
         self._context_reranker = context_reranker
+        self._trace_recorder = trace_recorder
 
     def plan(
         self,
@@ -320,6 +322,11 @@ class CognitiveHypervisor:
             "grounding_reranker": reranker_trace,
             "quad_brain": quad_brain_arbitration.to_dict() if quad_brain_arbitration else None,
             "quad_brain_replay": quad_brain_replay,
+            "quad_brain_trace_storage": self._record_quad_brain_replay(
+                decision=decision,
+                replay_record=quad_brain_replay,
+                runtime_preset=preset,
+            ),
             "knowledge_provenance": knowledge_provenance,
         }
         if template_guard_result.rewritten:
@@ -332,6 +339,69 @@ class CognitiveHypervisor:
             bridge_result=bridge_result,
             telemetry=telemetry,
         )
+
+    def _record_quad_brain_replay(
+        self,
+        *,
+        decision: HypervisorDecision,
+        replay_record: Mapping[str, Any] | None,
+        runtime_preset: str | None,
+    ) -> dict[str, Any]:
+        storage_trace = {
+            "schema": "synthesus.chal.quad_brain_trace_storage.v1",
+            "trace_id": decision.trace_id,
+            "route": decision.route.value,
+            "runtime_preset": runtime_preset,
+            "device": "chal://telemetry/quad_brain_replay_store",
+            "status": "skipped",
+            "stored": False,
+            "raw_prompt_stored": False,
+            "raw_response_stored": False,
+            "record_hash": None,
+            "reason": "no_quad_brain_replay_record",
+        }
+        if replay_record is None:
+            return storage_trace
+        storage_trace["record_hash"] = replay_record.get("record_hash")
+        if self._trace_recorder is None:
+            storage_trace["reason"] = "trace_recorder_unmounted"
+            return storage_trace
+
+        storage_record = {
+            "schema": "synthesus.chal.quad_brain_trace_storage_record.v1",
+            "trace_id": decision.trace_id,
+            "route": decision.route.value,
+            "runtime_preset": runtime_preset,
+            "record_hash": replay_record.get("record_hash"),
+            "quad_brain_replay": dict(replay_record),
+            "raw_prompt_stored": False,
+            "raw_response_stored": False,
+        }
+        try:
+            if hasattr(self._trace_recorder, "record"):
+                result = self._trace_recorder.record(storage_record)
+            else:
+                result = self._trace_recorder(storage_record)
+        except Exception as exc:
+            storage_trace.update(
+                {
+                    "status": "fault",
+                    "reason": "trace_recorder_fault",
+                    "error": str(exc),
+                }
+            )
+            return storage_trace
+
+        if isinstance(result, Mapping):
+            storage_trace["recorder_result"] = dict(result)
+        storage_trace.update(
+            {
+                "status": "stored",
+                "stored": True,
+                "reason": "quad_brain_replay_recorded",
+            }
+        )
+        return storage_trace
 
     def _get_quad_brain_orchestrator(self) -> Any:
         if self._quad_brain_orchestrator is None:

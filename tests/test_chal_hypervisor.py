@@ -187,6 +187,20 @@ class FailingAnswerVerifier:
         )
 
 
+class CapturingTraceRecorder:
+    def __init__(self):
+        self.records = []
+
+    def record(self, record):
+        self.records.append(record)
+        return {"backend": "memory", "offset": len(self.records) - 1}
+
+
+class FaultingTraceRecorder:
+    def record(self, record):
+        raise RuntimeError("trace store unavailable")
+
+
 def _quad_brain_quality_score(text, trace):
     score = 0
     if "The gate is sealed until dawn." in text:
@@ -369,6 +383,84 @@ def test_quad_brain_trace_emits_compact_replay_record_without_response_text():
     tampered = dict(replay)
     tampered["selected_response_chars"] += 1
     assert tampered["record_hash"] != QuadBrainArbitration.replay_record_hash(tampered)
+
+
+def test_quad_brain_replay_can_be_recorded_through_chal_trace_sink_without_raw_text():
+    bridge = PersonaBridge()
+    recorder = CapturingTraceRecorder()
+    hypervisor = CognitiveHypervisor(
+        bridge_factory=lambda: bridge,
+        trace_recorder=recorder,
+    )
+
+    result = asyncio.run(
+        hypervisor.process_query(
+            "Render Archivist dialogue about the sealed gate",
+            character_context={"character_id": "Archivist", "stance": "cautious"},
+        )
+    )
+
+    storage = result.telemetry["quad_brain_trace_storage"]
+    assert storage["schema"] == "synthesus.chal.quad_brain_trace_storage.v1"
+    assert storage["device"] == "chal://telemetry/quad_brain_replay_store"
+    assert storage["status"] == "stored"
+    assert storage["stored"] is True
+    assert storage["record_hash"] == result.telemetry["quad_brain_replay"]["record_hash"]
+    assert storage["raw_prompt_stored"] is False
+    assert storage["raw_response_stored"] is False
+    assert storage["recorder_result"] == {"backend": "memory", "offset": 0}
+
+    assert len(recorder.records) == 1
+    stored = recorder.records[0]
+    assert stored["schema"] == "synthesus.chal.quad_brain_trace_storage_record.v1"
+    assert stored["trace_id"] == result.decision.trace_id
+    assert stored["route"] == "quad_brain_path"
+    assert stored["record_hash"] == result.telemetry["quad_brain_replay"]["record_hash"]
+    assert stored["quad_brain_replay"] == result.telemetry["quad_brain_replay"]
+    assert stored["raw_prompt_stored"] is False
+    assert stored["raw_response_stored"] is False
+    assert "prompt" not in stored
+    assert "response" not in stored
+    assert result.response not in str(stored)
+
+
+def test_non_quad_brain_route_skips_quad_brain_replay_trace_storage():
+    recorder = CapturingTraceRecorder()
+    hypervisor = CognitiveHypervisor(
+        bridge_factory=lambda: StubBridge(),
+        trace_recorder=recorder,
+    )
+
+    result = asyncio.run(hypervisor.process_query("simple ping"))
+
+    storage = result.telemetry["quad_brain_trace_storage"]
+    assert result.decision.route == HypervisorRoute.FAST_PATH
+    assert storage["status"] == "skipped"
+    assert storage["stored"] is False
+    assert storage["reason"] == "no_quad_brain_replay_record"
+    assert recorder.records == []
+
+
+def test_quad_brain_trace_recorder_fault_is_trace_metadata_not_response_owner():
+    hypervisor = CognitiveHypervisor(
+        bridge_factory=lambda: PersonaBridge(),
+        trace_recorder=FaultingTraceRecorder(),
+    )
+
+    result = asyncio.run(
+        hypervisor.process_query(
+            "Render Archivist dialogue about the sealed gate",
+            character_context={"character_id": "Archivist", "stance": "cautious"},
+        )
+    )
+
+    storage = result.telemetry["quad_brain_trace_storage"]
+    assert storage["status"] == "fault"
+    assert storage["stored"] is False
+    assert storage["reason"] == "trace_recorder_fault"
+    assert storage["error"] == "trace store unavailable"
+    assert result.telemetry["quad_brain"]["state_contract"]["final_output_owner"] == "critic_metacognition"
+    assert "The gate is sealed until dawn." in result.response
 
 
 def test_quad_brain_dispatch_preserves_grounding_and_improves_persona_surface_over_dual_hemi():

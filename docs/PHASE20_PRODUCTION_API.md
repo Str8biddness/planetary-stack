@@ -78,7 +78,15 @@ When `include_debug=true`, responses include:
         "cache_hit": false,
         "mounts": []
       },
-      "quad_brain": null
+      "quad_brain": null,
+      "quad_brain_replay": null,
+      "quad_brain_trace_storage": {
+        "schema": "synthesus.chal.quad_brain_trace_storage.v1",
+        "status": "skipped",
+        "stored": false,
+        "raw_prompt_stored": false,
+        "raw_response_stored": false
+      }
     }
   }
 }
@@ -118,6 +126,13 @@ for the compact replay metadata emitted by the same route. That record preserves
 role/device identity, state-contract evidence, selected-response hash, character
 length, latency, and a canonical `record_hash` seal without exposing the raw
 response text.
+`CognitiveHypervisorTrace.quad_brain_trace_storage` references
+`QuadBrainTraceStorage` for the mounted replay trace-storage sink. The telemetry
+reports skipped/stored/fault status, the replay `record_hash`, backend
+acknowledgement metadata when available, and explicit
+`raw_prompt_stored=false` / `raw_response_stored=false` assertions. Recorder
+faults are trace metadata only; they do not transfer final language ownership
+away from the Critic/Metacognition brain.
 CGPU device-frame schemas are documented separately as `CGPUFrame` and
 `CGPUOutputFrame`; `/api/v1/query` does not emit CGPU candidate sets as top-level
 payloads.

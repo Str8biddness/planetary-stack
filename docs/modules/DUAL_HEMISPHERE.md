@@ -218,3 +218,9 @@ The replay record preserves:
 The public debug contract is mirrored as `QuadBrainReplayRecord` in `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`, and is referenced from `CognitiveHypervisorTrace.quad_brain_replay`. The schema preserves selected-response hash/length instead of raw response text.
 
 It intentionally omits full response text. This keeps replay artifacts suitable for comparison harnesses and runtime trace storage while preserving enough state-contract evidence to verify that Knowledge/Grounding, Executive Reasoning, CGPU Rendering, and Critic/Metacognition stayed serialized and inspectable.
+
+### Quad Brain Trace-Storage Sink Update (2026-06-06)
+
+`CognitiveHypervisor` now accepts an optional mounted trace recorder for Quad Brain replay records. When `route=quad_brain_path`, the hypervisor offers a `synthesus.chal.quad_brain_trace_storage_record.v1` payload to the recorder after `QuadBrainArbitration.to_replay_record()` is built. The stored payload contains the compact replay record, route/runtime identity, and replay `record_hash`; it does not contain raw prompt text or raw response text.
+
+The runtime telemetry field `telemetry.quad_brain_trace_storage` reports `skipped`, `stored`, or `fault` status for the `chal://telemetry/quad_brain_replay_store` boundary. This is a storage/control-plane device only. Recorder faults are kept as trace metadata and do not change `state_contract.final_output_owner=critic_metacognition`, do not bypass serialized arbitration, and do not create another brain or parallel agent.
