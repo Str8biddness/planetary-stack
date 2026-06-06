@@ -13,6 +13,7 @@ export interface TraceReplayMetadata {
   scenarioId: string;
   step: number;
   simulatedTime: string;
+  record?: Record<string, any>;
   chal?: {
     frameId: string;
     parentFrameId: string;
@@ -20,6 +21,9 @@ export interface TraceReplayMetadata {
     role: 'organ_accelerator';
     route: string;
     outputRef: string;
+    candidateRefs?: string[];
+    selectedCandidateRef?: string;
+    criticFeedback?: Record<string, any>;
   };
 }
 

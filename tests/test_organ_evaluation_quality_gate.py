@@ -4,6 +4,9 @@ import json
 from tools.evaluate_organs import (
     OrganScorecard,
     TraceRecord,
+    assert_organ_replay_integrity,
+    build_organ_replay_integrity_scorecard,
+    build_organ_replay_records,
     _candidate_critic_coverage,
     _chal_accelerator_coverage,
     _replay_identity_coverage,
@@ -57,6 +60,50 @@ def replay_record(**overrides):
     record.update(overrides)
     record["recordHash"] = hashlib.sha256(json.dumps(record, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
     return record
+
+
+def trace_record_with_replay(**overrides):
+    base_record = {
+        "domain": "chat",
+        "phase": "planning",
+        "organ": "policy_prior",
+        "state_features": [0.1, 0.2],
+        "action_features": [[0.3, 0.4]],
+        "multi_focus_weights": [1.0],
+        "trajectory_features": [0.5],
+        "chosen_index": 1,
+        "quality": 0.91,
+        "outcome": {},
+        "replay": {
+            "generator": "organ-triad-replay-v3",
+            "seed": 950907,
+            "scenarioId": "chat-0-policy-prior",
+            "step": 1,
+            "simulatedTime": "2026-05-30T12:00:00.000Z",
+            "record": replay_record(),
+            "chal": {
+                "frameId": "chal-organ-1",
+                "parentFrameId": "chal-training-session-chat-0",
+                "device": "chal://organs/chat/policy_prior",
+                "role": "organ_accelerator",
+                "route": "organ_training_replay",
+                "outputRef": "chat.policy_prior.planning",
+                "candidateRefs": [
+                    "chat.policy_prior.planning.candidate.0",
+                    "chat.policy_prior.planning.candidate.1",
+                ],
+                "selectedCandidateRef": "chat.policy_prior.planning.candidate.1",
+                "criticFeedback": {
+                    "source": "teacher_trace_outcome",
+                    "feedbackRef": "chat.policy_prior.planning.critic_feedback",
+                    "accepted": True,
+                    "quality": 0.91,
+                },
+            },
+        },
+    }
+    base_record.update(overrides)
+    return TraceRecord(**base_record)
 
 
 def test_quality_gate_passes_complete_replayable_scorecards():
@@ -251,6 +298,52 @@ def test_replay_identity_coverage_requires_matching_hash_and_compact_record():
     )
 
     assert _replay_identity_coverage([valid, tampered]) == 0.5
+
+
+def test_build_organ_replay_records_preserves_compact_bounded_identity():
+    compact_records = build_organ_replay_records([trace_record_with_replay()])
+
+    assert len(compact_records) == 1
+    record = compact_records[0]
+    expected_hash = hashlib.sha256(
+        json.dumps(
+            {key: value for key, value in record.items() if key != "recordHash"},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    assert record["schema"] == "synthesus.organ_replay_trace.v1"
+    assert record["recordHash"] == expected_hash
+    assert record["sourceRecordHash"] == replay_record()["recordHash"]
+    assert record["device"] == "chal://organs/chat/policy_prior"
+    assert record["selectedCandidateRef"] == "chat.policy_prior.planning.candidate.1"
+    assert "state_features" not in record
+    assert "action_features" not in record
+    assert "trajectory_features" not in record
+
+
+def test_organ_replay_integrity_scorecard_rejects_tampered_compact_source():
+    valid = trace_record_with_replay()
+    tampered = trace_record_with_replay(
+        replay={
+            **trace_record_with_replay().replay,
+            "record": {
+                **replay_record(),
+                "selectedCandidateRef": "chat.policy_prior.planning.candidate.0",
+            },
+        }
+    )
+
+    scorecard = build_organ_replay_integrity_scorecard([valid])
+    assert scorecard.passed is True
+    assert scorecard.total_chal_records == 1
+    assert scorecard.stored_records == 1
+    assert_organ_replay_integrity(scorecard)
+
+    failed = build_organ_replay_integrity_scorecard([valid, tampered])
+    assert failed.passed is False
+    assert failed.total_chal_records == 2
+    assert any("record hash mismatch" in failure for failure in failed.failures)
 
 
 def test_quality_gate_compares_metric_direction_to_baseline():

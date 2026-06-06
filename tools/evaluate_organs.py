@@ -94,6 +94,15 @@ class QualityGateResult:
     fail_missing_models: bool
 
 
+@dataclass
+class OrganReplayIntegrityResult:
+    schema: str
+    passed: bool
+    total_chal_records: int
+    stored_records: int
+    failures: list[str]
+
+
 def _safe_float(value: Any) -> float:
     try:
         if value is None:
@@ -395,6 +404,100 @@ def _replay_identity_coverage(records: Iterable[TraceRecord]) -> float:
     return (covered / total) if total else 0.0
 
 
+def _valid_replay_identity(rec: TraceRecord) -> tuple[bool, str]:
+    replay = rec.replay
+    if replay.get("generator") != CHAL_ACCELERATOR_GENERATOR:
+        return False, "not current CHAL accelerator generator"
+    record = replay.get("record")
+    if not isinstance(record, dict):
+        return False, "missing replay.record"
+    record_hash = record.get("recordHash")
+    record_without_hash = {key: value for key, value in record.items() if key != "recordHash"}
+    expected_hash = hashlib.sha256(_stable_json(record_without_hash).encode("utf-8")).hexdigest()
+    candidate_refs = record_without_hash.get("candidateRefs")
+    selected_ref = record_without_hash.get("selectedCandidateRef")
+    quality = record_without_hash.get("quality")
+    if record_without_hash.get("schema") != "organ_training_replay.v1":
+        return False, "invalid replay record schema"
+    if record_without_hash.get("generator") != CHAL_ACCELERATOR_GENERATOR:
+        return False, "invalid replay record generator"
+    if record_without_hash.get("domain") != rec.domain:
+        return False, "domain mismatch"
+    if record_without_hash.get("organ") != rec.organ:
+        return False, "organ mismatch"
+    if record_without_hash.get("phase") != rec.phase:
+        return False, "phase mismatch"
+    if record_without_hash.get("device") != f"chal://organs/{rec.domain}/{rec.organ}":
+        return False, "device mismatch"
+    if record_without_hash.get("route") != "organ_training_replay":
+        return False, "route mismatch"
+    if not isinstance(candidate_refs, list) or not candidate_refs:
+        return False, "missing candidate refs"
+    if not all(isinstance(ref, str) and ref for ref in candidate_refs):
+        return False, "invalid candidate ref"
+    if not isinstance(selected_ref, str) or selected_ref not in candidate_refs:
+        return False, "selected candidate ref mismatch"
+    if not isinstance(record_without_hash.get("accepted"), bool):
+        return False, "missing accepted flag"
+    if not isinstance(quality, (int, float)) or not math.isfinite(float(quality)):
+        return False, "invalid quality"
+    if not isinstance(record_hash, str) or record_hash != expected_hash:
+        return False, "record hash mismatch"
+    return True, ""
+
+
+def _valid_chal_accelerator(rec: TraceRecord) -> tuple[bool, str]:
+    replay = rec.replay
+    if replay.get("generator") != CHAL_ACCELERATOR_GENERATOR:
+        return False, "not current CHAL accelerator generator"
+    chal = replay.get("chal") if isinstance(replay, dict) else None
+    if not isinstance(chal, dict):
+        return False, "missing replay.chal"
+    expected_device = f"chal://organs/{rec.domain}/{rec.organ}"
+    if not chal.get("frameId"):
+        return False, "missing CHAL frame id"
+    if not chal.get("parentFrameId"):
+        return False, "missing CHAL parent frame id"
+    if chal.get("device") != expected_device:
+        return False, "CHAL device mismatch"
+    if chal.get("role") != "organ_accelerator":
+        return False, "CHAL role mismatch"
+    if chal.get("route") != "organ_training_replay":
+        return False, "CHAL route mismatch"
+    if chal.get("outputRef") != f"{rec.domain}.{rec.organ}.{rec.phase}":
+        return False, "CHAL output ref mismatch"
+    return True, ""
+
+
+def _valid_candidate_critic(rec: TraceRecord) -> tuple[bool, str]:
+    replay = rec.replay
+    if replay.get("generator") != CHAL_ACCELERATOR_GENERATOR:
+        return False, "not current CHAL accelerator generator"
+    chal = replay.get("chal") if isinstance(replay, dict) else None
+    if not isinstance(chal, dict):
+        return False, "missing replay.chal"
+    candidate_refs = chal.get("candidateRefs")
+    selected_ref = chal.get("selectedCandidateRef")
+    critic = chal.get("criticFeedback")
+    if not isinstance(candidate_refs, list) or not candidate_refs:
+        return False, "missing CHAL candidate refs"
+    if not all(isinstance(ref, str) and ref for ref in candidate_refs):
+        return False, "invalid CHAL candidate ref"
+    if not isinstance(selected_ref, str) or selected_ref not in candidate_refs:
+        return False, "CHAL selected candidate mismatch"
+    if not isinstance(critic, dict):
+        return False, "missing critic feedback"
+    if critic.get("source") != "teacher_trace_outcome":
+        return False, "critic feedback source mismatch"
+    if not isinstance(critic.get("feedbackRef"), str):
+        return False, "missing critic feedback ref"
+    if not isinstance(critic.get("accepted"), bool):
+        return False, "missing critic accepted flag"
+    if not isinstance(critic.get("quality"), (int, float)) or not math.isfinite(float(critic.get("quality"))):
+        return False, "invalid critic quality"
+    return True, ""
+
+
 def _chal_accelerator_coverage(records: Iterable[TraceRecord]) -> float:
     total = 0
     bounded = 0
@@ -447,6 +550,88 @@ def _candidate_critic_coverage(records: Iterable[TraceRecord]) -> float:
         ):
             covered += 1
     return (covered / total) if total else 0.0
+
+
+def build_organ_replay_records(records: Iterable[TraceRecord]) -> list[dict[str, Any]]:
+    replay_records: list[dict[str, Any]] = []
+    for rec in records:
+        if rec.replay.get("generator") != CHAL_ACCELERATOR_GENERATOR:
+            continue
+        identity_ok, _ = _valid_replay_identity(rec)
+        chal_ok, _ = _valid_chal_accelerator(rec)
+        candidate_ok, _ = _valid_candidate_critic(rec)
+        if not (identity_ok and chal_ok and candidate_ok):
+            continue
+        source_record = rec.replay["record"]
+        chal = rec.replay["chal"]
+        critic = chal["criticFeedback"]
+        compact = {
+            "schema": "synthesus.organ_replay_trace.v1",
+            "generator": CHAL_ACCELERATOR_GENERATOR,
+            "sourceRecordHash": source_record["recordHash"],
+            "seed": source_record["seed"],
+            "scenarioId": source_record["scenarioId"],
+            "step": source_record["step"],
+            "simulatedTime": rec.replay.get("simulatedTime"),
+            "domain": rec.domain,
+            "organ": rec.organ,
+            "phase": rec.phase,
+            "device": chal["device"],
+            "role": chal["role"],
+            "route": chal["route"],
+            "frameId": chal["frameId"],
+            "parentFrameId": chal["parentFrameId"],
+            "outputRef": chal["outputRef"],
+            "candidateRefs": list(chal["candidateRefs"]),
+            "selectedCandidateRef": chal["selectedCandidateRef"],
+            "criticFeedbackRef": critic["feedbackRef"],
+            "accepted": bool(critic["accepted"]),
+            "quality": float(critic["quality"]),
+        }
+        compact["recordHash"] = hashlib.sha256(_stable_json(compact).encode("utf-8")).hexdigest()
+        replay_records.append(compact)
+    return replay_records
+
+
+def build_organ_replay_integrity_scorecard(records: Iterable[TraceRecord]) -> OrganReplayIntegrityResult:
+    failures: list[str] = []
+    total = 0
+    source_records = list(records)
+    for idx, rec in enumerate(source_records):
+        if rec.replay.get("generator") != CHAL_ACCELERATOR_GENERATOR:
+            continue
+        total += 1
+        label = f"{idx}:{rec.domain}/{rec.organ}/{rec.phase}"
+        for ok, reason in (
+            _valid_replay_identity(rec),
+            _valid_chal_accelerator(rec),
+            _valid_candidate_critic(rec),
+        ):
+            if not ok:
+                failures.append(f"{label}: {reason}")
+    compact_records = build_organ_replay_records(source_records)
+    for idx, record in enumerate(compact_records):
+        record_hash = record.get("recordHash")
+        record_without_hash = {key: value for key, value in record.items() if key != "recordHash"}
+        expected_hash = hashlib.sha256(_stable_json(record_without_hash).encode("utf-8")).hexdigest()
+        if record_hash != expected_hash:
+            failures.append(f"compact:{idx}: record hash mismatch")
+        if "state_features" in record or "action_features" in record or "trajectory_features" in record:
+            failures.append(f"compact:{idx}: raw training features leaked into replay storage")
+    if total != len(compact_records):
+        failures.append(f"stored compact records {len(compact_records)} did not cover current CHAL records {total}")
+    return OrganReplayIntegrityResult(
+        schema="synthesus.organ_replay_integrity_scorecard.v1",
+        passed=not failures,
+        total_chal_records=total,
+        stored_records=len(compact_records),
+        failures=failures,
+    )
+
+
+def assert_organ_replay_integrity(scorecard: OrganReplayIntegrityResult) -> None:
+    if not scorecard.passed:
+        raise AssertionError("; ".join(scorecard.failures))
 
 
 def _load_model(domain: str, organ: str):
@@ -737,6 +922,9 @@ def main() -> int:
     parser.add_argument("--min-scientific-consistency", type=float, default=None, help="Fail if any organ numeric consistency is below this 0.0-1.0 threshold")
     parser.add_argument("--fail-under-baseline", action="store_true", help="Fail when validation performance is worse than the relevant baseline")
     parser.add_argument("--fail-missing-models", action="store_true", help="Fail when traces exist but a trained model file is missing")
+    parser.add_argument("--replay-jsonl", type=Path, default=None, help="Write compact CHAL organ replay records to this JSONL path")
+    parser.add_argument("--replay-integrity-json", type=Path, default=None, help="Write compact CHAL organ replay integrity scorecard JSON")
+    parser.add_argument("--fail-on-organ-replay-integrity", action="store_true", help="Fail when compact CHAL organ replay storage is incomplete or malformed")
     args = parser.parse_args()
 
     if np is None or joblib is None or accuracy_score is None or r2_score is None or train_test_split is None or mean_squared_error is None:
@@ -750,12 +938,21 @@ def main() -> int:
     organs = ["policy_prior", "risk_outcome", "attention"]
     domains = [args.domain] if args.domain else ["chat", "sysops", "gm"]
     scorecards = [evaluate_organ(domain, organ) for domain in domains for organ in organs]
+    trace_records = [
+        rec
+        for domain in domains
+        for organ in organs
+        for rec in _domain_records(domain, organ, "planning" if organ in {"policy_prior", "attention"} else "output")
+    ]
+    organ_replay_records = build_organ_replay_records(trace_records)
+    organ_replay_integrity = build_organ_replay_integrity_scorecard(trace_records)
 
     payload = {
         "trace_file": str(TRACE_FILE),
         "model_dir": str(MODELS_DIR),
         "fiction_policy": "Narrative fiction is accepted; scientific/math fields must stay bounded and internally consistent.",
         "scorecards": [asdict(s) for s in scorecards],
+        "organ_replay_integrity": asdict(organ_replay_integrity),
     }
 
     quality_gate = evaluate_quality_gate(
@@ -774,6 +971,16 @@ def main() -> int:
         REPORT_JSON.write_text(json.dumps(payload, indent=2))
     if args.write_md:
         REPORT_MD.write_text(render_markdown(scorecards))
+    if args.replay_jsonl:
+        args.replay_jsonl.parent.mkdir(parents=True, exist_ok=True)
+        args.replay_jsonl.write_text(
+            "\n".join(json.dumps(record, sort_keys=True) for record in organ_replay_records) + "\n"
+            if organ_replay_records
+            else ""
+        )
+    if args.replay_integrity_json:
+        args.replay_integrity_json.parent.mkdir(parents=True, exist_ok=True)
+        args.replay_integrity_json.write_text(json.dumps(asdict(organ_replay_integrity), indent=2, sort_keys=True))
 
     logger.info(f"Wrote {REPORT_JSON}")
     logger.info(f"Wrote {REPORT_MD}")
@@ -784,6 +991,10 @@ def main() -> int:
     if not quality_gate.passed:
         for failure in quality_gate.failures:
             logger.error(f"Quality gate failed: {failure}")
+        return 1
+    if args.fail_on_organ_replay_integrity and not organ_replay_integrity.passed:
+        for failure in organ_replay_integrity.failures:
+            logger.error(f"Organ replay integrity failed: {failure}")
         return 1
     return 0
 

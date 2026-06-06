@@ -3204,3 +3204,29 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - AIVM snapshot replay records are compact metadata: they preserve tick step order, event details, emit hashes, scheduler identity, and integrity hashes while omitting raw prompt and generated response text.
 - The new `record_hash` closes the gap where a valid `events_hash` could still accompany forged replay identity fields inside a validly resealed outer snapshot.
+
+## Current Session — 2026-06-05 (Agent 9 — Organ Replay Storage Integrity)
+
+### 📝 Summary
+- Added compact organ replay storage export to `tools/evaluate_organs.py` via `--replay-jsonl`, using schema `synthesus.organ_replay_trace.v1`.
+- Added an organ replay-integrity scorecard and `--fail-on-organ-replay-integrity` gate so current CHAL organ traces must persist source replay hashes, CHAL frame identity, candidate refs, selected-candidate refs, critic feedback refs, acceptance, and quality without raw state/action/trajectory feature vectors.
+- Updated `tools/selfImprove.ts` so the strict organ loop writes ignored compact replay artifacts under `tools/results/` and fails when replay storage is incomplete or malformed.
+- Advanced Phase 7 replayable trace storage for the Agent 9 organ-training lane while preserving organs as CHAL accelerators under training/eval control.
+
+### ✅ Verified
+- `python -m py_compile tools/evaluate_organs.py tests/test_organ_evaluation_quality_gate.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0 python -m pytest -q tests/test_organ_evaluation_quality_gate.py` — passed, 11 tests.
+- `npm run build` in `packages/organs` — passed.
+- `git diff --check -- tools/evaluate_organs.py tools/selfImprove.ts packages/core/learning/teacherTrace.ts tests/test_organ_evaluation_quality_gate.py docs/setup/ML_ORGAN_TRAINING.md docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md` — passed.
+- `npx ts-node cli.ts runTrainingSessions` in `packages/organs` — passed and generated ignored `logs/teacher_traces.jsonl`.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0 python tools/evaluate_organs.py --min-replay-coverage 1.0 --min-replay-identity-coverage 1.0 --min-chal-accelerator-coverage 1.0 --min-candidate-critic-coverage 1.0 --min-scientific-consistency 1.0 --replay-jsonl /tmp/organ_training_replay_latest.jsonl --replay-integrity-json /tmp/organ_training_replay_integrity_latest.json --fail-on-organ-replay-integrity` — passed; exported 72 compact replay records and the integrity scorecard reported 72/72 stored records.
+
+### 🚧 Left Off / Next Steps
+- Broader persistent runtime conversation trace storage remains open; this run adds the organ-training replay storage/export boundary only.
+- If future Agent 9 runs make baseline performance mandatory, combine this replay-integrity gate with `--fail-under-baseline` after trace diversity is strong enough.
+- Generated trace, scorecard, model, and `tools/results/` artifacts remain ignored and should stay out of Git.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Organ replay storage is metadata-only: it stores deterministic identity, CHAL accelerator frame references, candidate/critic handoff references, source hashes, and compact integrity hashes, not raw training vectors or final candidate bodies.
+- This keeps GM/SysOps/Chat organs as bounded CHAL accelerators beneath the hypervisor/training loop instead of promoting them into independent uncontrolled brains.
