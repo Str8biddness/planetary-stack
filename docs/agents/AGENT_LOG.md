@@ -3325,3 +3325,28 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Runtime cold-start admission now treats source-plane provenance as part of Knowledge Cloud hardware identity, alongside artifact hashes, FAISS/metadata count alignment, and FAISS/embedder/profile dimension compatibility.
 - The release gate remains source-only and does not patch around stale generated hardware; it reports the exact generated-bundle work required before RC tagging.
+
+## Current Session — 2026-06-06 (Knowledge Hardware Pending-Rebuild Command Gate)
+
+### 📝 Summary
+- Added a standalone Knowledge Cloud source-plane validation gate that rejects planned public-source `pending[]` entries without a non-empty `rebuild_command`.
+- Added explicit rebuild commands to the planned Kaggle and Hugging Face public-source declarations so future dataset enablement has an auditable regeneration route before becoming mounted CHAL hardware substrate.
+- Updated the source documentation and regenerated `manifests/source_manifest.json` so the source-plane fingerprint reflects the validator, manifest, docs, and regression-test changes.
+- Advanced the Phase 5 Knowledge Cloud hardware license/provenance validation checklist item without touching generated FAISS, KNDB, model, cache, mirror, or workflow artifacts.
+
+### ✅ Verified
+- `python -m py_compile synthesus_knowledge_cloud/source_planes.py tests/test_cli.py` — passed in `synthesus-knowledge-cloud`.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m pytest -q tests/test_cli.py` — passed, 10 tests.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud validate-sources --root /home/workspace/synthesus-knowledge-cloud` — passed, 25 required paths and 7 character pattern banks.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud build-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — regenerated 139-file source manifest.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud verify-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — passed, 139 source files.
+- `git diff --check` — passed in `synthesus-knowledge-cloud`.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align.
+- Restamp `synthesus-knowledge-cloud/artifacts/manifest.json` with `build.source_manifest` after the coherent rebuild, then rerun `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker`.
+- Do not patch around the generated-artifact dimension mismatch in runtime source; regenerate coherent mounted hardware instead.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes in `Synthesus_4.0` were left untouched.
+
+### 💡 Architectural Notes
+- Pending public datasets are disabled today, but they still represent future Knowledge Cloud hardware rebuild substrate. Requiring `rebuild_command` keeps license metadata, dataset identity, and regeneration route bound together before an operator can promote the source into mounted CHAL hardware.
