@@ -135,7 +135,14 @@ def _knowledge_artifact_check() -> ReleaseCheck:
             command=command_text,
         )
 
-    status = "blocked" if "FAISS/embedder dim mismatch" in output else "fail"
+    generated_bundle_blockers = (
+        "FAISS/embedder dim mismatch",
+        "FAISS/profile dim mismatch",
+        "Embedder/profile dim mismatch",
+        "manifest build.source_manifest fingerprint is missing",
+        "Knowledge Cloud source-manifest provenance failed",
+    )
+    status = "blocked" if any(marker in output for marker in generated_bundle_blockers) else "fail"
     return ReleaseCheck(
         id="knowledge:cold-start",
         label="Knowledge Cloud cold-start integrity",

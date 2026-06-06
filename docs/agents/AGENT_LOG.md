@@ -3303,3 +3303,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The `ml.swarm_embedder` import path is shared by legacy core modules and Knowledge Cloud runtime modules. The core-path compatibility export now preserves that legacy import while routing to the real CHAL Knowledge Cloud embedder implementation.
 - This is source-side bootstrap hygiene only; it does not paper over the generated hardware bundle mismatch. Golden queries must remain skipped until FAISS, embedder, profile, and provenance manifest identity are rebuilt coherently.
+
+## Current Session — 2026-06-06 (Agent 1 — Knowledge Hardware Release Admission)
+
+### 📝 Summary
+- Hardened the Synthesus 5 release gate by making cold-start Knowledge Cloud validation require `build.source_manifest` provenance in the artifact manifest.
+- Added source-manifest provenance reporting to `KnowledgeCloudMountTable`, wired `tools/validate_knowledge_cold_start.py` to enforce it, and taught `tools/synthesus5_release_gate.py` to classify missing provenance as a generated-bundle release blocker.
+- Added focused regression coverage for valid source-manifest fingerprints, missing provenance, combined retrieval/provenance blocker reporting, and release-gate blocker classification.
+- Updated the KN module doc and Phase 10 checklist ledger without touching generated FAISS, KNDB, model, cache, mirror, or workflow artifacts.
+
+### ✅ Verified
+- `python -m py_compile packages/knowledge/mount_table.py tools/validate_knowledge_cold_start.py tools/synthesus5_release_gate.py tests/test_knowledge_mount_table.py tests/test_synthesus5_release_gate.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge python -m pytest -q tests/test_knowledge_mount_table.py tests/test_synthesus5_release_gate.py` — passed, 22 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_release_gate.py --run-runtime --fail-on-blocker --output /tmp/synthesus5_release_gate_agent1.json` — expected exit 1; CHAL smoke passed, and `knowledge:cold-start` is blocked with both `FAISS/embedder dim mismatch: faiss=384, embedder=128; FAISS/profile dim mismatch: faiss=384, profile=128` and `manifest build.source_manifest fingerprint is missing`.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align.
+- Restamp `synthesus-knowledge-cloud/artifacts/manifest.json` with `build.source_manifest` after the coherent rebuild, then rerun `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker`.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Runtime cold-start admission now treats source-plane provenance as part of Knowledge Cloud hardware identity, alongside artifact hashes, FAISS/metadata count alignment, and FAISS/embedder/profile dimension compatibility.
+- The release gate remains source-only and does not patch around stale generated hardware; it reports the exact generated-bundle work required before RC tagging.

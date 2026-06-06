@@ -6,7 +6,14 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from synthesus5_release_gate import build_report, evaluate_launch_tiers, ReleaseCheck
+import subprocess
+
+from synthesus5_release_gate import (
+    _knowledge_artifact_check,
+    build_report,
+    evaluate_launch_tiers,
+    ReleaseCheck,
+)
 
 
 def test_static_release_gate_report_has_commercial_surfaces():
@@ -51,3 +58,24 @@ def test_blocked_knowledge_cloud_blocks_paid_launch():
     assert tiers["demo"] == "ready"
     assert tiers["private_beta"] == "limited-beta"
     assert tiers["paid_consumer_launch"] == "blocked"
+
+
+def test_missing_source_manifest_provenance_is_release_blocker(monkeypatch):
+    def fake_run(command, *, timeout):
+        return subprocess.CompletedProcess(
+            command,
+            1,
+            stdout=(
+                "Knowledge Cloud cold-start validation failed: "
+                "Knowledge Cloud source-manifest provenance failed: "
+                "manifest build.source_manifest fingerprint is missing\n"
+            ),
+        )
+
+    monkeypatch.setattr("synthesus5_release_gate._run", fake_run)
+
+    check = _knowledge_artifact_check()
+
+    assert check.status == "blocked"
+    assert check.id == "knowledge:cold-start"
+    assert "build.source_manifest" in check.detail

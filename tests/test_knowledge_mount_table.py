@@ -53,21 +53,37 @@ def _write_manifest(
     artifacts: list[dict],
     *,
     profile_embedder_dim: int | None = None,
+    source_manifest: dict | None = None,
 ) -> None:
     manifest = {
         "version": "1",
         "generated_at": "2026-05-28T00:00:00+00:00",
         "artifacts": artifacts,
     }
-    if profile_embedder_dim is not None:
+    if profile_embedder_dim is not None or source_manifest is not None:
         manifest["build"] = {
             "profile": "test-profile",
-            "extra": {"embed_dim": profile_embedder_dim},
         }
+        if profile_embedder_dim is not None:
+            manifest["build"]["extra"] = {"embed_dim": profile_embedder_dim}
+        if source_manifest is not None:
+            manifest["build"]["source_manifest"] = source_manifest
     (root / "manifest.json").write_text(
         json.dumps(manifest),
         encoding="utf-8",
     )
+
+
+def _source_manifest_fingerprint() -> dict:
+    return {
+        "path": "manifests/source_manifest.json",
+        "sha256": "a" * 64,
+        "size": 1234,
+        "kind": "synthesus-knowledge-source-plane",
+        "generated_at": "2026-06-06T00:00:00+00:00",
+        "roots": ["sources", "pipelines", "patterns"],
+        "artifact_count": 42,
+    }
 
 
 def _write_required_bundle_with_retrieval_semantics(
@@ -356,6 +372,61 @@ def test_mount_table_rejects_retrieval_semantic_profile_dimension_mismatch(tmp_p
             tmp_path,
             validate_retrieval_semantics=True,
         )
+
+
+def test_mount_table_requires_source_manifest_provenance_when_validating_cold_start(
+    tmp_path: Path,
+):
+    _write_required_bundle_with_retrieval_semantics(tmp_path)
+
+    with pytest.raises(
+        ValueError,
+        match="manifest build.source_manifest fingerprint is missing",
+    ):
+        KnowledgeCloudMountTable().validate_cold_start_bundle(
+            tmp_path,
+            validate_source_manifest_provenance=True,
+        )
+
+
+def test_mount_table_validates_source_manifest_provenance_fingerprint(tmp_path: Path):
+    _write_required_bundle_with_retrieval_semantics(tmp_path)
+    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    manifest.setdefault("build", {})["source_manifest"] = _source_manifest_fingerprint()
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    report = KnowledgeCloudMountTable().validate_cold_start_bundle(
+        tmp_path,
+        validate_retrieval_semantics=True,
+        validate_source_manifest_provenance=True,
+    )
+
+    assert report.ok is True
+    assert report.source_manifest_provenance is not None
+    assert report.source_manifest_provenance.path == "manifests/source_manifest.json"
+    assert report.source_manifest_provenance.artifact_count == 42
+    assert report.source_manifest_provenance.as_metadata()["source_manifest_provenance_ok"] is True
+
+
+def test_mount_table_reports_retrieval_and_source_manifest_blockers_together(
+    tmp_path: Path,
+):
+    _write_required_bundle_with_retrieval_semantics(
+        tmp_path,
+        faiss_dim=3,
+        embedder_dim=2,
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        KnowledgeCloudMountTable().validate_cold_start_bundle(
+            tmp_path,
+            validate_retrieval_semantics=True,
+            validate_source_manifest_provenance=True,
+        )
+
+    message = str(exc_info.value)
+    assert "FAISS/embedder dim mismatch: faiss=3, embedder=2" in message
+    assert "manifest build.source_manifest fingerprint is missing" in message
 
 
 def test_kal_controller_boots_from_manifest_before_default_mounts(tmp_path: Path):

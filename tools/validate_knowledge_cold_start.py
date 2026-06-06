@@ -31,6 +31,7 @@ def validate(root: Path) -> int:
     report = KnowledgeCloudMountTable().validate_cold_start_bundle(
         root,
         validate_retrieval_semantics=True,
+        validate_source_manifest_provenance=True,
     )
     print(f"Knowledge Cloud cold-start bundle OK: {root}")
     print(f"manifest={report.manifest_path} version={report.manifest_version or 'unknown'}")
@@ -43,6 +44,14 @@ def validate(root: Path) -> int:
             f"metadata_records={metadata['metadata_records']} "
             f"faiss_dim={metadata['faiss_dim']} "
             f"embedder_dim={metadata['embedder_dim']}"
+        )
+    if report.source_manifest_provenance is not None:
+        metadata = report.source_manifest_provenance.as_metadata()
+        print(
+            "source_manifest="
+            f"path={metadata['path']} "
+            f"sha256={metadata['sha256']} "
+            f"artifacts={metadata['artifact_count']}"
         )
     for mount_path in COLD_START_REQUIRED_MOUNTS:
         print(f"mounted {mount_path}")

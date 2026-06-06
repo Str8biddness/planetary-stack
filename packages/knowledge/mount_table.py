@@ -202,6 +202,33 @@ class RetrievalSemanticReport:
 
 
 @dataclass(frozen=True)
+class SourceManifestProvenanceReport:
+    path: str | None
+    sha256: str | None
+    size: int | None
+    kind: str | None
+    artifact_count: int | None
+    roots: tuple[str, ...]
+    errors: tuple[str, ...] = ()
+
+    @property
+    def ok(self) -> bool:
+        return not self.errors
+
+    def as_metadata(self) -> dict[str, Any]:
+        return {
+            "path": self.path,
+            "sha256": self.sha256,
+            "size": self.size,
+            "kind": self.kind,
+            "artifact_count": self.artifact_count,
+            "roots": list(self.roots),
+            "source_manifest_provenance_ok": self.ok,
+            "errors": list(self.errors),
+        }
+
+
+@dataclass(frozen=True)
 class ManifestCoverageReport:
     expected_artifacts: tuple[str, ...]
     mounted_artifacts: tuple[str, ...]
@@ -230,11 +257,16 @@ class MountTableBootReport:
     integrity: tuple[MountIntegrityReport, ...]
     coverage: ManifestCoverageReport | None = None
     retrieval_semantics: RetrievalSemanticReport | None = None
+    source_manifest_provenance: SourceManifestProvenanceReport | None = None
 
     @property
     def ok(self) -> bool:
         semantic_ok = self.retrieval_semantics is None or self.retrieval_semantics.ok
-        return all(report.ok for report in self.integrity) and semantic_ok
+        provenance_ok = (
+            self.source_manifest_provenance is None
+            or self.source_manifest_provenance.ok
+        )
+        return all(report.ok for report in self.integrity) and semantic_ok and provenance_ok
 
     @property
     def active_mount_paths(self) -> tuple[str, ...]:
@@ -265,10 +297,24 @@ class MountTableBootReport:
                 "Knowledge Cloud cold-start bundle missing required active mounts: "
                 + ", ".join(missing)
             )
+        runtime_errors: list[str] = []
         if self.retrieval_semantics is not None and not self.retrieval_semantics.ok:
-            raise ValueError(
-                "Knowledge Cloud retrieval semantic integrity failed: "
+            runtime_errors.append(
+                "retrieval semantic integrity failed: "
                 + "; ".join(self.retrieval_semantics.errors)
+            )
+        if (
+            self.source_manifest_provenance is not None
+            and not self.source_manifest_provenance.ok
+        ):
+            runtime_errors.append(
+                "source-manifest provenance failed: "
+                + "; ".join(self.source_manifest_provenance.errors)
+            )
+        if runtime_errors:
+            raise ValueError(
+                "Knowledge Cloud cold-start runtime validation failed: "
+                + " | ".join(runtime_errors)
             )
 
 
@@ -346,19 +392,107 @@ class KnowledgeCloudMountTable:
         *,
         required_mounts: tuple[str, ...] = COLD_START_REQUIRED_MOUNTS,
         validate_retrieval_semantics: bool = False,
+        validate_source_manifest_provenance: bool = False,
     ) -> MountTableBootReport:
         report = self.boot(root_dir, manifest_name=manifest_name, strict=True)
+        retrieval_semantics = None
+        source_manifest_provenance = None
         if validate_retrieval_semantics:
+            retrieval_semantics = self.validate_retrieval_semantics(root_dir)
+        if validate_source_manifest_provenance:
+            source_manifest_provenance = self.validate_source_manifest_provenance(root_dir)
+        if retrieval_semantics is not None or source_manifest_provenance is not None:
             report = MountTableBootReport(
                 manifest_path=report.manifest_path,
                 manifest_version=report.manifest_version,
                 mounts=report.mounts,
                 integrity=report.integrity,
                 coverage=report.coverage,
-                retrieval_semantics=self.validate_retrieval_semantics(root_dir),
+                retrieval_semantics=retrieval_semantics,
+                source_manifest_provenance=source_manifest_provenance,
             )
         report.assert_cold_start_ready(required_mounts)
         return report
+
+    def validate_source_manifest_provenance(
+        self,
+        root_dir: str | Path,
+        manifest_name: str = "manifest.json",
+    ) -> SourceManifestProvenanceReport:
+        """Verify artifact manifest provenance points at a source-plane manifest."""
+        root = Path(root_dir)
+        errors: list[str] = []
+        path: str | None = None
+        sha256: str | None = None
+        size: int | None = None
+        kind: str | None = None
+        artifact_count: int | None = None
+        roots: tuple[str, ...] = ()
+
+        try:
+            manifest = json.loads((root / manifest_name).read_text(encoding="utf-8"))
+        except Exception as exc:
+            return SourceManifestProvenanceReport(
+                path=None,
+                sha256=None,
+                size=None,
+                kind=None,
+                artifact_count=None,
+                roots=(),
+                errors=(f"Knowledge Cloud manifest load failed: {exc}",),
+            )
+
+        source_manifest = manifest.get("build", {}).get("source_manifest")
+        if not isinstance(source_manifest, dict):
+            return SourceManifestProvenanceReport(
+                path=None,
+                sha256=None,
+                size=None,
+                kind=None,
+                artifact_count=None,
+                roots=(),
+                errors=("manifest build.source_manifest fingerprint is missing",),
+            )
+
+        path_value = source_manifest.get("path")
+        sha_value = source_manifest.get("sha256")
+        size_value = source_manifest.get("size")
+        kind_value = source_manifest.get("kind")
+        artifact_count_value = source_manifest.get("artifact_count")
+        roots_value = source_manifest.get("roots")
+
+        path = str(path_value) if path_value is not None else None
+        sha256 = str(sha_value) if sha_value is not None else None
+        kind = str(kind_value) if kind_value is not None else None
+        if isinstance(size_value, int):
+            size = size_value
+        if isinstance(artifact_count_value, int):
+            artifact_count = artifact_count_value
+        if isinstance(roots_value, list):
+            roots = tuple(str(root) for root in roots_value)
+
+        if path != "manifests/source_manifest.json":
+            errors.append("manifest build.source_manifest.path must be manifests/source_manifest.json")
+        if sha256 is None or len(sha256) != 64 or any(ch not in "0123456789abcdef" for ch in sha256.lower()):
+            errors.append("manifest build.source_manifest.sha256 must be a 64-character hex digest")
+        if size is None or size <= 0:
+            errors.append("manifest build.source_manifest.size must be a positive integer")
+        if kind != "synthesus-knowledge-source-plane":
+            errors.append("manifest build.source_manifest.kind must be synthesus-knowledge-source-plane")
+        if artifact_count is None or artifact_count <= 0:
+            errors.append("manifest build.source_manifest.artifact_count must be a positive integer")
+        if not roots:
+            errors.append("manifest build.source_manifest.roots must be a non-empty list")
+
+        return SourceManifestProvenanceReport(
+            path=path,
+            sha256=sha256,
+            size=size,
+            kind=kind,
+            artifact_count=artifact_count,
+            roots=roots,
+            errors=tuple(errors),
+        )
 
     def validate_retrieval_semantics(self, root_dir: str | Path) -> RetrievalSemanticReport:
         """Verify mounted FAISS, metadata, and embedder artifacts can work together."""
@@ -550,5 +684,6 @@ __all__ = [
     "MountIntegrityReport",
     "MountTableBootReport",
     "RetrievalSemanticReport",
+    "SourceManifestProvenanceReport",
     "VOLATILE_MOUNT_SPECS",
 ]

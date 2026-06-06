@@ -197,6 +197,8 @@ The tool also validates retrieval-semantic compatibility across the mounted FAIS
 
 Cold-start retrieval validation also compares the FAISS index dimension and persisted embedder dimension against `build.extra.embed_dim` when the Knowledge Cloud manifest declares a build profile dimension. This prevents a profile-stamped bundle from mounting as ready when the parameter disk and grounding corpus are internally aligned but no longer match the selected profile contract.
 
+Cold-start release validation also requires the artifact manifest to carry `build.source_manifest` provenance with the source-plane manifest path, SHA-256, size, kind, roots, and artifact count. This keeps hash-valid generated hardware from passing release admission unless it can be traced back to the exact source-plane rebuild substrate that produced it.
+
 By default, the command uses `SYNTHESUS_KNOWLEDGE_ROOT` when set, then the companion `synthesus-knowledge-cloud/artifacts` checkout when present, and finally the runtime `data/` directory. It is also part of `tools/synthesus5_focused_suite.py`, so the source-only Synthesus 5 release gate now fails if the mounted Knowledge Cloud bundle cannot cold boot.
 
 ## Synthesus 5 Hot-Context Cache
