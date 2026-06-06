@@ -3394,3 +3394,27 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - The real bottleneck in this slice was observability, not another device. Hypervisor traces now show when retrieval and verifier budgets are saturated while preserving the strict boundary that context selection and verification are firmware/control signals, not final-language emitters.
+
+## Current Session — 2026-06-06 (Agent 5 — Source-Manifest Validation Gate)
+
+### 📝 Summary
+- Hardened the standalone Knowledge Cloud `validate` command so production `synthesus-knowledge-artifacts` manifests fail unless they carry a valid `build.source_manifest` fingerprint.
+- Added regression coverage for unstamped production manifests and stamped source-manifest provenance while preserving synthetic/test manifest validation.
+- Updated Knowledge Cloud provenance/data-model docs and the Synthesus KN module/checklist ledger so data-plane validation and runtime release admission share the same CHAL hardware identity requirement.
+- Advanced Phase 5 Knowledge Cloud hardware provenance validation without touching generated FAISS, KNDB, model, cache, mirror, or workflow artifacts.
+
+### ✅ Verified
+- `python -m py_compile synthesus_knowledge_cloud/manifest.py tests/test_cli.py` — passed in `synthesus-knowledge-cloud`.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m pytest -q tests/test_cli.py` — passed, 12 tests.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud validate-sources --root /home/workspace/synthesus-knowledge-cloud` — passed, 25 required paths and 7 character pattern banks.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud verify-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — passed, 139 source files.
+- `timeout 30 env PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud validate --root /home/workspace/synthesus-knowledge-cloud/artifacts` — expected exit 1; reports `manifest build.source_manifest fingerprint is missing` and the known `FAISS/embedder dim mismatch: faiss=384, embedder=128` blocker.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align.
+- Restamp `synthesus-knowledge-cloud/artifacts/manifest.json` with `build.source_manifest` after the coherent rebuild, then rerun `synthesus-kc validate` and `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker`.
+- Do not patch around the generated-artifact dimension mismatch in runtime source; regenerate coherent mounted hardware instead.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes in `Synthesus_4.0` were left untouched.
+
+### 💡 Architectural Notes
+- `build.source_manifest` is now a data-plane validation requirement, not just runtime release metadata. That keeps public Knowledge Cloud bundles from validating as mounted CHAL hardware unless their generated artifacts can be traced to the exact source-plane rebuild hash set.

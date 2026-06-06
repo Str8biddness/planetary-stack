@@ -199,6 +199,8 @@ Cold-start retrieval validation also compares the FAISS index dimension and pers
 
 Cold-start release validation also requires the artifact manifest to carry `build.source_manifest` provenance with the source-plane manifest path, SHA-256, size, kind, roots, and artifact count. This keeps hash-valid generated hardware from passing release admission unless it can be traced back to the exact source-plane rebuild substrate that produced it.
 
+The standalone Knowledge Cloud data-plane validator now enforces the same source-manifest identity gate for production `synthesus-knowledge-artifacts` manifests. Synthetic/test manifests can still validate without provenance, but public runtime bundles cannot pass `synthesus-kc validate` until `build.source_manifest` is stamped with the source-plane path, SHA-256, size, kind, roots, and artifact count.
+
 By default, the command uses `SYNTHESUS_KNOWLEDGE_ROOT` when set, then the companion `synthesus-knowledge-cloud/artifacts` checkout when present, and finally the runtime `data/` directory. It is also part of `tools/synthesus5_focused_suite.py`, so the source-only Synthesus 5 release gate now fails if the mounted Knowledge Cloud bundle cannot cold boot.
 
 ## Synthesus 5 Hot-Context Cache
