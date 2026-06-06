@@ -3253,3 +3253,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - The verifier and reranker schema contracts preserve CHAL device boundaries: reranker selects grounded context before bridge dispatch, verifier audits the final post-template-guard surface, and neither device emits normal-path final language.
+
+## Current Session — 2026-06-06 (Knowledge Hardware Pending-ID Collision Gate)
+
+### 📝 Summary
+- Added a standalone Knowledge Cloud source-plane validation gate that rejects duplicate `pending[].id` values across planned public-source manifests.
+- Added regression coverage and documented the unique pending-source identity contract in the Knowledge Cloud source docs.
+- Regenerated `manifests/source_manifest.json` so the source-plane fingerprint reflects the validator, tests, and docs.
+- Advanced Phase 5 Knowledge Cloud hardware provenance validation without touching generated runtime artifacts or workflow files.
+
+### ✅ Verified
+- `python -m py_compile synthesus_knowledge_cloud/source_planes.py tests/test_cli.py` — passed in `synthesus-knowledge-cloud`.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m pytest -q tests/test_cli.py` — passed, 9 tests.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud validate-sources --root /home/workspace/synthesus-knowledge-cloud` — passed, 25 required paths and 7 character pattern banks.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud build-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — regenerated 139-file source manifest.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud verify-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — passed, 139 source files.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align, then rerun cold-start validation, golden-query health, and `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker`.
+- Do not patch around the generated-artifact dimension mismatch in runtime source; regenerate coherent mounted hardware instead.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes in `Synthesus_4.0` were left untouched.
+
+### 💡 Architectural Notes
+- Pending public datasets are not runtime artifacts yet, but they are part of the future CHAL hardware rebuild substrate. Their IDs must be globally unique across planned source manifests so later enablement cannot ambiguously map one dataset identity to competing provenance or license records.
