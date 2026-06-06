@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Synthesus 5 CHAL API",
-    "description": "Legacy-compatible Synthesus query and control API for the active Synthesus 5 CHAL runtime. The public query path currently exposes explicit Cognitive Hypervisor routing through mode=chal, the business_bot CHAL preset, plus generation-spine, cognitive, RAG, kernel, and amplification telemetry. CognitiveHypervisorTrace documents debug.cognitive_hypervisor for CHAL requests, including QuadBrainArbitration and QuadBrainReplayRecord when route=quad_brain_path, plus memory-writeback telemetry after API arbitration; CGPU traces are documented as CHAL contracts until candidate-set payloads are surfaced by this endpoint.",
+    "description": "Legacy-compatible Synthesus query and control API for the active Synthesus 5 CHAL runtime. The public query path currently exposes explicit Cognitive Hypervisor routing through mode=chal, the business_bot CHAL preset, plus generation-spine, cognitive, RAG, kernel, and amplification telemetry. CognitiveHypervisorTrace documents debug.cognitive_hypervisor for CHAL requests, including reasoning-quality verifier telemetry, grounding-reranker telemetry, QuadBrainArbitration and QuadBrainReplayRecord when route=quad_brain_path, plus memory-writeback telemetry after API arbitration; CGPU traces are documented as CHAL contracts until candidate-set payloads are surfaced by this endpoint.",
     "version": "5.0.0"
   },
   "paths": {
@@ -2773,6 +2773,28 @@
             ],
             "description": "Mounted Knowledge Cloud provenance trace for grounded CHAL routes, including KAL operation, source mount, cache state, and artifact integrity metadata; null when no grounded hardware lookup was attempted."
           },
+          "grounding_reranker": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CHALGroundingRerankerTrace"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Compact `chal://reasoning/reranker` telemetry emitted for grounded routes when context chunks are reranked before bridge dispatch; null when no grounding context is available or reranking was not attempted."
+          },
+          "reasoning_quality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CHALReasoningQualityTrace"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Compact `chal://critic/verifier` telemetry emitted after template-guarded final surface generation. It audits answer quality and exposes critic-budget rewrite pressure without owning final language."
+          },
           "quad_brain": {
             "anyOf": [
               {
@@ -2824,6 +2846,162 @@
         ],
         "title": "CognitiveHypervisorTrace",
         "description": "Debug trace emitted under QueryResponse.debug.cognitive_hypervisor for explicit mode=chal requests."
+      },
+      "CHALGroundingRerankerTrace": {
+        "type": "object",
+        "title": "CHALGroundingRerankerTrace",
+        "description": "Compact Cognitive Hypervisor telemetry for the CHAL grounding reranker. The reranker selects/reorders grounded context before bridge dispatch and never emits final user-facing language.",
+        "required": [
+          "schema",
+          "trace_id",
+          "device",
+          "status",
+          "input_chunks",
+          "selected_chunks",
+          "selected_indices",
+          "scores"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "synthesus.chal.grounding_reranker.v1"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "device": {
+            "type": "string",
+            "const": "chal://reasoning/reranker"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "fault"
+            ]
+          },
+          "input_chunks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "selected_chunks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "selected_indices": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Indices selected from the original grounding chunk list."
+          },
+          "scores": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "Reranker scores aligned with selected_indices."
+          },
+          "error": {
+            "type": "string",
+            "description": "Present only when status=fault."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CHALReasoningQualityIssue": {
+        "type": "object",
+        "title": "CHALReasoningQualityIssue",
+        "description": "One verifier issue surfaced in CHAL reasoning-quality telemetry.",
+        "required": [
+          "issue_id",
+          "severity",
+          "category",
+          "description"
+        ],
+        "properties": {
+          "issue_id": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CHALReasoningQualityTrace": {
+        "type": "object",
+        "title": "CHALReasoningQualityTrace",
+        "description": "Compact Cognitive Hypervisor telemetry for the CHAL answer verifier. It audits the final post-template-guard surface and reports rewrite pressure to CGPU/critic callers without becoming a final-language source.",
+        "required": [
+          "schema",
+          "trace_id",
+          "device",
+          "status",
+          "score",
+          "issues",
+          "context_chunks",
+          "critic_passes_budgeted",
+          "critic_revision_required"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "synthesus.chal.reasoning_quality.v1"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "device": {
+            "type": "string",
+            "const": "chal://critic/verifier"
+          },
+          "status": {
+            "type": "string",
+            "description": "Verifier status, for example passed, failed, needs_revision, uncertain, or fault."
+          },
+          "score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CHALReasoningQualityIssue"
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "context_chunks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "critic_passes_budgeted": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "critic_revision_required": {
+            "type": "boolean",
+            "description": "True when verifier status requests revision and the hypervisor route still has critic-pass budget available."
+          },
+          "error": {
+            "type": "string",
+            "description": "Present only when status=fault."
+          }
+        },
+        "additionalProperties": false
       },
       "CHALDegradedState": {
         "type": "object",

@@ -97,6 +97,17 @@ message without reviving legacy fallback/template ownership.
 `CognitiveHypervisorTrace.knowledge_provenance` records mounted Knowledge Cloud
 provenance for grounded CHAL routes, including KAL operation, source mount,
 cache state, and artifact integrity metadata when available.
+`CognitiveHypervisorTrace.grounding_reranker` references
+`CHALGroundingRerankerTrace` when grounded context is split, selected, and
+reranked before bridge dispatch. The record carries the reranker device URI,
+status, chunk counts, selected indices, and scores without exposing or owning
+final language.
+`CognitiveHypervisorTrace.reasoning_quality` references
+`CHALReasoningQualityTrace` after template-guarded surface generation. The
+record carries verifier status, score, issues, metadata, context count, critic
+pass budget, and `critic_revision_required` so future CGPU/critic rewrites can
+consume bounded audit pressure without turning verifier output into user-facing
+prose.
 `CognitiveHypervisorTrace.quad_brain` references `QuadBrainArbitration` when the
 route is `quad_brain_path`, matching the runtime `telemetry.quad_brain` payload.
 The Quad Brain schema also types `QuadBrainStateTransition` records so clients

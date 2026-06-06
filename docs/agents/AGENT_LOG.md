@@ -3230,3 +3230,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Organ replay storage is metadata-only: it stores deterministic identity, CHAL accelerator frame references, candidate/critic handoff references, source hashes, and compact integrity hashes, not raw training vectors or final candidate bodies.
 - This keeps GM/SysOps/Chat organs as bounded CHAL accelerators beneath the hypervisor/training loop instead of promoting them into independent uncontrolled brains.
+
+## Current Session — 2026-06-05 (Agent 10 — Verifier/Reranker API Trace Schema)
+
+### 📝 Summary
+- Mirrored the implemented `debug.cognitive_hypervisor.reasoning_quality` telemetry as reusable `CHALReasoningQualityTrace` and `CHALReasoningQualityIssue` schemas in `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`.
+- Mirrored the implemented `debug.cognitive_hypervisor.grounding_reranker` telemetry as reusable `CHALGroundingRerankerTrace` in all API schema mirrors.
+- Updated the `/api/v1/query` debug prose in `packages/api/schemas.py` and `docs/PHASE20_PRODUCTION_API.md` so verifier/reranker CHAL devices are documented as bounded telemetry/audit surfaces, not final-language owners.
+- Advanced the Phase 9 API debug-contract checklist item after Agent 4 exposed CHAL verifier/reranker telemetry in runtime traces.
+
+### ✅ Verified
+- `python -m py_compile packages/api/schemas.py` — passed.
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed JSON mirrors match YAML and `CognitiveHypervisorTrace` references `CHALReasoningQualityTrace` and `CHALGroundingRerankerTrace`.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_hypervisor.py` — passed.
+- `git diff --check -- docs/openapi.yaml docs/openapi.json docs/api_schema.json packages/api/schemas.py docs/PHASE20_PRODUCTION_API.md docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md docs/agents/AGENT_LOG.md` — passed.
+
+### 🚧 Left Off / Next Steps
+- Future Agent 10 runs should keep typing any new `debug.cognitive_hypervisor.*` runtime telemetry in the OpenAPI/schema mirrors when those surfaces become stable.
+- Broader persistent runtime conversation trace storage remains open.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- The verifier and reranker schema contracts preserve CHAL device boundaries: reranker selects grounded context before bridge dispatch, verifier audits the final post-template-guard surface, and neither device emits normal-path final language.
