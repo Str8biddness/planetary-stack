@@ -52,11 +52,11 @@ Legend:
 
 - [x]  Add route modes: fast path, grounded path, deep reasoning path, Quad Brain path, safety path.
 
-- [x]  Add budget control for latency, retrieval depth, candidate count, and critic passes.
+- [x]  Add budget control for latency, retrieval depth, candidate count, and critic passes. Session log: 2026-06-06 Agent 4 exposed reranker retrieval-budget truncation and verifier revision-budget exhaustion as CHAL telemetry without granting either device final-language ownership.
 
 - [x]  Add per-device isolation and timeout handling. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation.
 
-- [x]  Emit trace records for route decisions and budget exhaustion. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation; 2026-06-05 Agent 4 added CHAL verifier/reranker telemetry so route traces expose grounded-context selection, verifier status, and critic-budget revision pressure.
+- [x]  Emit trace records for route decisions and budget exhaustion. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation; 2026-06-05 Agent 4 added CHAL verifier/reranker telemetry so route traces expose grounded-context selection, verifier status, and critic-budget revision pressure; 2026-06-06 Agent 4 added explicit reranker and verifier budget records for retrieval-depth truncation and exhausted critic revision budgets.
 
 - [x]  Add focused tests for route selection and timeout degradation. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation.
 

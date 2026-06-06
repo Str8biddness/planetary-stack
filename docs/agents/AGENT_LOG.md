@@ -3372,3 +3372,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Phase 8 runtime comparison storage is now metadata-only: it stores prompt hashes and response hashes, not prompt text or final response text.
 - The storage scorecard treats trace persistence as a CHAL-visible batch contract: every stored comparison record must map back to a source replay hash and preserve route/trace identity, category coverage, continuity coverage, and tamper evidence.
+
+## Current Session — 2026-06-06 (Agent 4 — Hypervisor Reasoning Budget Trace)
+
+### 📝 Summary
+- Added explicit CHAL budget records to Cognitive Hypervisor verifier/reranker telemetry.
+- `grounding_reranker.budget` now reports retrieval depth, input/selected chunk counts, truncation, and budget exhaustion when reranking drops context beyond the active retrieval budget.
+- `reasoning_quality.budget` now reports critic passes, required/available revision passes, and exhausted revision budget when verifier pressure cannot be serviced by the current route.
+- Preserved PPBRS/verifier/reranker firmware boundaries: reranker selects context, verifier emits `verifier_signal_only` pressure, and neither device owns normal-path final language.
+- Advanced Phase 2 Cognitive Hypervisor budget/trace records and reinforced Phase 6 firmware-boundary discipline.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/hypervisor.py tests/test_chal_hypervisor.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_hypervisor.py` — passed, 19 tests.
+
+### 🚧 Left Off / Next Steps
+- Future Agent 4 work can route `reasoning_quality.budget.revision_budget_exhausted=true` into a bounded generation-spine or CGPU/critic rewrite path instead of only telemetry pressure.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align.
+- Restamp `synthesus-knowledge-cloud/artifacts/manifest.json` with `build.source_manifest` after the coherent rebuild, then rerun `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker`.
+- Pre-existing unrelated root `AGENTS.md`, root `README.md`, root `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- The real bottleneck in this slice was observability, not another device. Hypervisor traces now show when retrieval and verifier budgets are saturated while preserving the strict boundary that context selection and verification are firmware/control signals, not final-language emitters.

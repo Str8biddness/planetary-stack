@@ -228,6 +228,15 @@ Legacy import paths are preserved through thin compatibility packages:
 
 These devices do not own final language and do not restore PPBRS template emission. They are routing/audit devices behind `chal://reasoning/reranker` and `chal://critic/verifier`; CGPU, critic arbitration, or the generation spine remain responsible for any future rewrite.
 
+### Reasoning Budget Trace Update (2026-06-06)
+
+The verifier/reranker telemetry now exposes explicit CHAL budget records:
+
+- `grounding_reranker.budget` records retrieval depth, input chunk count, selected chunk count, whether selection was truncated, and whether the retrieval budget was exhausted.
+- `reasoning_quality.budget` records critic pass count, required revision passes, available revision passes, and whether verifier revision pressure exceeded the active critic budget.
+
+Both traces also state their language boundary. The reranker is a context-selection device and the verifier is `verifier_signal_only`; neither may emit or rewrite normal-path final text. Their output is pressure for the Cognitive Hypervisor, CGPU/critic arbitration, or future generation-spine rewrite logic.
+
 ### NPC Response-Compositor Boundary (2026-06-01)
 
 `packages/core/cognitive/response_compositor.py` is no longer classified as an unlabeled legacy template emitter. It exposes `ResponseCompositor.compose_labeled()`, which returns text plus Synthesus 5 surface metadata:

@@ -403,25 +403,42 @@ class CognitiveHypervisor:
                 "trace_id": trace_id,
                 "device": "chal://reasoning/reranker",
                 "status": "fault",
+                "budget": {
+                    "retrieval_depth": max(1, top_k),
+                    "input_chunks": len(chunks),
+                    "selected_chunks": len(chunks),
+                    "selection_truncated": False,
+                    "budget_exhausted": False,
+                },
                 "input_chunks": len(chunks),
                 "selected_chunks": len(chunks),
                 "selected_indices": list(range(len(chunks))),
                 "scores": [],
+                "final_language_owner": "hemisphere_bridge_or_cgpu",
                 "error": str(exc),
             }
 
         selected_chunks = [str(item.get("chunk", "")) for item in ranked if item.get("chunk")]
         if not selected_chunks:
             selected_chunks = chunks
+        selection_truncated = len(chunks) > len(selected_chunks)
         return "\n\n".join(selected_chunks), {
             "schema": "synthesus.chal.grounding_reranker.v1",
             "trace_id": trace_id,
             "device": "chal://reasoning/reranker",
             "status": "ok",
+            "budget": {
+                "retrieval_depth": max(1, top_k),
+                "input_chunks": len(chunks),
+                "selected_chunks": len(selected_chunks),
+                "selection_truncated": selection_truncated,
+                "budget_exhausted": selection_truncated,
+            },
             "input_chunks": len(chunks),
             "selected_chunks": len(selected_chunks),
             "selected_indices": [int(item.get("index", -1)) for item in ranked],
             "scores": [float(item.get("score", 0.0)) for item in ranked],
+            "final_language_owner": "hemisphere_bridge_or_cgpu",
         }
 
     def _verify_surface_response(
@@ -451,6 +468,14 @@ class CognitiveHypervisor:
                 "context_chunks": len(context),
                 "critic_passes_budgeted": decision.budget.critic_passes,
                 "critic_revision_required": False,
+                "budget": {
+                    "critic_passes": decision.budget.critic_passes,
+                    "revision_passes_required": 0,
+                    "revision_passes_available": decision.budget.critic_passes,
+                    "revision_budget_exhausted": False,
+                },
+                "firmware_boundary": "verifier_signal_only",
+                "final_language_owner": "generation_spine_or_cgpu_critic",
                 "error": str(exc),
             }
 
@@ -466,6 +491,11 @@ class CognitiveHypervisor:
             for issue in getattr(result, "issues", [])
         ]
         revision_required = status in {"failed", "needs_revision", "uncertain"}
+        revision_passes_required = 1 if revision_required else 0
+        revision_passes_available = max(0, decision.budget.critic_passes)
+        revision_budget_exhausted = (
+            revision_required and revision_passes_available < revision_passes_required
+        )
         return {
             "schema": "synthesus.chal.reasoning_quality.v1",
             "trace_id": trace_id,
@@ -477,6 +507,14 @@ class CognitiveHypervisor:
             "context_chunks": len(context),
             "critic_passes_budgeted": decision.budget.critic_passes,
             "critic_revision_required": revision_required and decision.budget.critic_passes > 0,
+            "budget": {
+                "critic_passes": decision.budget.critic_passes,
+                "revision_passes_required": revision_passes_required,
+                "revision_passes_available": revision_passes_available,
+                "revision_budget_exhausted": revision_budget_exhausted,
+            },
+            "firmware_boundary": "verifier_signal_only",
+            "final_language_owner": "generation_spine_or_cgpu_critic",
         }
 
     def _resolve_grounding_context(

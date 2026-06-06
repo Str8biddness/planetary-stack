@@ -169,6 +169,24 @@ class FakeAnswerVerifier:
         )
 
 
+class FailingAnswerVerifier:
+    def verify(self, answer, query, context=None, revision_count=0):
+        return FakeVerificationResult(
+            status=FakeVerificationStatus("failed"),
+            score=0.18,
+            issues=[
+                FakeVerificationIssue(
+                    issue_id="surface_unverified",
+                    severity=3,
+                    category="quality",
+                    description="Surface could not be verified within the active critic budget",
+                    suggestion="Route through a critic rewrite pass before final emission",
+                )
+            ],
+            metadata={"overlap": 0.0},
+        )
+
+
 def _quad_brain_quality_score(text, trace):
     score = 0
     if "The gate is sealed until dawn." in text:
@@ -451,6 +469,42 @@ def test_grounded_hypervisor_reranks_context_before_bridge_dispatch():
     assert reranker_trace["input_chunks"] == 2
     assert reranker_trace["selected_indices"] == [1, 0]
     assert "manifest integrity record" not in str(reranker_trace["scores"])
+    assert reranker_trace["budget"] == {
+        "retrieval_depth": 4,
+        "input_chunks": 2,
+        "selected_chunks": 2,
+        "selection_truncated": False,
+        "budget_exhausted": False,
+    }
+    assert reranker_trace["final_language_owner"] == "hemisphere_bridge_or_cgpu"
+
+
+def test_grounded_reranker_trace_marks_retrieval_budget_truncation():
+    bridge = StubBridge()
+    hypervisor = CognitiveHypervisor(
+        bridge_factory=lambda: bridge,
+        context_reranker=FakeReranker(),
+    )
+
+    result = asyncio.run(
+        hypervisor.process_query(
+            "Check the Knowledge Cloud manifest",
+            rag_context=(
+                "chunk 0\n\nmanifest chunk 1\n\nchunk 2\n\n"
+                "manifest chunk 3\n\nchunk 4"
+            ),
+        )
+    )
+
+    reranker_trace = result.telemetry["grounding_reranker"]
+
+    assert result.decision.budget.retrieval_depth == 4
+    assert reranker_trace["selected_chunks"] == 4
+    assert reranker_trace["input_chunks"] == 5
+    assert reranker_trace["budget"]["retrieval_depth"] == 4
+    assert reranker_trace["budget"]["selection_truncated"] is True
+    assert reranker_trace["budget"]["budget_exhausted"] is True
+    assert len(bridge.calls[0]["rag_context"].split("\n\n")) == 4
 
 
 def test_hypervisor_verifier_marks_revision_need_as_critic_budget_signal():
@@ -476,7 +530,41 @@ def test_hypervisor_verifier_marks_revision_need_as_critic_budget_signal():
     assert quality["context_chunks"] == 1
     assert quality["critic_passes_budgeted"] == 1
     assert quality["critic_revision_required"] is True
+    assert quality["budget"] == {
+        "critic_passes": 1,
+        "revision_passes_required": 1,
+        "revision_passes_available": 1,
+        "revision_budget_exhausted": False,
+    }
+    assert quality["firmware_boundary"] == "verifier_signal_only"
+    assert quality["final_language_owner"] == "generation_spine_or_cgpu_critic"
     assert quality["issues"][0]["issue_id"] == "grounding_low"
+    assert result.response == "routed through auto"
+
+
+def test_fast_path_verifier_marks_exhausted_revision_budget_without_owning_language():
+    bridge = StubBridge()
+    hypervisor = CognitiveHypervisor(
+        bridge_factory=lambda: bridge,
+        answer_verifier=FailingAnswerVerifier(),
+    )
+
+    result = asyncio.run(hypervisor.process_query("simple ping"))
+
+    quality = result.telemetry["reasoning_quality"]
+
+    assert result.decision.route == HypervisorRoute.FAST_PATH
+    assert result.decision.budget.critic_passes == 0
+    assert quality["status"] == "failed"
+    assert quality["critic_revision_required"] is False
+    assert quality["budget"] == {
+        "critic_passes": 0,
+        "revision_passes_required": 1,
+        "revision_passes_available": 0,
+        "revision_budget_exhausted": True,
+    }
+    assert quality["firmware_boundary"] == "verifier_signal_only"
+    assert quality["final_language_owner"] == "generation_spine_or_cgpu_critic"
     assert result.response == "routed through auto"
 
 
