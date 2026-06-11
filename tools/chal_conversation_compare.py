@@ -135,6 +135,15 @@ QUAD_BRAIN_ROLES = (
     "critic_metacognition",
 )
 
+REQUIRED_PHASE8_CATEGORIES = (
+    "conversation_quality",
+    "cross_domain_reasoning",
+    "grounded_retrieval",
+    "npc_persona_behavior",
+    "business_bot_task",
+    "safety",
+)
+
 
 REFERENCE_EXPECTATIONS: dict[str, ReferenceExpectation] = {
     "conversation_quality": ReferenceExpectation(
@@ -1007,6 +1016,19 @@ def _quad_brain_roles(row: dict[str, Any]) -> list[str]:
 def build_reference_scorecard(rows: list[dict[str, Any]]) -> dict[str, Any]:
     summary = summarize(rows)
     case_results = []
+    category_counts = {
+        category: sum(1 for row in rows if row["category"] == category)
+        for category in REQUIRED_PHASE8_CATEGORIES
+    }
+    category_balance = {
+        "required_categories": list(REQUIRED_PHASE8_CATEGORIES),
+        "observed_categories": sorted({row["category"] for row in rows}),
+        "category_counts": category_counts,
+        "missing_categories": [
+            category for category, count in category_counts.items() if count == 0
+        ],
+        "passed": all(count > 0 for count in category_counts.values()),
+    }
     for row in rows:
         expectation = REFERENCE_EXPECTATIONS[row["case_id"]]
         synth = row["synthesus5"]
@@ -1061,6 +1083,7 @@ def build_reference_scorecard(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "synthesus5_mean_latency_ms": summary["synthesus5_mean_latency_ms"],
             "synthesus5_p95_latency_ms": summary["synthesus5_p95_latency_ms"],
             "synthesus5_template_leaks": summary["synthesus5_template_leaks"],
+            "category_balance": category_balance,
         },
         "cases": case_results,
     }
@@ -1068,6 +1091,12 @@ def build_reference_scorecard(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 def assert_reference_scorecard(scorecard: dict[str, Any]) -> None:
     failures = []
+    category_balance = scorecard.get("summary", {}).get("category_balance", {})
+    if category_balance and not category_balance.get("passed", False):
+        failures.append(
+            "missing required Phase 8 categories: "
+            + ", ".join(category_balance.get("missing_categories", []))
+        )
     for case in scorecard["cases"]:
         for check, passed in case["checks"].items():
             if not passed:

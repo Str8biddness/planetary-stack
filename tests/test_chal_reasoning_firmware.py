@@ -402,6 +402,17 @@ def test_phase8_comparison_harness_builds_reference_scorecard():
     assert scorecard["summary"]["case_count"] == len(rows)
     assert scorecard["summary"]["failed_cases"] == 0
     assert scorecard["summary"]["passed_cases"] == len(rows)
+    category_balance = scorecard["summary"]["category_balance"]
+    assert category_balance["passed"] is True
+    assert category_balance["missing_categories"] == []
+    assert category_balance["category_counts"] == {
+        "conversation_quality": 1,
+        "cross_domain_reasoning": 1,
+        "grounded_retrieval": 1,
+        "npc_persona_behavior": 1,
+        "business_bot_task": 1,
+        "safety": 1,
+    }
     assert_reference_scorecard(scorecard)
 
     business_case = next(case for case in scorecard["cases"] if case["case_id"] == "business_bot_task")
@@ -427,6 +438,22 @@ def test_phase8_reference_scorecard_reports_failed_checks():
         assert f"{scorecard['cases'][0]['case_id']} failed route" in str(exc)
     else:
         raise AssertionError("reference scorecard gate must fail when a case check fails")
+
+
+def test_phase8_reference_scorecard_reports_missing_required_category():
+    rows = asyncio.run(build_chal_rows())
+    rows = [row for row in rows if row["category"] != "grounded_retrieval"]
+    scorecard = build_reference_scorecard(rows)
+
+    assert scorecard["summary"]["category_balance"]["passed"] is False
+    assert scorecard["summary"]["category_balance"]["missing_categories"] == ["grounded_retrieval"]
+
+    try:
+        assert_reference_scorecard(scorecard)
+    except AssertionError as exc:
+        assert "missing required Phase 8 categories: grounded_retrieval" in str(exc)
+    else:
+        raise AssertionError("reference scorecard gate must fail when a required category is absent")
 
 
 def test_phase8_comparison_harness_builds_axis_improvement_scorecard():

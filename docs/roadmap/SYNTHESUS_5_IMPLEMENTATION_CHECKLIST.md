@@ -170,6 +170,8 @@ Legend:
 
 - [x]  Add a prompt-scrubbed persistent trace-storage scorecard gate so legacy-vs-Synthesus-5 runtime comparison batches carry prompt hashes, response hashes, source replay hashes, route/trace identity, category/continuity coverage, and no raw prompt or response text. Session log: 2026-06-06 Agent 3 Phase 8 trace storage gate.
 
+- [x]  Add a required-category balance gate to the GPT-4-class reference scorecard so the legacy-vs-Synthesus-5 harness fails when conversation quality, cross-domain reasoning, grounded retrieval, NPC/persona behavior, business-bot, or safety coverage silently drops out. Session log: 2026-06-11 Agent 3 Phase 8 category-balance scorecard gate.
+
 ## Phase 9: Product Runtime Polish
 
 - [~] Wire Synthesus 5 path into API entrypoints. Session log: 2026-05-28 Agent 1 API CHAL mode added explicit `/api/v1/query` `mode="chal"` routing through `CognitiveHypervisor`; default `auto` cutover remains.

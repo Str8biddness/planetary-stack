@@ -3583,3 +3583,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - The clean-worktree check is intentionally opt-in so demo/runtime health probes can still run in active development trees, while RC tagging can require a fully auditable source/docs state.
+
+## Current Session — 2026-06-11 (Agent 3 — Phase 8 Category-Balance Scorecard Gate)
+
+### 📝 Summary
+- Added explicit required Phase 8 category coverage to the deterministic GPT-4-class reference scorecard in `tools/chal_conversation_compare.py`.
+- The reference scorecard now records required categories, observed categories, per-category counts, missing categories, and a pass/fail balance flag for conversation quality, cross-domain reasoning, grounded retrieval, NPC/persona behavior, business-bot, and safety coverage.
+- `--fail-on-reference` now fails if any required single-turn evaluation category silently drops out, even when aggregate scores and remaining case checks pass.
+- Updated the evaluation harness docs and Phase 8 checklist for the new category-balance gate.
+
+### ✅ Verified
+- `python -m py_compile tools/chal_conversation_compare.py tests/test_chal_reasoning_firmware.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_reasoning_firmware.py` — passed, 25 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/chal_conversation_compare.py --fail-on-leak --fail-on-reference --fail-on-axis-regression --fail-on-continuity --fail-on-replay-integrity --fail-on-trace-storage --max-mean-latency-ms 1000 --max-p95-latency-ms 1500 --min-score-delta 0.1 --scorecard-json tools/results/synthesus5_phase8_reference_scorecard_latest.json --axis-scorecard-json tools/results/synthesus5_phase8_axis_scorecard_latest.json --continuity-scorecard-json tools/results/synthesus5_phase8_continuity_scorecard_latest.json --trace-store-scorecard-json tools/results/synthesus5_phase8_trace_storage_scorecard_latest.json --baseline-json tools/results/synthesus5_phase8_latency_baseline_latest.json` — passed; score delta 0.515, Synthesus 5 template leaks 0, mean latency 12.255 ms, p95 latency 47.455 ms, generated outputs ignored under `tools/results/`.
+
+### 🚧 Left Off / Next Steps
+- Add external/model-backed judge integration only after the deterministic Phase 8 breadth gates remain stable.
+- Broaden category-balance checks to continuity and trace-storage scorecards if future harness cases become dynamically selected.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align, then restamp `artifacts/manifest.json` with `build.source_manifest`.
+- Pre-existing unrelated dirty worktree entries in root docs/config, organ-training files, and untracked `synthesus_framework/` were left untouched.
+
+### 💡 Architectural Notes
+- The reference scorecard now protects benchmark breadth, not only benchmark quality. This keeps Phase 8 from passing as a narrow aggregate score if one of the required GPT-4-class behavior classes disappears from the comparison set.

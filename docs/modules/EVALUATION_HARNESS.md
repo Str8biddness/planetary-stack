@@ -40,7 +40,7 @@ Each output receives axis scores for:
 
 The overall score is the mean of those axes. Template leakage is checked against legacy surface signatures such as `[module]`, `[fallback]`, `response_template`, `Handled:`, and `No route matched`.
 
-The harness also builds a deterministic GPT-4-class reference scorecard. This is not an external model judge. It checks each case against fixed expectations for route selection, minimum score, grounding coverage, term coverage, latency, template leakage, required decision reasons, runtime preset telemetry, and Quad Brain role evidence where applicable.
+The harness also builds a deterministic GPT-4-class reference scorecard. This is not an external model judge. It checks each case against fixed expectations for route selection, minimum score, grounding coverage, term coverage, latency, template leakage, required decision reasons, runtime preset telemetry, and Quad Brain role evidence where applicable. The same gate now records a required-category balance check so the benchmark fails if any Phase 8 class silently drops out of the single-turn comparison set.
 
 It also builds a deterministic continuity scorecard. This checks each multi-turn sequence for turn count, final route, final score, continuity-term coverage, all-turn template cleanliness, expected legacy leakage baseline, runtime preset telemetry, decision reasons, and Quad Brain role coverage where required.
 
@@ -98,7 +98,7 @@ python tools/chal_conversation_compare.py \
 
 `--trace-store-jsonl` writes prompt-scrubbed storage records suitable for persistent runtime comparison trace storage. `--trace-store-scorecard-json` writes the storage completeness scorecard. `--fail-on-trace-storage` fails the run if storage records are missing source coverage, route/trace identity, prompt hashes, response hashes, continuity coverage, category coverage, or if raw prompt/response text leaks into storage.
 
-`--scorecard-json` writes the compact reference expectation scorecard. `--fail-on-reference` fails the run if any fixed expectation check fails, even when aggregate scores remain above threshold.
+`--scorecard-json` writes the compact reference expectation scorecard. `--fail-on-reference` fails the run if any fixed expectation check fails or if a required Phase 8 single-turn category is missing, even when aggregate scores remain above threshold.
 
 `--continuity-scorecard-json` writes the compact continuity scorecard. `--fail-on-continuity` fails the run if any fixed multi-turn sequence fails its continuity, routing, preset, role, latency, or template-cleanliness checks.
 
