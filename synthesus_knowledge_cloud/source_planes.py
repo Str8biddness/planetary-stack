@@ -149,6 +149,50 @@ def _validate_source_manifest_yaml(
             errors.append(f"pending source entry missing upstream locator: {rel}[{index}]")
 
 
+def _validate_aggregate_source_manifest_yaml(
+    path: Path,
+    root_path: Path,
+    errors: list[str],
+    source_ids: dict[str, str],
+) -> None:
+    rel = path.relative_to(root_path).as_posix()
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        errors.append(f"invalid yaml {rel}: {exc}")
+        return
+    if not isinstance(data, dict):
+        errors.append(f"source manifest is not a mapping: {rel}")
+        return
+
+    public_sources = data.get("public_sources", [])
+    if public_sources is None:
+        public_sources = []
+    if not isinstance(public_sources, list):
+        errors.append(f"aggregate source manifest public_sources field must be a list: {rel}")
+        return
+
+    aggregate_ids: dict[str, int] = {}
+    for index, item in enumerate(public_sources):
+        if not isinstance(item, dict):
+            errors.append(f"aggregate public source entry is not a mapping: {rel}[{index}]")
+            continue
+        source_id = item.get("id")
+        if not isinstance(source_id, str) or not source_id.strip():
+            errors.append(f"aggregate public source entry missing id: {rel}[{index}]")
+            continue
+        previous = aggregate_ids.setdefault(source_id, index)
+        if previous != index:
+            errors.append(
+                f"duplicate aggregate public source id: {source_id} in {rel}[{index}] "
+                f"already declared in {rel}[{previous}]"
+            )
+        if source_id not in source_ids:
+            errors.append(
+                f"aggregate public source id has no source manifest: {source_id} in {rel}[{index}]"
+            )
+
+
 def validate_source_planes(root: str | Path = ".") -> SourcePlaneValidation:
     root_path = Path(root).resolve()
     errors: list[str] = []
@@ -171,8 +215,12 @@ def validate_source_planes(root: str | Path = ".") -> SourcePlaneValidation:
     source_ids: dict[str, str] = {}
     pending_ids: dict[str, str] = {}
     if sources_dir.exists():
-        for path in sorted(sources_dir.glob("*.yaml")):
+        source_paths = sorted(path for path in sources_dir.glob("*.yaml") if path.name != "datasets.yaml")
+        for path in source_paths:
             _validate_source_manifest_yaml(path, root_path, errors, source_ids, pending_ids)
+        aggregate_path = sources_dir / "datasets.yaml"
+        if aggregate_path.exists():
+            _validate_aggregate_source_manifest_yaml(aggregate_path, root_path, errors, source_ids)
 
     char_dir = root_path / "patterns/characters"
     pattern_files = sorted(char_dir.glob("*/patterns.json")) if char_dir.exists() else []

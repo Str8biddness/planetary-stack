@@ -274,6 +274,64 @@ def test_source_planes_rejects_duplicate_source_manifest_ids(tmp_path):
     ) in result.errors
 
 
+def test_source_planes_rejects_unbacked_aggregate_public_source_id(tmp_path):
+    root = tmp_path
+    sources = root / "sources"
+    sources.mkdir()
+    (sources / "datasets.yaml").write_text(
+        "\n".join(
+            [
+                'version: "1"',
+                "name: datasets",
+                "public_sources:",
+                "  - id: missing_public_source",
+                "    type: github_tsv",
+                "    default_enabled: true",
+                "    loader: pipelines/ingest/example.py::load",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = validate_source_planes(root)
+
+    assert not result.ok
+    assert (
+        "aggregate public source id has no source manifest: "
+        "missing_public_source in sources/datasets.yaml[0]"
+    ) in result.errors
+
+
+def test_source_planes_rejects_duplicate_aggregate_public_source_ids(tmp_path):
+    root = tmp_path
+    sources = root / "sources"
+    sources.mkdir()
+    (sources / "datasets.yaml").write_text(
+        "\n".join(
+            [
+                'version: "1"',
+                "name: datasets",
+                "public_sources:",
+                "  - id: duplicate_public_source",
+                "    type: github_tsv",
+                "  - id: duplicate_public_source",
+                "    type: public_gzip_csv",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = validate_source_planes(root)
+
+    assert not result.ok
+    assert (
+        "duplicate aggregate public source id: duplicate_public_source in "
+        "sources/datasets.yaml[1] already declared in sources/datasets.yaml[0]"
+    ) in result.errors
+
+
 def test_source_planes_rejects_pending_dataset_without_rebuild_command(tmp_path):
     root = tmp_path
     sources = root / "sources"
