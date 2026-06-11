@@ -201,6 +201,8 @@ Cold-start release validation also requires the artifact manifest to carry `buil
 
 The standalone Knowledge Cloud data-plane validator now enforces the same source-manifest identity gate for production `synthesus-knowledge-artifacts` manifests. Synthetic/test manifests can still validate without provenance, but public runtime bundles cannot pass `synthesus-kc validate` until `build.source_manifest` is stamped with the source-plane path, SHA-256, size, kind, roots, and artifact count.
 
+Source-plane admission also treats concrete source manifest IDs and planned `pending[]` dataset IDs as one CHAL source-identity namespace. A pending public dataset cannot reuse an already-admitted source ID, so later promotion into the mounted Knowledge Cloud rebuild substrate cannot create ambiguous provenance fingerprints.
+
 By default, the command uses `SYNTHESUS_KNOWLEDGE_ROOT` when set, then the companion `synthesus-knowledge-cloud/artifacts` checkout when present, and finally the runtime `data/` directory. It is also part of `tools/synthesus5_focused_suite.py`, so the source-only Synthesus 5 release gate now fails if the mounted Knowledge Cloud bundle cannot cold boot.
 
 ## Synthesus 5 Hot-Context Cache
