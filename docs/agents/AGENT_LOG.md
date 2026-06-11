@@ -3516,3 +3516,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - AIVM snapshot admission now has two compact sealed metadata layers: `aivm.snapshot_replay.v1` for canonical tick replay identity and `aivm.device_manifest.v1` for mounted CHAL partition identity.
 - The manifest seal is intentionally source/runtime metadata, not a hardware acceleration claim. It makes Python AIVM snapshot restore stricter before kernel admission.
+
+## Current Session — 2026-06-11 (Knowledge Hardware Source-ID Collision Gate)
+
+### 📝 Summary
+- Hardened the standalone Knowledge Cloud source-plane validator so non-aggregate `sources/*.yaml` manifests cannot reuse the same top-level source `id`.
+- Added regression coverage for duplicate source-manifest IDs, updated source/data-model/provenance docs, and regenerated `manifests/source_manifest.json` so the source-plane fingerprint covers the new validator contract.
+- Advanced the Phase 5 Knowledge Cloud hardware license/provenance validation checklist item without touching generated FAISS, KNDB, model, cache, mirror, or workflow artifacts.
+
+### ✅ Verified
+- `python -m py_compile synthesus_knowledge_cloud/source_planes.py tests/test_cli.py` — passed in `synthesus-knowledge-cloud`.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m pytest -q tests/test_cli.py tests/test_build.py tests/test_provenance.py` — passed, 27 tests.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud validate-sources --root /home/workspace/synthesus-knowledge-cloud` — passed, 25 required paths and 7 character pattern banks.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud build-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — regenerated 151-file source manifest.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud verify-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — passed, 151 source files.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align.
+- Restamp `synthesus-knowledge-cloud/artifacts/manifest.json` with the current `build.source_manifest` after the coherent rebuild, then rerun `synthesus-kc validate` and `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker`.
+- Pre-existing unrelated changes in `Synthesus_4.0` root docs/config, organ-training files, and untracked `synthesus_framework/` were left untouched.
+
+### 💡 Architectural Notes
+- A top-level source manifest ID is mounted Knowledge Cloud hardware identity, not just display metadata. Duplicate IDs would make source-manifest fingerprints and later artifact provenance ambiguous, so source-plane validation now rejects them before any dataset can become CHAL rebuild substrate.
