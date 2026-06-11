@@ -2070,6 +2070,75 @@ components:
         suggestion:
           type: string
       additionalProperties: false
+    CHALReasoningRevisionRouteHint:
+      type: object
+      title: CHALReasoningRevisionRouteHint
+      description: Scheduler-only route pressure emitted when verifier revision
+        pressure should be serviced by the current route or a bounded follow-up
+        route. This is not verifier-owned final language.
+      required:
+      - schema
+      - trace_id
+      - device
+      - required
+      - reason
+      - verifier_status
+      - current_route
+      - recommended_route
+      - budget_delta
+      - issue_ids
+      - firmware_boundary
+      - final_language_owner
+      - verifier_may_emit_final_language
+      properties:
+        schema:
+          type: string
+          const: synthesus.chal.reasoning_revision_route_hint.v1
+        trace_id:
+          type: string
+        device:
+          type: string
+          const: chal://hypervisor/route_planner
+        required:
+          type: boolean
+        reason:
+          type: string
+          enum:
+          - active_route_has_critic_budget
+          - critic_budget_exhausted
+        verifier_status:
+          type: string
+        current_route:
+          type: string
+        recommended_route:
+          type: string
+        budget_delta:
+          type: object
+          required:
+          - critic_passes
+          - candidate_count
+          properties:
+            critic_passes:
+              type: integer
+              minimum: 0
+            candidate_count:
+              type: integer
+              minimum: 0
+          additionalProperties: false
+        issue_ids:
+          type: array
+          items:
+            type: string
+        firmware_boundary:
+          type: string
+          const: scheduler_hint_only
+        final_language_owner:
+          type: string
+          const: generation_spine_or_cgpu_critic
+        verifier_may_emit_final_language:
+          type: boolean
+          const: false
+      additionalProperties: false
     CHALReasoningQualityTrace:
       type: object
       title: CHALReasoningQualityTrace
@@ -2120,6 +2189,12 @@ components:
           type: boolean
           description: True when verifier status requests revision and the hypervisor
             route still has critic-pass budget available.
+        revision_route_hint:
+          oneOf:
+          - $ref: '#/components/schemas/CHALReasoningRevisionRouteHint'
+          - type: 'null'
+          description: Scheduler-only route hint emitted when verifier pressure requests
+            revision; it cannot emit or rewrite final language.
         error:
           type: string
           description: Present only when status=fault.

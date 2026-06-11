@@ -566,6 +566,16 @@ class CognitiveHypervisor:
         revision_budget_exhausted = (
             revision_required and revision_passes_available < revision_passes_required
         )
+        revision_route_hint = self._build_revision_route_hint(
+            decision=decision,
+            trace_id=trace_id,
+            verifier_status=status,
+            issues=issues,
+            revision_required=revision_required,
+            revision_passes_required=revision_passes_required,
+            revision_passes_available=revision_passes_available,
+            revision_budget_exhausted=revision_budget_exhausted,
+        )
         return {
             "schema": "synthesus.chal.reasoning_quality.v1",
             "trace_id": trace_id,
@@ -583,8 +593,54 @@ class CognitiveHypervisor:
                 "revision_passes_available": revision_passes_available,
                 "revision_budget_exhausted": revision_budget_exhausted,
             },
+            "revision_route_hint": revision_route_hint,
             "firmware_boundary": "verifier_signal_only",
             "final_language_owner": "generation_spine_or_cgpu_critic",
+        }
+
+    def _build_revision_route_hint(
+        self,
+        *,
+        decision: HypervisorDecision,
+        trace_id: str,
+        verifier_status: str,
+        issues: list[dict[str, Any]],
+        revision_required: bool,
+        revision_passes_required: int,
+        revision_passes_available: int,
+        revision_budget_exhausted: bool,
+    ) -> dict[str, Any] | None:
+        if not revision_required:
+            return None
+
+        if revision_budget_exhausted:
+            recommended_route = (
+                HypervisorRoute.QUAD_BRAIN_PATH.value
+                if decision.route != HypervisorRoute.QUAD_BRAIN_PATH
+                else decision.route.value
+            )
+            reason = "critic_budget_exhausted"
+        else:
+            recommended_route = decision.route.value
+            reason = "active_route_has_critic_budget"
+
+        return {
+            "schema": "synthesus.chal.reasoning_revision_route_hint.v1",
+            "trace_id": trace_id,
+            "device": "chal://hypervisor/route_planner",
+            "required": True,
+            "reason": reason,
+            "verifier_status": verifier_status,
+            "current_route": decision.route.value,
+            "recommended_route": recommended_route,
+            "budget_delta": {
+                "critic_passes": max(0, revision_passes_required - revision_passes_available),
+                "candidate_count": 1 if revision_budget_exhausted else 0,
+            },
+            "issue_ids": [str(issue.get("issue_id", "")) for issue in issues if issue.get("issue_id")],
+            "firmware_boundary": "scheduler_hint_only",
+            "final_language_owner": "generation_spine_or_cgpu_critic",
+            "verifier_may_emit_final_language": False,
         }
 
     def _resolve_grounding_context(

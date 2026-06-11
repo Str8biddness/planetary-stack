@@ -113,9 +113,11 @@ final language.
 `CognitiveHypervisorTrace.reasoning_quality` references
 `CHALReasoningQualityTrace` after template-guarded surface generation. The
 record carries verifier status, score, issues, metadata, context count, critic
-pass budget, and `critic_revision_required` so future CGPU/critic rewrites can
-consume bounded audit pressure without turning verifier output into user-facing
-prose.
+pass budget, `critic_revision_required`, and `revision_route_hint`. The route
+hint is scheduler-only pressure: it can recommend staying on the current route
+when critic budget exists or escalating to a bounded `quad_brain_path` follow-up
+when the active route exhausted revision budget, but it cannot emit or rewrite
+user-facing prose.
 `CognitiveHypervisorTrace.quad_brain` references `QuadBrainArbitration` when the
 route is `quad_brain_path`, matching the runtime `telemetry.quad_brain` payload.
 The Quad Brain schema also types `QuadBrainStateTransition` records so clients

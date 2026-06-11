@@ -628,6 +628,21 @@ def test_hypervisor_verifier_marks_revision_need_as_critic_budget_signal():
         "revision_passes_available": 1,
         "revision_budget_exhausted": False,
     }
+    assert quality["revision_route_hint"] == {
+        "schema": "synthesus.chal.reasoning_revision_route_hint.v1",
+        "trace_id": result.decision.trace_id,
+        "device": "chal://hypervisor/route_planner",
+        "required": True,
+        "reason": "active_route_has_critic_budget",
+        "verifier_status": "needs_revision",
+        "current_route": "grounded_path",
+        "recommended_route": "grounded_path",
+        "budget_delta": {"critic_passes": 0, "candidate_count": 0},
+        "issue_ids": ["grounding_low"],
+        "firmware_boundary": "scheduler_hint_only",
+        "final_language_owner": "generation_spine_or_cgpu_critic",
+        "verifier_may_emit_final_language": False,
+    }
     assert quality["firmware_boundary"] == "verifier_signal_only"
     assert quality["final_language_owner"] == "generation_spine_or_cgpu_critic"
     assert quality["issues"][0]["issue_id"] == "grounding_low"
@@ -654,6 +669,21 @@ def test_fast_path_verifier_marks_exhausted_revision_budget_without_owning_langu
         "revision_passes_required": 1,
         "revision_passes_available": 0,
         "revision_budget_exhausted": True,
+    }
+    assert quality["revision_route_hint"] == {
+        "schema": "synthesus.chal.reasoning_revision_route_hint.v1",
+        "trace_id": result.decision.trace_id,
+        "device": "chal://hypervisor/route_planner",
+        "required": True,
+        "reason": "critic_budget_exhausted",
+        "verifier_status": "failed",
+        "current_route": "fast_path",
+        "recommended_route": "quad_brain_path",
+        "budget_delta": {"critic_passes": 1, "candidate_count": 1},
+        "issue_ids": ["surface_unverified"],
+        "firmware_boundary": "scheduler_hint_only",
+        "final_language_owner": "generation_spine_or_cgpu_critic",
+        "verifier_may_emit_final_language": False,
     }
     assert quality["firmware_boundary"] == "verifier_signal_only"
     assert quality["final_language_owner"] == "generation_spine_or_cgpu_critic"

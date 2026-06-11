@@ -165,6 +165,7 @@ class QueryResponse(BaseModel):
             "For explicit mode=chal calls, cognitive_hypervisor follows the "
             "CognitiveHypervisorTrace OpenAPI component, including typed "
             "CHALReasoningQualityTrace verifier telemetry, "
+            "CHALReasoningRevisionRouteHint scheduler-only rewrite pressure, "
             "CHALGroundingRerankerTrace context-selection telemetry, "
             "QuadBrainArbitration records when route=quad_brain_path, "
             "QuadBrainReplayRecord and QuadBrainTraceStorage metadata for compact "

@@ -235,6 +235,7 @@ The verifier/reranker telemetry now exposes explicit CHAL budget records:
 
 - `grounding_reranker.budget` records retrieval depth, input chunk count, selected chunk count, whether selection was truncated, and whether the retrieval budget was exhausted.
 - `reasoning_quality.budget` records critic pass count, required revision passes, available revision passes, and whether verifier revision pressure exceeded the active critic budget.
+- `reasoning_quality.revision_route_hint` records scheduler-only follow-up pressure when the verifier requests revision. If the active route has critic budget, the hint keeps the current route; if the critic budget is exhausted, it recommends a bounded `quad_brain_path` follow-up with the additional critic/candidate budget needed. The hint is `scheduler_hint_only`: it cannot rewrite or emit final language.
 
 Both traces also state their language boundary. The reranker is a context-selection device and the verifier is `verifier_signal_only`; neither may emit or rewrite normal-path final text. Their output is pressure for the Cognitive Hypervisor, CGPU/critic arbitration, or future generation-spine rewrite logic.
 

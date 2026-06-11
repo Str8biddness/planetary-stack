@@ -3627,3 +3627,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - `sources/datasets.yaml` is now a public catalog view, not an independent source of truth. Every advertised public source must resolve to a validated mounted source identity with its own license block, loader contract, and upstream locator before it can participate in CHAL rebuild provenance.
+
+## Current Session — 2026-06-11 (Agent 4 — Verifier Revision Route Hint)
+
+### 📝 Summary
+- Added `reasoning_quality.revision_route_hint` to Cognitive Hypervisor verifier telemetry.
+- The hint records scheduler-only follow-up pressure when verifier revision is required: stay on the active route when critic budget exists, or recommend bounded `quad_brain_path` follow-up when the active route exhausted critic revision budget.
+- Preserved the PPBRS/verifier/reranker firmware boundary: verifier output remains `verifier_signal_only`, the route hint is `scheduler_hint_only`, and neither path may emit normal-path final language.
+- Mirrored the new route-hint contract into OpenAPI/API schema docs and the PPBRS module notes.
+- Advanced Phase 2 Cognitive Hypervisor route/budget trace records and reinforced Phase 6 firmware-boundary discipline.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/hypervisor.py packages/api/schemas.py tests/test_chal_hypervisor.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_hypervisor.py` — passed, 22 tests.
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed JSON mirrors match YAML.
+
+### 🚧 Left Off / Next Steps
+- Future Agent 4 work can make the generation spine or CGPU/critic path consume `reasoning_quality.revision_route_hint` to perform an explicit bounded rewrite pass.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root docs/config, organ-training, checklist/log drift, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- The real boundary here is route planning, not rewriting. The verifier can now tell the hypervisor that the current budget is insufficient and name the next bounded route, but final language remains owned by the generation spine or CGPU/critic arbitration.
