@@ -153,7 +153,7 @@ def _validate_aggregate_source_manifest_yaml(
     path: Path,
     root_path: Path,
     errors: list[str],
-    source_ids: dict[str, str],
+    source_manifests: dict[str, dict],
 ) -> None:
     rel = path.relative_to(root_path).as_posix()
     try:
@@ -187,9 +187,25 @@ def _validate_aggregate_source_manifest_yaml(
                 f"duplicate aggregate public source id: {source_id} in {rel}[{index}] "
                 f"already declared in {rel}[{previous}]"
             )
-        if source_id not in source_ids:
+        source_manifest = source_manifests.get(source_id)
+        if source_manifest is None:
             errors.append(
                 f"aggregate public source id has no source manifest: {source_id} in {rel}[{index}]"
+            )
+            continue
+        expected_loader = source_manifest.get("loader")
+        aggregate_loader = item.get("loader")
+        if aggregate_loader is not None and aggregate_loader != expected_loader:
+            errors.append(
+                f"aggregate public source loader mismatch for {source_id} in {rel}[{index}]: "
+                f"{aggregate_loader} != {expected_loader}"
+            )
+        aggregate_default = item.get("default_enabled")
+        source_default = source_manifest.get("default_enabled", True)
+        if aggregate_default is not None and aggregate_default != source_default:
+            errors.append(
+                f"aggregate public source default_enabled mismatch for {source_id} in {rel}[{index}]: "
+                f"{aggregate_default} != {source_default}"
             )
 
 
@@ -228,14 +244,23 @@ def validate_source_planes(root: str | Path = ".") -> SourcePlaneValidation:
     sources_dir = root_path / "sources"
     source_ids: dict[str, str] = {}
     pending_ids: dict[str, str] = {}
+    source_manifests: dict[str, dict] = {}
     if sources_dir.exists():
         source_paths = sorted(path for path in sources_dir.glob("*.yaml") if path.name != "datasets.yaml")
         for path in source_paths:
             _validate_source_manifest_yaml(path, root_path, errors, source_ids, pending_ids)
+            try:
+                data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if isinstance(data, dict):
+                source_id = data.get("id")
+                if isinstance(source_id, str) and source_id.strip() and source_id not in source_manifests:
+                    source_manifests[source_id] = data
         _validate_source_identity_namespace(errors, source_ids, pending_ids)
         aggregate_path = sources_dir / "datasets.yaml"
         if aggregate_path.exists():
-            _validate_aggregate_source_manifest_yaml(aggregate_path, root_path, errors, source_ids)
+            _validate_aggregate_source_manifest_yaml(aggregate_path, root_path, errors, source_manifests)
 
     char_dir = root_path / "patterns/characters"
     pattern_files = sorted(char_dir.glob("*/patterns.json")) if char_dir.exists() else []
