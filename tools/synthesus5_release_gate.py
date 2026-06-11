@@ -109,6 +109,56 @@ def _command_check(
     )
 
 
+def _clean_worktree_check() -> ReleaseCheck:
+    command = ["git", "status", "--porcelain", "--untracked-files=all"]
+    command_text = " ".join(command)
+    try:
+        completed = _run(command, timeout=30)
+    except subprocess.TimeoutExpired as exc:
+        return ReleaseCheck(
+            id="git:clean-worktree",
+            label="Clean release worktree",
+            status="fail",
+            severity="critical",
+            detail=f"Timed out after 30s.\n{_tail(exc.stdout or '')}",
+            command=command_text,
+        )
+
+    output = completed.stdout or ""
+    if completed.returncode != 0:
+        return ReleaseCheck(
+            id="git:clean-worktree",
+            label="Clean release worktree",
+            status="fail",
+            severity="critical",
+            detail=_tail(output) or f"git status exited {completed.returncode}.",
+            command=command_text,
+        )
+
+    dirty_entries = [line for line in output.splitlines() if line.strip()]
+    if dirty_entries:
+        return ReleaseCheck(
+            id="git:clean-worktree",
+            label="Clean release worktree",
+            status="fail",
+            severity="critical",
+            detail=(
+                "Release candidate tagging requires a clean source/docs worktree. "
+                f"Dirty entries: {len(dirty_entries)}.\n{_tail(output, lines=20)}"
+            ),
+            command=command_text,
+        )
+
+    return ReleaseCheck(
+        id="git:clean-worktree",
+        label="Clean release worktree",
+        status="pass",
+        severity="critical",
+        detail="git status --porcelain returned no source/docs changes.",
+        command=command_text,
+    )
+
+
 def _knowledge_artifact_check() -> ReleaseCheck:
     command = [sys.executable, "tools/validate_knowledge_cold_start.py"]
     command_text = " ".join(command)
@@ -153,7 +203,12 @@ def _knowledge_artifact_check() -> ReleaseCheck:
     )
 
 
-def collect_release_checks(*, run_runtime: bool, run_focused_suite: bool) -> list[ReleaseCheck]:
+def collect_release_checks(
+    *,
+    run_runtime: bool,
+    run_focused_suite: bool,
+    require_clean_worktree: bool = False,
+) -> list[ReleaseCheck]:
     checks = [
         _path_check("README.md", "Repository positioning"),
         _path_check("docs/roadmap/SYNTHESUS_5_CHAL_BLUEPRINT.md", "Synthesus 5 architecture blueprint"),
@@ -170,6 +225,9 @@ def collect_release_checks(*, run_runtime: bool, run_focused_suite: bool) -> lis
             timeout=30,
         ),
     ]
+
+    if require_clean_worktree:
+        checks.append(_clean_worktree_check())
 
     if run_focused_suite:
         checks.append(
@@ -271,8 +329,17 @@ def evaluate_launch_tiers(checks: list[ReleaseCheck]) -> list[LaunchTier]:
     ]
 
 
-def build_report(*, run_runtime: bool, run_focused_suite: bool = False) -> dict[str, Any]:
-    checks = collect_release_checks(run_runtime=run_runtime, run_focused_suite=run_focused_suite)
+def build_report(
+    *,
+    run_runtime: bool,
+    run_focused_suite: bool = False,
+    require_clean_worktree: bool = False,
+) -> dict[str, Any]:
+    checks = collect_release_checks(
+        run_runtime=run_runtime,
+        run_focused_suite=run_focused_suite,
+        require_clean_worktree=require_clean_worktree,
+    )
     tiers = evaluate_launch_tiers(checks)
     critical_blockers = [
         asdict(check)
@@ -285,6 +352,7 @@ def build_report(*, run_runtime: bool, run_focused_suite: bool = False) -> dict[
         "positioning": "bounded synthetic intelligence runtime for NPCs, business bots, and inspectable agent services",
         "run_runtime": run_runtime,
         "run_focused_suite": run_focused_suite,
+        "require_clean_worktree": require_clean_worktree,
         "checks": [asdict(check) for check in checks],
         "launch_tiers": [asdict(tier) for tier in tiers],
         "critical_blockers": critical_blockers,
@@ -302,11 +370,20 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate Synthesus 5 commercial release readiness report.")
     parser.add_argument("--run-runtime", action="store_true", help="Run CHAL smoke and Knowledge Cloud cold-start checks.")
     parser.add_argument("--run-focused-suite", action="store_true", help="Run the focused Synthesus 5 release suite.")
+    parser.add_argument(
+        "--require-clean-worktree",
+        action="store_true",
+        help="Require git status --porcelain to be clean before RC tagging.",
+    )
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help="JSON report output path.")
     parser.add_argument("--fail-on-blocker", action="store_true", help="Exit non-zero when critical blockers remain.")
     args = parser.parse_args()
 
-    report = build_report(run_runtime=args.run_runtime, run_focused_suite=args.run_focused_suite)
+    report = build_report(
+        run_runtime=args.run_runtime,
+        run_focused_suite=args.run_focused_suite,
+        require_clean_worktree=args.require_clean_worktree,
+    )
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2), encoding="utf-8")

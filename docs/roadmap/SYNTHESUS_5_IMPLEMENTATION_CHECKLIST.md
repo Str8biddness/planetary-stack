@@ -198,7 +198,7 @@ Legend:
 
 - [x]  Publish release notes describing Synthesus 5 behavior and limitations. Session log: 2026-06-03 Commercial Release Packaging Gate added RC1 release notes, commercial packaging docs, package scripts, and a runtime release gate that separates demo/private-beta readiness from paid-launch blockers; 2026-06-05 Agent 1 hardened the runtime release gate so focused-suite evidence is an explicit critical check before RC tagging.
 
-- [ ]  Tag a Synthesus 5 release candidate.
+- [ ]  Tag a Synthesus 5 release candidate. Session log: 2026-06-11 Agent 1 added an opt-in `--require-clean-worktree` critical release-gate check so RC tagging can be blocked on uncommitted source/docs drift in addition to the focused suite, CHAL smoke, and Knowledge Cloud cold-start blockers.
 
 ## Current Priority Queue
 

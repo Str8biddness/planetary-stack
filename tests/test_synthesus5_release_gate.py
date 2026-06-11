@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import subprocess
 
 from synthesus5_release_gate import (
+    _clean_worktree_check,
     _knowledge_artifact_check,
     build_report,
     evaluate_launch_tiers,
@@ -79,3 +80,45 @@ def test_missing_source_manifest_provenance_is_release_blocker(monkeypatch):
     assert check.status == "blocked"
     assert check.id == "knowledge:cold-start"
     assert "build.source_manifest" in check.detail
+
+
+def test_clean_worktree_gate_passes_when_git_status_is_empty(monkeypatch):
+    def fake_run(command, *, timeout):
+        return subprocess.CompletedProcess(command, 0, stdout="")
+
+    monkeypatch.setattr("synthesus5_release_gate._run", fake_run)
+
+    check = _clean_worktree_check()
+
+    assert check.status == "pass"
+    assert check.id == "git:clean-worktree"
+
+
+def test_clean_worktree_gate_blocks_dirty_release_candidate(monkeypatch):
+    def fake_run(command, *, timeout):
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=" M tools/synthesus5_release_gate.py\n?? tools/results/latest.json\n",
+        )
+
+    monkeypatch.setattr("synthesus5_release_gate._run", fake_run)
+
+    check = _clean_worktree_check()
+
+    assert check.status == "fail"
+    assert check.id == "git:clean-worktree"
+    assert "Dirty entries: 2" in check.detail
+    assert "tools/synthesus5_release_gate.py" in check.detail
+
+
+def test_release_gate_can_require_clean_worktree(monkeypatch):
+    monkeypatch.setattr(
+        "synthesus5_release_gate._clean_worktree_check",
+        lambda: ReleaseCheck("git:clean-worktree", "Clean release worktree", "pass", "critical", "ok"),
+    )
+
+    report = build_report(run_runtime=False, require_clean_worktree=True)
+
+    assert report["require_clean_worktree"] is True
+    assert any(check["id"] == "git:clean-worktree" and check["status"] == "pass" for check in report["checks"])

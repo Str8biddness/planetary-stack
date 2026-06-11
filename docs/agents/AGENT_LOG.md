@@ -3561,3 +3561,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - The runtime-side health path is behaving correctly: it admits source-plane and KAL/mount health, but refuses to treat incoherent generated retrieval hardware as golden-query-ready CHAL substrate.
+
+## Current Session — 2026-06-11 (Agent 1 — RC Worktree Release Gate)
+
+### 📝 Summary
+- Added an opt-in `--require-clean-worktree` critical check to `tools/synthesus5_release_gate.py` so release-candidate tagging can require `git status --porcelain --untracked-files=all` to be empty.
+- Exposed `require_clean_worktree` in the release-gate JSON report and included `git:clean-worktree` in critical blockers when the tree contains source/docs drift.
+- Added focused unit coverage for clean, dirty, and report-wired worktree gate paths.
+- Advanced the Phase 10 release-candidate readiness checklist item without marking the RC tag complete.
+
+### ✅ Verified
+- `python -m py_compile tools/synthesus5_release_gate.py tests/test_synthesus5_release_gate.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/tools python -m pytest -q tests/test_synthesus5_release_gate.py` — passed, 7 tests.
+- `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_release_gate.py --require-clean-worktree --output /tmp/synthesus5_release_gate_clean_probe.json --fail-on-blocker` — expected exit 1; reported `git:clean-worktree` as a critical blocker against the current dirty tree.
+- Earlier runtime probe `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_release_gate.py --run-runtime --fail-on-blocker --output /tmp/synthesus5_release_gate_agent1_probe.json` — expected exit 1; CHAL smoke passed and `knowledge:cold-start` remained blocked by FAISS/embedder/profile mismatch plus missing `build.source_manifest`.
+
+### 🚧 Left Off / Next Steps
+- Before tagging RC1, run `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --require-clean-worktree --fail-on-blocker`.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align, then restamp `artifacts/manifest.json` with `build.source_manifest`.
+- Resolve or commit the pre-existing unrelated root docs/config, organ-training, and `synthesus_framework/` worktree changes before using the new clean-worktree gate for RC tagging.
+
+### 💡 Architectural Notes
+- The clean-worktree check is intentionally opt-in so demo/runtime health probes can still run in active development trees, while RC tagging can require a fully auditable source/docs state.
