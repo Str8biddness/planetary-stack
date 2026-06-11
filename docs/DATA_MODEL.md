@@ -85,7 +85,7 @@ Small support artifacts that are not the FAISS query embedder but still support 
 - `artifacts/manifest.json` validates runtime downloads and, for production `synthesus-knowledge-artifacts` bundles, must carry `build.source_manifest` provenance.
 - `manifests/source_manifest.json` validates source/pipeline/pattern/synthetic/support planes plus the validator package and provenance docs that define source admission.
 - Both manifest types reject duplicate artifact paths so one file identity cannot carry competing provenance or integrity records.
-- Source-plane validation rejects duplicate top-level source manifest IDs across non-aggregate `sources/*.yaml` files so two upstream datasets cannot claim the same mounted source identity.
+- Source-plane validation rejects duplicate top-level source manifest IDs across non-aggregate `sources/*.yaml` files and rejects collisions between concrete source IDs and planned `pending[]` IDs, so two admitted or future upstream datasets cannot claim the same mounted source identity.
 - The aggregate `sources/datasets.yaml` public-source catalog must only list unique IDs backed by concrete non-aggregate source manifests, keeping advertised public sources tied to validated license, loader, and upstream-locator metadata.
 - Runtime clients should use the artifact manifest.
 - Rebuild/audit tools should use both manifests.

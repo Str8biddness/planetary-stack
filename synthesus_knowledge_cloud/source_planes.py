@@ -193,6 +193,20 @@ def _validate_aggregate_source_manifest_yaml(
             )
 
 
+def _validate_source_identity_namespace(
+    errors: list[str],
+    source_ids: dict[str, str],
+    pending_ids: dict[str, str],
+) -> None:
+    for source_id, source_rel in sorted(source_ids.items()):
+        pending_rel = pending_ids.get(source_id)
+        if pending_rel:
+            errors.append(
+                f"source identity collides with pending source id: {source_id} in {source_rel} "
+                f"already declared as pending in {pending_rel}"
+            )
+
+
 def validate_source_planes(root: str | Path = ".") -> SourcePlaneValidation:
     root_path = Path(root).resolve()
     errors: list[str] = []
@@ -218,6 +232,7 @@ def validate_source_planes(root: str | Path = ".") -> SourcePlaneValidation:
         source_paths = sorted(path for path in sources_dir.glob("*.yaml") if path.name != "datasets.yaml")
         for path in source_paths:
             _validate_source_manifest_yaml(path, root_path, errors, source_ids, pending_ids)
+        _validate_source_identity_namespace(errors, source_ids, pending_ids)
         aggregate_path = sources_dir / "datasets.yaml"
         if aggregate_path.exists():
             _validate_aggregate_source_manifest_yaml(aggregate_path, root_path, errors, source_ids)

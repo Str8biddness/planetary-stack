@@ -65,7 +65,7 @@ Before an executed build or profile-aware manual re-stamp writes `manifest.json`
 
 Artifact and source manifests also reject duplicate `artifacts[].path` entries. A duplicate path is ambiguous provenance because two records can claim the same mounted file identity with different size/hash metadata, so validation fails before the bundle or source plane can be treated as CHAL hardware.
 
-Source-plane validation also rejects duplicate top-level source manifest IDs across non-aggregate `sources/*.yaml` files. A source ID is the durable upstream identity carried into source-manifest fingerprints, rebuild audits, and later runtime bundle provenance, so two manifests cannot claim the same ID.
+Source-plane validation also rejects duplicate top-level source manifest IDs across non-aggregate `sources/*.yaml` files, and rejects collisions between admitted source IDs and planned `pending[]` dataset IDs. A source ID is the durable upstream identity carried into source-manifest fingerprints, rebuild audits, and later runtime bundle provenance, so admitted and future-promoted sources cannot claim the same ID.
 
 The aggregate catalog in `sources/datasets.yaml` is also validated against those concrete source IDs. Every `public_sources[].id` must be unique inside the aggregate file and must match a non-aggregate source manifest with its own license, loader, and upstream locator. This keeps public Knowledge Cloud source catalogs from drifting away from the provenance-clean manifests that actually admit mounted CHAL source hardware.
 

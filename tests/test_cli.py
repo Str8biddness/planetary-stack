@@ -274,6 +274,62 @@ def test_source_planes_rejects_duplicate_source_manifest_ids(tmp_path):
     ) in result.errors
 
 
+def test_source_planes_rejects_pending_id_that_collides_with_source_id(tmp_path):
+    root = tmp_path
+    sources = root / "sources"
+    sources.mkdir()
+    (sources / "datasets.yaml").write_text('version: "1"\nname: datasets\n', encoding="utf-8")
+    (sources / "admitted.yaml").write_text(
+        "\n".join(
+            [
+                'version: "1"',
+                "id: shared_source",
+                "name: Admitted Source",
+                "source_type: github_tsv",
+                "license:",
+                '  spdx: "MIT"',
+                "  notes: Redistributable admitted test fixture.",
+                "repository: https://example.com/repo",
+                "loader: pipelines/ingest/example.py::load",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (sources / "planned.yaml").write_text(
+        "\n".join(
+            [
+                'version: "1"',
+                "id: planned_source",
+                "name: Planned Source",
+                "source_type: huggingface_datasets",
+                "license:",
+                '  spdx: "MIXED"',
+                "  notes: Per-dataset licenses are required.",
+                "default_enabled: false",
+                "pending:",
+                "  - id: shared_source",
+                "    repo: owner/dataset",
+                "    rebuild_command: synthesus-kc build profiles/public-base.yaml",
+                "    license:",
+                '      spdx: "MIT"',
+                "      notes: Redistributable pending test fixture.",
+                "loader: pipelines/ingest/huggingface_loader.py::load_dataset",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = validate_source_planes(root)
+
+    assert not result.ok
+    assert (
+        "source identity collides with pending source id: shared_source in "
+        "sources/admitted.yaml already declared as pending in sources/planned.yaml[0]"
+    ) in result.errors
+
+
 def test_source_planes_rejects_unbacked_aggregate_public_source_id(tmp_path):
     root = tmp_path
     sources = root / "sources"
