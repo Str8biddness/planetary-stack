@@ -3638,7 +3638,7 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 - Advanced Phase 2 Cognitive Hypervisor route/budget trace records and reinforced Phase 6 firmware-boundary discipline.
 
 ### ✅ Verified
-- `python -m py_compile packages/core/chal/hypervisor.py packages/api/schemas.py tests/test_chal_hypervisor.py` — passed.
+- `python -m py_compile packages/core/chal/hypervisor.py tests/test_chal_hypervisor.py` — passed.
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_hypervisor.py` — passed, 22 tests.
 - Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed JSON mirrors match YAML.
 
@@ -3738,3 +3738,23 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - `sources/datasets.yaml` remains a public catalog view, but it can no longer advertise stale loader or enablement metadata for a mounted source identity. Repeated catalog fields must mirror the concrete source manifest that owns the license, upstream locator, and loader contract.
+
+## Current Session — 2026-06-11 (Agent 8 — AIVM Replay Device-Manifest Binding)
+
+### 📝 Summary
+- Bound `aivm.snapshot_replay.v1` records to the sealed `aivm.device_manifest.v1` `manifest_hash`, so compact AIVM replay traces now prove which mounted CHAL device set produced the captured tick.
+- Restore now rejects validly resealed snapshots whose replay trace points at a different device manifest, even when the replay `record_hash` and outer snapshot footer are recomputed.
+- Added focused snapshot regression coverage and updated the AIVM module docs plus Phase 7 checklist entries.
+
+### ✅ Verified
+- `python -m py_compile packages/aivm/snapshot/manager.py tests/aivm/test_snapshot_integrity.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/aivm/test_snapshot_integrity.py` — passed, 14 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/kernel/build SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_kernel_pybind_vpd.py` — passed, 1 pybind smoke test.
+
+### 🚧 Left Off / Next Steps
+- Broader persistent runtime trace storage is still open outside Quad Brain and organ traces.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root docs/config, organ-training files, and untracked `synthesus_framework/` worktree changes were left untouched except for required checklist/log entries in shared docs.
+
+### 💡 Architectural Notes
+- AIVM snapshot admission now ties replay identity and mounted-device identity together. The replay trace remains compact and prompt/response-scrubbed, but it can no longer be transplanted onto a different sealed CHAL device manifest without restore-time rejection.

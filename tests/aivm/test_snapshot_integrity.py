@@ -223,10 +223,15 @@ async def test_snapshot_records_compact_replay_trace_without_response_text():
     assert replay_trace["steps"] == SnapshotManager.CANONICAL_TICK_SEQUENCE
     assert replay_trace["canonical_sequence_observed"] is True
     assert replay_trace["emit_hashes"]
+    assert replay_trace["device_manifest_hash"] == data["device_manifest"]["manifest_hash"]
     assert len(replay_trace["events"]) == 12
     assert replay_trace["events"][0]["step"] == "admission"
-    assert replay_trace["events_hash"] == SnapshotManager.build_replay_trace(npc)["events_hash"]
-    assert replay_trace["record_hash"] == SnapshotManager.build_replay_trace(npc)["record_hash"]
+    rebuilt_replay_trace = SnapshotManager.build_replay_trace(
+        npc,
+        data["device_manifest"]["manifest_hash"],
+    )
+    assert replay_trace["events_hash"] == rebuilt_replay_trace["events_hash"]
+    assert replay_trace["record_hash"] == rebuilt_replay_trace["record_hash"]
     assert "Generated response from AIVM VGD." not in json.dumps(replay_trace)
 
     restored = AIVMKernel(enable_scheduler=False).restore_npc(SnapshotManager.capture(npc))
@@ -259,4 +264,19 @@ async def test_snapshot_restore_rejects_replay_trace_record_mismatch_with_valid_
     data["footer"]["fingerprint"] = SnapshotManager._fingerprint_payload(data)
 
     with pytest.raises(ValueError, match="replay trace record fingerprint mismatch"):
+        AIVMKernel(enable_scheduler=False).restore_npc(json.dumps(data, sort_keys=True).encode())
+
+
+@pytest.mark.asyncio
+async def test_snapshot_restore_rejects_replay_trace_device_manifest_mismatch_with_valid_outer_seal():
+    kernel = AIVMKernel(enable_scheduler=False)
+    npc = kernel.spawn_npc(PersonaIdentity(id="replay_manifest_npc", name="Replay Manifest", archetype="scribe"))
+
+    await kernel.tick("replay_manifest_npc", {"input": "bind replay to mounted devices"})
+    data = json.loads(SnapshotManager.capture(npc).decode())
+    data["replay_trace"]["device_manifest_hash"] = "forged-manifest-hash"
+    data["replay_trace"]["record_hash"] = SnapshotManager._fingerprint_replay_record(data["replay_trace"])
+    data["footer"]["fingerprint"] = SnapshotManager._fingerprint_payload(data)
+
+    with pytest.raises(ValueError, match="replay trace device manifest mismatch"):
         AIVMKernel(enable_scheduler=False).restore_npc(json.dumps(data, sort_keys=True).encode())

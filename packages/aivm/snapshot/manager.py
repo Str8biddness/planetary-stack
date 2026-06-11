@@ -69,7 +69,7 @@ class SnapshotManager:
         return manifest
 
     @staticmethod
-    def build_replay_trace(npc: NPC) -> dict[str, Any]:
+    def build_replay_trace(npc: NPC, device_manifest_hash: str | None = None) -> dict[str, Any]:
         """
         Build a compact, replay-oriented tick trace without storing full prompt
         or response text.
@@ -101,6 +101,7 @@ class SnapshotManager:
             "canonical_tick_sequence": canonical_start,
             "canonical_sequence_observed": steps[:len(canonical_start)] == canonical_start,
             "emit_hashes": emit_hashes,
+            "device_manifest_hash": device_manifest_hash,
             "events": events,
             "events_hash": SnapshotManager._fingerprint_replay_events(events),
         }
@@ -108,11 +109,19 @@ class SnapshotManager:
         return record
 
     @staticmethod
-    def _verify_replay_trace(replay_trace: dict[str, Any]) -> None:
+    def _verify_replay_trace(
+        replay_trace: dict[str, Any],
+        device_manifest: dict[str, Any] | None = None,
+    ) -> None:
         if not replay_trace:
             return
         if replay_trace.get("version") != SnapshotManager.REPLAY_TRACE_VERSION:
             raise ValueError("Snapshot replay trace version mismatch")
+        if device_manifest:
+            expected_manifest_hash = device_manifest.get("manifest_hash")
+            replay_manifest_hash = replay_trace.get("device_manifest_hash")
+            if replay_manifest_hash != expected_manifest_hash:
+                raise ValueError("Snapshot replay trace device manifest mismatch")
         events = list(replay_trace.get("events", []))
         expected_hash = replay_trace.get("events_hash")
         actual_hash = SnapshotManager._fingerprint_replay_events(events)
@@ -166,14 +175,15 @@ class SnapshotManager:
         for name, device in npc.mounted_devices.items():
             device_blobs[name] = device.snapshot().hex() # Hex encode for JSON compatibility
             device_fingerprints[name] = device.fingerprint()
+        device_manifest = SnapshotManager.build_device_manifest(device_blobs, device_fingerprints)
 
         # Payload
         payload = {
             "header": header,
             "devices": device_blobs,
             "device_fingerprints": device_fingerprints,
-            "device_manifest": SnapshotManager.build_device_manifest(device_blobs, device_fingerprints),
-            "replay_trace": SnapshotManager.build_replay_trace(npc),
+            "device_manifest": device_manifest,
+            "replay_trace": SnapshotManager.build_replay_trace(npc, device_manifest["manifest_hash"]),
             "identity": {
                 "name": npc.identity.name,
                 "archetype": npc.identity.archetype,
@@ -245,7 +255,7 @@ class SnapshotManager:
             if device.fingerprint() != expected:
                 raise ValueError(f"Snapshot device fingerprint mismatch: {name}")
 
-        SnapshotManager._verify_replay_trace(data.get("replay_trace", {}))
+        SnapshotManager._verify_replay_trace(data.get("replay_trace", {}), data.get("device_manifest", {}))
         npc.snapshot_replay_trace = dict(data.get("replay_trace", {}))
         npc.add_audit("restore", {"fingerprint": data["footer"]["fingerprint"]})
         return npc
