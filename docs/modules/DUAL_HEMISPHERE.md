@@ -224,3 +224,9 @@ It intentionally omits full response text. This keeps replay artifacts suitable 
 `CognitiveHypervisor` now accepts an optional mounted trace recorder for Quad Brain replay records. When `route=quad_brain_path`, the hypervisor offers a `synthesus.chal.quad_brain_trace_storage_record.v1` payload to the recorder after `QuadBrainArbitration.to_replay_record()` is built. The stored payload contains the compact replay record, route/runtime identity, and replay `record_hash`; it does not contain raw prompt text or raw response text.
 
 The runtime telemetry field `telemetry.quad_brain_trace_storage` reports `skipped`, `stored`, or `fault` status for the `chal://telemetry/quad_brain_replay_store` boundary. This is a storage/control-plane device only. Recorder faults are kept as trace metadata and do not change `state_contract.final_output_owner=critic_metacognition`, do not bypass serialized arbitration, and do not create another brain or parallel agent.
+
+### Quad Brain Arbitration-Step Ledger Update (2026-06-11)
+
+`QuadBrainArbitration.state_contract.arbitration_steps` now records the compact serialized ledger for the four-brain handoff chain. Each step includes the 1-based step index, role, CHAL device, input refs, output refs, rounded confidence, and warnings for the corresponding brain output.
+
+The replay record carries the same `arbitration_steps` list under its compact `state_contract`, and the integrity proof now includes `arbitration_steps_complete`. This gives trace consumers a direct ordered ledger to inspect without inferring execution order from the full output payload, while preserving the existing bounded topology: Knowledge/Grounding -> Executive Reasoning -> CGPU Rendering -> Critic/Metacognition.

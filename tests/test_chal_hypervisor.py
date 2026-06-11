@@ -290,6 +290,10 @@ def test_hypervisor_quad_brain_path_serializes_four_brain_arbitration():
     assert quad_trace["state_contract"]["serialized_arbitration"] is True
     assert quad_trace["state_contract"]["parallel_brain_spawn"] is False
     assert quad_trace["state_contract"]["required_roles"] == [role.value for role in QuadBrainRole]
+    assert [step["step"] for step in quad_trace["state_contract"]["arbitration_steps"]] == [1, 2, 3, 4]
+    assert [step["role"] for step in quad_trace["state_contract"]["arbitration_steps"]] == [
+        role.value for role in QuadBrainRole
+    ]
     assert quad_trace["state_contract"]["critic_input_ref"] == "cgpu.selected_candidate"
     assert quad_trace["state_contract"]["final_output_ref"] == "critic.selected_response"
     assert quad_trace["state_contract"]["final_output_owner"] == "critic_metacognition"
@@ -319,9 +323,16 @@ def test_quad_brain_trace_records_serial_state_transitions():
     assert transitions[1]["input_refs"] == ["hypervisor.decision", "knowledge.facts", "constraints"]
     assert transitions[2]["device"] == "chal://cgpu/render"
     assert transitions[3]["output_refs"] == ["critic.selected_response", "critic.template_guard"]
+    arbitration_steps = quad_trace["state_contract"]["arbitration_steps"]
 
-    for output, transition in zip(quad_trace["outputs"], transitions):
+    for output, transition, step in zip(quad_trace["outputs"], transitions, arbitration_steps):
         assert output["trace"]["state_transition"] == transition
+        assert step["role"] == output["role"] == transition["role"]
+        assert step["device"] == output["device"]
+        assert step["input_refs"] == transition["input_refs"]
+        assert step["output_refs"] == transition["output_refs"]
+        assert step["confidence"] == round(output["confidence"], 6)
+        assert step["warnings"] == output.get("warnings", [])
 
     cgpu_output = quad_trace["outputs"][2]
     critic_output = quad_trace["outputs"][3]
@@ -342,6 +353,7 @@ def test_quad_brain_trace_records_serial_state_transitions():
         "roles_complete": True,
         "serial_order_valid": True,
         "transitions_complete": True,
+        "arbitration_steps_complete": True,
         "output_transition_mirrors": True,
         "critic_handoff_valid": True,
         "final_output_owned_by_critic": True,
@@ -373,6 +385,7 @@ def test_quad_brain_trace_emits_compact_replay_record_without_response_text():
     assert state_contract["parallel_brain_spawn"] is False
     assert state_contract["final_output_owner"] == "critic_metacognition"
     assert state_contract["integrity"]["status"] == "passed"
+    assert state_contract["arbitration_steps"] == result.telemetry["quad_brain"]["state_contract"]["arbitration_steps"]
     assert replay["selected_response_chars"] == len(result.response)
     assert len(replay["selected_response_sha256"]) == 64
     assert len(replay["record_hash"]) == 64

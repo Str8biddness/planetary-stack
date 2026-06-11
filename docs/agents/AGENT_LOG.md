@@ -3695,6 +3695,28 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The PPBRS rule/action layer remains firmware only. This change reduces control-plane candidate work after CHAL-style trigger/tag filtering, but final wording still belongs to the generation spine, CGPU/critic arbitration, or labeled safety/platform/NPC-script exception surfaces.
 
+## Current Session — 2026-06-11 (Agent 7 — Quad Brain Arbitration-Step Ledger)
+
+### 📝 Summary
+- Added `state_contract.arbitration_steps` to Quad Brain arbitration traces as a compact four-step ledger covering step index, role, CHAL device, input refs, output refs, confidence, and warnings.
+- Mirrored the same arbitration-step ledger into compact Quad Brain replay records and extended the integrity proof with `arbitration_steps_complete`.
+- Updated focused hypervisor regressions, Dual Hemisphere module docs, OpenAPI/API schema mirrors, and the Phase 3 checklist.
+- Advanced the Phase 3 serialized Quad Brain arbiter item while preserving fixed Knowledge/Grounding -> Executive Reasoning -> CGPU Rendering -> Critic/Metacognition arbitration and avoiding uncontrolled multi-agent sprawl.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/quad_brain.py tests/test_chal_hypervisor.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_hypervisor.py` — passed, 22 tests.
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed schema mirrors load cleanly.
+
+### 🚧 Left Off / Next Steps
+- Future Agent 7 work can persist the compact arbitration-step ledger through the selected production trace backend once that storage boundary is chosen.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root docs/config, organ-training files, and untracked `synthesus_framework/` worktree changes were left untouched except for required shared checklist/log updates.
+
+### 💡 Architectural Notes
+- `arbitration_steps` is trace metadata, not another brain. It makes serialized arbitration easier to audit while final surface ownership remains `critic_metacognition`.
+- The state-contract change is backward-compatible with existing output payloads because it adds an explicit compact ledger alongside the existing role outputs and state transitions.
+
 ## Current Session — 2026-06-11 (Knowledge Hardware Aggregate Catalog Drift Gate)
 
 ### 📝 Summary

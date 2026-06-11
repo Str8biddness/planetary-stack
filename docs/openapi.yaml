@@ -1395,6 +1395,7 @@ components:
           - template_leakage_allowed
           - route
           - required_roles
+          - arbitration_steps
           - state_transitions
           - critic_input_ref
           - final_output_ref
@@ -1430,6 +1431,49 @@ components:
                 - executive_reasoning
                 - cgpu_rendering
                 - critic_metacognition
+            arbitration_steps:
+              type: array
+              description: Compact serialized arbitration ledger for the four Quad
+                Brain roles. Each step mirrors the corresponding role output and
+                state transition without requiring consumers to infer execution order
+                from the full output payload.
+              minItems: 4
+              maxItems: 4
+              items: &id002
+                type: object
+                required:
+                - step
+                - role
+                - device
+                - input_refs
+                - output_refs
+                - confidence
+                - warnings
+                properties:
+                  step:
+                    type: integer
+                    minimum: 1
+                    maximum: 4
+                  role:
+                    type: string
+                    enum: *id001
+                  device:
+                    type: string
+                  input_refs:
+                    type: array
+                    items:
+                      type: string
+                  output_refs:
+                    type: array
+                    items:
+                      type: string
+                  confidence:
+                    type: number
+                  warnings:
+                    type: array
+                    items:
+                      type: string
+                additionalProperties: false
             state_transitions:
               type: array
               description: Inspectable state handoffs for knowledge, executive, CGPU,
@@ -1479,6 +1523,7 @@ components:
                   - roles_complete
                   - serial_order_valid
                   - transitions_complete
+                  - arbitration_steps_complete
                   - output_transition_mirrors
                   - critic_handoff_valid
                   - final_output_owned_by_critic
@@ -1488,6 +1533,8 @@ components:
                     serial_order_valid:
                       type: boolean
                     transitions_complete:
+                      type: boolean
+                    arbitration_steps_complete:
                       type: boolean
                     output_transition_mirrors:
                       type: boolean
@@ -1587,6 +1634,7 @@ components:
           - parallel_brain_spawn
           - serialized_arbitration
           - required_roles
+          - arbitration_steps
           - state_transitions
           - critic_input_ref
           - final_output_ref
@@ -1607,6 +1655,11 @@ components:
               items:
                 type: string
                 enum: *id001
+            arbitration_steps:
+              type: array
+              items: *id002
+              minItems: 4
+              maxItems: 4
             state_transitions:
               type: array
               items:

@@ -121,6 +121,7 @@ class QuadBrainArbitration:
                 "parallel_brain_spawn": self.state_contract.get("parallel_brain_spawn"),
                 "serialized_arbitration": self.state_contract.get("serialized_arbitration"),
                 "required_roles": list(self.state_contract.get("required_roles", [])),
+                "arbitration_steps": list(self.state_contract.get("arbitration_steps", [])),
                 "state_transitions": list(self.state_contract.get("state_transitions", [])),
                 "critic_input_ref": self.state_contract.get("critic_input_ref"),
                 "critic_reviewed_candidate_id": self.state_contract.get(
@@ -219,6 +220,7 @@ class QuadBrainOrchestrator:
             selected_source = "hemisphere_bridge_fallback"
 
         outputs = [knowledge, executive, cgpu, critic]
+        arbitration_steps = self._arbitration_steps(outputs=outputs)
         state_contract = {
             "topology": "knowledge->executive->cgpu->critic",
             "parallel_brain_spawn": False,
@@ -227,6 +229,7 @@ class QuadBrainOrchestrator:
             "bridge_trace_id": bridge_result.get("hypervisor_trace", {}).get("trace_id"),
             "route": decision.route.value,
             "required_roles": serial_order,
+            "arbitration_steps": arbitration_steps,
             "state_transitions": [
                 transitions[role].to_dict()
                 for role in QuadBrainRole
@@ -239,6 +242,7 @@ class QuadBrainOrchestrator:
         state_contract["integrity"] = self._state_contract_integrity(
             outputs=outputs,
             serial_order=serial_order,
+            arbitration_steps=arbitration_steps,
             transitions=state_contract["state_transitions"],
             selected_source=selected_source,
         )
@@ -441,11 +445,14 @@ class QuadBrainOrchestrator:
         *,
         outputs: list[QuadBrainOutput],
         serial_order: list[str],
+        arbitration_steps: list[dict[str, Any]],
         transitions: list[dict[str, Any]],
         selected_source: str,
     ) -> dict[str, Any]:
         output_roles = [output.role.value for output in outputs]
         transition_roles = [str(transition.get("role")) for transition in transitions]
+        step_roles = [str(step.get("role")) for step in arbitration_steps]
+        step_indexes = [int(step.get("step", -1)) for step in arbitration_steps]
         mirrored_transitions = [
             output.trace.get("state_transition") == transition
             for output, transition in zip(outputs, transitions)
@@ -472,6 +479,8 @@ class QuadBrainOrchestrator:
             "roles_complete": output_roles == serial_order,
             "serial_order_valid": serial_order == [role.value for role in QuadBrainRole],
             "transitions_complete": transition_roles == serial_order,
+            "arbitration_steps_complete": step_roles == serial_order
+            and step_indexes == list(range(1, len(serial_order) + 1)),
             "output_transition_mirrors": all(mirrored_transitions)
             and len(mirrored_transitions) == len(serial_order),
             "critic_handoff_valid": bool(selected_candidate_id)
@@ -484,6 +493,27 @@ class QuadBrainOrchestrator:
             "selected_candidate_id": selected_candidate_id,
             "reviewed_candidate_id": reviewed_candidate_id,
         }
+
+    def _arbitration_steps(
+        self,
+        *,
+        outputs: list[QuadBrainOutput],
+    ) -> list[dict[str, Any]]:
+        steps: list[dict[str, Any]] = []
+        for index, output in enumerate(outputs, start=1):
+            transition = output.trace.get("state_transition") or {}
+            steps.append(
+                {
+                    "step": index,
+                    "role": output.role.value,
+                    "device": output.device,
+                    "input_refs": list(transition.get("input_refs", [])),
+                    "output_refs": list(transition.get("output_refs", [])),
+                    "confidence": round(float(output.confidence), 6),
+                    "warnings": list(output.warnings),
+                }
+            )
+        return steps
 
     def _intent_for_route(self, route: HypervisorRoute) -> str:
         if route == HypervisorRoute.SAFETY_PATH:
