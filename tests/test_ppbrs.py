@@ -317,6 +317,21 @@ class TestContextAwareReasoningPipeline:
         assert [item["rule"]["trigger_values"] for item in activated] == [{"signal": "disk_full"}, {}]
         assert calls == ["disk", "shared"]
 
+    def test_weighted_rules_materialize_indexed_candidates_directly(self):
+        evaluator = WeightedRuleEvaluator()
+        for i in range(100):
+            evaluator.add_rule(
+                lambda ctx, i=i: ctx.get("signal") == f"signal_{i}",
+                lambda ctx, i=i: f"result_{i}",
+                tags=[f"tag_{i % 10}"],
+                trigger_values={"signal": f"signal_{i}"},
+            )
+        evaluator.add_rule(lambda ctx: True, lambda ctx: "shared")
+
+        candidate_ids = evaluator._candidate_rule_ids({"tags": ["tag_7"], "signal": "signal_37"})
+
+        assert candidate_ids == [37, 100]
+
 
 class TestConfidenceScorer:
     """Tests for ConfidenceScorer."""
@@ -454,6 +469,23 @@ class TestRuleToActionMapper:
 
         assert [rule.rule_id for rule, _ in results] == ["disk_ops", "shared_ops"]
         assert calls == ["disk_ops", "shared_ops"]
+
+    def test_evaluate_rules_materializes_indexed_candidates_directly(self):
+        mapper = RuleToActionMapper()
+        for i in range(100):
+            mapper.add_rule(
+                f"rule_{i}",
+                f"Rule {i}",
+                lambda ctx, i=i: ctx.get("signal") == f"signal_{i}",
+                [],
+                tags=[f"tag_{i % 10}"],
+                metadata={"trigger_values": {"signal": f"signal_{i}"}},
+            )
+        mapper.add_rule("shared", "Shared", lambda ctx: True, [])
+
+        candidate_ids = mapper._candidate_rule_ids({"tags": ["tag_7"], "signal": "signal_37"})
+
+        assert candidate_ids == ["rule_37", "shared"]
     
     def test_execute_action(self):
         mapper = RuleToActionMapper()

@@ -116,6 +116,8 @@ class RuleToActionMapper:
         self._trigger_value_index: Dict[tuple, set] = {}
         self._trigger_value_key_rules: Dict[str, set] = {}
         self._untriggered_rules: set = set()
+        self._rule_order: List[str] = []
+        self._rule_position: Dict[str, int] = {}
         
     def register_rule(self, rule: Rule) -> None:
         """Registers a Rule object with the mapper.
@@ -126,6 +128,9 @@ class RuleToActionMapper:
         previous = self.rules.get(rule.rule_id)
         if previous:
             self._remove_from_indexes(previous)
+        elif rule.rule_id not in self._rule_position:
+            self._rule_position[rule.rule_id] = len(self._rule_order)
+            self._rule_order.append(rule.rule_id)
 
         self.rules[rule.rule_id] = rule
         self._add_to_indexes(rule)
@@ -183,7 +188,7 @@ class RuleToActionMapper:
             return f"{type(value).__name__}:{value!r}"
         return json.dumps(value, sort_keys=True, default=str)
 
-    def _candidate_rules(self, context: Dict[str, Any]) -> List[Rule]:
+    def _candidate_rule_ids(self, context: Dict[str, Any]) -> Optional[List[str]]:
         context_tags = set(context.get('tags', []))
         tag_filtered = None
         if context_tags:
@@ -210,9 +215,18 @@ class RuleToActionMapper:
             candidate_ids = set(filtered) if candidate_ids is None else candidate_ids & filtered
 
         if candidate_ids is None:
-            return list(self.rules.values())
+            return None
 
-        return [rule for rule_id, rule in self.rules.items() if rule_id in candidate_ids]
+        return sorted(
+            candidate_ids,
+            key=lambda rule_id: self._rule_position.get(rule_id, len(self._rule_order)),
+        )
+
+    def _candidate_rules(self, context: Dict[str, Any]) -> List[Rule]:
+        candidate_ids = self._candidate_rule_ids(context)
+        if candidate_ids is None:
+            return list(self.rules.values())
+        return [self.rules[rule_id] for rule_id in candidate_ids if rule_id in self.rules]
         
     def add_rule(self, rule_id: str, name: str,
                 condition: Callable[[Dict], bool],

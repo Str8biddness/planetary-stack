@@ -3671,3 +3671,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - A pending dataset ID is a future mounted source identity, not a throwaway planning label. It now cannot reuse an admitted source ID, which keeps source-manifest fingerprints and later runtime artifact provenance unambiguous when pending public datasets are promoted.
+
+## Current Session — 2026-06-11 (Agent 6 — Direct Indexed PPBRS Rule Materialization)
+
+### 📝 Summary
+- Added direct indexed candidate materialization to `WeightedRuleEvaluator` and `RuleToActionMapper`, so tag/trigger-filtered PPBRS firmware paths use bounded candidate ID sets instead of scanning the full rule registry after filtering.
+- Preserved fanout behavior for `evaluate()` / `evaluate_rules()` and single-winner short-circuit behavior for `apply_top_rule()` / `map_to_action()`.
+- Added focused regression coverage proving a selective tag+trigger context materializes only the matching rule plus the shared unindexed rule.
+- Advanced the Phase 6 PPBRS firmware-signal optimization item without changing normal-path surface ownership or adding canned output.
+
+### ✅ Verified
+- `python -m py_compile packages/reasoning/reasoning_chain.py packages/reasoning/rule_to_action.py tests/test_ppbrs.py tools/ppbrs_benchmark.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_ppbrs.py` — passed, 70 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — passed, 125 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_reasoning_firmware.py tests/test_template_surface_audit.py` — passed, 33 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/ppbrs_benchmark.py` — passed; rule evaluation avg `0.0090 ms`, action mapping avg `0.0130 ms`, weighted top-rule avg `0.0133 ms`.
+
+### 🚧 Left Off / Next Steps
+- The next Agent 6 pass can evaluate whether the remaining `evaluate()` fanout paths need heap/top-k selection or C++ kernel offload after the Python indexes remain stable.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root docs/config, organ-training, and untracked `synthesus_framework/` changes were left untouched except for required checklist/log entries in shared docs.
+
+### 💡 Architectural Notes
+- The PPBRS rule/action layer remains firmware only. This change reduces control-plane candidate work after CHAL-style trigger/tag filtering, but final wording still belongs to the generation spine, CGPU/critic arbitration, or labeled safety/platform/NPC-script exception surfaces.

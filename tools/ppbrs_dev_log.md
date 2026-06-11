@@ -650,3 +650,42 @@ PPBRS micro-benchmark after exact-match scoring cache:
 - `python -m py_compile packages/reasoning/pattern_classifier.py tests/test_ppbrs.py`
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 123 passed.
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/ppbrs_benchmark.py`
+## Baseline - 2026-06-11 21:05:15
+
+| Component | p50 (ms) | p95 (ms) | Avg (ms) |
+| --- | --- | --- | --- |
+| pattern_matching | 0.1802 | 0.2075 | 0.1603 |
+| rule_evaluation | 0.0084 | 0.0107 | 0.0090 |
+| action_mapping | 0.0113 | 0.0187 | 0.0130 |
+| weighted_top_rule | 0.0123 | 0.0150 | 0.0133 |
+| confidence_scoring | 0.0056 | 0.0059 | 0.0061 |
+| graph_traversal | 0.0160 | 0.0199 | 0.0168 |
+
+## Daily Entry: 2026-06-11 (Agent 6 — Direct Indexed Rule Materialization)
+
+### Actions Performed
+
+1. Added direct candidate-ID materialization to `WeightedRuleEvaluator` so tag/trigger-filtered contexts use the bounded indexed ID set instead of scanning the full rule list again.
+2. Added registration-order candidate materialization to `RuleToActionMapper` so action firmware preserves fanout ordering while avoiding full-registry scans after indexed filtering.
+3. Added regression coverage for the bounded tag+trigger candidate set on both rule evaluators.
+4. Preserved the PPBRS firmware boundary: rule/action optimization changes only candidate selection and do not emit normal-path final language.
+
+### Benchmark Run
+
+PPBRS micro-benchmark after direct indexed rule materialization:
+
+| Component | p50 (ms) | p95 (ms) | Avg (ms) |
+| --- | --- | --- | --- |
+| pattern_matching | 0.1802 | 0.2075 | 0.1603 |
+| rule_evaluation | 0.0084 | 0.0107 | 0.0090 |
+| action_mapping | 0.0113 | 0.0187 | 0.0130 |
+| weighted_top_rule | 0.0123 | 0.0150 | 0.0133 |
+| confidence_scoring | 0.0056 | 0.0059 | 0.0061 |
+| graph_traversal | 0.0160 | 0.0199 | 0.0168 |
+
+### Verified
+
+- `python -m py_compile packages/reasoning/reasoning_chain.py packages/reasoning/rule_to_action.py tests/test_ppbrs.py tools/ppbrs_benchmark.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 125 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_reasoning_firmware.py tests/test_template_surface_audit.py` — 33 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/ppbrs_benchmark.py`

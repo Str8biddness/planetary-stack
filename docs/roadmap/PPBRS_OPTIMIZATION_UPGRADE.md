@@ -73,7 +73,7 @@ Target files:
 - `ppbrs/reasoning_chain.py`
 - `ppbrs/rule_to_action.py`
 
-Status 2026-06-04: implemented tag and trigger indexes for `WeightedRuleEvaluator` and `RuleToActionMapper`. Tagged contexts now evaluate matching tagged rules plus untagged shared rules, and contexts with indexed trigger keys or exact trigger values skip unrelated rule conditions before scoring. `WeightedRuleEvaluator.apply_top_rule()` and `apply_fallback()` now use a short-circuiting top-rule scan so single-winner firmware paths stop after the highest-weight qualifying rule is known. `RuleToActionMapper.map_to_action()` now uses priority-first, score-upper-bound single-winner evaluation instead of full fanout when only one action will execute.
+Status 2026-06-11: implemented tag and trigger indexes for `WeightedRuleEvaluator` and `RuleToActionMapper`. Tagged contexts now evaluate matching tagged rules plus untagged shared rules, and contexts with indexed trigger keys or exact trigger values skip unrelated rule conditions before scoring. Indexed candidate sets are materialized directly from rule IDs instead of by scanning the full registry again. `WeightedRuleEvaluator.apply_top_rule()` and `apply_fallback()` now use a short-circuiting top-rule scan so single-winner firmware paths stop after the highest-weight qualifying rule is known. `RuleToActionMapper.map_to_action()` now uses priority-first, score-upper-bound single-winner evaluation instead of full fanout when only one action will execute.
 
 Implementation order:
 1. Add tag-based and trigger-based indexing for rules.

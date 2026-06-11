@@ -343,7 +343,7 @@ class WeightedRuleEvaluator:
             return f"{type(value).__name__}:{value!r}"
         return json.dumps(value, sort_keys=True, default=str)
 
-    def _candidate_rules(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _candidate_rule_ids(self, context: Dict[str, Any]) -> Optional[List[int]]:
         context_tags = set(context.get('tags', []))
         tag_filtered = None
         if context_tags:
@@ -370,9 +370,15 @@ class WeightedRuleEvaluator:
             candidate_ids = set(filtered) if candidate_ids is None else candidate_ids & filtered
 
         if candidate_ids is None:
-            return self.rules
+            return None
 
-        return [rule for i, rule in enumerate(self.rules) if i in candidate_ids]
+        return sorted(candidate_ids)
+
+    def _candidate_rules(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+        candidate_ids = self._candidate_rule_ids(context)
+        if candidate_ids is None:
+            return self.rules
+        return [self.rules[i] for i in candidate_ids if i < len(self.rules)]
     
     def evaluate(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Evaluates all rules against the context and identifies triggered ones.
