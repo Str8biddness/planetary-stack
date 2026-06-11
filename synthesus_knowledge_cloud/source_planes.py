@@ -65,6 +65,7 @@ def _validate_source_manifest_yaml(
     path: Path,
     root_path: Path,
     errors: list[str],
+    source_ids: dict[str, str],
     pending_ids: dict[str, str],
 ) -> None:
     rel = path.relative_to(root_path).as_posix()
@@ -83,6 +84,15 @@ def _validate_source_manifest_yaml(
         value = data.get(field)
         if not isinstance(value, str) or not value.strip():
             errors.append(f"source manifest missing {field}: {rel}")
+
+    source_id = data.get("id")
+    if isinstance(source_id, str) and source_id.strip():
+        previous = source_ids.setdefault(source_id, rel)
+        if previous != rel:
+            errors.append(
+                f"duplicate source manifest id: {source_id} in {rel} "
+                f"already declared in {previous}"
+            )
 
     _validate_license_block(data, rel, errors)
 
@@ -158,10 +168,11 @@ def validate_source_planes(root: str | Path = ".") -> SourcePlaneValidation:
                 errors.append(f"invalid json {rel}: {exc}")
 
     sources_dir = root_path / "sources"
+    source_ids: dict[str, str] = {}
     pending_ids: dict[str, str] = {}
     if sources_dir.exists():
         for path in sorted(sources_dir.glob("*.yaml")):
-            _validate_source_manifest_yaml(path, root_path, errors, pending_ids)
+            _validate_source_manifest_yaml(path, root_path, errors, source_ids, pending_ids)
 
     char_dir = root_path / "patterns/characters"
     pattern_files = sorted(char_dir.glob("*/patterns.json")) if char_dir.exists() else []

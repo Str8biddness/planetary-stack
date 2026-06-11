@@ -243,6 +243,37 @@ def test_source_planes_rejects_duplicate_pending_dataset_ids(tmp_path):
     ) in result.errors
 
 
+def test_source_planes_rejects_duplicate_source_manifest_ids(tmp_path):
+    root = tmp_path
+    sources = root / "sources"
+    sources.mkdir()
+    (sources / "datasets.yaml").write_text('version: "1"\nname: datasets\n', encoding="utf-8")
+    manifest = "\n".join(
+        [
+            'version: "1"',
+            "id: duplicate_source",
+            "name: Source A",
+            "source_type: github_tsv",
+            "license:",
+            '  spdx: "MIT"',
+            "  notes: Redistributable test fixture.",
+            "repository: https://example.com/repo",
+            "loader: pipelines/ingest/example.py::load",
+            "",
+        ]
+    )
+    (sources / "a.yaml").write_text(manifest, encoding="utf-8")
+    (sources / "b.yaml").write_text(manifest.replace("Source A", "Source B"), encoding="utf-8")
+
+    result = validate_source_planes(root)
+
+    assert not result.ok
+    assert (
+        "duplicate source manifest id: duplicate_source in sources/b.yaml "
+        "already declared in sources/a.yaml"
+    ) in result.errors
+
+
 def test_source_planes_rejects_pending_dataset_without_rebuild_command(tmp_path):
     root = tmp_path
     sources = root / "sources"

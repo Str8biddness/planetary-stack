@@ -65,4 +65,6 @@ Before an executed build or profile-aware manual re-stamp writes `manifest.json`
 
 Artifact and source manifests also reject duplicate `artifacts[].path` entries. A duplicate path is ambiguous provenance because two records can claim the same mounted file identity with different size/hash metadata, so validation fails before the bundle or source plane can be treated as CHAL hardware.
 
+Source-plane validation also rejects duplicate top-level source manifest IDs across non-aggregate `sources/*.yaml` files. A source ID is the durable upstream identity carried into source-manifest fingerprints, rebuild audits, and later runtime bundle provenance, so two manifests cannot claim the same ID.
+
 `build.source_manifest` is captured from `manifests/source_manifest.json` when present. Production `synthesus-knowledge-artifacts` manifests must include this fingerprint to pass `synthesus-kc validate`; unstamped runtime bundles are treated as incomplete CHAL hardware identity. Rebuild operators should run `synthesus-kc build-source-manifest --root .` and `synthesus-kc verify-source-manifest --root .` before stamping so the runtime artifact manifest points at a current source-plane hash set.

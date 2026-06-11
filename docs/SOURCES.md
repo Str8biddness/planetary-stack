@@ -53,4 +53,6 @@ Do not commit Kaggle credentials or raw archives without checking redistribution
 - a `loader` value in `module.py::function` form
 - an upstream locator (`url`, `repository`, `files`, or `docs`) for enabled sources
 
+Top-level source manifest IDs must be unique across all non-aggregate `sources/*.yaml` files. Duplicate IDs are rejected because each source ID is a mounted hardware identity used by the source manifest fingerprint, rebuild plan, and artifact provenance trail.
+
 Planned aggregate manifests such as Hugging Face or Kaggle may stay `default_enabled: false`, but every `pending[]` dataset still needs its own unique `id`, pinned upstream locator (`repo`, `url`, `repository`, `dataset`, or non-empty `files`), `license.spdx`, non-empty `license.notes`, and a non-empty `rebuild_command`. Duplicate pending IDs are rejected across all source manifests so a future public dataset cannot enter the rebuild substrate with ambiguous source identity. Rebuild commands are required even for disabled planned datasets because they bind future public-source expansion to an auditable regeneration route before the source can become mounted CHAL hardware.
