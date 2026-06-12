@@ -3825,3 +3825,26 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - The runtime-side health gate is behaving correctly: it keeps source-plane and KAL/mount health separate from generated retrieval hardware coherence, and refuses to treat the current bundle as golden-query-ready CHAL substrate.
+
+## Current Session — 2026-06-12 (Knowledge Hardware Aggregate Type Drift Gate)
+
+### 📝 Summary
+- Hardened the standalone Knowledge Cloud source-plane validator so aggregate `sources/datasets.yaml` public-source entries reject repeated `type` values that drift from their backed concrete source manifest `source_type`.
+- Aligned `sources/conceptnet.yaml` with the aggregate catalog by promoting its concrete `source_type` to `public_gzip_csv`, matching the existing public catalog identity.
+- Updated source/provenance/data-model docs and regenerated `manifests/source_manifest.json`.
+- Advanced the Phase 5 Knowledge Cloud hardware license/provenance validation checklist item without touching generated FAISS, KNDB, model, cache, mirror, or workflow artifacts.
+
+### ✅ Verified
+- `python -m py_compile synthesus_knowledge_cloud/source_planes.py tests/test_cli.py` — passed in `synthesus-knowledge-cloud`.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m pytest -q tests/test_cli.py tests/test_build.py tests/test_provenance.py` — passed, 33 tests.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud validate-sources --root /home/workspace/synthesus-knowledge-cloud` — passed, 25 required paths and 7 character pattern banks.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud build-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — regenerated 151-file source manifest.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud verify-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — passed, 151 source files.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align.
+- Restamp `synthesus-knowledge-cloud/artifacts/manifest.json` with the current `build.source_manifest` after the coherent rebuild, then rerun `synthesus-kc validate` and `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker`.
+- Pre-existing unrelated changes in `Synthesus_4.0` root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked framework files were left untouched except for required checklist/log entries.
+
+### 💡 Architectural Notes
+- `sources/datasets.yaml` remains a public catalog view, not a source of truth. Repeated catalog fields now have to mirror concrete manifest fields for ID, type, loader, and enabled state before a source can be treated as provenance-clean mounted CHAL hardware.
