@@ -59,6 +59,13 @@ class ReasoningGraph:
     forward_adjacency: Dict[str, List[Tuple[str, float]]] = field(default_factory=dict)
     reverse_adjacency: Dict[str, List[Tuple[str, float]]] = field(default_factory=dict)
     _topological_cache: Optional[List[str]] = None
+    _shortest_path_cache: Dict[Tuple[str, str], Tuple[List[str], float]] = field(default_factory=dict)
+    _version: int = 0
+
+    def _invalidate_caches(self) -> None:
+        self._version += 1
+        self._topological_cache = None
+        self._shortest_path_cache.clear()
     
     def add_node(self, node: ReasoningNode) -> None:
         """Adds a ReasoningNode to the graph.
@@ -69,7 +76,7 @@ class ReasoningGraph:
         self.nodes[node.node_id] = node
         self.forward_adjacency.setdefault(node.node_id, [])
         self.reverse_adjacency.setdefault(node.node_id, [])
-        self._topological_cache = None
+        self._invalidate_caches()
     
     def add_edge(self, from_id: str, to_id: str, weight: float = 1.0) -> None:
         """Creates a directed edge between two nodes in the graph.
@@ -89,7 +96,7 @@ class ReasoningGraph:
                 self.nodes[to_id].antecedents.append(from_id)
             self.forward_adjacency.setdefault(from_id, []).append((to_id, weight))
             self.reverse_adjacency.setdefault(to_id, []).append((from_id, weight))
-            self._topological_cache = None
+            self._invalidate_caches()
     
     def get_topological_order(self) -> List[str]:
         """Get nodes in topological order."""
@@ -270,6 +277,12 @@ class MultiStepReasoningChain:
         """
         if start not in self.graph.nodes or end not in self.graph.nodes:
             return [], 0.0
+
+        cache_key = (start, end)
+        cached = self.graph._shortest_path_cache.get(cache_key)
+        if cached is not None:
+            path, cost = cached
+            return list(path), cost
         
         distances = {n: float('inf') for n in self.graph.nodes}
         distances[start] = 0.0
@@ -302,7 +315,9 @@ class MultiStepReasoningChain:
             current = previous.get(current)
         
         path.reverse()
-        return path, distances.get(end, float('inf'))
+        cost = distances.get(end, float('inf'))
+        self.graph._shortest_path_cache[cache_key] = (list(path), cost)
+        return path, cost
     
     def backtrack_if_needed(self, current_confidence: float) -> bool:
         """Determines if the reasoning process should backtrack based on confidence.

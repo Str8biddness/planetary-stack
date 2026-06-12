@@ -229,6 +229,36 @@ class TestMultiStepReasoningChain:
         path, cost = chain.find_shortest_path("n1", "n3")
         assert path == ["n1", "n2", "n3"]
         assert cost == 2.0
+
+    def test_find_shortest_path_uses_versioned_cache(self):
+        chain = MultiStepReasoningChain()
+        steps = [
+            ReasoningNode("n1", "A", "direct"),
+            ReasoningNode("n2", "B", "direct"),
+            ReasoningNode("n3", "C", "direct"),
+        ]
+        chain.build_reasoning_graph(steps)
+        chain.graph.add_edge("n1", "n2", 1.0)
+        chain.graph.add_edge("n2", "n3", 1.0)
+
+        path, cost = chain.find_shortest_path("n1", "n3")
+        assert path == ["n1", "n2", "n3"]
+        assert cost == 2.0
+        assert ("n1", "n3") in chain.graph._shortest_path_cache
+
+        path.append("mutated_by_caller")
+        cached_path, cached_cost = chain.find_shortest_path("n1", "n3")
+        assert cached_path == ["n1", "n2", "n3"]
+        assert cached_cost == 2.0
+
+        chain.graph.add_node(ReasoningNode("n4", "D", "direct"))
+        assert chain.graph._shortest_path_cache == {}
+        chain.graph.add_edge("n1", "n4", 0.25)
+        chain.graph.add_edge("n4", "n3", 0.25)
+
+        updated_path, updated_cost = chain.find_shortest_path("n1", "n3")
+        assert updated_path == ["n1", "n4", "n3"]
+        assert updated_cost == 0.5
     
     def test_backtrack_logic(self):
         chain = MultiStepReasoningChain(backtrack_limit=2)

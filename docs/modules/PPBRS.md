@@ -70,6 +70,7 @@ The repository is currently in a validated PPBRS baseline state. Significant opt
 - **Exact-Match Scoring Cache**: `PatternClassifier` caches normalized token forms per pattern and short-circuits exact token/form matches before fuzzy distance checks, keeping Levenshtein work out of the common exact-match firmware path.
 - **Adjacency Maps**: Replaced linear edge scans with constant-time adjacency lookups in `multi_step_reasoning`.
 - **Cached Topology**: Pre-computed reasoning graph structures for zero-overhead traversal.
+- **Versioned Shortest-Path Cache**: Repeated bounded graph-routing queries reuse cached Dijkstra paths until graph mutation invalidates the cache, avoiding repeated adjacency walks for stable firmware graphs.
 - **Rule Tag + Trigger Indexing**: Rule evaluators prefilter by context tags, trigger keys, and exact trigger values before evaluating conditions.
 - **Direct Indexed Rule Materialization**: Once tag/trigger indexes select a small candidate ID set, `WeightedRuleEvaluator` and `RuleToActionMapper` now materialize those IDs directly in registration order instead of scanning every registered rule again.
 - **Top-Rule Short-Circuiting**: Single-winner weighted-rule execution scans indexed candidates by descending weight and stops once the best threshold-qualified firmware rule is known, while full `evaluate()` calls still return all activated rules for callers that need fanout.

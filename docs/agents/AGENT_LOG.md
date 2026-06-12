@@ -3935,6 +3935,27 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The verifier now produces pressure that the hypervisor can consume, but it still does not write the final sentence. The actual revised surface is owned by CGPU/critic arbitration and then audited again by the verifier.
 
+## Current Session — 2026-06-12 (Agent 6 — PPBRS Graph Shortest-Path Cache)
+
+### 📝 Summary
+- Added a mutation-invalidated shortest-path cache to `ReasoningGraph` so repeated PPBRS graph-routing firmware queries reuse bounded Dijkstra paths instead of re-walking adjacency.
+- Added regression coverage proving cached paths are defensively copied and invalidated when graph mutation introduces a lower-cost path.
+- Added `graph_shortest_path_cache` to the PPBRS benchmark and documented the optimization in the PPBRS module note plus the Phase 6 checklist.
+- Preserved the PPBRS firmware boundary: this changes graph candidate routing only and does not emit normal-path final language.
+
+### ✅ Verified
+- `python -m py_compile packages/reasoning/multi_step_reasoning.py tests/test_ppbrs_extended.py tools/ppbrs_benchmark.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py tests/test_chal_reasoning_firmware.py tests/test_template_surface_audit.py` — passed, 160 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/ppbrs_benchmark.py` — passed; `graph_shortest_path_cache` p50/p95/avg were 0.0002/0.0002/0.0002 ms.
+
+### 🚧 Left Off / Next Steps
+- Continue Phase 6 by finding any remaining PPBRS/generation call sites that still treat template fields as anything other than non-user-facing firmware context.
+- Consider adding cache-size bounds or route-scoped cache eviction only if future graphs become long-lived and high-cardinality.
+- Pre-existing unrelated root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- PPBRS graph routing now behaves more like firmware with stable path lookup over an immutable graph snapshot. Graph mutation is the explicit invalidation boundary, keeping route caches bounded to the current cognitive hardware topology.
+
 ## Current Session — 2026-06-12 (Knowledge Hardware Aggregate License Drift Gate)
 
 ### 📝 Summary

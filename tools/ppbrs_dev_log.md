@@ -689,3 +689,54 @@ PPBRS micro-benchmark after direct indexed rule materialization:
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py` — 125 passed.
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_reasoning_firmware.py tests/test_template_surface_audit.py` — 33 passed.
 - `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/ppbrs_benchmark.py`
+## Baseline - 2026-06-12 21:02:42
+
+| Component | p50 (ms) | p95 (ms) | Avg (ms) |
+| --- | --- | --- | --- |
+| pattern_matching | 0.1144 | 0.1239 | 0.1001 |
+| rule_evaluation | 0.0055 | 0.0079 | 0.0061 |
+| action_mapping | 0.0069 | 0.0086 | 0.0074 |
+| weighted_top_rule | 0.0084 | 0.0096 | 0.0087 |
+| confidence_scoring | 0.0038 | 0.0039 | 0.0039 |
+| graph_traversal | 0.0098 | 0.0107 | 0.0103 |
+
+## Baseline - 2026-06-12 21:04:03
+
+| Component | p50 (ms) | p95 (ms) | Avg (ms) |
+| --- | --- | --- | --- |
+| pattern_matching | 0.1151 | 0.1241 | 0.1018 |
+| rule_evaluation | 0.0055 | 0.0076 | 0.0060 |
+| action_mapping | 0.0068 | 0.0093 | 0.0073 |
+| weighted_top_rule | 0.0083 | 0.0089 | 0.0086 |
+| confidence_scoring | 0.0039 | 0.0039 | 0.0039 |
+| graph_traversal | 0.0101 | 0.0130 | 0.0106 |
+| graph_shortest_path_cache | 0.0002 | 0.0002 | 0.0002 |
+
+## Daily Entry: 2026-06-12 (Agent 6 — Versioned Graph Shortest-Path Cache)
+
+### Actions Performed
+
+1. Added a mutation-invalidated shortest-path cache to `ReasoningGraph` so repeated PPBRS graph-routing firmware queries reuse previously computed Dijkstra paths.
+2. Kept graph mutation bounded by clearing both topology and shortest-path caches on `add_node()` and `add_edge()`, with defensive path copies returned to callers.
+3. Added regression coverage for cache reuse, caller mutation isolation, and invalidation after a lower-cost graph route is added.
+4. Added a `graph_shortest_path_cache` metric to `tools/ppbrs_benchmark.py`.
+
+### Benchmark Run
+
+PPBRS micro-benchmark after graph shortest-path caching:
+
+| Component | p50 (ms) | p95 (ms) | Avg (ms) |
+| --- | --- | --- | --- |
+| pattern_matching | 0.1151 | 0.1241 | 0.1018 |
+| rule_evaluation | 0.0055 | 0.0076 | 0.0060 |
+| action_mapping | 0.0068 | 0.0093 | 0.0073 |
+| weighted_top_rule | 0.0083 | 0.0089 | 0.0086 |
+| confidence_scoring | 0.0039 | 0.0039 | 0.0039 |
+| graph_traversal | 0.0101 | 0.0130 | 0.0106 |
+| graph_shortest_path_cache | 0.0002 | 0.0002 | 0.0002 |
+
+### Verified
+
+- `python -m py_compile packages/reasoning/multi_step_reasoning.py tests/test_ppbrs_extended.py tools/ppbrs_benchmark.py`
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_ppbrs.py tests/test_ppbrs_extended.py tests/test_ppbrs_integration.py tests/test_chal_reasoning_firmware.py tests/test_template_surface_audit.py` — 160 passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/ppbrs_benchmark.py`

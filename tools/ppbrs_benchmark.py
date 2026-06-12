@@ -194,6 +194,38 @@ def benchmark_graph_traversal(n_nodes=100, n_edges=300, n_walks=50):
         "avg": np.mean(latencies) * 1000
     }
 
+def benchmark_graph_shortest_path_cache(n_nodes=100, n_edges=300, n_walks=500):
+    print(f"Baselining Graph Shortest-Path Cache ({n_nodes} nodes, {n_edges} edges, {n_walks} walks)...")
+    chain = MultiStepReasoningChain()
+
+    for i in range(n_nodes):
+        node = ReasoningNode(
+            node_id=f"h_{i}",
+            content=f"hypothesis {i} content with token_{i}",
+            reasoning_type="deduction",
+        )
+        chain.graph.add_node(node)
+        chain.add_hypothesis(Hypothesis(id=f"h_{i}", content=f"h_{i}"))
+
+    for i in range(n_edges):
+        u = i % n_nodes
+        v = (i + 1) % n_nodes
+        chain.graph.add_edge(f"h_{u}", f"h_{v}", 0.8)
+
+    chain.find_shortest_path("h_0", "h_10")
+
+    latencies = []
+    for _ in range(n_walks):
+        start = time.perf_counter()
+        chain.find_shortest_path("h_0", "h_10")
+        latencies.append(time.perf_counter() - start)
+
+    return {
+        "p50": np.percentile(latencies, 50) * 1000,
+        "p95": np.percentile(latencies, 95) * 1000,
+        "avg": np.mean(latencies) * 1000
+    }
+
 if __name__ == "__main__":
     results = {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -206,6 +238,7 @@ if __name__ == "__main__":
     results["metrics"]["weighted_top_rule"] = benchmark_weighted_top_rule()
     results["metrics"]["confidence_scoring"] = benchmark_confidence_scoring()
     results["metrics"]["graph_traversal"] = benchmark_graph_traversal()
+    results["metrics"]["graph_shortest_path_cache"] = benchmark_graph_shortest_path_cache()
     
     print("\nBenchmark Results (ms):")
     print(json.dumps(results, indent=2))
