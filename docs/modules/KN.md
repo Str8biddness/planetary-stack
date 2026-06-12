@@ -115,6 +115,8 @@ The knowledge integration pipeline sources data from:
 1. **Jeopardy Questions** — ~216,930 Q&A pairs (diverse trivia facts)
 2. **ConceptNet Assertions** — ~2M commonsense knowledge edges
 
+The standalone Knowledge Cloud source plane treats `sources/datasets.yaml` as an aggregate catalog view only. Public catalog entries must resolve to concrete source manifests, and repeated ID, type, loader, default-enabled, and upstream locator metadata must match those backed manifests before the source plane can be treated as provenance-clean CHAL hardware.
+
 **Production Scale Population (2026-04-27):**
 - Total index size: **501,819 vectors**.
 - Verified semantic search quality across Science, History, Geography, and Fiction domains.
