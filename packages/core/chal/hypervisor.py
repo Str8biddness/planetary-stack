@@ -302,6 +302,26 @@ class CognitiveHypervisor:
             rag_context=effective_rag_context,
             decision=decision,
         )
+        reasoning_revision = self._apply_bounded_reasoning_revision(
+            query=query,
+            response=response,
+            trace_id=decision.trace_id,
+            rag_context=effective_rag_context,
+            decision=decision,
+            verifier_trace=verifier_trace,
+            runtime_preset=preset,
+        )
+        if reasoning_revision.get("status") == "revised":
+            response = str(reasoning_revision["selected_text"])
+            bridge_result["response"] = response
+            bridge_result["reasoning_revision"] = reasoning_revision
+            verifier_trace = self._verify_surface_response(
+                query=query,
+                response=response,
+                trace_id=decision.trace_id,
+                rag_context=effective_rag_context,
+                decision=decision,
+            )
         telemetry = {
             "schema": "synthesus.chal.hypervisor_trace.v1",
             "trace_id": decision.trace_id,
@@ -319,6 +339,7 @@ class CognitiveHypervisor:
             "degraded_state": bridge_result.get("degraded_state"),
             "template_guard": template_guard_result.to_dict(),
             "reasoning_quality": verifier_trace,
+            "reasoning_revision": reasoning_revision,
             "grounding_reranker": reranker_trace,
             "quad_brain": quad_brain_arbitration.to_dict() if quad_brain_arbitration else None,
             "quad_brain_replay": quad_brain_replay,
@@ -642,6 +663,131 @@ class CognitiveHypervisor:
             "final_language_owner": "generation_spine_or_cgpu_critic",
             "verifier_may_emit_final_language": False,
         }
+
+    def _apply_bounded_reasoning_revision(
+        self,
+        *,
+        query: str,
+        response: str,
+        trace_id: str,
+        rag_context: str,
+        decision: HypervisorDecision,
+        verifier_trace: Mapping[str, Any],
+        runtime_preset: str | None,
+    ) -> dict[str, Any]:
+        route_hint = verifier_trace.get("revision_route_hint")
+        base_trace = {
+            "schema": "synthesus.chal.reasoning_revision.v1",
+            "trace_id": trace_id,
+            "device": "chal://cgpu/revision_render",
+            "status": "skipped",
+            "route": decision.route.value,
+            "source_verifier_status": verifier_trace.get("status"),
+            "source_issue_ids": [
+                str(issue.get("issue_id", ""))
+                for issue in verifier_trace.get("issues", [])
+                if issue.get("issue_id")
+            ],
+            "route_hint": dict(route_hint) if isinstance(route_hint, Mapping) else None,
+            "verifier_may_emit_final_language": False,
+            "reranker_may_emit_final_language": False,
+            "final_language_owner": "generation_spine_or_cgpu_critic",
+            "selected_text": None,
+        }
+        if not isinstance(route_hint, Mapping) or not route_hint.get("required"):
+            base_trace["reason"] = "no_revision_requested"
+            return base_trace
+
+        budget = verifier_trace.get("budget", {})
+        if budget.get("revision_budget_exhausted") or decision.budget.critic_passes <= 0:
+            base_trace["reason"] = "revision_budget_exhausted"
+            return base_trace
+
+        context_chunks = self._split_grounding_context(rag_context)
+        if not context_chunks:
+            base_trace["reason"] = "no_grounding_context_for_bounded_revision"
+            return base_trace
+
+        try:
+            try:
+                from reasoning.generation import CGPUFrame, CGPURenderer, ResponsePlan
+            except ModuleNotFoundError:  # pragma: no cover
+                from packages.reasoning.generation import CGPUFrame, CGPURenderer, ResponsePlan
+
+            issue_suggestions = [
+                str(issue.get("suggestion", "")).strip()
+                for issue in verifier_trace.get("issues", [])
+                if str(issue.get("suggestion", "")).strip()
+            ]
+            plan = ResponsePlan(
+                intent="revise",
+                style="direct",
+                safety_level=0.4,
+                target_length=min(96, max(32, len(response.split()) + 24)),
+                key_points=context_chunks[: max(1, min(3, decision.budget.retrieval_depth))],
+                required_phrases=[],
+                forbidden_phrases=[],
+                domain="business" if runtime_preset == "business_bot" else "general",
+            )
+            frame = CGPUFrame.create(
+                query=query,
+                plan=plan,
+                trace_id=trace_id,
+                grounded_state={"facts": context_chunks},
+                mode="business_bot" if runtime_preset == "business_bot" else "general",
+                candidate_count=max(1, decision.budget.candidate_count),
+                critic_passes=max(1, decision.budget.critic_passes),
+                constraints=[
+                    *decision.constraints,
+                    "verifier_revision_hint_consumed",
+                    "verifier_may_emit_final_language:false",
+                    "reranker_may_emit_final_language:false",
+                ],
+                provenance=[
+                    {
+                        "source": "hypervisor.effective_rag_context",
+                        "chunk_index": index,
+                    }
+                    for index, _chunk in enumerate(context_chunks)
+                ],
+            )
+            output = CGPURenderer().render(frame)
+        except Exception as exc:
+            base_trace.update(
+                {
+                    "status": "fault",
+                    "reason": "cgpu_revision_fault",
+                    "error": str(exc),
+                }
+            )
+            return base_trace
+
+        selected_text = output.selected_text
+        if not selected_text:
+            base_trace.update(
+                {
+                    "status": "blocked",
+                    "reason": "no_revision_candidate_passed_critic",
+                    "cgpu_output": output.to_dict(),
+                    "issue_suggestions": issue_suggestions,
+                }
+            )
+            return base_trace
+
+        base_trace.update(
+            {
+                "status": "revised",
+                "reason": "revision_route_hint_consumed",
+                "selected_text": selected_text,
+                "selected_candidate_id": output.selected_candidate_id,
+                "candidate_count": len(output.candidates),
+                "critic_passes_used": output.cost.get("critic_passes"),
+                "cgpu_output": output.to_dict(),
+                "issue_suggestions": issue_suggestions,
+                "final_language_owner": "cgpu_critic_arbitration",
+            }
+        )
+        return base_trace
 
     def _resolve_grounding_context(
         self,

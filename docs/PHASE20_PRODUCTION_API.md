@@ -118,6 +118,11 @@ hint is scheduler-only pressure: it can recommend staying on the current route
 when critic budget exists or escalating to a bounded `quad_brain_path` follow-up
 when the active route exhausted revision budget, but it cannot emit or rewrite
 user-facing prose.
+`CognitiveHypervisorTrace.reasoning_revision` references
+`CHALReasoningRevisionTrace` when that scheduler pressure is consumed inside the
+active route's critic budget. The revision device is `chal://cgpu/revision_render`;
+verifier and reranker records remain signal-only, and revised final language is
+owned by CGPU/critic arbitration.
 `CognitiveHypervisorTrace.quad_brain` references `QuadBrainArbitration` when the
 route is `quad_brain_path`, matching the runtime `telemetry.quad_brain` payload.
 The Quad Brain schema also types `QuadBrainStateTransition` records so clients

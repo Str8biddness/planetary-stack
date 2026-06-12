@@ -612,7 +612,7 @@ def test_grounded_reranker_trace_marks_retrieval_budget_truncation():
     assert len(bridge.calls[0]["rag_context"].split("\n\n")) == 4
 
 
-def test_hypervisor_verifier_marks_revision_need_as_critic_budget_signal():
+def test_hypervisor_consumes_revision_hint_with_bounded_cgpu_revision():
     bridge = StubBridge()
     hypervisor = CognitiveHypervisor(
         bridge_factory=lambda: bridge,
@@ -626,22 +626,15 @@ def test_hypervisor_verifier_marks_revision_need_as_critic_budget_signal():
         )
     )
 
+    revision = result.telemetry["reasoning_revision"]
     quality = result.telemetry["reasoning_quality"]
 
-    assert quality["schema"] == "synthesus.chal.reasoning_quality.v1"
-    assert quality["device"] == "chal://critic/verifier"
-    assert quality["status"] == "needs_revision"
-    assert quality["score"] == 0.42
-    assert quality["context_chunks"] == 1
-    assert quality["critic_passes_budgeted"] == 1
-    assert quality["critic_revision_required"] is True
-    assert quality["budget"] == {
-        "critic_passes": 1,
-        "revision_passes_required": 1,
-        "revision_passes_available": 1,
-        "revision_budget_exhausted": False,
-    }
-    assert quality["revision_route_hint"] == {
+    assert revision["schema"] == "synthesus.chal.reasoning_revision.v1"
+    assert revision["device"] == "chal://cgpu/revision_render"
+    assert revision["status"] == "revised"
+    assert revision["source_verifier_status"] == "needs_revision"
+    assert revision["source_issue_ids"] == ["grounding_low"]
+    assert revision["route_hint"] == {
         "schema": "synthesus.chal.reasoning_revision_route_hint.v1",
         "trace_id": result.decision.trace_id,
         "device": "chal://hypervisor/route_planner",
@@ -656,10 +649,32 @@ def test_hypervisor_verifier_marks_revision_need_as_critic_budget_signal():
         "final_language_owner": "generation_spine_or_cgpu_critic",
         "verifier_may_emit_final_language": False,
     }
+    assert revision["verifier_may_emit_final_language"] is False
+    assert revision["reranker_may_emit_final_language"] is False
+    assert revision["final_language_owner"] == "cgpu_critic_arbitration"
+    assert revision["selected_candidate_id"]
+    assert revision["cgpu_output"]["device"] == "chal://cgpu/render"
+    assert "mounted fact: manifest hash is valid" in revision["selected_text"]
+
+    assert quality["schema"] == "synthesus.chal.reasoning_quality.v1"
+    assert quality["device"] == "chal://critic/verifier"
+    assert quality["status"] == "passed"
+    assert quality["score"] == 0.91
+    assert quality["context_chunks"] == 1
+    assert quality["critic_passes_budgeted"] == 1
+    assert quality["critic_revision_required"] is False
+    assert quality["budget"] == {
+        "critic_passes": 1,
+        "revision_passes_required": 0,
+        "revision_passes_available": 1,
+        "revision_budget_exhausted": False,
+    }
+    assert quality["revision_route_hint"] is None
     assert quality["firmware_boundary"] == "verifier_signal_only"
     assert quality["final_language_owner"] == "generation_spine_or_cgpu_critic"
-    assert quality["issues"][0]["issue_id"] == "grounding_low"
-    assert result.response == "routed through auto"
+    assert quality["issues"] == []
+    assert result.response == revision["selected_text"]
+    assert result.bridge_result["reasoning_revision"] == revision
 
 
 def test_fast_path_verifier_marks_exhausted_revision_budget_without_owning_language():
@@ -672,9 +687,13 @@ def test_fast_path_verifier_marks_exhausted_revision_budget_without_owning_langu
     result = asyncio.run(hypervisor.process_query("simple ping"))
 
     quality = result.telemetry["reasoning_quality"]
+    revision = result.telemetry["reasoning_revision"]
 
     assert result.decision.route == HypervisorRoute.FAST_PATH
     assert result.decision.budget.critic_passes == 0
+    assert revision["status"] == "skipped"
+    assert revision["reason"] == "revision_budget_exhausted"
+    assert revision["selected_text"] is None
     assert quality["status"] == "failed"
     assert quality["critic_revision_required"] is False
     assert quality["budget"] == {

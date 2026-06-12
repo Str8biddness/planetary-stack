@@ -3913,3 +3913,24 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - The continuity scorecard now protects benchmark breadth as well as sequence quality. A passing continuity run must prove coverage across NPC/persona behavior, business-bot follow-up, and safety follow-up, not just pass whichever sequence classes remain in the input set.
+
+## Current Session — 2026-06-12 (Agent 4 — Bounded Reasoning Revision Trace)
+
+### 📝 Summary
+- Added `CognitiveHypervisor` consumption of `reasoning_quality.revision_route_hint` when the active route still has critic-pass budget.
+- The bounded revision path renders from selected grounding context through `chal://cgpu/revision_render`, records `synthesus.chal.reasoning_revision.v1`, then re-runs verifier telemetry against the revised surface.
+- Exhausted-budget routes remain scheduler hints only, and verifier/reranker/PPBRS devices retain explicit signal-only final-language boundaries.
+- Mirrored the new trace in OpenAPI/API schema docs and updated the PPBRS module note plus the Phase 2/6 checklist items.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/hypervisor.py tests/test_chal_hypervisor.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_hypervisor.py` — passed, 22 tests.
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed JSON mirrors match YAML and `CognitiveHypervisorTrace.reasoning_revision` references `CHALReasoningRevisionTrace`.
+
+### 🚧 Left Off / Next Steps
+- Broaden bounded revision beyond grounded active-budget routes only after replay/storage and quality gates can prove the revision improved the response without raw prompt/response leakage.
+- Keep exhausted fast-path verifier pressure as route-planning telemetry until a second bounded route execution path is explicitly budgeted.
+- Pre-existing unrelated root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- The verifier now produces pressure that the hypervisor can consume, but it still does not write the final sentence. The actual revised surface is owned by CGPU/critic arbitration and then audited again by the verifier.

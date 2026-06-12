@@ -166,6 +166,7 @@ class QueryResponse(BaseModel):
             "CognitiveHypervisorTrace OpenAPI component, including typed "
             "CHALReasoningQualityTrace verifier telemetry, "
             "CHALReasoningRevisionRouteHint scheduler-only rewrite pressure, "
+            "CHALReasoningRevisionTrace bounded CGPU/critic revision telemetry, "
             "CHALGroundingRerankerTrace context-selection telemetry, "
             "QuadBrainArbitration records when route=quad_brain_path, "
             "including state-contract arbitration_steps, QuadBrainReplayRecord, "

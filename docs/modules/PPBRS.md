@@ -240,6 +240,12 @@ The verifier/reranker telemetry now exposes explicit CHAL budget records:
 
 Both traces also state their language boundary. The reranker is a context-selection device and the verifier is `verifier_signal_only`; neither may emit or rewrite normal-path final text. Their output is pressure for the Cognitive Hypervisor, CGPU/critic arbitration, or future generation-spine rewrite logic.
 
+### Bounded Revision Hint Consumption (2026-06-12)
+
+`CognitiveHypervisor` now consumes `reasoning_quality.revision_route_hint` when the active route still has critic-pass budget. The bounded follow-up is emitted as `reasoning_revision` with schema `synthesus.chal.reasoning_revision.v1` and device `chal://cgpu/revision_render`.
+
+The revision pass renders from selected grounding context through CGPU candidate generation and critic arbitration, then re-runs verifier telemetry against the revised surface. Exhausted-budget routes remain scheduler hints only. The verifier and reranker still carry explicit `*_may_emit_final_language=false` flags; revised final language is owned by `cgpu_critic_arbitration`, not by verifier, reranker, or PPBRS firmware.
+
 ### NPC Response-Compositor Boundary (2026-06-01)
 
 `packages/core/cognitive/response_compositor.py` is no longer classified as an unlabeled legacy template emitter. It exposes `ResponseCompositor.compose_labeled()`, which returns text plus Synthesus 5 surface metadata:

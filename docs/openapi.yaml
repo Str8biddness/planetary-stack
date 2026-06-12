@@ -2009,6 +2009,13 @@ components:
           description: Compact `chal://critic/verifier` telemetry emitted after
             template-guarded final surface generation. It audits answer quality and
             exposes critic-budget rewrite pressure without owning final language.
+        reasoning_revision:
+          anyOf:
+          - $ref: '#/components/schemas/CHALReasoningRevisionTrace'
+          - type: 'null'
+          description: Bounded CGPU/critic revision telemetry emitted when verifier
+            route pressure is consumed inside the active critic budget; null when
+            no revision is requested.
         quad_brain:
           anyOf:
           - $ref: '#/components/schemas/QuadBrainArbitration'
@@ -2192,6 +2199,86 @@ components:
         verifier_may_emit_final_language:
           type: boolean
           const: false
+      additionalProperties: false
+    CHALReasoningRevisionTrace:
+      type: object
+      title: CHALReasoningRevisionTrace
+      description: Bounded revision telemetry emitted when the Cognitive Hypervisor
+        consumes a verifier route hint through CGPU/critic arbitration. The verifier
+        and reranker remain signal-only devices and cannot emit final language.
+      required:
+      - schema
+      - trace_id
+      - device
+      - status
+      - route
+      - verifier_may_emit_final_language
+      - reranker_may_emit_final_language
+      - final_language_owner
+      properties:
+        schema:
+          type: string
+          const: synthesus.chal.reasoning_revision.v1
+        trace_id:
+          type: string
+        device:
+          type: string
+          const: chal://cgpu/revision_render
+        status:
+          type: string
+          enum:
+          - skipped
+          - revised
+          - blocked
+          - fault
+        route:
+          type: string
+        source_verifier_status:
+          type: string
+        source_issue_ids:
+          type: array
+          items:
+            type: string
+        route_hint:
+          oneOf:
+          - $ref: '#/components/schemas/CHALReasoningRevisionRouteHint'
+          - type: 'null'
+        reason:
+          type: string
+        selected_text:
+          oneOf:
+          - type: string
+          - type: 'null'
+          description: Revised final text only when status=revised and final_language_owner
+            is cgpu_critic_arbitration.
+        selected_candidate_id:
+          type: string
+        candidate_count:
+          type: integer
+          minimum: 0
+        critic_passes_used:
+          type: integer
+          minimum: 0
+        cgpu_output:
+          type: object
+          additionalProperties: true
+        issue_suggestions:
+          type: array
+          items:
+            type: string
+        verifier_may_emit_final_language:
+          type: boolean
+          const: false
+        reranker_may_emit_final_language:
+          type: boolean
+          const: false
+        final_language_owner:
+          type: string
+          enum:
+          - generation_spine_or_cgpu_critic
+          - cgpu_critic_arbitration
+        error:
+          type: string
       additionalProperties: false
     CHALReasoningQualityTrace:
       type: object
