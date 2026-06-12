@@ -250,6 +250,11 @@ This repo is currently in a validated PPBRS baseline state. Future PPBRS optimiz
 - `packages/organs/tsconfig.json` uses CommonJS module semantics so the documented `cd packages/organs && npx ts-node cli.ts runTrainingSessions/selfImprove` commands resolve local TS modules.
 - Existing v2 traces remain historical replay records; the stricter candidate/critic gate applies to newly generated v3 records.
 
+### Shared-backbone replay update (2026-06-07)
+- `tools/runTrainingSessions.ts` now emits `organ-triad-replay-v4` traces that bind each organ-training replay record and CHAL accelerator frame to a `shared_organ_backbone.v1` contract.
+- `tools/evaluate_organs.py` validates the shared-backbone contract hash as part of replay identity and CHAL accelerator coverage, then stores full compact backbone identity metadata in `synthesus.organ_replay_trace.v1` records without raw state/action/trajectory vectors.
+- Existing v3 traces remain historical replay records; the stricter shared-backbone gate applies to newly generated v4 records.
+
 ## Emergent Resonance & Consciousness Loop (2026-05-05)
 
 ... (rest of the section) ...

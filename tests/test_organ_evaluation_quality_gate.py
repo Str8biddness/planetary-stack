@@ -2,7 +2,9 @@ import hashlib
 import json
 
 from tools.evaluate_organs import (
+    CHAL_ACCELERATOR_GENERATOR,
     OrganScorecard,
+    SHARED_BACKBONE_SCHEMA,
     TraceRecord,
     assert_organ_replay_integrity,
     build_organ_replay_integrity_scorecard,
@@ -12,6 +14,23 @@ from tools.evaluate_organs import (
     _replay_identity_coverage,
     evaluate_quality_gate,
 )
+
+
+def backbone_contract(domain="chat", organ="policy_prior", **overrides):
+    contract = {
+        "schema": SHARED_BACKBONE_SCHEMA,
+        "contractVersion": "shared-organ-backbone-v1",
+        "domain": domain,
+        "organ": organ,
+        "width": 12,
+        "scopes": ["state", "action", "trajectory", "multifocus"],
+        "device": f"chal://organs/{domain}/{organ}",
+    }
+    contract.update(overrides)
+    contract["contractHash"] = hashlib.sha256(
+        json.dumps(contract, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return contract
 
 
 def scorecard(**overrides):
@@ -40,7 +59,7 @@ def scorecard(**overrides):
 def replay_record(**overrides):
     record = {
         "schema": "organ_training_replay.v1",
-        "generator": "organ-triad-replay-v3",
+        "generator": CHAL_ACCELERATOR_GENERATOR,
         "seed": 950907,
         "scenarioId": "chat-0-policy-prior",
         "step": 1,
@@ -56,6 +75,7 @@ def replay_record(**overrides):
         "selectedCandidateRef": "chat.policy_prior.planning.candidate.1",
         "accepted": True,
         "quality": 0.91,
+        "backbone": backbone_contract(),
     }
     record.update(overrides)
     record["recordHash"] = hashlib.sha256(json.dumps(record, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
@@ -75,7 +95,7 @@ def trace_record_with_replay(**overrides):
         "quality": 0.91,
         "outcome": {},
         "replay": {
-            "generator": "organ-triad-replay-v3",
+            "generator": CHAL_ACCELERATOR_GENERATOR,
             "seed": 950907,
             "scenarioId": "chat-0-policy-prior",
             "step": 1,
@@ -99,6 +119,7 @@ def trace_record_with_replay(**overrides):
                     "accepted": True,
                     "quality": 0.91,
                 },
+                "backbone": backbone_contract(),
             },
         },
     }
@@ -189,7 +210,7 @@ def test_chal_accelerator_coverage_requires_matching_device_frame():
     valid = TraceRecord(
         **base_record,
         replay={
-            "generator": "organ-triad-replay-v3",
+            "generator": CHAL_ACCELERATOR_GENERATOR,
             "chal": {
                 "frameId": "chal-organ-1",
                 "parentFrameId": "chal-training-session-chat-0",
@@ -208,12 +229,13 @@ def test_chal_accelerator_coverage_requires_matching_device_frame():
                     "accepted": True,
                     "quality": 0.91,
                 },
-            }
+                "backbone": backbone_contract(),
+            },
         },
     )
     invalid = TraceRecord(
         **base_record,
-        replay={"generator": "organ-triad-replay-v3", "chal": {"device": "chal://organs/chat/attention"}},
+        replay={"generator": CHAL_ACCELERATOR_GENERATOR, "chal": {"device": "chal://organs/chat/attention"}},
     )
 
     assert _chal_accelerator_coverage([valid, invalid]) == 0.5
@@ -235,7 +257,7 @@ def test_candidate_critic_coverage_requires_selected_candidate_and_feedback():
     valid = TraceRecord(
         **base_record,
         replay={
-            "generator": "organ-triad-replay-v3",
+            "generator": CHAL_ACCELERATOR_GENERATOR,
             "chal": {
                 "candidateRefs": [
                     "chat.policy_prior.planning.candidate.0",
@@ -248,13 +270,14 @@ def test_candidate_critic_coverage_requires_selected_candidate_and_feedback():
                     "accepted": True,
                     "quality": 0.91,
                 },
+                "backbone": backbone_contract(),
             },
         },
     )
     invalid = TraceRecord(
         **base_record,
         replay={
-            "generator": "organ-triad-replay-v3",
+            "generator": CHAL_ACCELERATOR_GENERATOR,
             "chal": {
                 "candidateRefs": ["chat.policy_prior.planning.candidate.0"],
                 "selectedCandidateRef": "chat.policy_prior.planning.candidate.9",
@@ -282,14 +305,14 @@ def test_replay_identity_coverage_requires_matching_hash_and_compact_record():
     valid = TraceRecord(
         **base_record,
         replay={
-            "generator": "organ-triad-replay-v3",
+            "generator": CHAL_ACCELERATOR_GENERATOR,
             "record": replay_record(),
         },
     )
     tampered = TraceRecord(
         **base_record,
         replay={
-            "generator": "organ-triad-replay-v3",
+            "generator": CHAL_ACCELERATOR_GENERATOR,
             "record": {
                 **replay_record(),
                 "selectedCandidateRef": "chat.policy_prior.planning.candidate.0",
@@ -317,6 +340,11 @@ def test_build_organ_replay_records_preserves_compact_bounded_identity():
     assert record["sourceRecordHash"] == replay_record()["recordHash"]
     assert record["device"] == "chal://organs/chat/policy_prior"
     assert record["selectedCandidateRef"] == "chat.policy_prior.planning.candidate.1"
+    assert record["backbone"]["schema"] == SHARED_BACKBONE_SCHEMA
+    assert record["backbone"]["domain"] == "chat"
+    assert record["backbone"]["organ"] == "policy_prior"
+    assert record["backbone"]["device"] == "chal://organs/chat/policy_prior"
+    assert record["backbone"]["contractHash"] == backbone_contract()["contractHash"]
     assert "state_features" not in record
     assert "action_features" not in record
     assert "trajectory_features" not in record
@@ -344,6 +372,26 @@ def test_organ_replay_integrity_scorecard_rejects_tampered_compact_source():
     assert failed.passed is False
     assert failed.total_chal_records == 2
     assert any("record hash mismatch" in failure for failure in failed.failures)
+
+
+def test_organ_replay_integrity_scorecard_rejects_tampered_backbone_contract():
+    tampered_contract = backbone_contract(width=16)
+    tampered_contract["contractHash"] = "not-the-right-hash"
+    tampered = trace_record_with_replay(
+        replay={
+            **trace_record_with_replay().replay,
+            "record": replay_record(backbone=tampered_contract),
+            "chal": {
+                **trace_record_with_replay().replay["chal"],
+                "backbone": tampered_contract,
+            },
+        }
+    )
+
+    failed = build_organ_replay_integrity_scorecard([tampered])
+
+    assert failed.passed is False
+    assert any("shared backbone" in failure for failure in failed.failures)
 
 
 def test_quality_gate_compares_metric_direction_to_baseline():

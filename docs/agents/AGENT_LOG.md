@@ -3758,3 +3758,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - AIVM snapshot admission now ties replay identity and mounted-device identity together. The replay trace remains compact and prompt/response-scrubbed, but it can no longer be transplanted onto a different sealed CHAL device manifest without restore-time rejection.
+
+## Current Session — 2026-06-11 (Agent 9 — Organ Shared-Backbone Replay Identity)
+
+### 📝 Summary
+- Continued the Agent 9 organ-training replay upgrade by binding current `organ-triad-replay-v4` traces to `shared_organ_backbone.v1` contracts in both compact replay identity records and CHAL accelerator frames.
+- Tightened compact `synthesus.organ_replay_trace.v1` storage so stored replay records preserve full shared-backbone identity fields (`domain`, `organ`, `device`, scopes, width, version, and contract hash) without raw state/action/trajectory vectors.
+- Added focused regression coverage for tampered shared-backbone contracts and compact storage identity, and updated organ training docs plus the Phase 7 replay-storage checklist.
+
+### ✅ Verified
+- `python -m py_compile tools/evaluate_organs.py tests/test_organ_evaluation_quality_gate.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0 python -m pytest -q tests/test_organ_evaluation_quality_gate.py` — passed, 12 tests.
+- `cd packages/organs && npx tsc --noEmit --pretty false` — passed.
+- `cd packages/organs && SYNTHESUS_ORGAN_TRACE_SEED=950907 npx ts-node cli.ts runTrainingSessions` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0 python tools/evaluate_organs.py --min-replay-coverage 1.0 --min-replay-identity-coverage 1.0 --min-chal-accelerator-coverage 1.0 --min-candidate-critic-coverage 1.0 --min-scientific-consistency 1.0 --replay-jsonl tools/results/organ_training_replay_latest.jsonl --replay-integrity-json tools/results/organ_training_replay_integrity_latest.json --fail-on-organ-replay-integrity` — passed with 100% replay, replay-identity, CHAL accelerator, candidate/critic, and scientific-consistency coverage across all nine organ slices.
+
+### 🚧 Left Off / Next Steps
+- The full `selfImprove` command still uses `--fail-missing-models`; this run validated trace generation and strict replay/evaluator gates without committing generated traces, models, scorecards, or replay JSONL artifacts.
+- Broader non-Quad-Brain and non-organ production trace-store write-path selection remains open.
+- Rebuild or replace generated Knowledge Cloud artifacts so FAISS, metadata, embedder, profile dimension, and `build.source_manifest` align before release gates and golden-query health can pass.
+
+### 💡 Architectural Notes
+- Organs remain CHAL-bounded accelerators. The shared-backbone contract is replay identity and evaluator metadata, not a new independent brain or uncontrolled model owner.

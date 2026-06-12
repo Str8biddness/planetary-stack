@@ -43,7 +43,8 @@ MODELS_DIR = REPO_ROOT / "data" / "models"
 REPORT_JSON = REPO_ROOT / "logs" / "organ_evaluation_scorecard.json"
 REPORT_MD = REPO_ROOT / "logs" / "organ_evaluation_scorecard.md"
 ATTENTION_WIDTH = 10
-CHAL_ACCELERATOR_GENERATOR = "organ-triad-replay-v3"
+CHAL_ACCELERATOR_GENERATOR = "organ-triad-replay-v4"
+SHARED_BACKBONE_SCHEMA = "shared_organ_backbone.v1"
 
 
 @dataclass
@@ -381,6 +382,7 @@ def _replay_identity_coverage(records: Iterable[TraceRecord]) -> float:
         candidate_refs = record_without_hash.get("candidateRefs")
         selected_ref = record_without_hash.get("selectedCandidateRef")
         quality = record_without_hash.get("quality")
+        backbone_ok, _ = _valid_shared_backbone_contract(rec, record_without_hash.get("backbone"))
         if (
             record_without_hash.get("schema") == "organ_training_replay.v1"
             and record_without_hash.get("generator") == CHAL_ACCELERATOR_GENERATOR
@@ -397,11 +399,38 @@ def _replay_identity_coverage(records: Iterable[TraceRecord]) -> float:
             and isinstance(record_without_hash.get("accepted"), bool)
             and isinstance(quality, (int, float))
             and math.isfinite(float(quality))
+            and backbone_ok
             and isinstance(record_hash, str)
             and record_hash == expected_hash
         ):
             covered += 1
     return (covered / total) if total else 0.0
+
+
+def _valid_shared_backbone_contract(rec: TraceRecord, value: Any) -> tuple[bool, str]:
+    if not isinstance(value, dict):
+        return False, "missing shared backbone contract"
+    contract_hash = value.get("contractHash")
+    contract_without_hash = {key: entry for key, entry in value.items() if key != "contractHash"}
+    expected_hash = hashlib.sha256(_stable_json(contract_without_hash).encode("utf-8")).hexdigest()
+    scopes = contract_without_hash.get("scopes")
+    if contract_without_hash.get("schema") != SHARED_BACKBONE_SCHEMA:
+        return False, "invalid shared backbone schema"
+    if contract_without_hash.get("contractVersion") != "shared-organ-backbone-v1":
+        return False, "invalid shared backbone version"
+    if contract_without_hash.get("domain") != rec.domain:
+        return False, "shared backbone domain mismatch"
+    if contract_without_hash.get("organ") != rec.organ:
+        return False, "shared backbone organ mismatch"
+    if contract_without_hash.get("device") != f"chal://organs/{rec.domain}/{rec.organ}":
+        return False, "shared backbone device mismatch"
+    if not isinstance(contract_without_hash.get("width"), int) or contract_without_hash.get("width") <= 0:
+        return False, "invalid shared backbone width"
+    if not isinstance(scopes, list) or scopes != ["state", "action", "trajectory", "multifocus"]:
+        return False, "shared backbone scopes mismatch"
+    if not isinstance(contract_hash, str) or contract_hash != expected_hash:
+        return False, "shared backbone contract hash mismatch"
+    return True, ""
 
 
 def _valid_replay_identity(rec: TraceRecord) -> tuple[bool, str]:
@@ -417,6 +446,7 @@ def _valid_replay_identity(rec: TraceRecord) -> tuple[bool, str]:
     candidate_refs = record_without_hash.get("candidateRefs")
     selected_ref = record_without_hash.get("selectedCandidateRef")
     quality = record_without_hash.get("quality")
+    backbone_ok, backbone_reason = _valid_shared_backbone_contract(rec, record_without_hash.get("backbone"))
     if record_without_hash.get("schema") != "organ_training_replay.v1":
         return False, "invalid replay record schema"
     if record_without_hash.get("generator") != CHAL_ACCELERATOR_GENERATOR:
@@ -441,6 +471,8 @@ def _valid_replay_identity(rec: TraceRecord) -> tuple[bool, str]:
         return False, "missing accepted flag"
     if not isinstance(quality, (int, float)) or not math.isfinite(float(quality)):
         return False, "invalid quality"
+    if not backbone_ok:
+        return False, backbone_reason
     if not isinstance(record_hash, str) or record_hash != expected_hash:
         return False, "record hash mismatch"
     return True, ""
@@ -466,6 +498,9 @@ def _valid_chal_accelerator(rec: TraceRecord) -> tuple[bool, str]:
         return False, "CHAL route mismatch"
     if chal.get("outputRef") != f"{rec.domain}.{rec.organ}.{rec.phase}":
         return False, "CHAL output ref mismatch"
+    backbone_ok, backbone_reason = _valid_shared_backbone_contract(rec, chal.get("backbone"))
+    if not backbone_ok:
+        return False, backbone_reason
     return True, ""
 
 
@@ -517,6 +552,7 @@ def _chal_accelerator_coverage(records: Iterable[TraceRecord]) -> float:
             and chal.get("role") == "organ_accelerator"
             and chal.get("route") == "organ_training_replay"
             and chal.get("outputRef") == f"{rec.domain}.{rec.organ}.{rec.phase}"
+            and _valid_shared_backbone_contract(rec, chal.get("backbone"))[0]
         ):
             bounded += 1
     return (bounded / total) if total else 0.0
@@ -582,6 +618,16 @@ def build_organ_replay_records(records: Iterable[TraceRecord]) -> list[dict[str,
             "frameId": chal["frameId"],
             "parentFrameId": chal["parentFrameId"],
             "outputRef": chal["outputRef"],
+            "backbone": {
+                "schema": chal["backbone"]["schema"],
+                "contractVersion": chal["backbone"]["contractVersion"],
+                "domain": chal["backbone"]["domain"],
+                "organ": chal["backbone"]["organ"],
+                "width": chal["backbone"]["width"],
+                "scopes": list(chal["backbone"]["scopes"]),
+                "device": chal["backbone"]["device"],
+                "contractHash": chal["backbone"]["contractHash"],
+            },
             "candidateRefs": list(chal["candidateRefs"]),
             "selectedCandidateRef": chal["selectedCandidateRef"],
             "criticFeedbackRef": critic["feedbackRef"],

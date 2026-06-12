@@ -10,7 +10,8 @@ import { ChatWorldState, ChatAction, ChatFocusTarget } from '../packages/core/do
 import { SysWorldState, SysAction, SysFocusTarget, SysHistory } from '../packages/core/domains/sysops/types';
 import { GMWorldState, GMAction, GMFocusTarget, GMNpc, GMWorldEvent } from '../packages/core/domains/gm/types';
 
-const GENERATOR_VERSION = 'organ-triad-replay-v3';
+const GENERATOR_VERSION = 'organ-triad-replay-v4';
+const SHARED_BACKBONE_SCHEMA = 'shared_organ_backbone.v1';
 const DEFAULT_TRACE_SEED = 950907;
 const BASE_TIME_MS = Date.UTC(2026, 4, 30, 12, 0, 0);
 const HOUR_MS = 3_600_000;
@@ -31,6 +32,22 @@ function stableJson(value: unknown): string {
 
 function sha256(value: unknown): string {
   return createHash('sha256').update(stableJson(value)).digest('hex');
+}
+
+function sharedBackboneContract(domain: string, organ: string) {
+  const contract = {
+    schema: SHARED_BACKBONE_SCHEMA,
+    contractVersion: 'shared-organ-backbone-v1',
+    domain,
+    organ,
+    width: 12,
+    scopes: ['state', 'action', 'trajectory', 'multifocus'],
+    device: `chal://organs/${domain}/${organ}`,
+  };
+  return {
+    ...contract,
+    contractHash: sha256(contract),
+  };
 }
 
 class SeededRng {
@@ -80,6 +97,7 @@ function replay(
   const frameStem = `${runtime.seed}-${runtime.step}-${scenarioId}`.replace(/[^a-zA-Z0-9_-]/g, '-');
   const candidateRefs = Array.from({ length: candidateCount }, (_, idx) => `${domain}.${organ}.${phase}.candidate.${idx}`);
   const selectedCandidateRef = candidateRefs[chosenIndex] ?? candidateRefs[0] ?? `${domain}.${organ}.${phase}.candidate.0`;
+  const backbone = sharedBackboneContract(domain, organ);
   const compactRecord = {
     schema: 'organ_training_replay.v1',
     generator: GENERATOR_VERSION,
@@ -95,6 +113,7 @@ function replay(
     selectedCandidateRef,
     accepted: quality >= 0.5,
     quality: Number(quality.toFixed(6)),
+    backbone,
   };
   return {
     generator: GENERATOR_VERSION,
@@ -113,6 +132,7 @@ function replay(
       role: 'organ_accelerator' as const,
       route: 'organ_training_replay',
       outputRef: `${domain}.${organ}.${phase}`,
+      backbone,
       candidateRefs,
       selectedCandidateRef,
       criticFeedback: {
