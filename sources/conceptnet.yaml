@@ -1,7 +1,7 @@
 version: "1"
 id: conceptnet5_assertions
 name: ConceptNet 5.7 assertions
-source_type: gzip_tsv
+source_type: public_gzip_csv
 license:
   spdx: "CC-BY-SA-4.0"
   notes: >

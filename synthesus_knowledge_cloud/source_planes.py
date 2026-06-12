@@ -193,6 +193,13 @@ def _validate_aggregate_source_manifest_yaml(
                 f"aggregate public source id has no source manifest: {source_id} in {rel}[{index}]"
             )
             continue
+        expected_type = source_manifest.get("source_type")
+        aggregate_type = item.get("type")
+        if aggregate_type is not None and aggregate_type != expected_type:
+            errors.append(
+                f"aggregate public source type mismatch for {source_id} in {rel}[{index}]: "
+                f"{aggregate_type} != {expected_type}"
+            )
         expected_loader = source_manifest.get("loader")
         aggregate_loader = item.get("loader")
         if aggregate_loader is not None and aggregate_loader != expected_loader:
