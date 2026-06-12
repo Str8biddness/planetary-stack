@@ -31,6 +31,17 @@ class SnapshotManager:
         "emit",
         "close",
     ]
+    SENSITIVE_REPLAY_KEYS = {
+        "content",
+        "draft",
+        "input",
+        "intent",
+        "prompt",
+        "query",
+        "response",
+        "text",
+        "user_input",
+    }
 
     @staticmethod
     def _fingerprint_payload(payload: Dict[str, Any]) -> str:
@@ -50,6 +61,44 @@ class SnapshotManager:
         unsigned.pop("record_hash", None)
         json_payload = json.dumps(unsigned, sort_keys=True)
         return hashlib.sha256(json_payload.encode()).hexdigest()
+
+    @staticmethod
+    def _redact_replay_value(value: Any) -> dict[str, Any]:
+        serialized = json.dumps(value, sort_keys=True, default=str)
+        return {
+            "redacted": True,
+            "sha256": hashlib.sha256(serialized.encode()).hexdigest(),
+            "length": len(serialized),
+        }
+
+    @staticmethod
+    def _scrub_replay_details(details: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+        scrubbed: dict[str, Any] = {}
+        scrubbed_fields: list[str] = []
+        for key, value in details.items():
+            if key.lower() in SnapshotManager.SENSITIVE_REPLAY_KEYS:
+                scrubbed[key] = SnapshotManager._redact_replay_value(value)
+                scrubbed_fields.append(key)
+            elif isinstance(value, dict):
+                nested, nested_fields = SnapshotManager._scrub_replay_details(value)
+                scrubbed[key] = nested
+                scrubbed_fields.extend(f"{key}.{field}" for field in nested_fields)
+            else:
+                scrubbed[key] = value
+        return scrubbed, scrubbed_fields
+
+    @staticmethod
+    def _assert_replay_trace_scrubbed(replay_trace: dict[str, Any]) -> None:
+        def _assert_mapping_scrubbed(mapping: dict[str, Any]) -> None:
+            for key, value in mapping.items():
+                if key.lower() in SnapshotManager.SENSITIVE_REPLAY_KEYS:
+                    if not isinstance(value, dict) or value.get("redacted") is not True or not value.get("sha256"):
+                        raise ValueError(f"Snapshot replay trace contains unsanitized field: {key}")
+                elif isinstance(value, dict):
+                    _assert_mapping_scrubbed(value)
+
+        for event in replay_trace.get("events", []):
+            _assert_mapping_scrubbed(event.get("details", {}))
 
     @staticmethod
     def _fingerprint_device_manifest(manifest: dict[str, Any]) -> str:
@@ -75,15 +124,18 @@ class SnapshotManager:
         or response text.
         """
         audit_entries = [entry for entry in npc.audit_stream if entry.step != "spawn"]
-        events = [
-            {
-                "index": index,
-                "timestamp": entry.timestamp,
-                "step": entry.step,
-                "details": dict(entry.details),
-            }
-            for index, entry in enumerate(audit_entries)
-        ]
+        events = []
+        for index, entry in enumerate(audit_entries):
+            details, scrubbed_fields = SnapshotManager._scrub_replay_details(dict(entry.details))
+            events.append(
+                {
+                    "index": index,
+                    "timestamp": entry.timestamp,
+                    "step": entry.step,
+                    "details": details,
+                    "scrubbed_fields": scrubbed_fields,
+                }
+            )
         steps = [event["step"] for event in events]
         emit_hashes = [
             event["details"].get("hash")
@@ -127,6 +179,7 @@ class SnapshotManager:
         actual_hash = SnapshotManager._fingerprint_replay_events(events)
         if expected_hash != actual_hash:
             raise ValueError("Snapshot replay trace fingerprint mismatch")
+        SnapshotManager._assert_replay_trace_scrubbed(replay_trace)
         expected_record_hash = replay_trace.get("record_hash")
         actual_record_hash = SnapshotManager._fingerprint_replay_record(replay_trace)
         if expected_record_hash != actual_record_hash:

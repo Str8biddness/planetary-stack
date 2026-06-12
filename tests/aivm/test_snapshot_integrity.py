@@ -232,7 +232,11 @@ async def test_snapshot_records_compact_replay_trace_without_response_text():
     )
     assert replay_trace["events_hash"] == rebuilt_replay_trace["events_hash"]
     assert replay_trace["record_hash"] == rebuilt_replay_trace["record_hash"]
+    assert replay_trace["events"][2]["details"]["intent"]["redacted"] is True
+    assert replay_trace["events"][2]["scrubbed_fields"] == ["intent"]
+    assert replay_trace["events"][2]["details"]["intent"]["sha256"]
     assert "Generated response from AIVM VGD." not in json.dumps(replay_trace)
+    assert "record a replayable kernel tick" not in json.dumps(replay_trace)
 
     restored = AIVMKernel(enable_scheduler=False).restore_npc(SnapshotManager.capture(npc))
     assert restored.snapshot_replay_trace == replay_trace
@@ -279,4 +283,20 @@ async def test_snapshot_restore_rejects_replay_trace_device_manifest_mismatch_wi
     data["footer"]["fingerprint"] = SnapshotManager._fingerprint_payload(data)
 
     with pytest.raises(ValueError, match="replay trace device manifest mismatch"):
+        AIVMKernel(enable_scheduler=False).restore_npc(json.dumps(data, sort_keys=True).encode())
+
+
+@pytest.mark.asyncio
+async def test_snapshot_restore_rejects_unscrubbed_replay_trace_field_with_valid_outer_seal():
+    kernel = AIVMKernel(enable_scheduler=False)
+    npc = kernel.spawn_npc(PersonaIdentity(id="replay_raw_npc", name="Replay Raw", archetype="scribe"))
+
+    await kernel.tick("replay_raw_npc", {"input": "do not store this raw prompt"})
+    data = json.loads(SnapshotManager.capture(npc).decode())
+    data["replay_trace"]["events"][2]["details"]["intent"] = "Plan for: do not store this raw prompt"
+    data["replay_trace"]["events_hash"] = SnapshotManager._fingerprint_replay_events(data["replay_trace"]["events"])
+    data["replay_trace"]["record_hash"] = SnapshotManager._fingerprint_replay_record(data["replay_trace"])
+    data["footer"]["fingerprint"] = SnapshotManager._fingerprint_payload(data)
+
+    with pytest.raises(ValueError, match="unsanitized field: intent"):
         AIVMKernel(enable_scheduler=False).restore_npc(json.dumps(data, sort_keys=True).encode())

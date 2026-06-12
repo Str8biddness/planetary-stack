@@ -4019,3 +4019,24 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - The compact Quad Brain replay/storage ledger is no longer trusted only by completeness and ordering. It must mirror the serialized Knowledge/Grounding -> Executive Reasoning -> CGPU Rendering -> Critic/Metacognition transition chain before the state contract can report integrity as passed.
+
+## Current Session — 2026-06-12 (Agent 8 — AIVM Snapshot Replay Scrub Gate)
+
+### 📝 Summary
+- Hardened `SnapshotManager` replay storage so sensitive AIVM audit detail fields (`input`, `user_input`, `prompt`, `query`, `intent`, `draft`, `response`, `content`, `text`) are captured as redacted SHA-256 identity records with lengths instead of raw values.
+- Added restore-time scrub-contract validation so a validly resealed snapshot with recomputed replay hashes is still rejected if raw prompt/intent/detail fields are reintroduced into `aivm.snapshot_replay.v1`.
+- Updated the AIVM module doc and advanced the Phase 7 replayable trace storage plus CHAL memory partition save/load checklist items.
+
+### ✅ Verified
+- `python -m py_compile packages/aivm/snapshot/manager.py tests/aivm/test_snapshot_integrity.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/aivm/test_snapshot_integrity.py` — passed, 15 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/aivm/test_tick_sequence.py tests/aivm/test_snapshot_integrity.py tests/test_kernel_pybind_vpd.py` — passed, 17 tests.
+- `cmake --build /home/workspace/Synthesus_4.0/packages/kernel/build -j2` — passed; `_synthesus_kernel`, `synthesus_kernel`, `test_vmm`, and `test_emul` targets built.
+
+### 🚧 Left Off / Next Steps
+- Broader persistent runtime trace storage outside Quad Brain, organ traces, and AIVM snapshots remains open.
+- Consider promoting the replay scrub-key set into a shared CHAL trace-storage policy if other trace sinks need the same raw-prompt prevention.
+- Pre-existing unrelated root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- AIVM snapshot replay now preserves enough hashed identity to compare and audit a tick while explicitly denying raw prompt or response text a path into sealed replay storage.
