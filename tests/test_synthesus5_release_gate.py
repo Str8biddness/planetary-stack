@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import json
 import sys
 
 
@@ -80,6 +81,72 @@ def test_missing_source_manifest_provenance_is_release_blocker(monkeypatch):
     assert check.status == "blocked"
     assert check.id == "knowledge:cold-start"
     assert "build.source_manifest" in check.detail
+
+
+def test_knowledge_cold_start_summary_is_preserved_on_blocker(monkeypatch):
+    summary = {
+        "schema": "synthesus.knowledge_cold_start.summary.v1",
+        "ok": False,
+        "retrieval_semantics": {
+            "faiss_dim": 384,
+            "embedder_dim": 128,
+            "profile_embedder_dim": 128,
+            "errors": ["FAISS/embedder dim mismatch: faiss=384, embedder=128"],
+        },
+        "source_manifest_provenance": {
+            "errors": ["manifest build.source_manifest fingerprint is missing"],
+        },
+    }
+
+    def fake_run(command, *, timeout):
+        return subprocess.CompletedProcess(
+            command,
+            1,
+            stdout=(
+                "cold_start_summary="
+                + json.dumps(summary)
+                + "\nKnowledge Cloud cold-start validation failed: "
+                "FAISS/embedder dim mismatch: faiss=384, embedder=128\n"
+            ),
+        )
+
+    monkeypatch.setattr("synthesus5_release_gate._run", fake_run)
+
+    check = _knowledge_artifact_check()
+
+    assert check.status == "blocked"
+    assert check.diagnostics["retrieval_semantics"]["faiss_dim"] == 384
+    assert check.diagnostics["retrieval_semantics"]["embedder_dim"] == 128
+    assert "build.source_manifest" in check.diagnostics["source_manifest_provenance"]["errors"][0]
+
+
+def test_knowledge_cold_start_summary_is_preserved_on_pass(monkeypatch):
+    summary = {
+        "schema": "synthesus.knowledge_cold_start.summary.v1",
+        "ok": True,
+        "retrieval_semantics": {
+            "faiss_dim": 128,
+            "embedder_dim": 128,
+            "profile_embedder_dim": 128,
+            "errors": [],
+        },
+        "source_manifest_provenance": {"errors": []},
+    }
+
+    def fake_run(command, *, timeout):
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="cold_start_summary=" + json.dumps(summary) + "\nKnowledge Cloud cold-start bundle OK\n",
+        )
+
+    monkeypatch.setattr("synthesus5_release_gate._run", fake_run)
+
+    check = _knowledge_artifact_check()
+
+    assert check.status == "pass"
+    assert check.diagnostics["ok"] is True
+    assert check.diagnostics["retrieval_semantics"]["profile_embedder_dim"] == 128
 
 
 def test_clean_worktree_gate_passes_when_git_status_is_empty(monkeypatch):

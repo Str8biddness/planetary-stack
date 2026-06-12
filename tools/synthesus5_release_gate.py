@@ -7,7 +7,7 @@ import argparse
 import json
 import subprocess
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +24,7 @@ class ReleaseCheck:
     severity: str
     detail: str
     command: str | None = None
+    diagnostics: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,18 @@ def _run(command: list[str], *, timeout: int) -> subprocess.CompletedProcess[str
 def _tail(text: str, lines: int = 10) -> str:
     content = text.strip().splitlines()
     return "\n".join(content[-lines:])
+
+
+def _extract_cold_start_summary(text: str) -> dict[str, Any]:
+    for line in text.splitlines():
+        if not line.startswith("cold_start_summary="):
+            continue
+        try:
+            payload = json.loads(line.split("=", 1)[1])
+        except json.JSONDecodeError:
+            return {"parse_error": "invalid cold_start_summary JSON"}
+        return payload if isinstance(payload, dict) else {"parse_error": "cold_start_summary was not an object"}
+    return {}
 
 
 def _path_check(path: str, label: str, severity: str = "critical") -> ReleaseCheck:
@@ -175,6 +188,7 @@ def _knowledge_artifact_check() -> ReleaseCheck:
         )
 
     output = completed.stdout or ""
+    diagnostics = _extract_cold_start_summary(output)
     if completed.returncode == 0:
         return ReleaseCheck(
             id="knowledge:cold-start",
@@ -183,6 +197,7 @@ def _knowledge_artifact_check() -> ReleaseCheck:
             severity="critical",
             detail=_tail(output) or "Knowledge Cloud cold-start validation passed.",
             command=command_text,
+            diagnostics=diagnostics,
         )
 
     generated_bundle_blockers = (
@@ -200,6 +215,7 @@ def _knowledge_artifact_check() -> ReleaseCheck:
         severity="critical",
         detail=_tail(output) or f"Knowledge Cloud validation exited {completed.returncode}.",
         command=command_text,
+        diagnostics=diagnostics,
     )
 
 

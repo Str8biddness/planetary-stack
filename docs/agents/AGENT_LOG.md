@@ -3848,3 +3848,24 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - `sources/datasets.yaml` remains a public catalog view, not a source of truth. Repeated catalog fields now have to mirror concrete manifest fields for ID, type, loader, and enabled state before a source can be treated as provenance-clean mounted CHAL hardware.
+
+## Current Session — 2026-06-12 (Agent 1 — Release-Gate Cold-Start Diagnostics)
+
+### 📝 Summary
+- Added a `cold_start_summary=` JSON line to `tools/validate_knowledge_cold_start.py` so cold-start validation emits structured CHAL hardware diagnostics before pass/fail handling.
+- Extended `tools/synthesus5_release_gate.py` `ReleaseCheck` records with optional `diagnostics` metadata and preserved the Knowledge Cloud cold-start summary in both `checks[]` and `critical_blockers[]`.
+- Added regression coverage for preserving structured cold-start diagnostics on both blocked and passing Knowledge Cloud validation outcomes.
+- Advanced the Phase 10 release-candidate readiness checklist item without touching generated Knowledge Cloud artifacts or `.github/workflows/`.
+
+### ✅ Verified
+- `python -m py_compile tools/validate_knowledge_cold_start.py tools/synthesus5_release_gate.py tests/test_synthesus5_release_gate.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/tools python -m pytest -q tests/test_synthesus5_release_gate.py` — passed, 9 tests.
+- `SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_release_gate.py --run-runtime --fail-on-blocker --output /tmp/synthesus5_release_gate_agent1_20260612.json` — expected exit 1; CHAL smoke passed, `knowledge:cold-start` remained blocked, and the report now carries structured diagnostics: `faiss_dim=384`, `faiss_vectors=501819`, `metadata_records=501819`, `embedder_dim=128`, `profile_embedder_dim=128`, no integrity failures, no missing required mounts, and missing `build.source_manifest`.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align.
+- Restamp `synthesus-knowledge-cloud/artifacts/manifest.json` with `build.source_manifest` after the coherent rebuild, then rerun `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --require-clean-worktree --fail-on-blocker`.
+- Pre-existing unrelated root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Release readiness now separates human-readable cold-start output from machine-readable CHAL hardware diagnostics. The release gate can report exact generated-bundle repair facts without parsing prose or weakening the hard blocker on bad Knowledge Cloud retrieval hardware.
