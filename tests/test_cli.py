@@ -527,6 +527,59 @@ def test_source_planes_rejects_aggregate_public_source_default_enabled_drift(tmp
     ) in result.errors
 
 
+def test_source_planes_rejects_aggregate_public_source_license_drift(tmp_path):
+    root = tmp_path
+    sources = root / "sources"
+    sources.mkdir()
+    (sources / "datasets.yaml").write_text(
+        "\n".join(
+            [
+                'version: "1"',
+                "name: datasets",
+                "public_sources:",
+                "  - id: backed_public_source",
+                "    type: github_tsv",
+                "    default_enabled: true",
+                "    loader: pipelines/ingest/current_loader.py::load",
+                "    license:",
+                '      spdx: "Apache-2.0"',
+                "      notes: Stale catalog license.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (sources / "backed.yaml").write_text(
+        "\n".join(
+            [
+                'version: "1"',
+                "id: backed_public_source",
+                "name: Backed Public Source",
+                "source_type: github_tsv",
+                "license:",
+                '  spdx: "MIT"',
+                "  notes: Redistributable test fixture.",
+                "repository: https://example.com/repo",
+                "loader: pipelines/ingest/current_loader.py::load",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = validate_source_planes(root)
+
+    assert not result.ok
+    assert (
+        "aggregate public source license.spdx mismatch for backed_public_source in "
+        "sources/datasets.yaml[0]: Apache-2.0 != MIT"
+    ) in result.errors
+    assert (
+        "aggregate public source license.notes mismatch for backed_public_source in "
+        "sources/datasets.yaml[0]: Stale catalog license. != Redistributable test fixture."
+    ) in result.errors
+
+
 def test_source_planes_rejects_aggregate_public_source_upstream_drift(tmp_path):
     root = tmp_path
     sources = root / "sources"

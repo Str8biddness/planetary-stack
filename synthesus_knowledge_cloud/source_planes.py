@@ -231,6 +231,30 @@ def _validate_aggregate_source_manifest_yaml(
                 f"aggregate public source default_enabled mismatch for {source_id} in {rel}[{index}]: "
                 f"{aggregate_default} != {source_default}"
             )
+        aggregate_license = item.get("license")
+        if aggregate_license is not None:
+            source_license = source_manifest.get("license")
+            if not isinstance(aggregate_license, dict):
+                errors.append(
+                    f"aggregate public source license field must be a mapping for {source_id} "
+                    f"in {rel}[{index}]"
+                )
+            elif not isinstance(source_license, dict):
+                errors.append(
+                    f"aggregate public source license has no source manifest license block for "
+                    f"{source_id} in {rel}[{index}]"
+                )
+            else:
+                for license_key in ("spdx", "notes"):
+                    aggregate_value = aggregate_license.get(license_key)
+                    if aggregate_value is None:
+                        continue
+                    source_value = source_license.get(license_key)
+                    if aggregate_value != source_value:
+                        errors.append(
+                            f"aggregate public source license.{license_key} mismatch for "
+                            f"{source_id} in {rel}[{index}]: {aggregate_value} != {source_value}"
+                        )
         aggregate_upstream = item.get("upstream")
         if aggregate_upstream is not None:
             if not isinstance(aggregate_upstream, dict):
