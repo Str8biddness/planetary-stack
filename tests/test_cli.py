@@ -629,6 +629,60 @@ def test_source_planes_rejects_aggregate_public_source_upstream_drift(tmp_path):
     ) in result.errors
 
 
+def test_source_planes_rejects_aggregate_public_source_local_cache_drift(tmp_path):
+    root = tmp_path
+    sources = root / "sources"
+    sources.mkdir()
+    (sources / "datasets.yaml").write_text(
+        "\n".join(
+            [
+                'version: "1"',
+                "name: datasets",
+                "public_sources:",
+                "  - id: backed_public_source",
+                "    type: github_tsv",
+                "    default_enabled: true",
+                "    loader: pipelines/ingest/current_loader.py::load",
+                "    local_cache:",
+                "      directory: data/current",
+                "      files:",
+                "        - stale.tsv",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (sources / "backed.yaml").write_text(
+        "\n".join(
+            [
+                'version: "1"',
+                "id: backed_public_source",
+                "name: Backed Public Source",
+                "source_type: github_tsv",
+                "license:",
+                '  spdx: "MIT"',
+                "  notes: Redistributable test fixture.",
+                "repository: https://example.com/current-repo",
+                "files:",
+                "  - url: https://example.com/current.tsv",
+                "    cache_path: data/current/current.tsv",
+                "loader: pipelines/ingest/current_loader.py::load",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = validate_source_planes(root)
+
+    assert not result.ok
+    assert (
+        "aggregate public source local_cache file mismatch for backed_public_source "
+        "in sources/datasets.yaml[0].local_cache.files[0]: data/current/stale.tsv "
+        "not declared as source manifest cache_path"
+    ) in result.errors
+
+
 def test_source_planes_rejects_pending_dataset_without_rebuild_command(tmp_path):
     root = tmp_path
     sources = root / "sources"

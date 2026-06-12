@@ -189,6 +189,21 @@ def _validate_aggregate_source_manifest_yaml(
                         locators.add(value.strip())
         return locators
 
+    def source_cache_paths(source_manifest: dict) -> set[str]:
+        cache_paths: set[str] = set()
+        cache_path = source_manifest.get("cache_path")
+        if isinstance(cache_path, str) and cache_path.strip():
+            cache_paths.add(cache_path.strip())
+        files = source_manifest.get("files", [])
+        if isinstance(files, list):
+            for file_item in files:
+                if not isinstance(file_item, dict):
+                    continue
+                file_cache_path = file_item.get("cache_path")
+                if isinstance(file_cache_path, str) and file_cache_path.strip():
+                    cache_paths.add(file_cache_path.strip())
+        return cache_paths
+
     aggregate_ids: dict[str, int] = {}
     for index, item in enumerate(public_sources):
         if not isinstance(item, dict):
@@ -277,6 +292,45 @@ def _validate_aggregate_source_manifest_yaml(
                             f"in {rel}[{index}].upstream.{upstream_key}: "
                             f"{upstream_value} not declared in source manifest"
                         )
+        aggregate_local_cache = item.get("local_cache")
+        if aggregate_local_cache is not None:
+            if not isinstance(aggregate_local_cache, dict):
+                errors.append(
+                    f"aggregate public source local_cache field must be a mapping for "
+                    f"{source_id} in {rel}[{index}]"
+                )
+            else:
+                cache_directory = aggregate_local_cache.get("directory")
+                cache_files = aggregate_local_cache.get("files")
+                if cache_files is not None:
+                    if not isinstance(cache_directory, str) or not cache_directory.strip():
+                        errors.append(
+                            f"aggregate public source local_cache.directory must be non-empty "
+                            f"when files are declared for {source_id} in {rel}[{index}]"
+                        )
+                    if not isinstance(cache_files, list):
+                        errors.append(
+                            f"aggregate public source local_cache.files must be a list for "
+                            f"{source_id} in {rel}[{index}]"
+                        )
+                    elif isinstance(cache_directory, str) and cache_directory.strip():
+                        declared_cache_paths = source_cache_paths(source_manifest)
+                        for cache_index, cache_file in enumerate(cache_files):
+                            if not isinstance(cache_file, str) or not cache_file.strip():
+                                errors.append(
+                                    f"aggregate public source local_cache file must be non-empty for "
+                                    f"{source_id} in {rel}[{index}].local_cache.files[{cache_index}]"
+                                )
+                                continue
+                            aggregate_cache_path = (
+                                f"{cache_directory.strip().rstrip('/')}/{cache_file.strip().lstrip('/')}"
+                            )
+                            if aggregate_cache_path not in declared_cache_paths:
+                                errors.append(
+                                    f"aggregate public source local_cache file mismatch for "
+                                    f"{source_id} in {rel}[{index}].local_cache.files[{cache_index}]: "
+                                    f"{aggregate_cache_path} not declared as source manifest cache_path"
+                                )
 
 
 def _validate_source_identity_namespace(
