@@ -42,7 +42,7 @@ The overall score is the mean of those axes. Template leakage is checked against
 
 The harness also builds a deterministic GPT-4-class reference scorecard. This is not an external model judge. It checks each case against fixed expectations for route selection, minimum score, grounding coverage, term coverage, latency, template leakage, required decision reasons, runtime preset telemetry, and Quad Brain role evidence where applicable. The same gate now records a required-category balance check so the benchmark fails if any Phase 8 class silently drops out of the single-turn comparison set.
 
-It also builds a deterministic continuity scorecard. This checks each multi-turn sequence for turn count, final route, final score, continuity-term coverage, all-turn template cleanliness, expected legacy leakage baseline, runtime preset telemetry, decision reasons, and Quad Brain role coverage where required.
+It also builds a deterministic continuity scorecard. This checks each multi-turn sequence for turn count, final route, final score, continuity-term coverage, all-turn template cleanliness, expected legacy leakage baseline, runtime preset telemetry, decision reasons, and Quad Brain role coverage where required. The continuity scorecard also records required category balance for NPC/persona, business-bot, and safety continuity sequences, so follow-up coverage cannot silently narrow to one behavior class while the remaining sequences pass.
 
 The compact replay trace records also carry response SHA-256 hashes, response character counts, and a per-record integrity hash. The replay integrity scorecard verifies that records are hash-stable, carry trace and route identity, preserve template-leak flags, and omit raw response text from legacy and Synthesus 5 replay payloads.
 
@@ -100,7 +100,7 @@ python tools/chal_conversation_compare.py \
 
 `--scorecard-json` writes the compact reference expectation scorecard. `--fail-on-reference` fails the run if any fixed expectation check fails or if a required Phase 8 single-turn category is missing, even when aggregate scores remain above threshold.
 
-`--continuity-scorecard-json` writes the compact continuity scorecard. `--fail-on-continuity` fails the run if any fixed multi-turn sequence fails its continuity, routing, preset, role, latency, or template-cleanliness checks.
+`--continuity-scorecard-json` writes the compact continuity scorecard. `--fail-on-continuity` fails the run if any fixed multi-turn sequence fails its continuity, routing, preset, role, latency, or template-cleanliness checks, or if any required continuity category is absent.
 
 Run the regression tests:
 

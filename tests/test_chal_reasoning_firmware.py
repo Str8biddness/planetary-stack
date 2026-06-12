@@ -498,6 +498,14 @@ def test_phase8_comparison_harness_builds_continuity_scorecard():
     assert scorecard["summary"]["turn_count"] == len(flat_rows)
     assert scorecard["summary"]["failed_sequences"] == 0
     assert scorecard["summary"]["synthesus5_template_leaks"] == 0
+    category_balance = scorecard["summary"]["category_balance"]
+    assert category_balance["passed"] is True
+    assert category_balance["missing_categories"] == []
+    assert category_balance["category_counts"] == {
+        "npc_persona_behavior": 1,
+        "business_bot_task": 1,
+        "safety": 1,
+    }
     assert_continuity_scorecard(scorecard)
 
     sequence_ids = {case["sequence_id"] for case in scorecard["cases"]}
@@ -531,6 +539,24 @@ def test_phase8_continuity_scorecard_reports_sequence_failures():
         assert f"{scorecard['cases'][0]['sequence_id']} failed continuity_term_coverage" in str(exc)
     else:
         raise AssertionError("continuity scorecard gate must fail when a sequence check fails")
+
+
+def test_phase8_continuity_scorecard_reports_missing_required_category():
+    continuity_rows = asyncio.run(build_continuity_rows())
+    continuity_rows = [
+        sequence for sequence in continuity_rows if sequence["category"] != "business_bot_task"
+    ]
+    scorecard = build_continuity_scorecard(continuity_rows)
+
+    assert scorecard["summary"]["category_balance"]["passed"] is False
+    assert scorecard["summary"]["category_balance"]["missing_categories"] == ["business_bot_task"]
+
+    try:
+        assert_continuity_scorecard(scorecard)
+    except AssertionError as exc:
+        assert "missing required Phase 8 continuity categories: business_bot_task" in str(exc)
+    else:
+        raise AssertionError("continuity scorecard gate must fail when a required category is absent")
 
 
 def test_phase8_comparison_harness_enforces_latency_regression_thresholds():

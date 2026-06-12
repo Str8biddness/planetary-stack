@@ -144,6 +144,12 @@ REQUIRED_PHASE8_CATEGORIES = (
     "safety",
 )
 
+REQUIRED_PHASE8_CONTINUITY_CATEGORIES = (
+    "npc_persona_behavior",
+    "business_bot_task",
+    "safety",
+)
+
 
 REFERENCE_EXPECTATIONS: dict[str, ReferenceExpectation] = {
     "conversation_quality": ReferenceExpectation(
@@ -927,6 +933,19 @@ def flatten_continuity_rows(continuity_rows: list[dict[str, Any]]) -> list[dict[
 
 def build_continuity_scorecard(continuity_rows: list[dict[str, Any]]) -> dict[str, Any]:
     cases = []
+    category_counts = {
+        category: sum(1 for sequence in continuity_rows if sequence["category"] == category)
+        for category in REQUIRED_PHASE8_CONTINUITY_CATEGORIES
+    }
+    category_balance = {
+        "required_categories": list(REQUIRED_PHASE8_CONTINUITY_CATEGORIES),
+        "observed_categories": sorted({sequence["category"] for sequence in continuity_rows}),
+        "category_counts": category_counts,
+        "missing_categories": [
+            category for category, count in category_counts.items() if count == 0
+        ],
+        "passed": all(count > 0 for count in category_counts.values()),
+    }
     for sequence in continuity_rows:
         turns = sequence["turns"]
         final_turn = turns[-1]
@@ -987,6 +1006,7 @@ def build_continuity_scorecard(continuity_rows: list[dict[str, Any]]) -> dict[st
             "synthesus5_mean_latency_ms": summary["synthesus5_mean_latency_ms"],
             "synthesus5_p95_latency_ms": summary["synthesus5_p95_latency_ms"],
             "synthesus5_template_leaks": summary["synthesus5_template_leaks"],
+            "category_balance": category_balance,
         },
         "cases": cases,
     }
@@ -994,6 +1014,12 @@ def build_continuity_scorecard(continuity_rows: list[dict[str, Any]]) -> dict[st
 
 def assert_continuity_scorecard(scorecard: dict[str, Any]) -> None:
     failures = []
+    category_balance = scorecard.get("summary", {}).get("category_balance", {})
+    if category_balance and not category_balance.get("passed", False):
+        failures.append(
+            "missing required Phase 8 continuity categories: "
+            + ", ".join(category_balance.get("missing_categories", []))
+        )
     for case in scorecard["cases"]:
         for check, passed in case["checks"].items():
             if not passed:

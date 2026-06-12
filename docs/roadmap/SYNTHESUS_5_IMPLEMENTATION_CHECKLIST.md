@@ -164,7 +164,7 @@ Legend:
 
 - [x]  Add a per-case axis-improvement gate so the legacy-vs-Synthesus-5 harness fails when an individual case regresses on grounding, naturalness, safety, template leakage, or overall score even if aggregate metrics still pass. Session log: 2026-06-03 Agent 3 Phase 8 axis-improvement scorecard gate.
 
-- [x]  Add a multi-turn continuity scorecard gate for NPC/persona, business-bot follow-up, and safety follow-up sequences so legacy-vs-Synthesus-5 comparison fails on continuity-term loss, route drift, runtime-preset drift, Quad Brain role loss, or template leakage. Session log: 2026-06-04 Agent 3 Phase 8 multi-turn continuity scorecard gate.
+- [x]  Add a multi-turn continuity scorecard gate for NPC/persona, business-bot follow-up, and safety follow-up sequences so legacy-vs-Synthesus-5 comparison fails on continuity-term loss, route drift, runtime-preset drift, Quad Brain role loss, template leakage, or missing continuity-category coverage. Session log: 2026-06-04 Agent 3 Phase 8 multi-turn continuity scorecard gate; 2026-06-12 Agent 3 Phase 8 continuity category-balance gate.
 
 - [x]  Add a compact replay-integrity scorecard gate so legacy-vs-Synthesus-5 comparison traces carry response hashes, per-record hashes, route/trace identity, and no raw response text. Session log: 2026-06-05 Agent 3 Phase 8 replay integrity gate.
 

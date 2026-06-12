@@ -3869,3 +3869,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - Release readiness now separates human-readable cold-start output from machine-readable CHAL hardware diagnostics. The release gate can report exact generated-bundle repair facts without parsing prose or weakening the hard blocker on bad Knowledge Cloud retrieval hardware.
+
+## Current Session — 2026-06-12 (Agent 3 — Phase 8 Continuity Category-Balance Gate)
+
+### 📝 Summary
+- Added required continuity-category balance to `tools/chal_conversation_compare.py` so the multi-turn scorecard records NPC/persona, business-bot, and safety continuity coverage and fails if any required follow-up behavior class drops out.
+- Added focused regression coverage for both the healthy continuity balance and a missing business-bot continuity category.
+- Wired the focused Synthesus 5 suite Phase 8 command to run `--fail-on-replay-integrity` and write the replay-integrity scorecard alongside the trace-storage scorecard.
+- Updated `docs/modules/EVALUATION_HARNESS.md` and the Phase 8 implementation checklist for the new continuity breadth gate.
+
+### ✅ Verified
+- `python -m py_compile tools/chal_conversation_compare.py tools/synthesus5_focused_suite.py tests/test_chal_reasoning_firmware.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_reasoning_firmware.py` — passed, 26 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/chal_conversation_compare.py --fail-on-leak --fail-on-reference --fail-on-axis-regression --fail-on-continuity --fail-on-replay-integrity --fail-on-trace-storage --max-mean-latency-ms 1000 --max-p95-latency-ms 1500 --min-score-delta 0.1 --scorecard-json tools/results/synthesus5_phase8_reference_scorecard_latest.json --axis-scorecard-json tools/results/synthesus5_phase8_axis_scorecard_latest.json --continuity-scorecard-json tools/results/synthesus5_phase8_continuity_scorecard_latest.json --replay-scorecard-json tools/results/synthesus5_phase8_replay_integrity_scorecard_latest.json --trace-store-scorecard-json tools/results/synthesus5_phase8_trace_storage_scorecard_latest.json --baseline-json tools/results/synthesus5_phase8_latency_baseline_latest.json` — passed; score delta 0.515, Synthesus 5 template leaks 0, mean latency 25.088 ms, p95 latency 100.138 ms, and continuity category balance reported 1 NPC/persona, 1 business-bot, 1 safety sequence with no missing categories. Generated outputs remained ignored under `tools/results/`.
+
+### 🚧 Left Off / Next Steps
+- Add external/model-backed or recorded-human judge integration only after deterministic Phase 8 breadth gates remain stable.
+- If future continuity sequences become dynamically selected, keep the required-category balance updated with any new mandatory GPT-4-class follow-up behavior class.
+- Rebuild or replace generated Knowledge Cloud artifacts so FAISS, metadata, embedder, profile dimension, and `build.source_manifest` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, `README.md`, `pyproject.toml`, `docs/modules/KN.md`, and untracked `synthesus_framework/` changes were left untouched except for required shared checklist/log updates.
+
+### 💡 Architectural Notes
+- The continuity scorecard now protects benchmark breadth as well as sequence quality. A passing continuity run must prove coverage across NPC/persona behavior, business-bot follow-up, and safety follow-up, not just pass whichever sequence classes remain in the input set.
