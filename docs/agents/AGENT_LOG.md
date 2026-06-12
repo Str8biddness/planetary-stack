@@ -3801,3 +3801,27 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - Organs remain CHAL-bounded accelerators. The shared-backbone contract is replay identity and evaluator metadata, not a new independent brain or uncontrolled model owner.
+
+## Current Session — 2026-06-12 (Daily Knowledge Hardware Health Check)
+
+### 📝 Summary
+- Ran the fast Synthesus 5 Knowledge Cloud-as-hardware health check across source-plane validation, source-manifest verification, sampled artifact manifest hashes, KAL mount bootstrap, and runtime CHAL smoke.
+- Confirmed no new source-plane or mount regression: source validation, source-manifest verification, sampled manifest hashes, KAL/KN mount exposure, and CHAL smoke still pass.
+- Reconfirmed Phase 10 golden-query/release readiness remains blocked by generated-bundle coherence only: `faiss.index` is 384-dimensional while the embedder/profile contract remains 128-dimensional, and `artifacts/manifest.json` still lacks `build.source_manifest`.
+
+### ✅ Verified
+- `python -m synthesus_knowledge_cloud validate-sources --root /home/workspace/synthesus-knowledge-cloud` — passed, 25 required paths and 7 character pattern banks.
+- `python -m synthesus_knowledge_cloud verify-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — passed, 151 source files.
+- Sampled artifact manifest probe — manifest kind `synthesus-knowledge-artifacts`, 10 artifacts, `build.source_manifest` absent; sampled hashes and sizes passed for `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, `knowledge_cloud/world_lore.json`, and `knowledge_cloud/transitions.json`.
+- KAL mount smoke — strict manifest boot passed with 12 active mounts across `CACHE_SEED`, `GROUNDING_CORPUS`, `PARAMETER_DISK`, `ROM`, `SOURCE_PROVENANCE`, and `WRITEBACK_MEMORY`; `CHALMemoryController` exposed the same active mount types.
+- `python tools/synthesus5_release_gate.py --run-runtime --fail-on-blocker --output /tmp/synthesus5_release_gate_20260612.json` — expected exit 1; CHAL smoke passed, `knowledge:cold-start` remained blocked by FAISS/embedder/profile mismatch plus missing `build.source_manifest`.
+- Full `synthesus-kc validate`, `tools/validate_knowledge_cold_start.py`, and `packages/knowledge/health_check.py` were bounded with timeouts and did not finish before the fast probes and runtime release gate identified the known generated-bundle blocker.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align.
+- Restamp `synthesus-knowledge-cloud/artifacts/manifest.json` with `build.source_manifest` only after the coherent rebuild, then rerun `synthesus-kc validate` and `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker`.
+- Golden queries remain intentionally skipped until retrieval semantic integrity passes.
+- Pre-existing unrelated root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/docs/AIVM_NPC_CONTRACT.md` changes were left untouched.
+
+### 💡 Architectural Notes
+- The runtime-side health gate is behaving correctly: it keeps source-plane and KAL/mount health separate from generated retrieval hardware coherence, and refuses to treat the current bundle as golden-query-ready CHAL substrate.
