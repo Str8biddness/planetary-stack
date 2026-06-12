@@ -3562,6 +3562,27 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - The runtime-side health path is behaving correctly: it admits source-plane and KAL/mount health, but refuses to treat incoherent generated retrieval hardware as golden-query-ready CHAL substrate.
 
+## Current Session — 2026-06-12 (Agent 10 — Quad Brain Arbitration-Step API Docs)
+
+### 📝 Summary
+- Updated the `/api/v1/query` CHAL debug contract prose so API consumers are told that `QuadBrainArbitration.state_contract.arbitration_steps` is the compact ordered ledger for the fixed Knowledge/Grounding -> Executive Reasoning -> CGPU Rendering -> Critic/Metacognition handoff.
+- Regenerated `docs/openapi.json` and `docs/api_schema.json` from `docs/openapi.yaml` after adding `arbitration_steps` to the top-level API description and `QueryResponse.debug` description.
+- Updated `packages/api/schemas.py` and `docs/PHASE20_PRODUCTION_API.md` so source model docs, OpenAPI mirrors, and production API notes all describe the same implemented runtime surface.
+- Advanced the Phase 9 `/api/v1/query` `mode="chal"` debug-contract checklist item.
+
+### ✅ Verified
+- `python -m py_compile packages/api/schemas.py` — passed.
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed both JSON mirrors match YAML and that `arbitration_steps` is documented in API descriptions and required in both `QuadBrainArbitration.state_contract` and `QuadBrainReplayRecord.state_contract`.
+- `git diff --check -- packages/api/schemas.py docs/openapi.yaml docs/openapi.json docs/api_schema.json docs/PHASE20_PRODUCTION_API.md docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md` — passed.
+
+### 🚧 Left Off / Next Steps
+- Future Agent 10 work should keep OpenAPI/schema docs aligned when production trace storage expands beyond Quad Brain, organ, and AIVM replay records.
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, profile dimension, and manifest `build.source_manifest` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/docs/AIVM_NPC_CONTRACT.md` changes were left untouched.
+
+### 💡 Architectural Notes
+- `arbitration_steps` is API-visible trace metadata, not another execution path or brain. It lets clients audit serialized Quad Brain order without parsing full role outputs, while final response ownership remains with Critic/Metacognition.
+
 ## Current Session — 2026-06-11 (Agent 1 — RC Worktree Release Gate)
 
 ### 📝 Summary

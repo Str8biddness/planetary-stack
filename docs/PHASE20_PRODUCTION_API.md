@@ -123,11 +123,15 @@ route is `quad_brain_path`, matching the runtime `telemetry.quad_brain` payload.
 The Quad Brain schema also types `QuadBrainStateTransition` records so clients
 can validate the fixed knowledge -> executive -> CGPU -> critic state handoff
 and the `final_output_ref=critic.selected_response` contract.
+The same `state_contract` includes `arbitration_steps`, a compact ordered ledger
+of the four handoffs with step index, role, CHAL device, input refs, output refs,
+confidence, and warnings. Clients should prefer that ledger when they need to
+audit execution order without parsing full role outputs.
 `CognitiveHypervisorTrace.quad_brain_replay` references `QuadBrainReplayRecord`
 for the compact replay metadata emitted by the same route. That record preserves
-role/device identity, state-contract evidence, selected-response hash, character
-length, latency, and a canonical `record_hash` seal without exposing the raw
-response text.
+role/device identity, state-contract evidence including `arbitration_steps`,
+selected-response hash, character length, latency, and a canonical `record_hash`
+seal without exposing the raw response text.
 `CognitiveHypervisorTrace.quad_brain_trace_storage` references
 `QuadBrainTraceStorage` for the mounted replay trace-storage sink. The telemetry
 reports skipped/stored/fault status, the replay `record_hash`, backend

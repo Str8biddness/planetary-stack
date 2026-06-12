@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Synthesus 5 CHAL API",
-    "description": "Legacy-compatible Synthesus query and control API for the active Synthesus 5 CHAL runtime. The public query path currently exposes explicit Cognitive Hypervisor routing through mode=chal, the business_bot CHAL preset, plus generation-spine, cognitive, RAG, kernel, and amplification telemetry. CognitiveHypervisorTrace documents debug.cognitive_hypervisor for CHAL requests, including reasoning-quality verifier telemetry, grounding-reranker telemetry, QuadBrainArbitration, QuadBrainReplayRecord, and QuadBrainTraceStorage when route=quad_brain_path, plus memory-writeback telemetry after API arbitration; CGPU traces are documented as CHAL contracts until candidate-set payloads are surfaced by this endpoint.",
+    "description": "Legacy-compatible Synthesus query and control API for the active Synthesus 5 CHAL runtime. The public query path currently exposes explicit Cognitive Hypervisor routing through mode=chal, the business_bot CHAL preset, plus generation-spine, cognitive, RAG, kernel, and amplification telemetry. CognitiveHypervisorTrace documents debug.cognitive_hypervisor for CHAL requests, including reasoning-quality verifier telemetry, grounding-reranker telemetry, QuadBrainArbitration, state-contract arbitration_steps, QuadBrainReplayRecord, and QuadBrainTraceStorage when route=quad_brain_path, plus memory-writeback telemetry after API arbitration; CGPU traces are documented as CHAL contracts until candidate-set payloads are surfaced by this endpoint.",
     "version": "5.0.0"
   },
   "paths": {
@@ -2818,7 +2818,7 @@
               }
             ],
             "title": "Debug",
-            "description": "Optional implementation telemetry returned only when include_debug is true. Current keys include kernel_triggered, symbolic_triggered, trace, rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. For explicit mode=chal calls, cognitive_hypervisor follows the CognitiveHypervisorTrace OpenAPI component, including typed QuadBrainArbitration records when route=quad_brain_path and QuadBrainReplayRecord plus QuadBrainTraceStorage metadata for compact replay/storage traces, plus CHALMemoryWritebackResult records when the API attempts post-arbitration memory writeback. CGPU candidate-set trace records should also live here as the runtime wiring expands without changing the stable response envelope. Legacy-compatible template exceptions are labeled under debug.template_surface using the TemplateSurface schema."
+            "description": "Optional implementation telemetry returned only when include_debug is true. Current keys include kernel_triggered, symbolic_triggered, trace, rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. For explicit mode=chal calls, cognitive_hypervisor follows the CognitiveHypervisorTrace OpenAPI component, including typed QuadBrainArbitration records when route=quad_brain_path with state-contract arbitration_steps, QuadBrainReplayRecord, and QuadBrainTraceStorage metadata for compact replay/storage traces, plus CHALMemoryWritebackResult records when the API attempts post-arbitration memory writeback. CGPU candidate-set trace records should also live here as the runtime wiring expands without changing the stable response envelope. Legacy-compatible template exceptions are labeled under debug.template_surface using the TemplateSurface schema."
           }
         },
         "type": "object",
