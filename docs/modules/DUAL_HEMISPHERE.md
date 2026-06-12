@@ -230,3 +230,9 @@ The runtime telemetry field `telemetry.quad_brain_trace_storage` reports `skippe
 `QuadBrainArbitration.state_contract.arbitration_steps` now records the compact serialized ledger for the four-brain handoff chain. Each step includes the 1-based step index, role, CHAL device, input refs, output refs, rounded confidence, and warnings for the corresponding brain output.
 
 The replay record carries the same `arbitration_steps` list under its compact `state_contract`, and the integrity proof now includes `arbitration_steps_complete`. This gives trace consumers a direct ordered ledger to inspect without inferring execution order from the full output payload, while preserving the existing bounded topology: Knowledge/Grounding -> Executive Reasoning -> CGPU Rendering -> Critic/Metacognition.
+
+### Quad Brain Arbitration-Step Mirror Check (2026-06-12)
+
+`QuadBrainArbitration.state_contract.integrity.checks.arbitration_steps_mirror_transitions` now verifies that every compact arbitration step mirrors the corresponding brain output and `state_transitions` record for role, CHAL device, input refs, output refs, rounded confidence, and warnings.
+
+This keeps the compact replay/storage ledger inspectable without trusting it as a loose duplicate field. A trace can still carry all four ordered step entries, but integrity fails if a stored step rewrites the refs or device identity away from the serialized Knowledge/Grounding -> Executive Reasoning -> CGPU Rendering -> Critic/Metacognition handoff chain.

@@ -457,6 +457,15 @@ class QuadBrainOrchestrator:
             output.trace.get("state_transition") == transition
             for output, transition in zip(outputs, transitions)
         ]
+        mirrored_steps = [
+            step.get("role") == output.role.value == transition.get("role")
+            and step.get("device") == output.device == transition.get("device")
+            and list(step.get("input_refs", [])) == list(transition.get("input_refs", []))
+            and list(step.get("output_refs", [])) == list(transition.get("output_refs", []))
+            and step.get("confidence") == round(float(output.confidence), 6)
+            and list(step.get("warnings", [])) == list(output.warnings)
+            for output, transition, step in zip(outputs, transitions, arbitration_steps)
+        ]
         cgpu_output = next(
             (output for output in outputs if output.role == QuadBrainRole.CGPU_RENDERING),
             None,
@@ -481,6 +490,8 @@ class QuadBrainOrchestrator:
             "transitions_complete": transition_roles == serial_order,
             "arbitration_steps_complete": step_roles == serial_order
             and step_indexes == list(range(1, len(serial_order) + 1)),
+            "arbitration_steps_mirror_transitions": all(mirrored_steps)
+            and len(mirrored_steps) == len(serial_order),
             "output_transition_mirrors": all(mirrored_transitions)
             and len(mirrored_transitions) == len(serial_order),
             "critic_handoff_valid": bool(selected_candidate_id)

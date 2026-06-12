@@ -3977,3 +3977,45 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - `sources/datasets.yaml` remains a public catalog view. It may repeat license metadata for readability, but repeated SPDX and license notes now have to mirror the concrete source manifest that owns source admission before public-source provenance can become mounted CHAL hardware.
+
+## Current Session — 2026-06-12 (Knowledge Hardware Aggregate Local-Cache Drift Gate)
+
+### 📝 Summary
+- Hardened the standalone Knowledge Cloud source-plane validator so aggregate `sources/datasets.yaml` public-source `local_cache.files` entries must resolve through `local_cache.directory` to concrete source-manifest `cache_path` declarations.
+- Added regression coverage for stale aggregate cache metadata, updated source/provenance/data-model docs plus the runtime KN module note, and regenerated `manifests/source_manifest.json`.
+- Advanced the Phase 5 Knowledge Cloud hardware license/provenance validation checklist item without touching generated FAISS, KNDB, model, cache, mirror, or workflow artifacts.
+
+### ✅ Verified
+- `python -m py_compile synthesus_knowledge_cloud/source_planes.py tests/test_cli.py` — passed in `synthesus-knowledge-cloud`.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m pytest -q tests/test_cli.py tests/test_build.py tests/test_provenance.py` — passed, 36 tests.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud validate-sources --root /home/workspace/synthesus-knowledge-cloud` — passed, 25 required paths and 7 character pattern banks.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud build-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — regenerated 151-file source manifest.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud verify-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — passed, 151 source files.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align.
+- Restamp `synthesus-knowledge-cloud/artifacts/manifest.json` with the current `build.source_manifest` after the coherent rebuild, then rerun `synthesus-kc validate` and `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --require-clean-worktree --fail-on-blocker`.
+- Pre-existing unrelated runtime root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched except for required shared checklist/log/module-doc entries.
+
+### 💡 Architectural Notes
+- `sources/datasets.yaml` remains a public catalog view. It may repeat local cache metadata for operator readability, but those cache files now have to resolve to concrete `cache_path` values owned by the backed source manifest before the source can become provenance-clean mounted CHAL rebuild substrate.
+
+## Current Session — 2026-06-12 (Agent 7 — Quad Brain Arbitration-Step Mirror Integrity)
+
+### 📝 Summary
+- Hardened `QuadBrainArbitration.state_contract.integrity` with `arbitration_steps_mirror_transitions`, proving each compact arbitration step mirrors the corresponding brain output and `state_transitions` record for role, CHAL device, input refs, output refs, rounded confidence, and warnings.
+- Added focused regression coverage showing an ordered but ref-tampered arbitration-step ledger now fails integrity without changing the serialized four-brain topology or final-output ownership.
+- Mirrored the new integrity check in the Dual Hemisphere module doc and OpenAPI/API schema mirrors, and updated the Phase 3 checklist entry.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/quad_brain.py tests/test_chal_hypervisor.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_hypervisor.py` — passed, 23 tests.
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed JSON mirrors match YAML.
+
+### 🚧 Left Off / Next Steps
+- Broader persistent runtime trace storage outside Quad Brain and organ traces remains open.
+- Rebuild or replace generated Knowledge Cloud artifacts so FAISS, metadata, embedder, profile dimension, and `build.source_manifest` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- The compact Quad Brain replay/storage ledger is no longer trusted only by completeness and ordering. It must mirror the serialized Knowledge/Grounding -> Executive Reasoning -> CGPU Rendering -> Critic/Metacognition transition chain before the state contract can report integrity as passed.

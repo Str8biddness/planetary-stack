@@ -2253,6 +2253,7 @@
                       "serial_order_valid",
                       "transitions_complete",
                       "arbitration_steps_complete",
+                      "arbitration_steps_mirror_transitions",
                       "output_transition_mirrors",
                       "critic_handoff_valid",
                       "final_output_owned_by_critic"
@@ -2269,6 +2270,10 @@
                       },
                       "arbitration_steps_complete": {
                         "type": "boolean"
+                      },
+                      "arbitration_steps_mirror_transitions": {
+                        "type": "boolean",
+                        "description": "True only when every compact arbitration step mirrors the matching role output and state transition for role, device, input refs, output refs, rounded confidence, and warnings."
                       },
                       "output_transition_mirrors": {
                         "type": "boolean"

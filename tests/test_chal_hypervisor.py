@@ -3,7 +3,7 @@ import time
 from dataclasses import dataclass
 
 from core.chal.hypervisor import CognitiveHypervisor, HypervisorRoute
-from core.chal.quad_brain import QuadBrainArbitration, QuadBrainRole
+from core.chal.quad_brain import QuadBrainArbitration, QuadBrainOutput, QuadBrainRole
 
 
 class StubBridge:
@@ -354,6 +354,7 @@ def test_quad_brain_trace_records_serial_state_transitions():
         "serial_order_valid": True,
         "transitions_complete": True,
         "arbitration_steps_complete": True,
+        "arbitration_steps_mirror_transitions": True,
         "output_transition_mirrors": True,
         "critic_handoff_valid": True,
         "final_output_owned_by_critic": True,
@@ -396,6 +397,47 @@ def test_quad_brain_trace_emits_compact_replay_record_without_response_text():
     tampered = dict(replay)
     tampered["selected_response_chars"] += 1
     assert tampered["record_hash"] != QuadBrainArbitration.replay_record_hash(tampered)
+
+
+def test_quad_brain_integrity_rejects_tampered_arbitration_step_refs():
+    bridge = PersonaBridge()
+    hypervisor = CognitiveHypervisor(bridge_factory=lambda: bridge)
+
+    result = asyncio.run(
+        hypervisor.process_query(
+            "Render Archivist dialogue about the sealed gate",
+            character_context={"character_id": "Archivist", "stance": "cautious"},
+        )
+    )
+
+    quad_trace = result.telemetry["quad_brain"]
+    orchestrator = hypervisor._get_quad_brain_orchestrator()
+    tampered_steps = [
+        dict(step) for step in quad_trace["state_contract"]["arbitration_steps"]
+    ]
+    tampered_steps[2]["input_refs"] = ["executive.response_plan", "unverified.raw_text"]
+
+    integrity = orchestrator._state_contract_integrity(
+        outputs=[
+            QuadBrainOutput(
+                role=QuadBrainRole(output["role"]),
+                device=output["device"],
+                content=output["content"],
+                confidence=output["confidence"],
+                trace=output.get("trace", {}),
+                warnings=output.get("warnings", []),
+            )
+            for output in quad_trace["outputs"]
+        ],
+        serial_order=quad_trace["serial_order"],
+        arbitration_steps=tampered_steps,
+        transitions=quad_trace["state_contract"]["state_transitions"],
+        selected_source=quad_trace["selected_source"],
+    )
+
+    assert integrity["status"] == "failed"
+    assert integrity["checks"]["arbitration_steps_complete"] is True
+    assert integrity["checks"]["arbitration_steps_mirror_transitions"] is False
 
 
 def test_quad_brain_replay_can_be_recorded_through_chal_trace_sink_without_raw_text():
