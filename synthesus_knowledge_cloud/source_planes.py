@@ -172,6 +172,23 @@ def _validate_aggregate_source_manifest_yaml(
         errors.append(f"aggregate source manifest public_sources field must be a list: {rel}")
         return
 
+    def source_locators(source_manifest: dict) -> set[str]:
+        locators: set[str] = set()
+        for key in ("url", "repository", "docs", "repo", "dataset"):
+            value = source_manifest.get(key)
+            if isinstance(value, str) and value.strip():
+                locators.add(value.strip())
+        files = source_manifest.get("files", [])
+        if isinstance(files, list):
+            for file_item in files:
+                if not isinstance(file_item, dict):
+                    continue
+                for key in ("url", "repository", "docs"):
+                    value = file_item.get(key)
+                    if isinstance(value, str) and value.strip():
+                        locators.add(value.strip())
+        return locators
+
     aggregate_ids: dict[str, int] = {}
     for index, item in enumerate(public_sources):
         if not isinstance(item, dict):
@@ -214,6 +231,28 @@ def _validate_aggregate_source_manifest_yaml(
                 f"aggregate public source default_enabled mismatch for {source_id} in {rel}[{index}]: "
                 f"{aggregate_default} != {source_default}"
             )
+        aggregate_upstream = item.get("upstream")
+        if aggregate_upstream is not None:
+            if not isinstance(aggregate_upstream, dict):
+                errors.append(
+                    f"aggregate public source upstream field must be a mapping for {source_id} "
+                    f"in {rel}[{index}]"
+                )
+            else:
+                declared_locators = source_locators(source_manifest)
+                for upstream_key, upstream_value in sorted(aggregate_upstream.items()):
+                    if not isinstance(upstream_value, str) or not upstream_value.strip():
+                        errors.append(
+                            f"aggregate public source upstream locator must be non-empty for "
+                            f"{source_id} in {rel}[{index}].upstream.{upstream_key}"
+                        )
+                        continue
+                    if upstream_value.strip() not in declared_locators:
+                        errors.append(
+                            f"aggregate public source upstream locator mismatch for {source_id} "
+                            f"in {rel}[{index}].upstream.{upstream_key}: "
+                            f"{upstream_value} not declared in source manifest"
+                        )
 
 
 def _validate_source_identity_namespace(

@@ -1,7 +1,7 @@
 {
   "version": "1",
   "kind": "synthesus-knowledge-source-plane",
-  "generated_at": "2026-06-12T14:06:23.224819+00:00",
+  "generated_at": "2026-06-12T18:04:41.181488+00:00",
   "roots": [
     "sources",
     "synthesus_knowledge_cloud",
@@ -86,8 +86,8 @@
     },
     {
       "path": "synthesus_knowledge_cloud/source_planes.py",
-      "size": 11682,
-      "sha256": "4670c54e2fb57ba62927aa97313f9a5d08743db8221baa9ab8da4bba6fa45e9c"
+      "size": 13711,
+      "sha256": "4e1cc8f549277784ccd1901ba272affc8e2fe8d4f5f3b31817829660ab15a3ef"
     },
     {
       "path": "synthesus_knowledge_cloud/status.py",
@@ -191,8 +191,8 @@
     },
     {
       "path": "docs/DATA_MODEL.md",
-      "size": 3678,
-      "sha256": "7812e6ca18f979807d10be7e61916d5c2b23ddfedcc39ef6542627ca3e6d5fd1"
+      "size": 3687,
+      "sha256": "bb8e63368faee6f253d7c60b5b4ea54d4c66551abcd617259a3877de964db237"
     },
     {
       "path": "docs/INTEGRATION.md",
@@ -216,8 +216,8 @@
     },
     {
       "path": "docs/PROVENANCE.md",
-      "size": 5142,
-      "sha256": "841bb9049c653c6261626ac80e5e52c4b85bd2ab99f23ea83d7c9d946a7af927"
+      "size": 5179,
+      "sha256": "86458fe18886289a0bdb47c33457cc43a79f6b481eba8aa5938152e0d99d9830"
     },
     {
       "path": "docs/REBUILDING.md",
@@ -226,8 +226,8 @@
     },
     {
       "path": "docs/SOURCES.md",
-      "size": 3459,
-      "sha256": "8d2a7ae0a4ac6bd478725e7df67bc45c85adaf00fbc4c69f93ca749ed2dbc6bb"
+      "size": 3486,
+      "sha256": "c7e98a596feacf46e6deb56311f3c31e4f29ee15078b94050be54aec2a27cd95"
     },
     {
       "path": "patterns/characters/computress/bio.json",
