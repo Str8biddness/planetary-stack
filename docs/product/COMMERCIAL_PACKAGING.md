@@ -56,6 +56,7 @@ Run:
 
 ```bash
 python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker
+python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --require-clean-worktree --candidate-tag synthesus5-rc1 --fail-on-blocker
 ```
 
 Do not start paid launch unless:
@@ -63,6 +64,7 @@ Do not start paid launch unless:
 - CHAL API smoke passes.
 - Focused Synthesus 5 suite passes through the release gate.
 - Knowledge Cloud cold-start integrity passes.
+- RC tag format and local/remote availability pass through the release gate.
 - Release notes are current.
 - API contract docs match runtime telemetry.
 - Template leakage audit remains clean for normal-path responses.

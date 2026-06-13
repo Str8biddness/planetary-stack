@@ -11,6 +11,7 @@ import subprocess
 
 from synthesus5_release_gate import (
     _clean_worktree_check,
+    _candidate_tag_check,
     _knowledge_artifact_check,
     build_report,
     evaluate_launch_tiers,
@@ -189,3 +190,79 @@ def test_release_gate_can_require_clean_worktree(monkeypatch):
 
     assert report["require_clean_worktree"] is True
     assert any(check["id"] == "git:clean-worktree" and check["status"] == "pass" for check in report["checks"])
+
+
+def test_candidate_tag_gate_rejects_invalid_tag():
+    check = _candidate_tag_check("latest")
+
+    assert check.status == "fail"
+    assert check.id == "git:candidate-tag"
+    assert "synthesus5-rcN" in check.detail
+
+
+def test_candidate_tag_gate_blocks_existing_local_tag(monkeypatch):
+    def fake_run(command, *, timeout):
+        assert command[:3] == ["git", "tag", "--list"]
+        return subprocess.CompletedProcess(command, 0, stdout="synthesus5-rc1\n")
+
+    monkeypatch.setattr("synthesus5_release_gate._run", fake_run)
+
+    check = _candidate_tag_check("synthesus5-rc1")
+
+    assert check.status == "fail"
+    assert "Local tag already exists" in check.detail
+
+
+def test_candidate_tag_gate_blocks_existing_remote_tag(monkeypatch):
+    def fake_run(command, *, timeout):
+        if command[:3] == ["git", "tag", "--list"]:
+            return subprocess.CompletedProcess(command, 0, stdout="")
+        assert command[:3] == ["git", "ls-remote", "--tags"]
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="abc123\trefs/tags/synthesus5-rc1\n",
+        )
+
+    monkeypatch.setattr("synthesus5_release_gate._run", fake_run)
+
+    check = _candidate_tag_check("synthesus5-rc1")
+
+    assert check.status == "fail"
+    assert "Remote tag already exists" in check.detail
+
+
+def test_candidate_tag_gate_accepts_available_rc_tag(monkeypatch):
+    calls = []
+
+    def fake_run(command, *, timeout):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout="")
+
+    monkeypatch.setattr("synthesus5_release_gate._run", fake_run)
+
+    check = _candidate_tag_check("v5.0.0-rc.1")
+
+    assert check.status == "pass"
+    assert check.diagnostics["tag"] == "v5.0.0-rc.1"
+    assert calls[0] == ["git", "tag", "--list", "v5.0.0-rc.1"]
+    assert calls[1][:3] == ["git", "ls-remote", "--tags"]
+
+
+def test_release_gate_can_validate_candidate_tag(monkeypatch):
+    monkeypatch.setattr(
+        "synthesus5_release_gate._candidate_tag_check",
+        lambda tag: ReleaseCheck(
+            "git:candidate-tag",
+            "Release candidate tag",
+            "pass",
+            "critical",
+            "ok",
+            diagnostics={"tag": tag},
+        ),
+    )
+
+    report = build_report(run_runtime=False, candidate_tag="synthesus5-rc1")
+
+    assert report["candidate_tag"] == "synthesus5-rc1"
+    assert any(check["id"] == "git:candidate-tag" and check["status"] == "pass" for check in report["checks"])

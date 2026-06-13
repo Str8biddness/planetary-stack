@@ -26,6 +26,7 @@ The current generated Knowledge Cloud bundle has a known FAISS/embedder dimensio
 ```bash
 python tools/synthesus5_release_gate.py
 python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --fail-on-blocker
+python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --require-clean-worktree --candidate-tag synthesus5-rc1 --fail-on-blocker
 SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/synthesus5_focused_suite.py
 ```
 

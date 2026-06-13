@@ -4128,3 +4128,24 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - `sources/datasets.yaml` remains a public catalog view. It may repeat filter metadata for operator readability, but repeated retrieval-scope filters now have to mirror the concrete source manifest that owns source admission before the source can become provenance-clean mounted CHAL hardware.
+
+## Current Session — 2026-06-13 (Agent 1 — RC Candidate Tag Gate)
+
+### 📝 Summary
+- Added an opt-in `--candidate-tag` check to `tools/synthesus5_release_gate.py` so RC tooling validates Synthesus 5 RC tag format plus local and remote `origin` tag availability before tagging.
+- Added release-gate regression coverage for invalid tag names, existing local tags, existing remote tags, available RC tags, and report wiring.
+- Updated RC1 release notes, commercial packaging launch gates, and the Phase 10 checklist with the stricter taggable-RC command.
+- Advanced the "Tag a Synthesus 5 release candidate" checklist item without creating a tag; actual RC tagging remains blocked by runtime/cold-start release gates.
+
+### ✅ Verified
+- `python -m py_compile tools/synthesus5_release_gate.py tests/test_synthesus5_release_gate.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_synthesus5_release_gate.py` — passed, 14 tests.
+- `python tools/synthesus5_release_gate.py --candidate-tag synthesus5-rc1 --output /tmp/synthesus5_release_gate_candidate_tag_check.json` — passed the static gate and confirmed `synthesus5-rc1` is currently available locally/remotely; focused suite, CHAL smoke, and Knowledge Cloud cold-start checks remained skipped because this was not a runtime gate run.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so FAISS, metadata, embedder, profile dimension, and `build.source_manifest` align.
+- Before tagging, run `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --require-clean-worktree --candidate-tag synthesus5-rc1 --fail-on-blocker`.
+- Pre-existing unrelated root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- RC tagging is now treated as a release-gate concern rather than a manual post-check. The gate still separates tag availability from runtime readiness: an available tag does not override focused-suite, CHAL smoke, or Knowledge Cloud cold-start blockers.

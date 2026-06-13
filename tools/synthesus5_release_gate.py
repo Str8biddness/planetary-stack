@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
@@ -14,6 +15,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = ROOT / "tools" / "results" / "synthesus5_release_gate_latest.json"
+RC_TAG_PATTERN = re.compile(r"^(?:synthesus5-rc[1-9][0-9]*|v?\d+\.\d+\.\d+-rc\.?[1-9][0-9]*)$")
 
 
 @dataclass(frozen=True)
@@ -172,6 +174,110 @@ def _clean_worktree_check() -> ReleaseCheck:
     )
 
 
+def _candidate_tag_check(tag: str) -> ReleaseCheck:
+    normalized = tag.strip()
+    if not normalized:
+        return ReleaseCheck(
+            id="git:candidate-tag",
+            label="Release candidate tag",
+            status="fail",
+            severity="critical",
+            detail="Release candidate tag cannot be empty.",
+        )
+    if not RC_TAG_PATTERN.fullmatch(normalized):
+        return ReleaseCheck(
+            id="git:candidate-tag",
+            label="Release candidate tag",
+            status="fail",
+            severity="critical",
+            detail=(
+                "Release candidate tag must use `synthesus5-rcN` or semantic RC form "
+                "like `v5.0.0-rc1` / `v5.0.0-rc.1`."
+            ),
+        )
+
+    local_command = ["git", "tag", "--list", normalized]
+    local_command_text = " ".join(local_command)
+    try:
+        local = _run(local_command, timeout=30)
+    except subprocess.TimeoutExpired as exc:
+        return ReleaseCheck(
+            id="git:candidate-tag",
+            label="Release candidate tag",
+            status="fail",
+            severity="critical",
+            detail=f"Timed out while checking local tags.\n{_tail(exc.stdout or '')}",
+            command=local_command_text,
+        )
+    if local.returncode != 0:
+        return ReleaseCheck(
+            id="git:candidate-tag",
+            label="Release candidate tag",
+            status="fail",
+            severity="critical",
+            detail=_tail(local.stdout or "") or f"git tag exited {local.returncode}.",
+            command=local_command_text,
+        )
+    if (local.stdout or "").strip():
+        return ReleaseCheck(
+            id="git:candidate-tag",
+            label="Release candidate tag",
+            status="fail",
+            severity="critical",
+            detail=f"Local tag already exists: {normalized}.",
+            command=local_command_text,
+        )
+
+    remote_command = [
+        "git",
+        "ls-remote",
+        "--tags",
+        "origin",
+        f"refs/tags/{normalized}",
+        f"refs/tags/{normalized}^{{}}",
+    ]
+    remote_command_text = " ".join(remote_command)
+    try:
+        remote = _run(remote_command, timeout=45)
+    except subprocess.TimeoutExpired as exc:
+        return ReleaseCheck(
+            id="git:candidate-tag",
+            label="Release candidate tag",
+            status="fail",
+            severity="critical",
+            detail=f"Timed out while checking remote tags.\n{_tail(exc.stdout or '')}",
+            command=remote_command_text,
+        )
+    if remote.returncode != 0:
+        return ReleaseCheck(
+            id="git:candidate-tag",
+            label="Release candidate tag",
+            status="fail",
+            severity="critical",
+            detail=_tail(remote.stdout or "") or f"git ls-remote exited {remote.returncode}.",
+            command=remote_command_text,
+        )
+    if (remote.stdout or "").strip():
+        return ReleaseCheck(
+            id="git:candidate-tag",
+            label="Release candidate tag",
+            status="fail",
+            severity="critical",
+            detail=f"Remote tag already exists on origin: {normalized}.",
+            command=remote_command_text,
+        )
+
+    return ReleaseCheck(
+        id="git:candidate-tag",
+        label="Release candidate tag",
+        status="pass",
+        severity="critical",
+        detail=f"Candidate tag is valid and available locally/remotely: {normalized}.",
+        command=f"{local_command_text} && {remote_command_text}",
+        diagnostics={"tag": normalized},
+    )
+
+
 def _knowledge_artifact_check() -> ReleaseCheck:
     command = [sys.executable, "tools/validate_knowledge_cold_start.py"]
     command_text = " ".join(command)
@@ -224,6 +330,7 @@ def collect_release_checks(
     run_runtime: bool,
     run_focused_suite: bool,
     require_clean_worktree: bool = False,
+    candidate_tag: str | None = None,
 ) -> list[ReleaseCheck]:
     checks = [
         _path_check("README.md", "Repository positioning"),
@@ -244,6 +351,9 @@ def collect_release_checks(
 
     if require_clean_worktree:
         checks.append(_clean_worktree_check())
+
+    if candidate_tag is not None:
+        checks.append(_candidate_tag_check(candidate_tag))
 
     if run_focused_suite:
         checks.append(
@@ -350,11 +460,13 @@ def build_report(
     run_runtime: bool,
     run_focused_suite: bool = False,
     require_clean_worktree: bool = False,
+    candidate_tag: str | None = None,
 ) -> dict[str, Any]:
     checks = collect_release_checks(
         run_runtime=run_runtime,
         run_focused_suite=run_focused_suite,
         require_clean_worktree=require_clean_worktree,
+        candidate_tag=candidate_tag,
     )
     tiers = evaluate_launch_tiers(checks)
     critical_blockers = [
@@ -369,6 +481,7 @@ def build_report(
         "run_runtime": run_runtime,
         "run_focused_suite": run_focused_suite,
         "require_clean_worktree": require_clean_worktree,
+        "candidate_tag": candidate_tag,
         "checks": [asdict(check) for check in checks],
         "launch_tiers": [asdict(tier) for tier in tiers],
         "critical_blockers": critical_blockers,
@@ -391,6 +504,13 @@ def main() -> int:
         action="store_true",
         help="Require git status --porcelain to be clean before RC tagging.",
     )
+    parser.add_argument(
+        "--candidate-tag",
+        help=(
+            "Validate an available release-candidate tag before RC tagging "
+            "(for example `synthesus5-rc1` or `v5.0.0-rc1`)."
+        ),
+    )
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help="JSON report output path.")
     parser.add_argument("--fail-on-blocker", action="store_true", help="Exit non-zero when critical blockers remain.")
     args = parser.parse_args()
@@ -399,6 +519,7 @@ def main() -> int:
         run_runtime=args.run_runtime,
         run_focused_suite=args.run_focused_suite,
         require_clean_worktree=args.require_clean_worktree,
+        candidate_tag=args.candidate_tag,
     )
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
