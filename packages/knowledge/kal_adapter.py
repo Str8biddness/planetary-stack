@@ -347,6 +347,7 @@ class CHALMemoryController:
                     "actual_size",
                     "actual_sha256",
                     "integrity_ok",
+                    "source_manifest_provenance",
                 )
                 if key in mount.partition.metadata
             }

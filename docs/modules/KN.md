@@ -224,6 +224,14 @@ Synthesus 5 hypervisor copies this KAL telemetry into
 responses, so final response metadata can show which mounted hardware supplied
 context without changing the stable `QueryResponse` envelope.
 
+When `artifacts/manifest.json` carries a `build.source_manifest` fingerprint,
+mount-table boot now propagates that source-plane provenance into each
+artifact-backed mount's partition metadata. KAL lookup and hot-context cache-hit
+telemetry preserve the same `source_manifest_provenance` block beside per-file
+artifact integrity, so provenance traces can connect a mounted ROM, corpus, or
+parameter artifact back to the exact Knowledge Cloud source manifest that
+produced it.
+
 The cache is volatile and source-only: it does not write generated artifacts into `data/`, the standalone Knowledge Cloud repo, or the public artifact mirror. Runtime/debug surfaces can inspect it with `get_hot_context_stats()` and clear it with `clear_hot_context()`.
 
 ## Synthesus 5 Memory And Cache Tier Policy

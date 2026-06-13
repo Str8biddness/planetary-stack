@@ -334,6 +334,7 @@ class KnowledgeCloudMountTable:
         root = Path(root_dir)
         manifest_path = root / manifest_name
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        source_manifest_metadata = self._source_manifest_provenance_metadata(manifest)
 
         mounts: list[Mount] = []
         reports: list[MountIntegrityReport] = []
@@ -366,7 +367,10 @@ class KnowledgeCloudMountTable:
                         partition_id=self._partition_id(relative_path),
                         namespace=namespace,
                         is_read_only=read_only,
-                        metadata=report.as_metadata(),
+                        metadata=self._mount_metadata(
+                            report,
+                            source_manifest_metadata,
+                        ),
                     ),
                     locality=locality,
                     trust_level=1.0 if report.ok else 0.0,
@@ -454,6 +458,20 @@ class KnowledgeCloudMountTable:
                 errors=("manifest build.source_manifest fingerprint is missing",),
             )
 
+        return self._source_manifest_provenance_report(source_manifest)
+
+    @staticmethod
+    def _source_manifest_provenance_report(
+        source_manifest: dict[str, Any],
+    ) -> SourceManifestProvenanceReport:
+        errors: list[str] = []
+        path: str | None = None
+        sha256: str | None = None
+        size: int | None = None
+        kind: str | None = None
+        artifact_count: int | None = None
+        roots: tuple[str, ...] = ()
+
         path_value = source_manifest.get("path")
         sha_value = source_manifest.get("sha256")
         size_value = source_manifest.get("size")
@@ -493,6 +511,15 @@ class KnowledgeCloudMountTable:
             roots=roots,
             errors=tuple(errors),
         )
+
+    def _source_manifest_provenance_metadata(
+        self,
+        manifest: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        source_manifest = manifest.get("build", {}).get("source_manifest")
+        if not isinstance(source_manifest, dict):
+            return None
+        return self._source_manifest_provenance_report(source_manifest).as_metadata()
 
     def validate_retrieval_semantics(self, root_dir: str | Path) -> RetrievalSemanticReport:
         """Verify mounted FAISS, metadata, and embedder artifacts can work together."""
@@ -622,6 +649,16 @@ class KnowledgeCloudMountTable:
             expected_sha256=expected_sha,
             actual_sha256=actual_sha,
         )
+
+    @staticmethod
+    def _mount_metadata(
+        report: MountIntegrityReport,
+        source_manifest_metadata: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        metadata = report.as_metadata()
+        if source_manifest_metadata is not None:
+            metadata["source_manifest_provenance"] = source_manifest_metadata
+        return metadata
 
     @staticmethod
     def _partition_id(relative_path: str) -> str:

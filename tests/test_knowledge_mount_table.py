@@ -408,6 +408,30 @@ def test_mount_table_validates_source_manifest_provenance_fingerprint(tmp_path: 
     assert report.source_manifest_provenance.as_metadata()["source_manifest_provenance_ok"] is True
 
 
+def test_mount_table_propagates_source_manifest_provenance_to_mount_metadata(
+    tmp_path: Path,
+):
+    artifacts = [
+        _write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n'),
+        _write_artifact(tmp_path, "faiss_metadata.json", b'{"sources": []}\n'),
+    ]
+    _write_manifest(
+        tmp_path,
+        artifacts,
+        source_manifest=_source_manifest_fingerprint(),
+    )
+
+    report = KnowledgeCloudMountTable().boot(tmp_path, strict=True)
+    mounts = {mount.mount_path: mount for mount in report.mounts}
+    world_lore = mounts["/mnt/rom/world_lore"].partition.metadata
+    faiss_metadata = mounts["/mnt/provenance/faiss_metadata"].partition.metadata
+
+    assert world_lore["source_manifest_provenance"]["path"] == "manifests/source_manifest.json"
+    assert world_lore["source_manifest_provenance"]["sha256"] == "a" * 64
+    assert world_lore["source_manifest_provenance"]["source_manifest_provenance_ok"] is True
+    assert faiss_metadata["source_manifest_provenance"] == world_lore["source_manifest_provenance"]
+
+
 def test_mount_table_reports_retrieval_and_source_manifest_blockers_together(
     tmp_path: Path,
 ):
@@ -453,6 +477,7 @@ def test_kal_hot_context_serves_repeated_mounted_queries(tmp_path: Path):
     _write_manifest(
         tmp_path,
         [_write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n')],
+        source_manifest=_source_manifest_fingerprint(),
     )
 
     class FakeKnowledgeCloud:
@@ -490,11 +515,19 @@ def test_kal_hot_context_serves_repeated_mounted_queries(tmp_path: Path):
     assert first_telemetry.metadata["mounts"][0]["mount_path"] == "/mnt/rom/world_lore"
     assert first_telemetry.metadata["mounts"][0]["artifact"]["relative_path"] == "knowledge_cloud/world_lore.json"
     assert first_telemetry.metadata["mounts"][0]["artifact"]["integrity_ok"] is True
+    assert (
+        first_telemetry.metadata["mounts"][0]["artifact"]["source_manifest_provenance"]["path"]
+        == "manifests/source_manifest.json"
+    )
     assert second_telemetry.operation_id == "hot_context_hit"
     assert second_telemetry.trace_id.startswith("telemetry-")
     assert second_telemetry.budgets["latency_ms"] == 5.0
     assert second_telemetry.cache_hit is True
     assert second_telemetry.metadata["hot_context"] is True
+    assert (
+        second_telemetry.metadata["mounts"][0]["artifact"]["source_manifest_provenance"]["sha256"]
+        == "a" * 64
+    )
     assert stats["entries"] == 1
     assert stats["hits"] == 1
     assert stats["misses"] == 1

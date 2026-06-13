@@ -4231,3 +4231,22 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - Successful re-verification no longer erases the reason revision happened. The hypervisor now preserves verifier pressure as audited firmware signal history, while final language remains owned by CGPU/critic arbitration.
+
+## Current Session — 2026-06-13 (Agent 5 — Knowledge Hardware Source-Manifest Mount Provenance)
+
+### 📝 Summary
+- Propagated valid `build.source_manifest` fingerprints from Knowledge Cloud artifact manifests into every artifact-backed CHAL mount's partition metadata during mount-table boot.
+- Extended KAL active-mount telemetry so first-pass Knowledge Cloud lookups and L1 hot-context cache hits preserve `source_manifest_provenance` beside per-file integrity metadata.
+- Updated the KN module doc and advanced Phase 5 provenance trace and mounted-partition test ledger items without touching generated FAISS, KNDB, model, cache, mirror, or workflow artifacts.
+
+### ✅ Verified
+- `python -m py_compile packages/knowledge/mount_table.py packages/knowledge/kal_adapter.py tests/test_knowledge_mount_table.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_knowledge_mount_table.py` — passed, 19 tests.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so FAISS, metadata, embedder, profile dimension, and `build.source_manifest` align before golden-query health and release gates can pass.
+- Consider mirroring `source_manifest_provenance` in higher-level API/OpenAPI debug schemas if product surfaces begin exposing the full nested KAL artifact provenance block directly.
+- Pre-existing unrelated root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Mounted Knowledge Cloud hardware now carries two linked provenance layers at runtime: artifact integrity proves the mounted file bytes, and source-manifest provenance identifies the rebuild substrate that produced those bytes. Hot-context cache locality preserves both instead of collapsing repeated lookups to cache-only evidence.
