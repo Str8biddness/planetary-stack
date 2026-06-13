@@ -302,6 +302,7 @@ class CognitiveHypervisor:
             rag_context=effective_rag_context,
             decision=decision,
         )
+        initial_verifier_trace = dict(verifier_trace)
         reasoning_revision = self._apply_bounded_reasoning_revision(
             query=query,
             response=response,
@@ -322,6 +323,14 @@ class CognitiveHypervisor:
                 rag_context=effective_rag_context,
                 decision=decision,
             )
+        revision_audit = self._build_reasoning_revision_audit(
+            trace_id=decision.trace_id,
+            decision=decision,
+            initial_verifier_trace=initial_verifier_trace,
+            final_verifier_trace=verifier_trace,
+            reasoning_revision=reasoning_revision,
+        )
+        reasoning_revision["audit"] = revision_audit
         telemetry = {
             "schema": "synthesus.chal.hypervisor_trace.v1",
             "trace_id": decision.trace_id,
@@ -340,6 +349,7 @@ class CognitiveHypervisor:
             "template_guard": template_guard_result.to_dict(),
             "reasoning_quality": verifier_trace,
             "reasoning_revision": reasoning_revision,
+            "reasoning_revision_audit": revision_audit,
             "grounding_reranker": reranker_trace,
             "quad_brain": quad_brain_arbitration.to_dict() if quad_brain_arbitration else None,
             "quad_brain_replay": quad_brain_replay,
@@ -360,6 +370,55 @@ class CognitiveHypervisor:
             bridge_result=bridge_result,
             telemetry=telemetry,
         )
+
+    def _build_reasoning_revision_audit(
+        self,
+        *,
+        trace_id: str,
+        decision: HypervisorDecision,
+        initial_verifier_trace: Mapping[str, Any],
+        final_verifier_trace: Mapping[str, Any],
+        reasoning_revision: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        initial_hint = initial_verifier_trace.get("revision_route_hint")
+        final_hint = final_verifier_trace.get("revision_route_hint")
+        return {
+            "schema": "synthesus.chal.reasoning_revision_audit.v1",
+            "trace_id": trace_id,
+            "device": "chal://hypervisor/revision_audit",
+            "route": decision.route.value,
+            "status": reasoning_revision.get("status"),
+            "revision_attempted": reasoning_revision.get("status") in {"revised", "blocked", "fault"},
+            "revision_applied": reasoning_revision.get("status") == "revised",
+            "initial_verifier_status": initial_verifier_trace.get("status"),
+            "final_verifier_status": final_verifier_trace.get("status"),
+            "initial_issue_ids": [
+                str(issue.get("issue_id", ""))
+                for issue in initial_verifier_trace.get("issues", [])
+                if issue.get("issue_id")
+            ],
+            "final_issue_ids": [
+                str(issue.get("issue_id", ""))
+                for issue in final_verifier_trace.get("issues", [])
+                if issue.get("issue_id")
+            ],
+            "initial_revision_required": bool(initial_hint.get("required"))
+            if isinstance(initial_hint, Mapping)
+            else False,
+            "final_revision_required": bool(final_hint.get("required"))
+            if isinstance(final_hint, Mapping)
+            else False,
+            "initial_budget": dict(initial_verifier_trace.get("budget", {}) or {}),
+            "final_budget": dict(final_verifier_trace.get("budget", {}) or {}),
+            "route_hint": dict(initial_hint) if isinstance(initial_hint, Mapping) else None,
+            "firmware_boundary": "verifier_signal_audited",
+            "verifier_may_emit_final_language": False,
+            "reranker_may_emit_final_language": False,
+            "final_language_owner": reasoning_revision.get(
+                "final_language_owner",
+                "generation_spine_or_cgpu_critic",
+            ),
+        }
 
     def _record_quad_brain_replay(
         self,

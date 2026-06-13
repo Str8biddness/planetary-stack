@@ -4212,3 +4212,22 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - Phase 8 now distinguishes trace presence from route semantics. A row can no longer pass by merely naming `grounded_path`, `quad_brain_path`, or `safety_path`; the route must carry the expected CHAL budget, critic, reranker, safety, and arbitration ownership boundaries.
+
+## Current Session — 2026-06-13 (Agent 4 — Reasoning Revision Audit Chain)
+
+### 📝 Summary
+- Added `synthesus.chal.reasoning_revision_audit.v1` telemetry to `CognitiveHypervisor` so active-budget CGPU/critic revisions preserve the original verifier pressure record after the final verifier pass succeeds.
+- Mirrored the audit inside `reasoning_revision.audit` and `telemetry.reasoning_revision_audit`, recording initial/final verifier statuses, issue IDs, budgets, route hint, revision attempted/applied flags, and final-language ownership.
+- Updated the PPBRS module boundary note and Phase 2 checklist item. This advances route-decision/budget traceability while keeping verifier/reranker/PPBRS signal-only boundaries intact.
+
+### ✅ Verified
+- `python -m py_compile packages/core/chal/hypervisor.py tests/test_chal_hypervisor.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_hypervisor.py` — passed, 23 tests.
+
+### 🚧 Left Off / Next Steps
+- Extend Phase 8 comparison gates with fixture rows that intentionally trigger `reasoning_revision.status="revised"` and assert the new revision audit chain, instead of only checking no-revision benchmark rows.
+- Rebuild or replace generated Knowledge Cloud artifacts so FAISS, metadata, embedder, profile dimension, and `build.source_manifest` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Successful re-verification no longer erases the reason revision happened. The hypervisor now preserves verifier pressure as audited firmware signal history, while final language remains owned by CGPU/critic arbitration.

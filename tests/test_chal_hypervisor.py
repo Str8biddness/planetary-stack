@@ -669,6 +669,7 @@ def test_hypervisor_consumes_revision_hint_with_bounded_cgpu_revision():
     )
 
     revision = result.telemetry["reasoning_revision"]
+    revision_audit = result.telemetry["reasoning_revision_audit"]
     quality = result.telemetry["reasoning_quality"]
 
     assert revision["schema"] == "synthesus.chal.reasoning_revision.v1"
@@ -694,6 +695,39 @@ def test_hypervisor_consumes_revision_hint_with_bounded_cgpu_revision():
     assert revision["verifier_may_emit_final_language"] is False
     assert revision["reranker_may_emit_final_language"] is False
     assert revision["final_language_owner"] == "cgpu_critic_arbitration"
+    assert revision["audit"] == revision_audit
+    assert revision_audit == {
+        "schema": "synthesus.chal.reasoning_revision_audit.v1",
+        "trace_id": result.decision.trace_id,
+        "device": "chal://hypervisor/revision_audit",
+        "route": "grounded_path",
+        "status": "revised",
+        "revision_attempted": True,
+        "revision_applied": True,
+        "initial_verifier_status": "needs_revision",
+        "final_verifier_status": "passed",
+        "initial_issue_ids": ["grounding_low"],
+        "final_issue_ids": [],
+        "initial_revision_required": True,
+        "final_revision_required": False,
+        "initial_budget": {
+            "critic_passes": 1,
+            "revision_passes_required": 1,
+            "revision_passes_available": 1,
+            "revision_budget_exhausted": False,
+        },
+        "final_budget": {
+            "critic_passes": 1,
+            "revision_passes_required": 0,
+            "revision_passes_available": 1,
+            "revision_budget_exhausted": False,
+        },
+        "route_hint": revision["route_hint"],
+        "firmware_boundary": "verifier_signal_audited",
+        "verifier_may_emit_final_language": False,
+        "reranker_may_emit_final_language": False,
+        "final_language_owner": "cgpu_critic_arbitration",
+    }
     assert revision["selected_candidate_id"]
     assert revision["cgpu_output"]["device"] == "chal://cgpu/render"
     assert "mounted fact: manifest hash is valid" in revision["selected_text"]

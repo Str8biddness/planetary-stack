@@ -247,6 +247,12 @@ Both traces also state their language boundary. The reranker is a context-select
 
 The revision pass renders from selected grounding context through CGPU candidate generation and critic arbitration, then re-runs verifier telemetry against the revised surface. Exhausted-budget routes remain scheduler hints only. The verifier and reranker still carry explicit `*_may_emit_final_language=false` flags; revised final language is owned by `cgpu_critic_arbitration`, not by verifier, reranker, or PPBRS firmware.
 
+### Reasoning Revision Audit Chain (2026-06-13)
+
+`CognitiveHypervisor` now preserves the verifier pressure chain after an active revision succeeds. `reasoning_revision.audit` and the mirrored `telemetry.reasoning_revision_audit` record schema `synthesus.chal.reasoning_revision_audit.v1`, the initial verifier status/issues/budget, the final verifier status/issues/budget after re-verification, whether a revision was attempted/applied, and the original scheduler-only route hint.
+
+This closes the observability gap where a successful CGPU/critic revision replaced the failed verifier trace with a passing one. The verifier remains `verifier_signal_only`, the reranker remains a context-selection device, and final language ownership remains with `cgpu_critic_arbitration` when a bounded revision is applied.
+
 ### NPC Response-Compositor Boundary (2026-06-01)
 
 `packages/core/cognitive/response_compositor.py` is no longer classified as an unlabeled legacy template emitter. It exposes `ResponseCompositor.compose_labeled()`, which returns text plus Synthesus 5 surface metadata:
