@@ -4250,3 +4250,22 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - Mounted Knowledge Cloud hardware now carries two linked provenance layers at runtime: artifact integrity proves the mounted file bytes, and source-manifest provenance identifies the rebuild substrate that produced those bytes. Hot-context cache locality preserves both instead of collapsing repeated lookups to cache-only evidence.
+
+## Current Session — 2026-06-13 (Agent 5 — Invalid Source-Manifest Mount Provenance Guard)
+
+### 📝 Summary
+- Hardened Knowledge Cloud mount-table boot so malformed `build.source_manifest` fingerprints are not attached as trusted `source_manifest_provenance` on artifact-backed CHAL partitions.
+- Preserved malformed source-manifest validation errors in partition metadata for diagnostics, while keeping cold-start provenance validation as the release-admission failure path.
+- Updated the KN module doc and advanced the Phase 5 provenance trace and mounted-partition test ledger items without touching generated FAISS, KNDB, model, cache, mirror, or workflow artifacts.
+
+### ✅ Verified
+- `python -m py_compile packages/knowledge/mount_table.py tests/test_knowledge_mount_table.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_knowledge_mount_table.py` — passed, 20 tests.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so FAISS, metadata, embedder, profile dimension, and `build.source_manifest` align before golden-query health and release gates can pass.
+- Consider mirroring source-manifest provenance trust/error state in higher-level API/OpenAPI debug schemas if product surfaces begin exposing the full nested KAL artifact provenance block directly.
+- Pre-existing unrelated root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Mount-table provenance now distinguishes trusted source identity from malformed provenance diagnostics. Artifact integrity can still activate a partition, but invalid source-plane fingerprints cannot become trusted provenance evidence in KAL lookup or hot-context traces.

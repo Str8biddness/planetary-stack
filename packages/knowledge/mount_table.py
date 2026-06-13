@@ -657,7 +657,13 @@ class KnowledgeCloudMountTable:
     ) -> dict[str, Any]:
         metadata = report.as_metadata()
         if source_manifest_metadata is not None:
-            metadata["source_manifest_provenance"] = source_manifest_metadata
+            if source_manifest_metadata.get("source_manifest_provenance_ok") is True:
+                metadata["source_manifest_provenance"] = source_manifest_metadata
+            else:
+                metadata["source_manifest_provenance_ok"] = False
+                metadata["source_manifest_provenance_errors"] = list(
+                    source_manifest_metadata.get("errors", [])
+                )
         return metadata
 
     @staticmethod

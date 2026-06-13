@@ -432,6 +432,31 @@ def test_mount_table_propagates_source_manifest_provenance_to_mount_metadata(
     assert faiss_metadata["source_manifest_provenance"] == world_lore["source_manifest_provenance"]
 
 
+def test_mount_table_does_not_trust_invalid_source_manifest_metadata(
+    tmp_path: Path,
+):
+    artifacts = [
+        _write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n'),
+    ]
+    source_manifest = _source_manifest_fingerprint()
+    source_manifest["sha256"] = "not-a-sha"
+    _write_manifest(
+        tmp_path,
+        artifacts,
+        source_manifest=source_manifest,
+    )
+
+    report = KnowledgeCloudMountTable().boot(tmp_path, strict=True)
+    mounts = {mount.mount_path: mount for mount in report.mounts}
+    metadata = mounts["/mnt/rom/world_lore"].partition.metadata
+
+    assert "source_manifest_provenance" not in metadata
+    assert metadata["source_manifest_provenance_ok"] is False
+    assert metadata["source_manifest_provenance_errors"] == [
+        "manifest build.source_manifest.sha256 must be a 64-character hex digest"
+    ]
+
+
 def test_mount_table_reports_retrieval_and_source_manifest_blockers_together(
     tmp_path: Path,
 ):

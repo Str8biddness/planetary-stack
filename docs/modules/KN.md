@@ -232,6 +232,11 @@ artifact integrity, so provenance traces can connect a mounted ROM, corpus, or
 parameter artifact back to the exact Knowledge Cloud source manifest that
 produced it.
 
+Malformed `build.source_manifest` fingerprints are never attached as trusted
+`source_manifest_provenance` on mounted partitions. Mount-table boot keeps their
+validation errors in partition metadata for diagnostics, while cold-start release
+validation still fails the bundle when source-manifest provenance is required.
+
 The cache is volatile and source-only: it does not write generated artifacts into `data/`, the standalone Knowledge Cloud repo, or the public artifact mirror. Runtime/debug surfaces can inspect it with `get_hot_context_stats()` and clear it with `clear_hot_context()`.
 
 ## Synthesus 5 Memory And Cache Tier Policy
