@@ -26,6 +26,7 @@ from tools.chal_conversation_compare import (
     assert_regression_thresholds,
     assert_replay_integrity_scorecard,
     assert_replay_storage_scorecard,
+    assert_trace_schema_scorecard,
     build_axis_improvement_scorecard,
     build_continuity_rows,
     build_continuity_scorecard,
@@ -34,6 +35,7 @@ from tools.chal_conversation_compare import (
     build_replay_records,
     build_replay_storage_records,
     build_replay_storage_scorecard,
+    build_trace_schema_scorecard,
     build_chal_rows,
     flatten_continuity_rows,
     summarize,
@@ -377,6 +379,47 @@ def test_phase8_comparison_harness_builds_prompt_scrubbed_replay_storage_records
     assert scorecard["summary"]["batch_checks"]["source_hash_coverage"] is True
     assert scorecard["summary"]["batch_checks"]["continuity_turns"] is True
     assert_replay_storage_scorecard(scorecard)
+
+
+def test_phase8_comparison_harness_builds_trace_schema_scorecard():
+    rows = asyncio.run(build_chal_rows())
+    continuity_rows = asyncio.run(build_continuity_rows())
+    continuity_flat_rows = flatten_continuity_rows(continuity_rows)
+    scorecard = build_trace_schema_scorecard(rows + continuity_flat_rows)
+
+    assert scorecard["schema"] == "synthesus.phase8.trace_schema_scorecard.v1"
+    assert scorecard["summary"]["case_count"] == len(rows) + len(continuity_flat_rows)
+    assert scorecard["summary"]["failed_cases"] == 0
+    assert scorecard["summary"]["route_checks"] == {
+        "grounded_path": True,
+        "quad_brain_path": True,
+        "safety_path": True,
+    }
+    assert_trace_schema_scorecard(scorecard)
+
+    business_case = next(case for case in scorecard["cases"] if case["case_id"] == "business_bot_task")
+    assert business_case["route"] == "quad_brain_path"
+    assert business_case["runtime_preset"] == "business_bot"
+    assert set(business_case["quad_brain_roles"]) == {
+        "knowledge_grounding",
+        "executive_reasoning",
+        "cgpu_rendering",
+        "critic_metacognition",
+    }
+
+
+def test_phase8_trace_schema_scorecard_reports_missing_trace_fields():
+    rows = asyncio.run(build_chal_rows())
+    rows[0]["synthesus5"]["telemetry"]["trace_id"] = ""
+    rows[0]["synthesus5"]["decision"]["trace_id"] = ""
+    scorecard = build_trace_schema_scorecard(rows)
+
+    try:
+        assert_trace_schema_scorecard(scorecard)
+    except AssertionError as exc:
+        assert f"{rows[0]['case_id']} failed trace_id" in str(exc)
+    else:
+        raise AssertionError("trace schema gate must fail when trace identity is missing")
 
 
 def test_phase8_replay_storage_scorecard_reports_tampering():

@@ -899,6 +899,89 @@ def assert_replay_storage_scorecard(scorecard: dict[str, Any]) -> None:
         raise AssertionError("\n".join(failures))
 
 
+def _row_trace_schema_checks(row: dict[str, Any]) -> dict[str, bool]:
+    synth = row.get("synthesus5", {})
+    telemetry = synth.get("telemetry", {})
+    decision = synth.get("decision", {})
+    trace_id = telemetry.get("trace_id") or decision.get("trace_id")
+    route = decision.get("route")
+    runtime_preset = row.get("runtime_preset")
+    roles = set(_quad_brain_roles(row))
+    requires_quad_brain = route == "quad_brain_path" or runtime_preset == "business_bot"
+    return {
+        "trace_id": bool(trace_id),
+        "decision_route": bool(route),
+        "decision_reasons": isinstance(decision.get("reasons"), list),
+        "decision_constraints": isinstance(decision.get("constraints"), list),
+        "telemetry_runtime_preset": telemetry.get("runtime_preset") == runtime_preset,
+        "runtime_latency": isinstance(synth.get("runtime_ms"), (int, float))
+        and synth.get("runtime_ms", 0) >= 0,
+        "bridge_result": isinstance(synth.get("bridge_result"), dict)
+        and bool(synth.get("bridge_result", {}).get("hemisphere_used")),
+        "quad_brain_roles": (
+            set(QUAD_BRAIN_ROLES).issubset(roles)
+            if requires_quad_brain
+            else True
+        ),
+    }
+
+
+def build_trace_schema_scorecard(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    cases = []
+    route_counts: dict[str, int] = {}
+    for row in rows:
+        synth = row.get("synthesus5", {})
+        telemetry = synth.get("telemetry", {})
+        decision = synth.get("decision", {})
+        route = decision.get("route")
+        if route:
+            route_counts[route] = route_counts.get(route, 0) + 1
+        checks = _row_trace_schema_checks(row)
+        cases.append(
+            {
+                "case_id": row.get("case_id"),
+                "category": row.get("category"),
+                "turn": row.get("turn"),
+                "trace_id": telemetry.get("trace_id") or decision.get("trace_id"),
+                "route": route,
+                "runtime_preset": telemetry.get("runtime_preset"),
+                "quad_brain_roles": _quad_brain_roles(row),
+                "checks": checks,
+                "passed": all(checks.values()),
+            }
+        )
+    route_checks = {
+        "grounded_path": route_counts.get("grounded_path", 0) > 0,
+        "quad_brain_path": route_counts.get("quad_brain_path", 0) > 0,
+        "safety_path": route_counts.get("safety_path", 0) > 0,
+    }
+    return {
+        "schema": "synthesus.phase8.trace_schema_scorecard.v1",
+        "summary": {
+            "case_count": len(cases),
+            "passed_cases": sum(1 for case in cases if case["passed"]),
+            "failed_cases": sum(1 for case in cases if not case["passed"]),
+            "route_counts": dict(sorted(route_counts.items())),
+            "route_checks": route_checks,
+            "passed": all(route_checks.values()) and all(case["passed"] for case in cases),
+        },
+        "cases": cases,
+    }
+
+
+def assert_trace_schema_scorecard(scorecard: dict[str, Any]) -> None:
+    failures = []
+    for route, passed in scorecard.get("summary", {}).get("route_checks", {}).items():
+        if not passed:
+            failures.append(f"route coverage missing {route}")
+    for case in scorecard["cases"]:
+        for check, passed in case["checks"].items():
+            if not passed:
+                failures.append(f"{case['case_id']} failed {check}")
+    if failures:
+        raise AssertionError("\n".join(failures))
+
+
 async def build_continuity_rows(
     sequences: Iterable[ContinuitySequence] = CONTINUITY_SEQUENCES,
 ) -> list[dict[str, Any]]:
@@ -1335,6 +1418,7 @@ async def main() -> int:
     parser.add_argument("--replay-scorecard-json", type=Path, help="Write compact replay integrity scorecard JSON.")
     parser.add_argument("--trace-store-jsonl", type=Path, help="Write prompt-scrubbed replay storage records to this JSONL path.")
     parser.add_argument("--trace-store-scorecard-json", type=Path, help="Write replay storage completeness scorecard JSON.")
+    parser.add_argument("--trace-schema-scorecard-json", type=Path, help="Write CHAL trace schema completeness scorecard JSON.")
     parser.add_argument("--scorecard-json", type=Path, help="Write GPT-4-class reference expectation scorecard JSON.")
     parser.add_argument("--axis-scorecard-json", type=Path, help="Write per-case axis improvement scorecard JSON.")
     parser.add_argument("--continuity-json", type=Path, help="Write multi-turn continuity comparison JSON.")
@@ -1347,6 +1431,7 @@ async def main() -> int:
     parser.add_argument("--fail-on-continuity", action="store_true", help="Fail if any multi-turn continuity sequence fails.")
     parser.add_argument("--fail-on-replay-integrity", action="store_true", help="Fail if compact replay records are malformed or tampered.")
     parser.add_argument("--fail-on-trace-storage", action="store_true", help="Fail if prompt-scrubbed replay storage records are incomplete or malformed.")
+    parser.add_argument("--fail-on-trace-schema", action="store_true", help="Fail if comparison rows lose required CHAL trace fields.")
     parser.add_argument("--max-mean-latency-ms", type=float, help="Fail if Synthesus 5 mean runtime exceeds this value.")
     parser.add_argument("--max-p95-latency-ms", type=float, help="Fail if Synthesus 5 p95 runtime exceeds this value.")
     parser.add_argument("--min-score-delta", type=float, help="Fail if Synthesus 5 score delta falls below this value.")
@@ -1375,6 +1460,9 @@ async def main() -> int:
     replay_storage_scorecard = build_replay_storage_scorecard(replay_records, replay_storage_records)
     if args.fail_on_trace_storage:
         assert_replay_storage_scorecard(replay_storage_scorecard)
+    trace_schema_scorecard = build_trace_schema_scorecard(rows + continuity_flat_rows)
+    if args.fail_on_trace_schema:
+        assert_trace_schema_scorecard(trace_schema_scorecard)
     summary = summarize(rows)
     assert_regression_thresholds(
         summary,
@@ -1436,6 +1524,13 @@ async def main() -> int:
             encoding="utf-8",
         )
         print(args.trace_store_scorecard_json)
+    if args.trace_schema_scorecard_json:
+        args.trace_schema_scorecard_json.parent.mkdir(parents=True, exist_ok=True)
+        args.trace_schema_scorecard_json.write_text(
+            json.dumps(trace_schema_scorecard, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        print(args.trace_schema_scorecard_json)
     if args.scorecard_json:
         args.scorecard_json.parent.mkdir(parents=True, exist_ok=True)
         args.scorecard_json.write_text(
