@@ -174,6 +174,8 @@ Legend:
 
 - [x]  Add a CHAL trace-schema completeness gate so legacy-vs-Synthesus-5 comparison batches fail when route identity, trace IDs, runtime presets, bridge results, latency, decision fields, Quad Brain roles, or grounded/QuadBrain/safety route coverage silently drift out of benchmark rows. Session log: 2026-06-13 Agent 3 Phase 8 trace schema completeness gate.
 
+- [x]  Add a route-semantics scorecard gate so legacy-vs-Synthesus-5 comparison batches fail when route names are present but budget shape, critic/verifier firmware ownership, CGPU revision ownership, reranker final-language boundaries, safety guard surface, device isolation, or Quad Brain arbitration semantics drift. Session log: 2026-06-13 Agent 3 Phase 8 route semantics scorecard gate.
+
 ## Phase 9: Product Runtime Polish
 
 - [~] Wire Synthesus 5 path into API entrypoints. Session log: 2026-05-28 Agent 1 API CHAL mode added explicit `/api/v1/query` `mode="chal"` routing through `CognitiveHypervisor`; default `auto` cutover remains.

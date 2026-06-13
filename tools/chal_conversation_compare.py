@@ -982,6 +982,147 @@ def assert_trace_schema_scorecard(scorecard: dict[str, Any]) -> None:
         raise AssertionError("\n".join(failures))
 
 
+def _row_route_semantics_checks(row: dict[str, Any]) -> dict[str, bool]:
+    synth = row.get("synthesus5", {})
+    telemetry = synth.get("telemetry", {})
+    decision = synth.get("decision", {})
+    route = decision.get("route")
+    decision_budget = decision.get("budget", {})
+    telemetry_budget = telemetry.get("budget", {})
+    quality = telemetry.get("reasoning_quality", {})
+    revision = telemetry.get("reasoning_revision", {})
+    reranker = telemetry.get("grounding_reranker")
+    template_guard = telemetry.get("template_guard", {})
+    isolation = telemetry.get("device_isolation", {})
+    quad_brain = telemetry.get("quad_brain")
+    requires_grounding = route in {"grounded_path", "safety_path"}
+    requires_quad_brain = route == "quad_brain_path"
+    requires_safety = route == "safety_path"
+    reranker_budget = reranker.get("budget", {}) if isinstance(reranker, dict) else {}
+
+    checks = {
+        "budget_mirror": decision_budget == telemetry_budget and bool(telemetry_budget),
+        "device_isolation_ok": isolation.get("status") == "ok" and isolation.get("ok") is True,
+        "route_not_budget_exhausted": telemetry.get("budget_exhausted") is False,
+        "template_guard_clean": template_guard.get("allowed") is True
+        and template_guard.get("rewritten") is False
+        and template_guard.get("matched_signatures") == [],
+        "critic_trace_schema": quality.get("schema") == "synthesus.chal.reasoning_quality.v1"
+        and quality.get("device") == "chal://critic/verifier",
+        "critic_budget_mirror": quality.get("critic_passes_budgeted") == decision_budget.get("critic_passes")
+        and quality.get("budget", {}).get("critic_passes") == decision_budget.get("critic_passes"),
+        "critic_firmware_boundary": quality.get("firmware_boundary") == "verifier_signal_only"
+        and quality.get("final_language_owner") == "generation_spine_or_cgpu_critic",
+        "revision_trace_schema": revision.get("schema") == "synthesus.chal.reasoning_revision.v1"
+        and revision.get("device") == "chal://cgpu/revision_render",
+        "revision_final_language_boundary": revision.get("verifier_may_emit_final_language") is False
+        and revision.get("reranker_may_emit_final_language") is False
+        and revision.get("final_language_owner")
+        in {"generation_spine_or_cgpu_critic", "cgpu_critic_arbitration"},
+        "grounding_reranker_boundary": (
+            isinstance(reranker, dict)
+            and reranker.get("schema") == "synthesus.chal.grounding_reranker.v1"
+            and reranker.get("device") == "chal://reasoning/reranker"
+            and reranker.get("final_language_owner") == "hemisphere_bridge_or_cgpu"
+            and reranker_budget.get("retrieval_depth") == decision_budget.get("retrieval_depth")
+        )
+        if requires_grounding
+        else reranker is None,
+        "quad_brain_arbitration": (
+            isinstance(quad_brain, dict)
+            and set(QUAD_BRAIN_ROLES).issubset(set(_quad_brain_roles(row)))
+            and quad_brain.get("state_contract", {}).get("final_output_owner") == "critic_metacognition"
+        )
+        if requires_quad_brain
+        else quad_brain is None,
+        "safety_guard_surface": (
+            template_guard.get("surface") == "safety"
+            and decision_budget.get("critic_passes", 0) >= 2
+            and "critic_must_validate_before_emit" in decision.get("constraints", [])
+        )
+        if requires_safety
+        else template_guard.get("surface") == "normal",
+    }
+
+    if route == "grounded_path":
+        checks["route_budget_shape"] = (
+            decision_budget.get("retrieval_depth", 0) >= 4
+            and decision_budget.get("candidate_count", 0) >= 2
+            and decision_budget.get("critic_passes", 0) >= 1
+            and "ground_response_in_mounted_knowledge" in decision.get("constraints", [])
+        )
+    elif route == "quad_brain_path":
+        checks["route_budget_shape"] = (
+            decision_budget.get("candidate_count", 0) >= 2
+            and decision_budget.get("critic_passes", 0) >= 1
+            and "serialize_arbitration_after_parallel_dispatch" in decision.get("constraints", [])
+        )
+    elif route == "safety_path":
+        checks["route_budget_shape"] = (
+            decision_budget.get("candidate_count") == 1
+            and decision_budget.get("critic_passes", 0) >= 2
+            and "safety_or_platform_constraint" in decision.get("reasons", [])
+        )
+    else:
+        checks["route_budget_shape"] = bool(route)
+
+    return checks
+
+
+def build_route_semantics_scorecard(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    cases = []
+    route_counts: dict[str, int] = {}
+    for row in rows:
+        synth = row.get("synthesus5", {})
+        decision = synth.get("decision", {})
+        route = decision.get("route")
+        if route:
+            route_counts[route] = route_counts.get(route, 0) + 1
+        checks = _row_route_semantics_checks(row)
+        cases.append(
+            {
+                "case_id": row.get("case_id"),
+                "category": row.get("category"),
+                "turn": row.get("turn"),
+                "route": route,
+                "runtime_preset": row.get("runtime_preset"),
+                "budget": decision.get("budget", {}),
+                "checks": checks,
+                "passed": all(checks.values()),
+            }
+        )
+    route_checks = {
+        "grounded_path": route_counts.get("grounded_path", 0) > 0,
+        "quad_brain_path": route_counts.get("quad_brain_path", 0) > 0,
+        "safety_path": route_counts.get("safety_path", 0) > 0,
+    }
+    return {
+        "schema": "synthesus.phase8.route_semantics_scorecard.v1",
+        "summary": {
+            "case_count": len(cases),
+            "passed_cases": sum(1 for case in cases if case["passed"]),
+            "failed_cases": sum(1 for case in cases if not case["passed"]),
+            "route_counts": dict(sorted(route_counts.items())),
+            "route_checks": route_checks,
+            "passed": all(route_checks.values()) and all(case["passed"] for case in cases),
+        },
+        "cases": cases,
+    }
+
+
+def assert_route_semantics_scorecard(scorecard: dict[str, Any]) -> None:
+    failures = []
+    for route, passed in scorecard.get("summary", {}).get("route_checks", {}).items():
+        if not passed:
+            failures.append(f"route semantics coverage missing {route}")
+    for case in scorecard["cases"]:
+        for check, passed in case["checks"].items():
+            if not passed:
+                failures.append(f"{case['case_id']} failed {check}")
+    if failures:
+        raise AssertionError("\n".join(failures))
+
+
 async def build_continuity_rows(
     sequences: Iterable[ContinuitySequence] = CONTINUITY_SEQUENCES,
 ) -> list[dict[str, Any]]:
@@ -1419,6 +1560,7 @@ async def main() -> int:
     parser.add_argument("--trace-store-jsonl", type=Path, help="Write prompt-scrubbed replay storage records to this JSONL path.")
     parser.add_argument("--trace-store-scorecard-json", type=Path, help="Write replay storage completeness scorecard JSON.")
     parser.add_argument("--trace-schema-scorecard-json", type=Path, help="Write CHAL trace schema completeness scorecard JSON.")
+    parser.add_argument("--route-semantics-scorecard-json", type=Path, help="Write route budget/critic/reranker semantics scorecard JSON.")
     parser.add_argument("--scorecard-json", type=Path, help="Write GPT-4-class reference expectation scorecard JSON.")
     parser.add_argument("--axis-scorecard-json", type=Path, help="Write per-case axis improvement scorecard JSON.")
     parser.add_argument("--continuity-json", type=Path, help="Write multi-turn continuity comparison JSON.")
@@ -1432,6 +1574,7 @@ async def main() -> int:
     parser.add_argument("--fail-on-replay-integrity", action="store_true", help="Fail if compact replay records are malformed or tampered.")
     parser.add_argument("--fail-on-trace-storage", action="store_true", help="Fail if prompt-scrubbed replay storage records are incomplete or malformed.")
     parser.add_argument("--fail-on-trace-schema", action="store_true", help="Fail if comparison rows lose required CHAL trace fields.")
+    parser.add_argument("--fail-on-route-semantics", action="store_true", help="Fail if route budget, critic, reranker, safety, or Quad Brain semantics drift.")
     parser.add_argument("--max-mean-latency-ms", type=float, help="Fail if Synthesus 5 mean runtime exceeds this value.")
     parser.add_argument("--max-p95-latency-ms", type=float, help="Fail if Synthesus 5 p95 runtime exceeds this value.")
     parser.add_argument("--min-score-delta", type=float, help="Fail if Synthesus 5 score delta falls below this value.")
@@ -1463,6 +1606,9 @@ async def main() -> int:
     trace_schema_scorecard = build_trace_schema_scorecard(rows + continuity_flat_rows)
     if args.fail_on_trace_schema:
         assert_trace_schema_scorecard(trace_schema_scorecard)
+    route_semantics_scorecard = build_route_semantics_scorecard(rows + continuity_flat_rows)
+    if args.fail_on_route_semantics:
+        assert_route_semantics_scorecard(route_semantics_scorecard)
     summary = summarize(rows)
     assert_regression_thresholds(
         summary,
@@ -1531,6 +1677,13 @@ async def main() -> int:
             encoding="utf-8",
         )
         print(args.trace_schema_scorecard_json)
+    if args.route_semantics_scorecard_json:
+        args.route_semantics_scorecard_json.parent.mkdir(parents=True, exist_ok=True)
+        args.route_semantics_scorecard_json.write_text(
+            json.dumps(route_semantics_scorecard, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        print(args.route_semantics_scorecard_json)
     if args.scorecard_json:
         args.scorecard_json.parent.mkdir(parents=True, exist_ok=True)
         args.scorecard_json.write_text(

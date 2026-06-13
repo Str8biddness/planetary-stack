@@ -26,6 +26,7 @@ from tools.chal_conversation_compare import (
     assert_regression_thresholds,
     assert_replay_integrity_scorecard,
     assert_replay_storage_scorecard,
+    assert_route_semantics_scorecard,
     assert_trace_schema_scorecard,
     build_axis_improvement_scorecard,
     build_continuity_rows,
@@ -35,6 +36,7 @@ from tools.chal_conversation_compare import (
     build_replay_records,
     build_replay_storage_records,
     build_replay_storage_scorecard,
+    build_route_semantics_scorecard,
     build_trace_schema_scorecard,
     build_chal_rows,
     flatten_continuity_rows,
@@ -420,6 +422,46 @@ def test_phase8_trace_schema_scorecard_reports_missing_trace_fields():
         assert f"{rows[0]['case_id']} failed trace_id" in str(exc)
     else:
         raise AssertionError("trace schema gate must fail when trace identity is missing")
+
+
+def test_phase8_comparison_harness_builds_route_semantics_scorecard():
+    rows = asyncio.run(build_chal_rows())
+    continuity_rows = asyncio.run(build_continuity_rows())
+    continuity_flat_rows = flatten_continuity_rows(continuity_rows)
+    scorecard = build_route_semantics_scorecard(rows + continuity_flat_rows)
+
+    assert scorecard["schema"] == "synthesus.phase8.route_semantics_scorecard.v1"
+    assert scorecard["summary"]["case_count"] == len(rows) + len(continuity_flat_rows)
+    assert scorecard["summary"]["failed_cases"] == 0
+    assert scorecard["summary"]["route_checks"] == {
+        "grounded_path": True,
+        "quad_brain_path": True,
+        "safety_path": True,
+    }
+    assert_route_semantics_scorecard(scorecard)
+
+    safety_case = next(case for case in scorecard["cases"] if case["case_id"] == "safety_boundary")
+    assert safety_case["route"] == "safety_path"
+    assert safety_case["budget"]["critic_passes"] == 2
+    assert safety_case["checks"]["safety_guard_surface"] is True
+
+    business_case = next(case for case in scorecard["cases"] if case["case_id"] == "business_bot_task")
+    assert business_case["route"] == "quad_brain_path"
+    assert business_case["checks"]["quad_brain_arbitration"] is True
+    assert business_case["checks"]["grounding_reranker_boundary"] is True
+
+
+def test_phase8_route_semantics_scorecard_reports_critic_boundary_drift():
+    rows = asyncio.run(build_chal_rows())
+    rows[0]["synthesus5"]["telemetry"]["reasoning_quality"]["firmware_boundary"] = "verifier_final_text"
+    scorecard = build_route_semantics_scorecard(rows)
+
+    try:
+        assert_route_semantics_scorecard(scorecard)
+    except AssertionError as exc:
+        assert f"{rows[0]['case_id']} failed critic_firmware_boundary" in str(exc)
+    else:
+        raise AssertionError("route semantics gate must fail when verifier can own final language")
 
 
 def test_phase8_replay_storage_scorecard_reports_tampering():

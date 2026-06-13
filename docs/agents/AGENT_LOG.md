@@ -4192,3 +4192,23 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - Phase 8 now treats benchmark telemetry as a first-class contract. A response can score well and have valid replay hashes, but the run still fails if the CHAL route identity, Quad Brain topology, runtime preset mirror, or route-family coverage disappears from the comparison row.
+
+## Current Session — 2026-06-13 (Agent 3 — Phase 8 Route Semantics Scorecard Gate)
+
+### 📝 Summary
+- Added `synthesus.phase8.route_semantics_scorecard.v1` to the legacy-vs-Synthesus-5 comparison harness so benchmark batches validate route-specific budget shape, device-isolation health, template-guard cleanliness, critic/verifier firmware ownership, CGPU revision ownership, reranker final-language boundaries, safety guard surface, and Quad Brain arbitration semantics.
+- Exposed the gate through `--route-semantics-scorecard-json` and `--fail-on-route-semantics`, then added focused regression coverage for both the passing scorecard and a verifier-boundary drift failure.
+- Advanced the Phase 8 GPT-4-class evaluation harness checklist item while keeping generated benchmark outputs under ignored `tools/results/`.
+
+### ✅ Verified
+- `python -m py_compile tools/chal_conversation_compare.py tests/test_chal_reasoning_firmware.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_chal_reasoning_firmware.py` — passed, 30 tests.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python tools/chal_conversation_compare.py --write tools/results/synthesus5_phase8_comparison_latest.md --json tools/results/synthesus5_phase8_comparison_latest.json --trace-jsonl tools/results/synthesus5_phase8_replay_latest.jsonl --replay-scorecard-json tools/results/synthesus5_phase8_replay_integrity_scorecard_latest.json --trace-store-jsonl tools/results/synthesus5_phase8_trace_storage_replay_latest.jsonl --trace-store-scorecard-json tools/results/synthesus5_phase8_trace_storage_replay_scorecard_latest.json --trace-schema-scorecard-json tools/results/synthesus5_phase8_trace_schema_scorecard_latest.json --route-semantics-scorecard-json tools/results/synthesus5_phase8_route_semantics_scorecard_latest.json --scorecard-json tools/results/synthesus5_phase8_reference_scorecard_latest.json --axis-scorecard-json tools/results/synthesus5_phase8_axis_scorecard_latest.json --continuity-json tools/results/synthesus5_phase8_continuity_latest.json --continuity-scorecard-json tools/results/synthesus5_phase8_continuity_scorecard_latest.json --continuity-markdown tools/results/synthesus5_phase8_continuity_latest.md --baseline-json tools/results/synthesus5_phase8_latency_baseline_latest.json --fail-on-leak --fail-on-reference --fail-on-axis-regression --fail-on-continuity --fail-on-replay-integrity --fail-on-trace-storage --fail-on-trace-schema --fail-on-route-semantics --max-mean-latency-ms 1000 --max-p95-latency-ms 1500 --min-score-delta 0.1` — passed; route-semantics scorecard reported 12 cases, 0 failures, and route counts `grounded_path=3`, `quad_brain_path=6`, `safety_path=3`.
+
+### 🚧 Left Off / Next Steps
+- Continue strengthening Phase 8 comparison gates around active revision scenarios that intentionally trigger `reasoning_revision.status="revised"` and exhausted-budget scheduler hints, not only the currently passing no-revision benchmark rows.
+- Rebuild or replace generated Knowledge Cloud artifacts so FAISS, metadata, embedder, profile dimension, and `build.source_manifest` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Phase 8 now distinguishes trace presence from route semantics. A row can no longer pass by merely naming `grounded_path`, `quad_brain_path`, or `safety_path`; the route must carry the expected CHAL budget, critic, reranker, safety, and arbitration ownership boundaries.
