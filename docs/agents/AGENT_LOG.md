@@ -4040,3 +4040,23 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - AIVM snapshot replay now preserves enough hashed identity to compare and audit a tick while explicitly denying raw prompt or response text a path into sealed replay storage.
+
+## Current Session — 2026-06-13 (Agent 9 — Organ Replay Mirror Integrity)
+
+### 📝 Summary
+- Hardened `tools/evaluate_organs.py` so compact CHAL organ replay storage now requires `replay.record` and `replay.chal` to mirror the same candidate refs, selected candidate, critic acceptance/quality, and shared-backbone contract before a storage record is admitted.
+- Added focused regression coverage for a drifted CHAL selected candidate/critic result that previously looked valid in isolation but no longer passes organ replay integrity.
+- Updated the ML organ training guide and Phase 7 checklist entry for the new record/CHAL mirror-integrity gate.
+
+### ✅ Verified
+- `python -m py_compile tools/evaluate_organs.py tests/test_organ_evaluation_quality_gate.py` — passed.
+- `PYTHONPATH=/home/workspace/Synthesus_4.0/packages:/home/workspace/Synthesus_4.0/packages/core:/home/workspace/Synthesus_4.0/packages/reasoning:/home/workspace/Synthesus_4.0/packages/kernel:/home/workspace/Synthesus_4.0/packages/knowledge SYNTHESUS_KNOWLEDGE_SYNC_MODE=off python -m pytest -q tests/test_organ_evaluation_quality_gate.py` — passed, 13 tests.
+
+### 🚧 Left Off / Next Steps
+- Continue broader persistent runtime trace storage outside Quad Brain, organ traces, and AIVM snapshots.
+- Consider promoting the AIVM replay scrub-key policy into a shared CHAL trace-storage helper before adding more storage sinks.
+- Rebuild or replace generated Knowledge Cloud artifacts so FAISS, metadata, embedder, profile dimension, and `build.source_manifest` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Organ replay storage now treats the compact source identity record and CHAL accelerator frame as a coupled boundary. Candidate generation and critic feedback can be stored only when both sides prove the same bounded accelerator event, preserving organs as CHAL accelerators rather than independent uncontrolled brains.

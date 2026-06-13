@@ -533,6 +533,36 @@ def _valid_candidate_critic(rec: TraceRecord) -> tuple[bool, str]:
     return True, ""
 
 
+def _valid_replay_chal_mirror(rec: TraceRecord) -> tuple[bool, str]:
+    replay = rec.replay
+    if replay.get("generator") != CHAL_ACCELERATOR_GENERATOR:
+        return False, "not current CHAL accelerator generator"
+    record = replay.get("record")
+    chal = replay.get("chal")
+    if not isinstance(record, dict):
+        return False, "missing replay.record"
+    if not isinstance(chal, dict):
+        return False, "missing replay.chal"
+    if record.get("candidateRefs") != chal.get("candidateRefs"):
+        return False, "record/CHAL candidate refs mismatch"
+    if record.get("selectedCandidateRef") != chal.get("selectedCandidateRef"):
+        return False, "record/CHAL selected candidate mismatch"
+    critic = chal.get("criticFeedback")
+    if not isinstance(critic, dict):
+        return False, "missing critic feedback"
+    if record.get("accepted") != critic.get("accepted"):
+        return False, "record/critic accepted mismatch"
+    record_quality = record.get("quality")
+    critic_quality = critic.get("quality")
+    if not isinstance(record_quality, (int, float)) or not isinstance(critic_quality, (int, float)):
+        return False, "record/critic quality mismatch"
+    if not math.isclose(float(record_quality), float(critic_quality), rel_tol=0.0, abs_tol=1e-6):
+        return False, "record/critic quality mismatch"
+    if record.get("backbone") != chal.get("backbone"):
+        return False, "record/CHAL backbone mismatch"
+    return True, ""
+
+
 def _chal_accelerator_coverage(records: Iterable[TraceRecord]) -> float:
     total = 0
     bounded = 0
@@ -596,7 +626,8 @@ def build_organ_replay_records(records: Iterable[TraceRecord]) -> list[dict[str,
         identity_ok, _ = _valid_replay_identity(rec)
         chal_ok, _ = _valid_chal_accelerator(rec)
         candidate_ok, _ = _valid_candidate_critic(rec)
-        if not (identity_ok and chal_ok and candidate_ok):
+        mirror_ok, _ = _valid_replay_chal_mirror(rec)
+        if not (identity_ok and chal_ok and candidate_ok and mirror_ok):
             continue
         source_record = rec.replay["record"]
         chal = rec.replay["chal"]
@@ -652,6 +683,7 @@ def build_organ_replay_integrity_scorecard(records: Iterable[TraceRecord]) -> Or
             _valid_replay_identity(rec),
             _valid_chal_accelerator(rec),
             _valid_candidate_critic(rec),
+            _valid_replay_chal_mirror(rec),
         ):
             if not ok:
                 failures.append(f"{label}: {reason}")

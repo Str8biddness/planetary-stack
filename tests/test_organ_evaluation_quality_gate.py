@@ -394,6 +394,29 @@ def test_organ_replay_integrity_scorecard_rejects_tampered_backbone_contract():
     assert any("shared backbone" in failure for failure in failed.failures)
 
 
+def test_organ_replay_integrity_scorecard_rejects_record_chal_candidate_drift():
+    source = trace_record_with_replay()
+    drifted = trace_record_with_replay(
+        replay={
+            **source.replay,
+            "chal": {
+                **source.replay["chal"],
+                "selectedCandidateRef": "chat.policy_prior.planning.candidate.0",
+                "criticFeedback": {
+                    **source.replay["chal"]["criticFeedback"],
+                    "accepted": False,
+                },
+            },
+        }
+    )
+
+    failed = build_organ_replay_integrity_scorecard([drifted])
+
+    assert failed.passed is False
+    assert failed.stored_records == 0
+    assert any("record/CHAL selected candidate mismatch" in failure for failure in failed.failures)
+
+
 def test_quality_gate_compares_metric_direction_to_baseline():
     result = evaluate_quality_gate(
         [
