@@ -4081,28 +4081,6 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 ### 💡 Architectural Notes
 - Organ replay records are now schema-visible as bounded CHAL accelerator storage records. The schema intentionally preserves hashes, candidate refs, critic refs, and shared-backbone identity while excluding raw state/action/trajectory vectors and avoiding any claim that the public query API emits those artifacts.
 
-## Current Session — 2026-06-13 (Knowledge Hardware Aggregate Filter Drift Gate)
-
-### 📝 Summary
-- Hardened the standalone Knowledge Cloud source-plane validator so aggregate `sources/datasets.yaml` public-source `filters` metadata must match the backed concrete source manifest when repeated.
-- Moved the ConceptNet relation filter list into `sources/conceptnet.yaml`, keeping retrieval-scope semantics owned by the concrete source identity rather than only the aggregate catalog view.
-- Updated source/provenance/data-model docs plus the runtime KN module note, regenerated `manifests/source_manifest.json`, and advanced the Phase 5 Knowledge Cloud hardware license/provenance validation checklist item without touching generated FAISS, KNDB, model, cache, mirror, or workflow artifacts.
-
-### ✅ Verified
-- `python -m py_compile synthesus_knowledge_cloud/source_planes.py tests/test_cli.py` — passed in `synthesus-knowledge-cloud`.
-- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m pytest -q tests/test_cli.py tests/test_build.py tests/test_provenance.py` — passed, 37 tests.
-- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud validate-sources --root /home/workspace/synthesus-knowledge-cloud` — passed, 25 required paths and 7 character pattern banks.
-- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud build-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — regenerated 151-file source manifest.
-- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud verify-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — passed, 151 source files.
-
-### 🚧 Left Off / Next Steps
-- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align.
-- Restamp `synthesus-knowledge-cloud/artifacts/manifest.json` with the current `build.source_manifest` after the coherent rebuild, then rerun `synthesus-kc validate` and `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --require-clean-worktree --fail-on-blocker`.
-- Pre-existing unrelated runtime root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched except for required shared checklist/log/module-doc entries.
-
-### 💡 Architectural Notes
-- `sources/datasets.yaml` remains a public catalog view. It may repeat filter metadata for operator readability, but repeated retrieval-scope filters now have to mirror the concrete source manifest that owns source admission before the source can become provenance-clean mounted CHAL hardware.
-
 ## Current Session — 2026-06-13 (Daily Knowledge Hardware Health Check)
 
 ### 📝 Summary
@@ -4128,3 +4106,25 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - The health check is correctly treating Knowledge Cloud as mounted CHAL hardware: manifest identity and source-plane provenance can pass independently, but golden-query execution stays gated until the retrieval vector hardware, embedder, profile dimension, and source-manifest fingerprint describe one coherent generated bundle.
+
+## Current Session — 2026-06-13 (Knowledge Hardware Aggregate Filter Drift Gate)
+
+### 📝 Summary
+- Hardened the standalone Knowledge Cloud source-plane validator so aggregate `sources/datasets.yaml` public-source `filters` metadata must match the backed concrete source manifest when repeated.
+- Moved the ConceptNet relation filter list into `sources/conceptnet.yaml`, keeping retrieval-scope semantics owned by the concrete source identity rather than only the aggregate catalog view.
+- Updated source/provenance/data-model docs plus the runtime KN module note, regenerated `manifests/source_manifest.json`, and advanced the Phase 5 Knowledge Cloud hardware license/provenance validation checklist item without touching generated FAISS, KNDB, model, cache, mirror, or workflow artifacts.
+
+### ✅ Verified
+- `python -m py_compile synthesus_knowledge_cloud/source_planes.py tests/test_cli.py` — passed in `synthesus-knowledge-cloud`.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m pytest -q tests/test_cli.py tests/test_build.py tests/test_provenance.py` — passed, 37 tests.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud validate-sources --root /home/workspace/synthesus-knowledge-cloud` — passed, 25 required paths and 7 character pattern banks.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud build-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — regenerated 151-file source manifest.
+- `PYTHONPATH=/home/workspace/synthesus-knowledge-cloud python -m synthesus_knowledge_cloud verify-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — passed, 151 source files.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align.
+- Restamp `synthesus-knowledge-cloud/artifacts/manifest.json` with the current `build.source_manifest` after the coherent rebuild, then rerun `synthesus-kc validate` and `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --require-clean-worktree --fail-on-blocker`.
+- Pre-existing unrelated runtime root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched except for required shared checklist/log/module-doc entries.
+
+### 💡 Architectural Notes
+- `sources/datasets.yaml` remains a public catalog view. It may repeat filter metadata for operator readability, but repeated retrieval-scope filters now have to mirror the concrete source manifest that owns source admission before the source can become provenance-clean mounted CHAL hardware.
