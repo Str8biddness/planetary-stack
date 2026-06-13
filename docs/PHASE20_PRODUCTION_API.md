@@ -148,6 +148,14 @@ CGPU device-frame schemas are documented separately as `CGPUFrame` and
 `CGPUOutputFrame`; `/api/v1/query` does not emit CGPU candidate sets as top-level
 payloads.
 
+The compact ML-organ replay storage contract is mirrored as `OrganReplayTrace`
+in `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`.
+`tools/evaluate_organs.py --replay-jsonl` emits these
+`synthesus.organ_replay_trace.v1` JSONL records after proving `replay.record`
+and `replay.chal` mirror the same candidate refs, selected candidate,
+critic acceptance/quality, and shared-backbone identity. This schema documents
+a CHAL accelerator replay artifact; it is not returned by `/api/v1/query`.
+
 Legacy-compatible template or fallback exceptions are mirrored as the
 `TemplateSurface` schema. When returned, the payload lives under
 `debug.template_surface` and must identify the audited boundary, such as

@@ -10,7 +10,8 @@ info:
     state-contract arbitration_steps, QuadBrainReplayRecord, and QuadBrainTraceStorage
     when route=quad_brain_path, plus memory-writeback telemetry after API arbitration;
     CGPU traces are documented as CHAL contracts until candidate-set payloads are
-    surfaced by this endpoint.
+    surfaced by this endpoint. OrganReplayTrace documents compact CHAL organ evaluator
+    replay/storage records emitted by tooling, not /api/v1/query responses.
   version: 5.0.0
 paths:
   /parameter-cloud/v2/fetch-batch:
@@ -1770,6 +1771,148 @@ components:
         error:
           type: string
           description: Recorder exception text when status=fault.
+    OrganReplayTrace:
+      type: object
+      title: OrganReplayTrace
+      description: Compact CHAL organ replay storage record emitted by tools/evaluate_organs.py
+        when --replay-jsonl is used. It preserves organ accelerator frame identity,
+        candidate refs, critic refs, shared-backbone contract identity, and a canonical
+        record hash without storing raw state/action/trajectory feature vectors.
+        This is a tooling/storage contract, not a /api/v1/query response payload.
+      required:
+      - schema
+      - generator
+      - sourceRecordHash
+      - seed
+      - scenarioId
+      - step
+      - simulatedTime
+      - domain
+      - organ
+      - phase
+      - device
+      - role
+      - route
+      - frameId
+      - parentFrameId
+      - outputRef
+      - backbone
+      - candidateRefs
+      - selectedCandidateRef
+      - criticFeedbackRef
+      - accepted
+      - quality
+      - recordHash
+      properties:
+        schema:
+          type: string
+          const: synthesus.organ_replay_trace.v1
+        generator:
+          type: string
+          const: organ-triad-replay-v4
+        sourceRecordHash:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          description: Hash of the compact organ_training_replay.v1 source identity
+            record.
+        seed:
+          type: integer
+        scenarioId:
+          type: string
+        step:
+          type: integer
+          minimum: 0
+        simulatedTime:
+          type: string
+          description: Deterministic simulated timestamp copied from the source replay
+            metadata.
+        domain:
+          type: string
+          enum:
+          - chat
+          - sysops
+          - gm
+        organ:
+          type: string
+          enum:
+          - policy_prior
+          - risk_outcome
+          - attention
+        phase:
+          type: string
+        device:
+          type: string
+          pattern: ^chal://organs/(chat|sysops|gm)/(policy_prior|risk_outcome|attention)$
+        role:
+          type: string
+          const: organ_accelerator
+        route:
+          type: string
+          const: organ_training_replay
+        frameId:
+          type: string
+        parentFrameId:
+          type: string
+        outputRef:
+          type: string
+        backbone:
+          type: object
+          required:
+          - schema
+          - contractVersion
+          - domain
+          - organ
+          - width
+          - scopes
+          - device
+          - contractHash
+          properties:
+            schema:
+              type: string
+              const: shared_organ_backbone.v1
+            contractVersion:
+              type: string
+              const: shared-organ-backbone-v1
+            domain:
+              type: string
+            organ:
+              type: string
+            width:
+              type: integer
+              minimum: 1
+            scopes:
+              type: array
+              items:
+                type: string
+            device:
+              type: string
+            contractHash:
+              type: string
+              pattern: ^[a-f0-9]{64}$
+          additionalProperties: false
+        candidateRefs:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        selectedCandidateRef:
+          type: string
+          description: Must match one of candidateRefs before the compact replay
+            record is admitted by the integrity gate.
+        criticFeedbackRef:
+          type: string
+        accepted:
+          type: boolean
+        quality:
+          type: number
+          minimum: 0
+          maximum: 1
+        recordHash:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          description: SHA-256 hash over the canonical compact record excluding
+            recordHash itself.
+      additionalProperties: false
     QueryRequest:
       properties:
         query:

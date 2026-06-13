@@ -4060,3 +4060,23 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - Organ replay storage now treats the compact source identity record and CHAL accelerator frame as a coupled boundary. Candidate generation and critic feedback can be stored only when both sides prove the same bounded accelerator event, preserving organs as CHAL accelerators rather than independent uncontrolled brains.
+
+## Current Session — 2026-06-13 (Agent 10 — Organ Replay Schema Mirror)
+
+### 📝 Summary
+- Mirrored the implemented `tools/evaluate_organs.py --replay-jsonl` compact organ replay artifact as reusable `OrganReplayTrace` in `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`.
+- Documented the boundary in `docs/PHASE20_PRODUCTION_API.md` and `docs/setup/ML_ORGAN_TRAINING.md`: `synthesus.organ_replay_trace.v1` is a CHAL organ accelerator replay/storage artifact, not a `/api/v1/query` response payload.
+- Advanced the Phase 7 replayable trace-storage checklist item without changing runtime code, generated results, workflow files, or Knowledge Cloud artifacts.
+
+### ✅ Verified
+- Regenerated `docs/openapi.json` and `docs/api_schema.json` from `docs/openapi.yaml`.
+- Parsed `docs/openapi.yaml`, `docs/openapi.json`, and `docs/api_schema.json`; confirmed both JSON mirrors match YAML and `OrganReplayTrace` carries `schema="synthesus.organ_replay_trace.v1"`, `generator="organ-triad-replay-v4"`, required `recordHash`, and no raw feature-vector fields.
+- `git diff --check -- docs/openapi.yaml docs/openapi.json docs/api_schema.json docs/PHASE20_PRODUCTION_API.md docs/setup/ML_ORGAN_TRAINING.md docs/roadmap/SYNTHESUS_5_IMPLEMENTATION_CHECKLIST.md` — passed.
+
+### 🚧 Left Off / Next Steps
+- Broader persistent runtime trace storage outside Quad Brain, organ traces, and AIVM snapshots remains open.
+- Rebuild or replace generated Knowledge Cloud artifacts so FAISS, metadata, embedder, profile dimension, and `build.source_manifest` align before release gates and golden-query health can pass.
+- Pre-existing unrelated root `AGENTS.md`, `README.md`, `pyproject.toml`, and untracked `synthesus_framework/` changes were left untouched.
+
+### 💡 Architectural Notes
+- Organ replay records are now schema-visible as bounded CHAL accelerator storage records. The schema intentionally preserves hashes, candidate refs, critic refs, and shared-backbone identity while excluding raw state/action/trajectory vectors and avoiding any claim that the public query API emits those artifacts.
