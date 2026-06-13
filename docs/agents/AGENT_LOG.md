@@ -4102,3 +4102,29 @@ Red Team (Breach Persona) -> EmulationTool (Sandbox) -> Blue Team (Ghostkey Sent
 
 ### 💡 Architectural Notes
 - `sources/datasets.yaml` remains a public catalog view. It may repeat filter metadata for operator readability, but repeated retrieval-scope filters now have to mirror the concrete source manifest that owns source admission before the source can become provenance-clean mounted CHAL hardware.
+
+## Current Session — 2026-06-13 (Daily Knowledge Hardware Health Check)
+
+### 📝 Summary
+- Re-ran the fast Synthesus 5 Knowledge Cloud-as-hardware health path across bundle integrity, manifest hashes, source validation, source-manifest verification, runtime mount bootstrap, KAL mount health, golden-query gating, and provenance.
+- Confirmed no new source-code issue was exposed during this run; the remaining blocker is still the generated Knowledge Cloud artifact bundle, not runtime source.
+- Updated the Phase 10 golden-query health checklist with current validation evidence.
+
+### ✅ Verified
+- `python -m synthesus_knowledge_cloud validate-sources --root /home/workspace/synthesus-knowledge-cloud` — passed, 25 required paths and 7 character pattern banks.
+- `python -m synthesus_knowledge_cloud verify-source-manifest --root /home/workspace/synthesus-knowledge-cloud` — passed, 151 source files.
+- Full manifest hash sweep over `synthesus-knowledge-cloud/artifacts/manifest.json` — passed, 10 artifacts with 0 hash/size errors.
+- `python -m synthesus_knowledge_cloud validate --root artifacts` — failed only on known release blockers: missing `build.source_manifest` and `FAISS/embedder dim mismatch: faiss=384, embedder=128`.
+- `python tools/validate_knowledge_cold_start.py --root /home/workspace/synthesus-knowledge-cloud/artifacts` — failed only on known release blockers: `FAISS/embedder dim mismatch: faiss=384, embedder=128`, `FAISS/profile dim mismatch: faiss=384, profile=128`, and missing `build.source_manifest`.
+- `python -m packages.knowledge.health_check --artifact-root /home/workspace/synthesus-knowledge-cloud/artifacts --report-path /tmp/synthesus_knowledge_health_report_20260613.json` — failed only on known retrieval-semantic blockers; FAISS and metadata counts both reported 501819, KAL mount count reported 4, and golden queries were intentionally skipped.
+- `python -m pytest -q tests/test_knowledge_health_check.py` — passed, 2 tests.
+- Manual runtime mount bootstrap smoke reported 12 active mounts and 0 integrity failures before optional diagnostic-print attribute drift in the ad-hoc probe.
+
+### 🚧 Left Off / Next Steps
+- Rebuild or replace generated Knowledge Cloud artifacts so `faiss.index`, `faiss_metadata.json`, `models/swarm_embedder.pkl`, and manifest `build.extra.embed_dim` align.
+- Restamp `synthesus-knowledge-cloud/artifacts/manifest.json` with the current `build.source_manifest` after the coherent rebuild.
+- Rerun `synthesus-kc validate`, `tools/validate_knowledge_cold_start.py`, `packages.knowledge.health_check`, and the release gate before attempting RC tagging.
+- Pre-existing unrelated runtime root `AGENTS.md`, `README.md`, `docs/modules/KN.md`, `pyproject.toml`, untracked `synthesus_framework/`, and pre-existing Knowledge Cloud source-plane edits were left untouched except for this required checklist/log update.
+
+### 💡 Architectural Notes
+- The health check is correctly treating Knowledge Cloud as mounted CHAL hardware: manifest identity and source-plane provenance can pass independently, but golden-query execution stays gated until the retrieval vector hardware, embedder, profile dimension, and source-manifest fingerprint describe one coherent generated bundle.
