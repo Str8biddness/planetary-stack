@@ -1,7 +1,7 @@
 {
   "version": "1",
   "kind": "synthesus-knowledge-source-plane",
-  "generated_at": "2026-06-12T22:04:18.032603+00:00",
+  "generated_at": "2026-06-13T14:05:34.153465+00:00",
   "roots": [
     "sources",
     "synthesus_knowledge_cloud",
@@ -16,8 +16,8 @@
   "artifacts": [
     {
       "path": "sources/conceptnet.yaml",
-      "size": 743,
-      "sha256": "c9cb0a1e94d5ead569e999eea55d1ee62e0cf8a86884b91db9a50602a013cbe8"
+      "size": 943,
+      "sha256": "7204a4b6e2a1e6dc708d666620281447337bf6fec7dc369d893484d0acd789c6"
     },
     {
       "path": "sources/datasets.yaml",
@@ -86,8 +86,8 @@
     },
     {
       "path": "synthesus_knowledge_cloud/source_planes.py",
-      "size": 18152,
-      "sha256": "ee30b5f0ac7d85fe0ee36652a04a81cf344cb62e78d957d3333e7a79f0e68752"
+      "size": 19278,
+      "sha256": "24525082800e037af25b9672ac2ff1923163bf56d8835e57c268902a087d2a7c"
     },
     {
       "path": "synthesus_knowledge_cloud/status.py",
@@ -191,8 +191,8 @@
     },
     {
       "path": "docs/DATA_MODEL.md",
-      "size": 3722,
-      "sha256": "a9f653e4ddeb688a82aa6730ef7aaeb9d904e55592b0fbfff4c01ca371d6ed87"
+      "size": 3747,
+      "sha256": "3f2bff9e3c5fc6086e7292cae9a4c9b32502a0aa6b582acc4d069d73df460b02"
     },
     {
       "path": "docs/INTEGRATION.md",
@@ -216,8 +216,8 @@
     },
     {
       "path": "docs/PROVENANCE.md",
-      "size": 5361,
-      "sha256": "8323f49da54a7271a14090b9ede638d44bcc7641cf9c9570649b18e01435a393"
+      "size": 5372,
+      "sha256": "895415432db759ddb74ed19877e4adaca31e4aef6595787d2cce9b1060c70bca"
     },
     {
       "path": "docs/REBUILDING.md",
@@ -226,8 +226,8 @@
     },
     {
       "path": "docs/SOURCES.md",
-      "size": 3692,
-      "sha256": "73c57f44c4abe1396e6758b116fc091c46247f9b5c43485aac0c84ff6c677f52"
+      "size": 3720,
+      "sha256": "4f4a7470d82c06fa6d6c3ef5eb19db6e82b5f79e427c991e9c0acd2eb15566aa"
     },
     {
       "path": "patterns/characters/computress/bio.json",

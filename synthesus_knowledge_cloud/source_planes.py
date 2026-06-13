@@ -331,6 +331,27 @@ def _validate_aggregate_source_manifest_yaml(
                                     f"{source_id} in {rel}[{index}].local_cache.files[{cache_index}]: "
                                     f"{aggregate_cache_path} not declared as source manifest cache_path"
                                 )
+        aggregate_filters = item.get("filters")
+        if aggregate_filters is not None:
+            source_filters = source_manifest.get("filters")
+            if not isinstance(aggregate_filters, dict):
+                errors.append(
+                    f"aggregate public source filters field must be a mapping for "
+                    f"{source_id} in {rel}[{index}]"
+                )
+            elif not isinstance(source_filters, dict):
+                errors.append(
+                    f"aggregate public source filters have no source manifest filters block for "
+                    f"{source_id} in {rel}[{index}]"
+                )
+            else:
+                for filter_key, aggregate_value in sorted(aggregate_filters.items()):
+                    source_value = source_filters.get(filter_key)
+                    if aggregate_value != source_value:
+                        errors.append(
+                            f"aggregate public source filters.{filter_key} mismatch for "
+                            f"{source_id} in {rel}[{index}]: {aggregate_value} != {source_value}"
+                        )
 
 
 def _validate_source_identity_namespace(

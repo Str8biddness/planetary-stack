@@ -580,6 +580,60 @@ def test_source_planes_rejects_aggregate_public_source_license_drift(tmp_path):
     ) in result.errors
 
 
+def test_source_planes_rejects_aggregate_public_source_filters_drift(tmp_path):
+    root = tmp_path
+    sources = root / "sources"
+    sources.mkdir()
+    (sources / "datasets.yaml").write_text(
+        "\n".join(
+            [
+                'version: "1"',
+                "name: datasets",
+                "public_sources:",
+                "  - id: backed_public_source",
+                "    type: public_gzip_csv",
+                "    default_enabled: true",
+                "    loader: pipelines/ingest/current_loader.py::load",
+                "    filters:",
+                "      language: fr",
+                "      relations:",
+                "        - RelatedTo",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (sources / "backed.yaml").write_text(
+        "\n".join(
+            [
+                'version: "1"',
+                "id: backed_public_source",
+                "name: Backed Public Source",
+                "source_type: public_gzip_csv",
+                "license:",
+                '  spdx: "MIT"',
+                "  notes: Redistributable test fixture.",
+                "repository: https://example.com/repo",
+                "loader: pipelines/ingest/current_loader.py::load",
+                "filters:",
+                "  language: en",
+                "  relations:",
+                "    - RelatedTo",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = validate_source_planes(root)
+
+    assert not result.ok
+    assert (
+        "aggregate public source filters.language mismatch for backed_public_source in "
+        "sources/datasets.yaml[0]: fr != en"
+    ) in result.errors
+
+
 def test_source_planes_rejects_aggregate_public_source_upstream_drift(tmp_path):
     root = tmp_path
     sources = root / "sources"

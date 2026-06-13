@@ -16,3 +16,17 @@ loader: pipelines/ingest/kaggle_loader.py::load_conceptnet
 entry_source: conceptnet5
 filters:
   language: en
+  relations:
+    - RelatedTo
+    - IsA
+    - PartOf
+    - HasA
+    - UsedFor
+    - CapableOf
+    - AtLocation
+    - Synonym
+    - Antonym
+    - DerivedFrom
+    - HasContext
+    - Causes
+    - Desires
