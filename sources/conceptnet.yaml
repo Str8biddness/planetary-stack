@@ -30,3 +30,10 @@ filters:
     - HasContext
     - Causes
     - Desires
+output_schema:
+  key: string
+  question: generated natural language prompt
+  answer: target concept
+  category: conceptnet:<relation>
+  value: weight metadata
+  source: conceptnet5

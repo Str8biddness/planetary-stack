@@ -352,6 +352,27 @@ def _validate_aggregate_source_manifest_yaml(
                             f"aggregate public source filters.{filter_key} mismatch for "
                             f"{source_id} in {rel}[{index}]: {aggregate_value} != {source_value}"
                         )
+        aggregate_output_schema = item.get("output_schema")
+        if aggregate_output_schema is not None:
+            source_output_schema = source_manifest.get("output_schema")
+            if not isinstance(aggregate_output_schema, dict):
+                errors.append(
+                    f"aggregate public source output_schema field must be a mapping for "
+                    f"{source_id} in {rel}[{index}]"
+                )
+            elif not isinstance(source_output_schema, dict):
+                errors.append(
+                    f"aggregate public source output_schema has no source manifest output_schema "
+                    f"block for {source_id} in {rel}[{index}]"
+                )
+            else:
+                for schema_key, aggregate_value in sorted(aggregate_output_schema.items()):
+                    source_value = source_output_schema.get(schema_key)
+                    if aggregate_value != source_value:
+                        errors.append(
+                            f"aggregate public source output_schema.{schema_key} mismatch for "
+                            f"{source_id} in {rel}[{index}]: {aggregate_value} != {source_value}"
+                        )
 
 
 def _validate_source_identity_namespace(

@@ -21,3 +21,10 @@ files:
     expected_extension: tsv
 loader: pipelines/ingest/kaggle_loader.py::load_jeopardy
 entry_source: jeopardy_github
+output_schema:
+  key: string
+  question: string
+  answer: string
+  category: string
+  value: metadata string
+  source: jeopardy_github

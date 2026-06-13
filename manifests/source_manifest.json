@@ -1,7 +1,7 @@
 {
   "version": "1",
   "kind": "synthesus-knowledge-source-plane",
-  "generated_at": "2026-06-13T14:05:34.153465+00:00",
+  "generated_at": "2026-06-13T18:04:41.051387+00:00",
   "roots": [
     "sources",
     "synthesus_knowledge_cloud",
@@ -16,8 +16,8 @@
   "artifacts": [
     {
       "path": "sources/conceptnet.yaml",
-      "size": 943,
-      "sha256": "7204a4b6e2a1e6dc708d666620281447337bf6fec7dc369d893484d0acd789c6"
+      "size": 1124,
+      "sha256": "3422be68e2c6bf458cd465843e981e2aa0283209ab427f5f725de7f359412974"
     },
     {
       "path": "sources/datasets.yaml",
@@ -31,8 +31,8 @@
     },
     {
       "path": "sources/jeopardy.yaml",
-      "size": 941,
-      "sha256": "0397278c55585ae06228a29113e51f36e3e15e1032d97323cd13869e902d9ca5"
+      "size": 1076,
+      "sha256": "5ca5e2c41ea0384dbef4ffe8cf463f402e69523b60176163ca08c38666544628"
     },
     {
       "path": "sources/kaggle.yaml",
@@ -86,8 +86,8 @@
     },
     {
       "path": "synthesus_knowledge_cloud/source_planes.py",
-      "size": 19278,
-      "sha256": "24525082800e037af25b9672ac2ff1923163bf56d8835e57c268902a087d2a7c"
+      "size": 20481,
+      "sha256": "22bfd804c10e20e2cf385d8c17c57470b576badac79a22cbe9ac7942a2e0bd91"
     },
     {
       "path": "synthesus_knowledge_cloud/status.py",
@@ -191,8 +191,8 @@
     },
     {
       "path": "docs/DATA_MODEL.md",
-      "size": 3747,
-      "sha256": "3f2bff9e3c5fc6086e7292cae9a4c9b32502a0aa6b582acc4d069d73df460b02"
+      "size": 3786,
+      "sha256": "8af61a59062de610e88eada9da8b87e29173d32107ba581b26fc969d14617938"
     },
     {
       "path": "docs/INTEGRATION.md",
@@ -216,8 +216,8 @@
     },
     {
       "path": "docs/PROVENANCE.md",
-      "size": 5372,
-      "sha256": "895415432db759ddb74ed19877e4adaca31e4aef6595787d2cce9b1060c70bca"
+      "size": 5404,
+      "sha256": "965be706249d7636314e35902a49bca2ac6b1e6f4f8df9a5e3cd84e224a4ee8d"
     },
     {
       "path": "docs/REBUILDING.md",
@@ -226,8 +226,8 @@
     },
     {
       "path": "docs/SOURCES.md",
-      "size": 3720,
-      "sha256": "4f4a7470d82c06fa6d6c3ef5eb19db6e82b5f79e427c991e9c0acd2eb15566aa"
+      "size": 3761,
+      "sha256": "e805e88008e5837cfc427192e7ef2875319555cd4fca375c694fcd4fd1c75478"
     },
     {
       "path": "patterns/characters/computress/bio.json",
