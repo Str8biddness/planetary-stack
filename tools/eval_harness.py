@@ -152,6 +152,12 @@ def test_realizer():
     hedged = any(m in h.lower() for m in ("not certain", "unclear", "tentativ", "might", "may"))
     gate("hedges when uncertain", hedged, h)
 
+    pos = json.load(open(SHARD_DIR / "pos_lexicon.kn"))
+    verbs = set(pos["verbs"])
+    gate("POS tags verbs not nouns",
+         "requires" in verbs and "energy" not in verbs and "mass" not in verbs,
+         "requires∈verbs; energy,mass∉verbs")
+
 
 # ---- D. Hash parity regression -----------------------------------------
 def test_parity():

@@ -44,6 +44,11 @@ class ConductiveAssembler:
         if dfile.exists():
             with open(dfile, 'r', encoding='utf-8') as f:
                 self.derived = json.load(f)['vectors']
+        # Distributional POS tags: drop verb-like tokens from realized families.
+        self.verbs = set()
+        pfile = self.shard_dir / "pos_lexicon.kn"
+        if pfile.exists():
+            self.verbs = set(json.load(open(pfile)).get("verbs", []))
         # PPBRS reasoning layer: a Bayesian belief over the derived patterns,
         # giving calibrated uncertainty (it can answer "I'm not sure").
         self.activator = None
@@ -87,7 +92,10 @@ class ConductiveAssembler:
         if observed == 0:
             return None
         H = self.activator.entropy()
-        fam = [w for w, _ in self.activator.top_k(6)]
+        fam = [w for w, _ in self.activator.top_k(8)]
+        nouns = [w for w in fam if w not in self.verbs]   # POS filter: keep nouns
+        if len(nouns) >= 2:
+            fam = nouns
         resolved = self.activator.is_resolved()
         print(f"🧮 [PPBRS] {'resolved' if resolved else 'uncertain'} | entropy {H:.2f}")
         if self.realizer:                          # GRE-style surface realization
