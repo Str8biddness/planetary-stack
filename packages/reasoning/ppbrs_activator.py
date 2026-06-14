@@ -96,10 +96,20 @@ class ProbabilisticPatternActivator:
         idx = np.argsort(-self.logp)[:k]
         return [(self.field.words[i], float(np.exp(self.logp[i]))) for i in idx]
 
-    def is_resolved(self, conf_threshold: float = 0.5,
-                    entropy_threshold: float = 2.0) -> bool:
-        return (float(np.exp(self.logp).max()) > conf_threshold
-                and self.entropy() < entropy_threshold)
+    def normalized_entropy(self) -> float:
+        """Entropy / log(N): 0 = certain, 1 = uniform. Scale-invariant."""
+        n = len(self.field)
+        return self.entropy() / float(np.log(n)) if n > 1 else 0.0
+
+    def is_resolved(self, max_norm_entropy: float = 0.30) -> bool:
+        """Resolved = belief is concentrated, measured by *normalized* entropy.
+
+        Using normalized entropy (not a top-1 probability floor) means a coherent
+        multi-topic query — belief split across a few RELATED concepts — still
+        resolves, while only genuinely diffuse, cross-domain beliefs stay
+        unresolved. log(N)-scaled so the threshold holds as the vocabulary grows.
+        """
+        return self.normalized_entropy() < max_norm_entropy
 
 
 if __name__ == "__main__":
