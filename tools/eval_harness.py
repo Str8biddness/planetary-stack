@@ -89,6 +89,33 @@ def test_family(D):
              f"family={fc:+.2f} >> random={rc:+.2f}  [{' '.join(fam)}]")
 
 
+# ---- E. Scene composition (colour + layout) ----------------------------
+def test_scene():
+    print("\nE. Scene composition (colour + layout)")
+    import scene_composer as sc
+    from PIL import Image
+    grounded = sc.load_colors()
+
+    items, rel = sc.parse("a red apple on green grass", grounded)
+    ents = {i["entity"] for i in items}
+    gate("parse", ents == {"apple", "grass"} and rel == "on", f"{sorted(ents)} rel={rel}")
+
+    out = sc.render("a red apple on green grass", out="/tmp/_scene_test.png")
+    img = Image.open(out).convert("RGB")
+    W, H = img.size
+
+    def patch(cx, cy, r=6):
+        ps = [img.getpixel((cx + dx, cy + dy)) for dx in range(-r, r) for dy in range(-r, r)]
+        n = len(ps)
+        return tuple(sum(p[k] for p in ps) // n for k in range(3))
+
+    ground = patch(W // 2, int(H * 0.90))     # bottom band -> grass
+    apple = patch(W // 2, int(H * 0.55))      # mid -> apple
+    gate("grass green at bottom", ground[1] > ground[0] and ground[1] > ground[2], f"{ground}")
+    gate("apple red at centre", apple[0] > apple[1] and apple[0] > apple[2], f"{apple}")
+    gate("apple above grass line", int(H * 0.55) < int(H * 0.68), "disc rests on ground")
+
+
 # ---- D. Hash parity regression -----------------------------------------
 def test_parity():
     print("\nD. Python↔C++ hash parity")
@@ -105,6 +132,7 @@ if __name__ == "__main__":
     test_motor()
     test_semantic(D)
     test_family(D)
+    test_scene()
     test_parity()
     n_pass, n = sum(results), len(results)
     print("\n" + "=" * 60)
