@@ -116,6 +116,29 @@ def test_scene():
     gate("apple above grass line", int(H * 0.55) < int(H * 0.68), "disc rests on ground")
 
 
+# ---- F. PPBRS uncertainty (calibrated "I don't know") ------------------
+def test_uncertainty():
+    print("\nF. PPBRS uncertainty (calibrated 'I don't know')")
+    sys.path.insert(0, os.path.abspath("packages/reasoning"))
+    import ppbrs_activator as ppbrs
+    field = ppbrs.PatternField.from_shard()
+
+    def run(evidence):
+        a = ppbrs.ProbabilisticPatternActivator(field)
+        for w in evidence:
+            a.observe(w)
+        return a
+
+    coh = run(["species", "varieties", "descent"])    # one domain -> resolves
+    inc = run(["species", "geometry", "fertility"])   # cross-domain -> stays unsure
+    gate("coherent resolves", coh.is_resolved() and coh.top_k(1)[0][0] == "species",
+         f"H={coh.entropy():.2f} top={coh.top_k(1)[0][0]}")
+    gate("incoherent stays uncertain", (not inc.is_resolved()) and inc.entropy() > 2.0,
+         f"H={inc.entropy():.2f}")
+    gate("coherent entropy < incoherent", coh.entropy() < inc.entropy(),
+         f"{coh.entropy():.2f} < {inc.entropy():.2f}")
+
+
 # ---- D. Hash parity regression -----------------------------------------
 def test_parity():
     print("\nD. Python↔C++ hash parity")
@@ -133,6 +156,7 @@ if __name__ == "__main__":
     test_semantic(D)
     test_family(D)
     test_scene()
+    test_uncertainty()
     test_parity()
     n_pass, n = sum(results), len(results)
     print("\n" + "=" * 60)
