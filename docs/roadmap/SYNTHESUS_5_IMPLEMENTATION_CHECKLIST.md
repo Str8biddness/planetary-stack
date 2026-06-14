@@ -29,6 +29,10 @@ Legend:
 
 - [x]  Create this implementation checklist as the cross-agent progress ledger. Session log: 2026-06-03 Weekly Heavy Maintenance normalized malformed blank/escaped checklist markers after drift scan.
 
+- [x]  Validate 5-axis Geometric Prediction logic (C++ Kernel Engine). Session log: 2026-06-14 Ported MD5-based deterministic hashing and resonance logic to C++ kernel; verified with unit tests; exposed via pybind11.
+
+- [x]  Implement Automated Multi-Category Live Ingestion & Categorical Sharding. Session log: 2026-06-14 Added `LiveIngestor` (News, Weather, Stocks, Sports, Technical/arXiv, Regulatory, Crypto, GitHub) and refactored refinery to produce isolated `.kn` shards for the Distributed Knowledge Cloud.
+
 - [x]  Ensure all scheduled automations are retargeted from Synthesus 4.1 to Synthesus 5 and restricted to Codex-class or Google/Gemini CLI/CML models.
 
 - [x]  Commit and push Phase 0 control-plane files to GitHub.

@@ -309,5 +309,55 @@ PYBIND11_MODULE(_synthesus_kernel, m) {
             });
         });
 
+    py::class_<zo::GeometricEngine, std::shared_ptr<zo::GeometricEngine>>(m, "GeometricEngine")
+        .def(py::init<>())
+        .def("word_to_vector", [](zo::GeometricEngine& e, const std::string& w) {
+            auto v = e.word_to_vector(w);
+            return std::vector<float>(v.begin(), v.end());
+        })
+        .def("calculate_resonance", &zo::GeometricEngine::calculate_resonance)
+        .def("predict_next", [](zo::GeometricEngine& e, const std::string& ctx, const std::vector<std::string>& cands, int n) {
+            auto results = e.predict_next(ctx, cands, n);
+            py::list out;
+            for (const auto& r : results) {
+                py::dict d; d["word"] = r.word; d["resonance"] = r.resonance;
+                out.append(d);
+            }
+            return out;
+        }, py::arg("context"), py::arg("candidates"), py::arg("top_n") = 5);
+
+    py::class_<zo::GeometricOptics::CameraParams>(m, "CameraParams")
+        .def(py::init<float, float, float, float, int, int>())
+        .def_readwrite("focal_length", &zo::GeometricOptics::CameraParams::focal_length)
+        .def_readwrite("px_width", &zo::GeometricOptics::CameraParams::px_width)
+        .def_readwrite("px_height", &zo::GeometricOptics::CameraParams::px_height);
+
+    py::class_<zo::GeometricOptics>(m, "GeometricOptics")
+        .def(py::init<std::shared_ptr<zo::GeometricEngine>, zo::GeometricOptics::CameraParams>())
+        .def("pixel_to_geometric", [](zo::GeometricOptics& o, int x, int y, std::vector<float> rgb, float d) {
+            float rgb_arr[3] = {rgb[0], rgb[1], rgb[2]};
+            auto v = o.pixel_to_geometric(x, y, rgb_arr, d);
+            return std::vector<float>(v.begin(), v.end());
+        })
+        .def("geometric_to_pixel", [](zo::GeometricOptics& o, std::vector<float> v) {
+            zo::GeometricVector gv; std::copy(v.begin(), v.end(), gv.begin());
+            int x, y; float rgb[3];
+            o.geometric_to_pixel(gv, x, y, rgb);
+            return py::make_tuple(x, y, std::vector<float>{rgb[0], rgb[1], rgb[2]});
+        });
+
+    py::class_<zo::ResonanceObserver>(m, "ResonanceObserver")
+        .def(py::init<std::shared_ptr<zo::GeometricEngine>>())
+        .def("sample_concept", [](zo::ResonanceObserver& o, const std::string& c) {
+            auto r = o.sample_concept(c);
+            py::dict d;
+            d["concept"] = r.concept;
+            d["vector"] = std::vector<float>(r.current_vector.begin(), r.current_vector.end());
+            d["confidence"] = r.confidence;
+            return d;
+        })
+        .def("apply_bias_nudge", &zo::ResonanceObserver::apply_bias_nudge)
+        .def("calculate_logical_health", &zo::ResonanceObserver::calculate_logical_health);
+
     m.attr("__version__") = "4.0.0";
 }

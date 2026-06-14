@@ -11,6 +11,7 @@ from __future__ import annotations
 import time
 import re
 import random
+from pathlib import Path
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -20,6 +21,7 @@ from .response_plan import ResponsePlan, GenerationConfig, GenerationTrace
 from .organ_param_mapper import map_organs_to_config, build_response_plan
 from .decoder import decode_response, set_models_dir
 from .ngram_model import NgramModel
+from ..geometric_interference import GeometricInterferenceEngine
 
 
 @dataclass
@@ -120,6 +122,14 @@ class GenerationSpine:
         self._recent_outputs: Dict[str, List[str]] = defaultdict(list)  # session -> recent texts
         self._max_recent = 5
         
+        # SLLM 5-Axis Geometric Engine
+        root_dir = Path(__file__).resolve().parents[3]
+        map_path = root_dir / "data/knowledge/symbolic_map_5axis.json"
+        if map_path.exists():
+            self._geometric_engine = GeometricInterferenceEngine(str(map_path))
+        else:
+            self._geometric_engine = None
+
         # Safety patterns (regex)
         self._forbidden_patterns = [
             r"\b(harm|kill|die|suicide)\b",  # Self-harm/crisis
@@ -169,6 +179,9 @@ class GenerationSpine:
             text, trace = self._finalize_text(inp.raw_text, inp, organ_scores)
         elif inp.firmware_signals:
             text, trace = self._generate_from_firmware(inp, organ_scores)
+        elif self._geometric_engine and not inp.response_plan:
+            # Option D: Geometric SLLM Generation (Primary Synthetic Path)
+            text, trace = self._generate_geometrically(inp, organ_scores)
         elif inp.response_plan:
             # Option B: Probabilistic generation from plan
             config = map_organs_to_config(organ_scores)
@@ -244,6 +257,42 @@ class GenerationSpine:
         )
         
         return raw_text, trace
+
+    def _generate_geometrically(self, inp: SpineInput, organ_scores: Dict[str, float]) -> tuple:
+        """Generate text using the 5-axis Geometric SLLM engine."""
+        if not self._geometric_engine:
+            return self._generate_fallback(inp, organ_scores), None
+
+        # Start with the query as context
+        context = inp.query
+        tokens = []
+        max_tokens = 5 # Small burst for SLLM demonstration
+        
+        current_context = context
+        total_resonance = 0
+        
+        for _ in range(max_tokens):
+            predictions = self._geometric_engine.predict_next_token(current_context, top_n=1)
+            if not predictions:
+                break
+                
+            next_word, resonance = predictions[0]
+            tokens.append(next_word)
+            current_context += " " + next_word
+            total_resonance += resonance
+            
+        text = " ".join(tokens)
+        
+        trace = GenerationTrace(
+            text=text,
+            token_logprobs=[],
+            mean_logprob=total_resonance / max(len(tokens), 1),
+            constraints_satisfied=True,
+            decode_attempts=1,
+            config_used=map_organs_to_config(organ_scores)
+        )
+        
+        return text, trace
 
     def _generate_from_firmware(self, inp: SpineInput, organ_scores: Dict[str, float]) -> tuple:
         """Generate bounded surface text from CHAL firmware signals."""

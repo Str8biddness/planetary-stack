@@ -11,6 +11,9 @@
 #include "../vmm/virtual_vpu_device.hpp"
 #include "../vmm/virtual_sllm_device.hpp"
 #include "../vmm/virtual_accelerator_device.hpp"
+#include "../geometric_engine.hpp"
+#include "../shard_manager.hpp"
+#include "../resonance_observer.hpp"
 #include <string>
 #include <vector>
 #include <memory>
@@ -131,6 +134,9 @@ private:
     std::shared_ptr<synthesus::kernel::vmm::VirtualVpuDevice> vpu_device_;
     std::shared_ptr<synthesus::kernel::vmm::VirtualSllmDevice> sllm_device_;
     std::shared_ptr<synthesus::kernel::vmm::VirtualAcceleratorDevice> accelerator_device_;
+    std::unique_ptr<zo::GeometricEngine> geometric_engine_;
+    std::unique_ptr<zo::ShardManager> shard_manager_;
+    std::unique_ptr<zo::ResonanceObserver> resonance_observer_;
 
     // Secure Enclave
     std::vector<uint8_t> secure_key_;

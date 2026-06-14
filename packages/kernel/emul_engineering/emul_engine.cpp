@@ -1,4 +1,5 @@
 #include "emul_engine.hpp"
+#include "../voice_vcu.hpp"
 #include <iostream>
 #include <cstring>
 #include <algorithm>
@@ -57,7 +58,21 @@ EmulEngine::EmulEngine()
       mirror_device_(std::make_shared<synthesus::kernel::vmm::VirtualMirrorDevice>()),
       vpu_device_(std::make_shared<synthesus::kernel::vmm::VirtualVpuDevice>()),
       sllm_device_(std::make_shared<synthesus::kernel::vmm::VirtualSllmDevice>()),
-      accelerator_device_(std::make_shared<synthesus::kernel::vmm::VirtualAcceleratorDevice>()) {}
+      accelerator_device_(std::make_shared<synthesus::kernel::vmm::VirtualAcceleratorDevice>()),
+      geometric_engine_(std::make_shared<zo::GeometricEngine>()),
+      shard_manager_(std::make_unique<zo::ShardManager>(geometric_engine_)),
+      resonance_observer_(std::make_unique<zo::ResonanceObserver>(geometric_engine_)) {
+    
+    // Set default geometric prediction handler using the ShardManager
+    sllm_device_->set_predict_handler([this](const std::string& context) {
+        static const std::vector<std::string> default_candidates = {
+            "the", "a", "is", "of", "and", "to", "in", "it", "with", "that"
+        };
+        auto results = shard_manager_->predict_global(context, default_candidates, 1);
+        if (!results.empty()) return results[0].word;
+        return std::string("...");
+    });
+}
 
 bool EmulEngine::initialize() {
     HardwareProfiler profiler;

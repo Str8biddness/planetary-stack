@@ -48,6 +48,10 @@ set(KERNEL_SOURCES
     ppbrs_router.cpp
     context_memory.cpp
     hemi_reconciler.cpp
+    geometric_engine.cpp
+    geometric_optics.cpp
+    resonance_observer.cpp
+    shard_manager.cpp
     fusion_transformer_block.cpp
 )
 
@@ -75,6 +79,7 @@ set(VCU_SOURCES
     language_vcu.cpp
     memo_vcu.cpp
     motor_vcu.cpp
+    voice_vcu.cpp
     perception_vcu.cpp
     sensory_vcu.cpp
     social_vcu.cpp
