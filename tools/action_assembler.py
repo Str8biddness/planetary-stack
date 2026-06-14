@@ -25,30 +25,26 @@ class ActionAssembler:
             "who": {"vec": self.engine.word_to_vector("who"), "cmd": "whoami"}
         }
 
+    # Explicit trigger keywords per action. Command execution must NOT be gated
+    # on geometric resonance: in the 5-axis hash space cosine is inflated (random
+    # words score ~0.99), so resonance-gating fired `whoami` on "tell me about
+    # space". A motor that runs shell commands needs a deterministic, explicit
+    # trigger — the literal intent word must appear in the query.
+    TRIGGERS = {"list": {"list", "ls"}, "who": {"who", "whoami"}}
+
+    def detect_action(self, query_text):
+        """Return the matched action (or None) WITHOUT executing it."""
+        words = {w.strip(".,;:!?") for w in query_text.lower().split()}
+        for name, data in self.action_anchors.items():
+            if words & self.TRIGGERS.get(name, {name}):
+                return data
+        return None
+
     def check_for_action(self, query_vec, query_text):
-        """
-        Scans for constructive interference with command peaks.
-        """
-        best_resonance = 0.0
-        triggered_action = None
-
-        # Check every word in the query for action resonance
-        words = query_text.lower().split()
-        for word in words:
-            w_vec = self.engine.word_to_vector(word)
-            for name, data in self.action_anchors.items():
-                res = self._calculate_resonance(w_vec, data['vec'])
-                
-                # Action Trigger Threshold: 0.99 for precise command resonance
-                if res > 0.99:
-                    if res > best_resonance:
-                        best_resonance = res
-                        triggered_action = data
-
-        if triggered_action:
-            print(f"⚡ [MOTOR] Resonance peak ({best_resonance:.4f}) detected for action: '{triggered_action['cmd']}'")
-            return self._execute_action(triggered_action, query_text)
-        
+        action = self.detect_action(query_text)
+        if action:
+            print(f"⚡ [MOTOR] Explicit trigger detected for action: '{action['cmd']}'")
+            return self._execute_action(action, query_text)
         return None
 
     def _execute_action(self, action, query_text):

@@ -24,24 +24,95 @@ class ConductiveAssembler:
 
     def _boot(self):
         print("🎵 [CONDUCTOR] Tuning the Linguistic Orchestra...")
+        self.grounding = {}
         for shard_file in self.shard_dir.glob("*.kn"):
             with open(shard_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 self.knowledge_cloud.update(data['vectors'])
-        print(f"✅ [CONDUCTOR] Ready. {len(self.knowledge_cloud)} notes (concepts) in the score.")
+        # Grounding map wins over hash vectors: it carries deliberate meaning.
+        gfile = self.shard_dir / "grounding.kn"
+        if gfile.exists():
+            with open(gfile, 'r', encoding='utf-8') as f:
+                self.grounding = json.load(f)['vectors']
+            self.knowledge_cloud.update(self.grounding)  # override hash for grounded words
+
+        # Derived grounding: coordinates learned from corpus statistics
+        # (tools/cooccurrence_grounding.py). This is the PRIMARY meaning source —
+        # real distributional semantics, not hash, not a hand table.
+        self.derived = {}
+        dfile = self.shard_dir / "grounding_derived.kn"
+        if dfile.exists():
+            with open(dfile, 'r', encoding='utf-8') as f:
+                self.derived = json.load(f)['vectors']
+        print(f"✅ [CONDUCTOR] Ready. {len(self.knowledge_cloud)} notes "
+              f"({len(self.grounding)} hand-grounded, {len(self.derived)} derived).")
+
+    def _resolve_tonic(self, query):
+        """Tonic = the grounded concept in the query if present, else hash fallback.
+
+        This is what makes selection topical: 'tell me about water' keys off the
+        grounded coordinates of 'water', not the hash of the whole sentence.
+        """
+        for w in query.lower().split():
+            w = w.strip(".,;:!?\"'()[]{}")
+            if w in self.grounding:
+                return self.grounding[w], True
+        return self.engine.word_to_vector(query), False
+
+    @staticmethod
+    def _query_words(query):
+        return [w.strip(".,;:!?\"'()[]{}") for w in query.lower().split()]
+
+    def _compose_derived(self, query):
+        """Primary path: select the topical family from corpus-derived coordinates.
+
+        Returns the queried concept plus its most resonant neighbours in the
+        learned distributional space (real semantics, no hash). None if the
+        query names no derived concept.
+        """
+        keys = [w for w in self._query_words(query) if w in self.derived]
+        if not keys:
+            return None
+        dim = len(next(iter(self.derived.values())))
+        tonic = [sum(self.derived[k][d] for k in keys) / len(keys) for d in range(dim)]
+        scored = []
+        for w, v in self.derived.items():
+            if w in keys:
+                continue
+            scored.append((self._calculate_resonance(tonic, v), w))
+        scored.sort(reverse=True)
+        family = [w for _, w in scored[:6]]
+        coherence = sum(s for s, _ in scored[:6]) / 6 if scored else 0.0
+        print(f"🎼 [DERIVED] {len(self.derived)} concepts | family resonance "
+              f"{coherence*100:.0f}%")
+        return (keys[0] + ": " + " ".join(family)).capitalize() + "."
 
     def compose_sentence(self, query):
         """
         Composes a sentence by following musical harmony rules.
         """
-        # 1. Establish the 'Key' (Phase) from the Query
-        tonic_vec = self.engine.word_to_vector(query)
+        # 0. Primary path: corpus-derived distributional coordinates.
+        derived = self._compose_derived(query)
+        if derived is not None:
+            return derived
+
+        # 1. Establish the 'Key' (Phase) from the Query's grounded concept
+        tonic_vec, grounded = self._resolve_tonic(query)
         key_phase = tonic_vec[3]
-        
+
+        # Grounding is authoritative: if the query names a grounded concept,
+        # compose from that concept's cluster (same phase) instead of the hash
+        # soup, where ~1% of 22k words cross the resonance gate by accident.
+        if grounded:
+            pool = {w: v for w, v in self.grounding.items()
+                    if abs(v[3] - key_phase) < 1e-3}
+        else:
+            pool = self.knowledge_cloud
+
         # 2. Find the 'Tonic' (First Word)
         # We find concepts with the highest resonance to the query
         potential_notes = []
-        for word, vec in self.knowledge_cloud.items():
+        for word, vec in pool.items():
             res = self._calculate_resonance(tonic_vec, vec)
             if res > 0.95:
                 potential_notes.append({'word': word, 'vec': vec, 'res': res})
@@ -59,7 +130,8 @@ class ConductiveAssembler:
         # Composition Loop (Targeting 5-7 words for a 'Bar' of music)
         for _ in range(5):
             current_note = sentence[-1]
-            next_note = self._find_consonant_neighbor(current_note, key_phase)
+            used = {n['word'] for n in sentence}
+            next_note = self._find_consonant_neighbor(current_note, key_phase, used, pool)
             if next_note:
                 sentence.append(next_note)
             else:
@@ -76,17 +148,19 @@ class ConductiveAssembler:
         print(f"🎼 [SCORE] Coherence: {coherence*100:.1f}% | Key: {key_phase*360:.1f}°")
         return score
 
-    def _find_consonant_neighbor(self, current, key_phase):
+    def _find_consonant_neighbor(self, current, key_phase, used=None, pool=None):
         """
-        Finds a word whose Pitch (Axis 2) is a 'Consonant Interval' 
+        Finds a word whose Pitch (Axis 2) is a 'Consonant Interval'
         from the current word while staying in Key (Phase).
         """
+        if pool is None:
+            pool = self.knowledge_cloud
         best_match = None
         min_dissonance = float('inf')
-        
+
         # Sample a subset for speed in this prototype
         sample_size = 0
-        for word, vec in self.knowledge_cloud.items():
+        for word, vec in pool.items():
             # Filter by Phase (Key alignment)
             phase_diff = abs(vec[3] - key_phase)
             if phase_diff > 0.1: continue # Out of Key
@@ -102,7 +176,7 @@ class ConductiveAssembler:
                     is_consonant = True
                     break
             
-            if is_consonant and word not in [n['word'] for n in [current]]:
+            if is_consonant and word != current['word'] and (used is None or word not in used):
                 # Track best by resonance and scale
                 dissonance = phase_diff + (1.0 - vec[4])
                 if dissonance < min_dissonance:

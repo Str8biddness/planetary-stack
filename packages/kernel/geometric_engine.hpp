@@ -8,10 +8,13 @@
 namespace zo {
 
 /**
- * 5-Axis Symbolic Vector: [X, Y, Z, Phase, Scale, P1, P2, P3]
- * Padded to 8-axis for SIMD alignment.
+ * Symbolic concept vector. Widened from 5 to GEO_DIM axes: real text needs
+ * many dimensions to separate cleanly (5 dims collapse on a real vocabulary;
+ * see tools/cooccurrence_grounding.py). GEO_DIM is a multiple of 8 so it stays
+ * AVX-friendly and a multiple of 4 for the SSE resonance loop.
  */
-using GeometricVector = std::array<float, 8>;
+constexpr int GEO_DIM = 64;
+using GeometricVector = std::array<float, GEO_DIM>;
 
 struct ResonanceResult {
     std::string word;
@@ -24,8 +27,8 @@ struct ResonanceResult {
  */
 class GeometricEngine {
 public:
-    static constexpr int DIM = 5;
-    static constexpr int SIMD_DIM = 8;
+    static constexpr int DIM = GEO_DIM;
+    static constexpr int SIMD_DIM = GEO_DIM;
 
     GeometricEngine();
 

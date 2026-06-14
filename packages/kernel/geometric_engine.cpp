@@ -35,59 +35,50 @@ void GeometricEngine::set_grounding_map(const std::unordered_map<std::string, Ge
 }
 
 GeometricVector GeometricEngine::generate_vector_from_hash(const std::string& word) {
-    // Simple deterministic hash function
+    // Deterministic fallback for ungrounded words (real coordinates come from
+    // the grounding map / co-occurrence pipeline). djb2 + fnv1a seed, then a
+    // splitmix64 finisher per axis to fill all GEO_DIM dimensions.
     uint64_t h1 = 5381;
     uint64_t h2 = 0x811c9dc5;
-    
     for (char c : word) {
-        h1 = ((h1 << 5) + h1) + c; // djb2
-        h2 = (h2 ^ c) * 0x01000193; // fnv1a
+        h1 = ((h1 << 5) + h1) + c;   // djb2
+        h2 = (h2 ^ c) * 0x01000193;  // fnv1a
     }
 
-    // Map to 8-axis (5 active CHAL axes + 3 padding) for SIMD alignment
-    float x = static_cast<float>(h1 & 0xFFFF) / 65535.0f;
-    float y = static_cast<float>((h1 >> 16) & 0xFFFF) / 65535.0f;
-    float z = static_cast<float>((h1 >> 32) & 0xFFFF) / 65535.0f;
-    float phase = static_cast<float>((h1 >> 48) & 0xFFFF) / 65535.0f;
-    float scale = static_cast<float>(h2 & 0xFFFF) / 65535.0f;
-
-    return {x, y, z, phase, scale, 0.0f, 0.0f, 0.0f};
+    GeometricVector vec{};
+    for (int i = 0; i < SIMD_DIM; ++i) {
+        uint64_t z = h1 ^ (h2 + static_cast<uint64_t>(i) * 0x9E3779B97F4A7C15ULL);
+        z ^= z >> 33; z *= 0xff51afd7ed558ccdULL;   // splitmix64 mix
+        z ^= z >> 33; z *= 0xc4ceb9fe1a85ec53ULL;
+        z ^= z >> 33;
+        vec[i] = static_cast<float>(z & 0xFFFF) / 65535.0f;
+    }
+    return vec;
 }
 
 float GeometricEngine::calculate_resonance(const GeometricVector& v1, const GeometricVector& v2) {
-    // SSE4.2 Optimized Cosine Similarity (4-wide floats)
-    // We process the 8-axis vector in two 4-wide blocks
-    __m128 m_v1_low = _mm_loadu_ps(&v1[0]);
-    __m128 m_v1_high = _mm_loadu_ps(&v1[4]);
-    __m128 m_v2_low = _mm_loadu_ps(&v2[0]);
-    __m128 m_v2_high = _mm_loadu_ps(&v2[4]);
+    // SSE Cosine Similarity over GEO_DIM axes, accumulated in 4-wide blocks.
+    static_assert(GEO_DIM % 4 == 0, "GEO_DIM must be a multiple of 4 for the SSE loop");
+    __m128 acc_dot = _mm_setzero_ps();
+    __m128 acc_m1  = _mm_setzero_ps();
+    __m128 acc_m2  = _mm_setzero_ps();
 
-    // Dot product: (v1.low * v2.low) + (v1.high * v2.high)
-    __m128 dot_low = _mm_mul_ps(m_v1_low, m_v2_low);
-    __m128 dot_high = _mm_mul_ps(m_v1_high, m_v2_high);
-    __m128 dot_all = _mm_add_ps(dot_low, dot_high);
-    
-    // Horizontal sum using _mm_hadd_ps (SSE3+)
-    __m128 hsum = _mm_hadd_ps(dot_all, dot_all);
-    hsum = _mm_hadd_ps(hsum, hsum);
-    float dot;
-    _mm_store_ss(&dot, hsum);
+    for (int i = 0; i < SIMD_DIM; i += 4) {
+        __m128 a = _mm_loadu_ps(&v1[i]);
+        __m128 b = _mm_loadu_ps(&v2[i]);
+        acc_dot = _mm_add_ps(acc_dot, _mm_mul_ps(a, b));
+        acc_m1  = _mm_add_ps(acc_m1,  _mm_mul_ps(a, a));
+        acc_m2  = _mm_add_ps(acc_m2,  _mm_mul_ps(b, b));
+    }
 
-    // Magnitudes: sqrt(sum(v1^2)) * sqrt(sum(v2^2))
-    __m128 m1_sq = _mm_add_ps(_mm_mul_ps(m_v1_low, m_v1_low), _mm_mul_ps(m_v1_high, m_v1_high));
-    __m128 m2_sq = _mm_add_ps(_mm_mul_ps(m_v2_low, m_v2_low), _mm_mul_ps(m_v2_high, m_v2_high));
+    auto hsum = [](__m128 v) -> float {
+        v = _mm_hadd_ps(v, v);
+        v = _mm_hadd_ps(v, v);
+        float r; _mm_store_ss(&r, v); return r;
+    };
 
-    __m128 hsum1 = _mm_hadd_ps(m1_sq, m1_sq);
-    hsum1 = _mm_hadd_ps(hsum1, hsum1);
-    float mag1_sq;
-    _mm_store_ss(&mag1_sq, hsum1);
-
-    __m128 hsum2 = _mm_hadd_ps(m2_sq, m2_sq);
-    hsum2 = _mm_hadd_ps(hsum2, hsum2);
-    float mag2_sq;
-    _mm_store_ss(&mag2_sq, hsum2);
-
-    float denom = std::sqrt(mag1_sq) * std::sqrt(mag2_sq);
+    float dot = hsum(acc_dot);
+    float denom = std::sqrt(hsum(acc_m1)) * std::sqrt(hsum(acc_m2));
     return (denom == 0) ? 0.0f : dot / denom;
 }
 
@@ -101,7 +92,7 @@ std::vector<ResonanceResult> GeometricEngine::predict_next(const std::string& co
     std::string w;
     while (ss >> w) words.push_back(w);
 
-    GeometricVector interference_point = {0, 0, 0, 0, 0, 0, 0, 0};
+    GeometricVector interference_point{};
     float total_weight = 0;
 
     for (size_t i = 0; i < words.size(); ++i) {

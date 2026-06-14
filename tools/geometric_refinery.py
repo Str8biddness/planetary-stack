@@ -8,6 +8,8 @@ Supports Multi-Category Live Ingestion and Categorical Sharding.
 
 import os
 import sys
+import re
+import html
 import json
 import time
 import hashlib
@@ -24,17 +26,25 @@ class GeometricEngineFallback:
     def __init__(self):
         self.DIM = 5
 
+    MASK64 = 0xFFFFFFFFFFFFFFFF
+
     def word_to_vector(self, word):
+        # Canonical hash: bit-for-bit identical to the C++ kernel
+        # (geometric_engine.cpp::generate_vector_from_hash) so shards built in
+        # Python remain valid when the SSE kernel is loaded. djb2 + fnv1a over
+        # UTF-8 bytes with signed-char semantics to match g++ on x86.
         word = word.lower().strip()
-        # Use MD5 to simulate the djb2/fnv1a dual hash behavior
-        h = hashlib.md5(word.encode()).digest()
-        
-        x = (h[0] + h[1] * 256) / 65535.0
-        y = (h[2] + h[3] * 256) / 65535.0
-        z = (h[4] + h[5] * 256) / 65535.0
-        phase = (h[6] + h[7] * 256) / 65535.0
-        scale = (h[8] + h[9] * 256) / 65535.0
-        
+        h1 = 5381
+        h2 = 0x811c9dc5
+        for b in word.encode('utf-8'):
+            c = b - 256 if b > 127 else b          # emulate signed char
+            h1 = (((h1 << 5) + h1) + c) & self.MASK64          # djb2
+            h2 = ((h2 ^ (c & self.MASK64)) * 0x01000193) & self.MASK64  # fnv1a
+        x = (h1 & 0xFFFF) / 65535.0
+        y = ((h1 >> 16) & 0xFFFF) / 65535.0
+        z = ((h1 >> 32) & 0xFFFF) / 65535.0
+        phase = ((h1 >> 48) & 0xFFFF) / 65535.0
+        scale = (h2 & 0xFFFF) / 65535.0
         return [x, y, z, phase, scale]
 
 class ArchiveIngestor:
@@ -202,22 +212,66 @@ class GeometricRefinery:
             
         print("\n--- Multi-Category Ingestion Complete ---")
 
+    # Tokens that are markup/code/noise rather than concepts.
+    _CJK = lambda self, ch: '\u4e00' <= ch <= '\u9fff'
+
+    # Markers + phrases that signal corpus boilerplate (Project Gutenberg
+    # headers/footers and license text) rather than real content. Left
+    # unstripped these dominate the low-frequency spectral modes.
+    _BOILERPLATE = re.compile(
+        r'project gutenberg|gutenberg\.org|gutenberg-tm|public domain|'
+        r'distributed proofread|ebook|copyright|trademark|donation|'
+        r'redistribut|paragraph 1\.|section [0-9]|terms of (this|the) agreement',
+        re.IGNORECASE)
+
+    def _strip_boilerplate(self, text):
+        # Extract every body between START / END markers (handles a corpus of
+        # several concatenated Gutenberg books, not just one).
+        bodies = re.findall(
+            r'\*\*\*\s*start of th[ei]s? project gutenberg.*?\*\*\*'
+            r'(.*?)'
+            r'\*\*\*\s*end of th[ei]s? project gutenberg',
+            text, re.IGNORECASE | re.DOTALL)
+        if bodies:
+            text = "\n".join(bodies)
+        # Drop any residual admin/license lines that survived.
+        return "\n".join(ln for ln in text.splitlines()
+                         if not self._BOILERPLATE.search(ln))
+
+    def clean_and_tokenize(self, text):
+        """Turn raw scraped text into concept tokens.
+
+        Strips HTML tags + entities, drops URLs / LaTeX / code residue, keeps
+        alphabetic words (len>=2) and individual CJK pictographs. This is the
+        gate that keeps `nasa</h2>`, `rel="noopener">mexico`, `$\\textit{jwst}$`
+        and `arxiv:2603.17835` out of the knowledge cloud.
+        """
+        text = self._strip_boilerplate(text)                         # kill license/admin text
+        text = html.unescape(re.sub(r'<[^>]+>', ' ', text))          # kill HTML tags + entities
+        text = re.sub(r'https?://\S+|www\.\S+', ' ', text)            # kill URLs
+        text = re.sub(r'\$[^$]*\$|\\[a-zA-Z]+', ' ', text)            # kill inline LaTeX / commands
+
+        tokens = []
+        for raw in text.lower().split():
+            # CJK: every pictograph is its own concept
+            if any(self._CJK(ch) for ch in raw):
+                tokens.extend(ch for ch in raw if self._CJK(ch))
+                continue
+            # Strip surrounding punctuation, keep internal hyphen/apostrophe
+            w = raw.strip(".,;:!?\"'()[]{}<>=*|/\\`~#%&+")
+            # Drop code/byte-string prefixes like b'ee, r'x, u'y, f'z
+            if "'" in w and len(w.split("'", 1)[0]) < 2:
+                continue
+            # Concept = purely alphabetic (allowing - and ') and at least 2 chars
+            if len(w) >= 2 and re.fullmatch(r"[a-z][a-z'\-]*[a-z]", w):
+                tokens.append(w)
+        return tokens
+
     def refine_text_to_partition(self, input_path, output_path):
         if not os.path.exists(input_path): return
         with open(input_path, 'r', encoding='utf-8') as f: text = f.read()
 
-        # Advanced Unicode Tokenization
-        # 1. Split by spaces for most languages
-        # 2. Extract individual characters for CJK (Chinese, Japanese, Korean)
-        words = []
-        for word in text.lower().split():
-            # Check if word contains CJK characters
-            is_cjk = any('\u4e00' <= char <= '\u9fff' for char in word)
-            if is_cjk:
-                words.extend(list(word)) # Individual pictographs are concepts
-            else:
-                words.append(word)
-        
+        words = self.clean_and_tokenize(text)
         unique_words = list(set(words))
         
         kn_data = {
