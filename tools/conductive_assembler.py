@@ -47,6 +47,7 @@ class ConductiveAssembler:
         # PPBRS reasoning layer: a Bayesian belief over the derived patterns,
         # giving calibrated uncertainty (it can answer "I'm not sure").
         self.activator = None
+        self.realizer = None
         if self.derived:
             try:
                 import importlib.util
@@ -56,6 +57,12 @@ class ConductiveAssembler:
                 mod = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(mod)
                 self.activator = mod.ProbabilisticPatternActivator(mod.PatternField(self.derived))
+                rp = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  "..", "packages", "reasoning", "realizer.py")
+                rspec = importlib.util.spec_from_file_location("realizer", rp)
+                rmod = importlib.util.module_from_spec(rspec)
+                rspec.loader.exec_module(rmod)
+                self.realizer = rmod.Realizer()
             except Exception as e:
                 print(f"⚠️ [PPBRS] reasoning layer unavailable: {e}")
         print(f"✅ [CONDUCTOR] Ready. {len(self.knowledge_cloud)} notes "
@@ -82,12 +89,13 @@ class ConductiveAssembler:
         H = self.activator.entropy()
         fam = [w for w, _ in self.activator.top_k(6)]
         resolved = self.activator.is_resolved()
+        print(f"🧮 [PPBRS] {'resolved' if resolved else 'uncertain'} | entropy {H:.2f}")
+        if self.realizer:                          # GRE-style surface realization
+            return self.realizer.realize(fam[0], fam[1:5], resolved)
+        # fallback if the realizer didn't load
         body = fam[0] + ": " + " ".join(fam[1:])
-        if resolved:
-            print(f"🧮 [PPBRS] resolved | entropy {H:.2f}")
-            return body.capitalize() + "."
-        print(f"🧮 [PPBRS] uncertain | entropy {H:.2f}")
-        return ("I'm not certain, but this seems related to " + body + ".").capitalize()
+        return body.capitalize() + "." if resolved else \
+            ("I'm not certain, but this seems related to " + body + ".").capitalize()
 
     def _resolve_tonic(self, query):
         """Tonic = the grounded concept in the query if present, else hash fallback.

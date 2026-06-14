@@ -139,6 +139,20 @@ def test_uncertainty():
          f"{coh.entropy():.2f} < {inc.entropy():.2f}")
 
 
+# ---- G. Realizer (surface form: word-lists -> sentences) ---------------
+def test_realizer():
+    print("\nG. Realizer (grammatical surface form)")
+    sys.path.insert(0, os.path.abspath("packages/reasoning"))
+    import realizer
+    r = realizer.Realizer()
+    s = r.realize("energy", ["mass", "motion", "force"], resolved=True)
+    gate("grammatical sentence", s[0].isupper() and s.endswith(".") and len(s.split()) >= 5, s)
+    gate("contains head concept", "energy" in s.lower(), s)
+    h = r.realize("species", ["geometry", "music"], resolved=False)
+    hedged = any(m in h.lower() for m in ("not certain", "unclear", "tentativ", "might", "may"))
+    gate("hedges when uncertain", hedged, h)
+
+
 # ---- D. Hash parity regression -----------------------------------------
 def test_parity():
     print("\nD. Python↔C++ hash parity")
@@ -157,6 +171,7 @@ if __name__ == "__main__":
     test_family(D)
     test_scene()
     test_uncertainty()
+    test_realizer()
     test_parity()
     n_pass, n = sum(results), len(results)
     print("\n" + "=" * 60)
