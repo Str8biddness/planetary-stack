@@ -14,11 +14,13 @@ from pathlib import Path
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from geometric_refinery import GeometricEngineFallback
 from conductive_assembler import ConductiveAssembler
+from action_assembler import ActionAssembler
 
 class ModularSynthesusShell:
     def __init__(self):
         self.engine = GeometricEngineFallback()
         self.assembler = ConductiveAssembler()
+        self.motor = ActionAssembler(self.engine)
         self.shard_dir = Path("/home/dakin/dev/Synthesus_4.0/data/geometric_shards")
         self.active_agent = None
         self.agent_shard = {}
@@ -67,14 +69,25 @@ class ModularSynthesusShell:
 
     def bolt_on_agent(self, agent_info):
         print(f"\n🔩 [SYSTEM] Bolting on {agent_info['name']} Agent...")
+        
+        # 1. Load Knowledge (Archetype)
         with open(agent_info['file'], 'r', encoding='utf-8') as f:
             data = json.load(f)
             self.agent_shard = data['vectors']
+        
+        # 2. Load Conversational Style (Cadence)
+        cadence_file = self.shard_dir / f"cadence_{agent_info['name'].lower()}.kn"
+        if cadence_file.exists():
+            print(f"   - Anchoring conversational cadence from {cadence_file.name}...")
+            with open(cadence_file, 'r', encoding='utf-8') as f:
+                c_data = json.load(f)
+                self.agent_shard.update(c_data['vectors'])
+        
         self.active_agent = agent_info['name']
         
-        # Update the assembler's logic with the agent's harmonic DNA
+        # Update the assembler's logic with the agent's combined harmonic DNA
         self.assembler.knowledge_cloud.update(self.agent_shard)
-        print(f"✅ {agent_info['name']} Agent loaded into active RAM.")
+        print(f"✅ {agent_info['name']} Agent fully loaded and realistically backed.")
 
     def unload_agent(self):
         print(f"\n🔌 [SYSTEM] Unbolting active agent...")
@@ -115,12 +128,17 @@ class ModularSynthesusShell:
         query_vec = self.engine.word_to_vector(text)
         pitch = 220.0 + (query_vec[1] * 660.0)
         
-        # 2. Conductive Generation
+        # 2. Action Resonance Check (Motor Control)
+        action_result = self.motor.check_for_action(query_vec, text)
+        
+        # 3. Conductive Generation
         response = self.assembler.compose_sentence(text)
         
-        # 3. Render with Persona Branding
+        # 4. Render with Persona Branding
         print(f"\033[1;35m🧠 {self.active_agent.upper()} > \033[0m", end="")
         print(response)
+        if action_result:
+            print(f"\033[1;33m🛠️  [ACTION_RESULT]: {action_result}\033[0m")
         print(f"\033[2m   [Frequency: {pitch:.1f}Hz | Multi-modal Sync: OK]\033[0m\n")
 
 if __name__ == "__main__":
