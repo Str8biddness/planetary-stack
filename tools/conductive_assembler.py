@@ -28,7 +28,7 @@ class ConductiveAssembler:
         for shard_file in self.shard_dir.glob("*.kn"):
             with open(shard_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                self.knowledge_cloud.update(data['vectors'])
+                self.knowledge_cloud.update(data.get('vectors', {}))  # skip non-vector shards
         # Grounding map wins over hash vectors: it carries deliberate meaning.
         gfile = self.shard_dir / "grounding.kn"
         if gfile.exists():
@@ -44,8 +44,50 @@ class ConductiveAssembler:
         if dfile.exists():
             with open(dfile, 'r', encoding='utf-8') as f:
                 self.derived = json.load(f)['vectors']
+        # PPBRS reasoning layer: a Bayesian belief over the derived patterns,
+        # giving calibrated uncertainty (it can answer "I'm not sure").
+        self.activator = None
+        if self.derived:
+            try:
+                import importlib.util
+                pa = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  "..", "packages", "reasoning", "ppbrs_activator.py")
+                spec = importlib.util.spec_from_file_location("ppbrs_activator", pa)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                self.activator = mod.ProbabilisticPatternActivator(mod.PatternField(self.derived))
+            except Exception as e:
+                print(f"⚠️ [PPBRS] reasoning layer unavailable: {e}")
         print(f"✅ [CONDUCTOR] Ready. {len(self.knowledge_cloud)} notes "
-              f"({len(self.grounding)} hand-grounded, {len(self.derived)} derived).")
+              f"({len(self.grounding)} hand-grounded, {len(self.derived)} derived"
+              f"{', PPBRS active' if self.activator else ''}).")
+
+    def _compose_ppbrs(self, query):
+        """Primary path: Bayesian reasoning over derived patterns.
+
+        Accumulates each grounded query word as evidence, then answers from the
+        posterior — and crucially, HEDGES when the belief stays uncertain (high
+        entropy) instead of returning a confident-looking list for nonsense.
+        Returns None if the query names no grounded concept.
+        """
+        if not self.activator:
+            return None
+        self.activator.reset()
+        observed = 0
+        for w in self._query_words(query):
+            if self.activator.observe(w) is not None:
+                observed += 1
+        if observed == 0:
+            return None
+        H = self.activator.entropy()
+        fam = [w for w, _ in self.activator.top_k(6)]
+        resolved = self.activator.is_resolved()
+        body = fam[0] + ": " + " ".join(fam[1:])
+        if resolved:
+            print(f"🧮 [PPBRS] resolved | entropy {H:.2f}")
+            return body.capitalize() + "."
+        print(f"🧮 [PPBRS] uncertain | entropy {H:.2f}")
+        return ("I'm not certain, but this seems related to " + body + ".").capitalize()
 
     def _resolve_tonic(self, query):
         """Tonic = the grounded concept in the query if present, else hash fallback.
@@ -91,7 +133,11 @@ class ConductiveAssembler:
         """
         Composes a sentence by following musical harmony rules.
         """
-        # 0. Primary path: corpus-derived distributional coordinates.
+        # 0. Primary path: PPBRS Bayesian reasoning (with calibrated uncertainty),
+        #    falling back to plain derived-coordinate selection.
+        ppbrs = self._compose_ppbrs(query)
+        if ppbrs is not None:
+            return ppbrs
         derived = self._compose_derived(query)
         if derived is not None:
             return derived
