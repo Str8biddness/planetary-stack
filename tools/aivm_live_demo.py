@@ -37,12 +37,18 @@ async def main():
     identity = PersonaIdentity(id="npc-1", name="Aria", archetype="scholar")
     kernel.spawn_npc(identity, permission=PermissionLevel.GUEST, reasoning_core=core)
 
+    print("amplification router GOVERNS the hemispheres.")
+    print("learned routing (hemisphere tried first, per query-type):")
+    for d, h in core.routing_table().items():
+        print(f"   {d:5} -> {h}")
+    print()
+
     questions = [
-        "Who bit the man?",          # LEFT symbolic   -> grounded
-        "Is a dog an animal?",       # LEFT symbolic   -> grounded
-        "Who chases the wolf?",      # RIGHT abstraction-> imagination (inferred)
-        "tell me about the wolf and the fox",  # RIGHT Hopfield -> imagination (associative)
-        "Who flies the airplane?",   # neither         -> ungrounded (declined)
+        "Who bit the man?",          # who  -> symbolic first
+        "Is a dog an animal?",       # isa  -> symbolic first
+        "Who chases the wolf?",      # who  -> symbolic abstains, imagination inferred
+        "tell me about the wolf and the fox",  # open -> hopfield FIRST (governed)
+        "Who flies the airplane?",   # nothing grounds or imagines -> declined
     ]
 
     for q in questions:
@@ -54,8 +60,8 @@ async def main():
         tag = core.last_groundedness.upper()
         shown = resp if resp != "[NO_GROUNDED_ANSWER]" else "(declined)"
         print(f"Q: {q}")
-        print(f"   hemisphere={core.last_mechanism:11} tag={tag:12} "
-              f"conf={core.last_confidence:.2f} coherence_post={post}")
+        print(f"   hemisphere={core.last_mechanism:11} attempts={core.last_attempts} "
+              f"tag={tag:12} coherence_post={post}")
         print(f"   -> {shown}\n")
 
     kernel.stop()

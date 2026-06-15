@@ -389,8 +389,22 @@ tell me about the wolf and the fox  hemisphere=hopfield    -> [educated guess] s
 Who flies the airplane?             hemisphere=none        -> (declined)
 ```
 The full loop: imagination *proposes* → symbolic *verifies* → tagger *labels*
-(verified / educated guess) → (the amplification router can then govern when to
-spend each hemisphere). Demo: `tools/aivm_live_demo.py`.
+(verified / educated guess). Demo: `tools/aivm_live_demo.py`.
+
+**Governed hemispheres (§5.11 loop applied to the hemispheres).** The three
+hemispheres are organs; the `MetaController` learns per query-type which to try
+first (grounded valued above imagined, structured inference above loose
+association):
+```
+learned routing:  who/isa/what -> symbolic     open -> hopfield
+Who bit the man?                    symbolic    attempts=1  [verified] dog
+Who chases the wolf?                abstraction attempts=2  [educated guess] ...canine level
+tell me about the wolf and the fox  hopfield    attempts=1  [educated guess] settles toward 'fox'
+Who flies the airplane?             none        attempts=3  (declined)
+```
+Governance gives correct routing (relational → abstraction, open → association)
+AND efficiency (open queries reach imagination in 1 attempt, not 3). The same
+loop now governs operators (§5.11), memory (§5.12), and hemispheres (here).
 
 ## 6. Files
 
