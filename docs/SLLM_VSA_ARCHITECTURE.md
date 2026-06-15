@@ -427,6 +427,25 @@ taxonomy) need *relations* (facts, is-a edges), which raw text doesn't provide �
 they scale by relation EXTRACTION (e.g. distributional inclusion for hypernyms),
 a separate frontier, not by feeding more words.
 
+### 5.17 Image-space GPU optimization — `vsa_gpu_imagespace.py`
+The spatial/image-space math insight applied to reasoning: a BATCH of reasoning
+states is an image (B states × d dims), and settling becomes one parallel
+tensor op instead of a per-state Python loop — the GPU's native parallel-element
+path (the same shape anaglyph/texture math rides).
+```
+  per-state loop:  for each cue:  xi <- X^T softmax(beta X xi)     (serial)
+  image-space:     XI <- softmax(beta·C @ X^T) @ X  over ALL cues  (parallel)
+
+backend=numpy(CPU)  attractors 1500x128  batch 512:
+  correctness: image-space vs loop agree 100.0%
+  per-state loop 8228 ms  ->  image-space 985 ms   = 8.4x  (CPU BLAS proxy)
+```
+Identical results, 8.4× from CPU vectorization alone; the code is
+backend-agnostic, so a one-line CuPy swap runs it on GPU unchanged (adding
+thousands of parallel lanes). This is the GPU-optimization path for the
+imagination hemisphere — settle many cues at once. (`bind` is likewise
+convolution, the most GPU-optimized op of all.)
+
 ## 6. Files
 
 | File | Role |
@@ -446,6 +465,7 @@ a separate frontier, not by feeding more words.
 | `packages/reasoning/vsa_memory.py` | Amplified Memory Router — same loop governing the 4-source memory cascade (`MemoryRouter`) |
 | `packages/reasoning/vsa_hopfield.py` | Energy/Hopfield settling reasoner — GPU-shaped imagination organ (`ModernHopfield`) |
 | `packages/reasoning/vsa_scaled_hemispheres.py` | grounding-dependent hemispheres on the real 292k-word corpus (1500 concepts) |
+| `packages/reasoning/vsa_gpu_imagespace.py` | image-space GPU optimization of settling (backend-agnostic NumPy/CuPy) |
 
 `TwoLayerVSA` (in `vsa_twolayer.py`) is the reusable core: builds both layers
 from a corpus and exposes `encode(s,v,o)`, `recover(S, role)`, `meaning_of(word)`.
@@ -493,4 +513,5 @@ cd /home/dakin/Synthesus_4.0
 ./venv/bin/python packages/reasoning/vsa_memory.py   # amplified memory governance
 ./venv/bin/python packages/reasoning/vsa_hopfield.py # energy/Hopfield settling (imagination organ)
 ./venv/bin/python packages/reasoning/vsa_scaled_hemispheres.py  # hemispheres on the real corpus
+./venv/bin/python packages/reasoning/vsa_gpu_imagespace.py      # image-space GPU optimization
 ```
