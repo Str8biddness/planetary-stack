@@ -504,6 +504,28 @@ need richer per-object geometry — hand-authored templates (bounded) or learned
 from images (open-ended, needs visual data). The ceiling is knowledge, not
 engineering.
 
+### 5.21 Pattern compression: a recursive tree pattern — `vsa_pattern_fractal.py`
+Proves "scale the pattern, not the pixels." The crude green-circle tree becomes a
+detailed tree by giving it a RECURSIVE pattern (an L-system): **7 parameters →
+511 branches + a leaf per twig**, rendered resolution-free with anti-aliasing.
+A procedural/geometric pattern is an extremely compressed, symbolic,
+vector-encodable unit of visual knowledge — and nature is fractal, so it
+compresses well (this is the proven basis of procedural generation: L-systems,
+fractal terrain, SpeedTree). It unifies with the rest of the stack: image
+patterns (rules-as-vectors) + concept coordinates + Hopfield attractors are ONE
+vector-symbolic substrate.
+```
+pattern parameters: 7   ->   branches grown: 511   (+ leaves)   = high compression
+```
+**Honest caveat (narrower than for the raster case):** procedural patterns
+compress STRUCTURED/regular/fractal content beautifully (much of nature), but the
+RULE still encodes sourced knowledge (how a tree branches was learned by studying
+trees); synthetic variation multiplies coverage of known forms, it does not
+invent unseen real form; and irreducibly-specific content (a particular face, a
+specific photo) is not a few rules — that still needs real data / a learned model.
+So: a vast class of generative imagery is real and compact here; arbitrary
+photorealism still needs observed patterns.
+
 ## 6. Files
 
 | File | Role |
