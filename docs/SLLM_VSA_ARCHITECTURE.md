@@ -466,6 +466,24 @@ absolute shard path in `scene_composer.py` so grounded colours load.) Honest
 ceiling unchanged: vector illustrations, not photographs — recognisable objects
 need a learned visual model.
 
+### 5.19 Resolution-independent analytic rendering — `vsa_hd_render.py`
+The "maximum world size + pi" idea, made rigorous:
+- **Maximum world size** = a normalized [0,1]² reference frame; geometry is stored
+  relative to it, not in pixels → the same scene rasterizes to ANY resolution.
+- **pi / continuous math** = shapes are continuous functions (signed-distance
+  fields, radial `(1+cos(pi·t))/2` glows, smooth gradients); edges anti-aliased
+  to sub-pixel precision using pixel-size (1/res) in world units.
+```
+same scene -> hd_..._256.png and hd_..._1024.png : both crisp (mountain, sun glow, gradient sky)
+```
+**What this surpasses:** the resolution/sharpness bottleneck — crisp HD/4K at any
+res, because the image is defined by equations, not a pixel grid. **What it does
+NOT:** the semantic bottleneck — it makes mathematically-perfect *procedural
+illustrations*, not photographs. pi buys infinite sharpness, not learned content;
+a photorealistic real object still needs a learned visual model. (The deeper form
+of this is harmonic/Fourier synthesis — also pi-based, resolution-free, more
+terms = more detail — the rigorous version of the original "interference" idea.)
+
 ## 6. Files
 
 | File | Role |
@@ -487,6 +505,7 @@ need a learned visual model.
 | `packages/reasoning/vsa_scaled_hemispheres.py` | grounding-dependent hemispheres on the real 292k-word corpus (1500 concepts) |
 | `packages/reasoning/vsa_gpu_imagespace.py` | image-space GPU optimization of settling (backend-agnostic NumPy/CuPy) |
 | `packages/reasoning/vsa_imagine_image.py` | dual-process image generation: imagination (Hopfield) → pattern-base render |
+| `packages/reasoning/vsa_hd_render.py` | resolution-independent analytic rendering (normalized world + pi-based continuous shapes) |
 
 `TwoLayerVSA` (in `vsa_twolayer.py`) is the reusable core: builds both layers
 from a corpus and exposes `encode(s,v,o)`, `recover(S, role)`, `meaning_of(word)`.
@@ -536,4 +555,5 @@ cd /home/dakin/Synthesus_4.0
 ./venv/bin/python packages/reasoning/vsa_scaled_hemispheres.py  # hemispheres on the real corpus
 ./venv/bin/python packages/reasoning/vsa_gpu_imagespace.py      # image-space GPU optimization
 ./venv/bin/python packages/reasoning/vsa_imagine_image.py      # dual-process image generation
+./venv/bin/python packages/reasoning/vsa_hd_render.py          # resolution-independent HD rendering
 ```
