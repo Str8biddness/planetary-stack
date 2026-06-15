@@ -406,6 +406,27 @@ Governance gives correct routing (relational → abstraction, open → associati
 AND efficiency (open queries reach imagination in 1 attempt, not 3). The same
 loop now governs operators (§5.11), memory (§5.12), and hemispheres (here).
 
+### 5.16 Scaled grounding across the hemispheres — `vsa_scaled_hemispheres.py`
+Scales the shared semantic substrate to the real 292k-word corpus and runs the
+grounding-dependent hemispheres on 1500 concepts × 128 dims:
+```
+similarity:  light ~ velocity, propagation, ray   |  mass ~ energy, force, gravitation
+imagination: Hopfield recovery 99.5% up to 1.2x-signal corruption (toy 13-dim collapsed)
+settling:    space+time -> 'space'   mass+energy -> 'energy'   light+velocity -> 'velocity'
+analogy:     space:time::length:? -> measured, rod   (force analogy noisier: single-domain)
+```
+Two honest results: (1) the imagination/analogy/similarity hemispheres scale to
+real geometry with **zero architecture change** — they're pure functions of the
+coordinate space; (2) scale **fixes the Hopfield capacity** weakness — the toy
+13-dim collapse was dimensionality, not the method (note: must use norm-relative
+corruption to compare fairly across dims; fixed per-component sigma grows like
+√dims and falsely swamps the signal).
+
+**Honest scope:** the STRUCTURED hemispheres (symbolic fact-store, entailment
+taxonomy) need *relations* (facts, is-a edges), which raw text doesn't provide —
+they scale by relation EXTRACTION (e.g. distributional inclusion for hypernyms),
+a separate frontier, not by feeding more words.
+
 ## 6. Files
 
 | File | Role |
@@ -424,6 +445,7 @@ loop now governs operators (§5.11), memory (§5.12), and hemispheres (here).
 | `packages/reasoning/vsa_amplify.py` | Amplified Reasoning Router — legacy amplification_bridge refined into operator governance (`AmplifiedRouter`) |
 | `packages/reasoning/vsa_memory.py` | Amplified Memory Router — same loop governing the 4-source memory cascade (`MemoryRouter`) |
 | `packages/reasoning/vsa_hopfield.py` | Energy/Hopfield settling reasoner — GPU-shaped imagination organ (`ModernHopfield`) |
+| `packages/reasoning/vsa_scaled_hemispheres.py` | grounding-dependent hemispheres on the real 292k-word corpus (1500 concepts) |
 
 `TwoLayerVSA` (in `vsa_twolayer.py`) is the reusable core: builds both layers
 from a corpus and exposes `encode(s,v,o)`, `recover(S, role)`, `meaning_of(word)`.
@@ -470,4 +492,5 @@ cd /home/dakin/Synthesus_4.0
 ./venv/bin/python packages/reasoning/vsa_amplify.py  # amplified metacognitive router
 ./venv/bin/python packages/reasoning/vsa_memory.py   # amplified memory governance
 ./venv/bin/python packages/reasoning/vsa_hopfield.py # energy/Hopfield settling (imagination organ)
+./venv/bin/python packages/reasoning/vsa_scaled_hemispheres.py  # hemispheres on the real corpus
 ```
