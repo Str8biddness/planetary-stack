@@ -374,10 +374,23 @@ C. beta = imagination temperature: beta=1 -> blended/imaginative; beta=16 -> dec
 Role: the GPU **imagination hemisphere**. It proposes a completed pattern; the
 symbolic layer verifies/tags it (high overlap → grounded, low → educated guess,
 feeding §5.13). Core op is dense matmul (`X@xi`, `X^T@softmax`), batchable over
-cues — CPU/NumPy here, a CuPy/torch swap parallelises it on GPU unchanged. It
-mounts as an organ in the amplification router (§5.11) and the `VSLLM` device slot.
+cues — CPU/NumPy here, a CuPy/torch swap parallelises it on GPU unchanged.
 Honest scope: small-dim/few-pattern here limits noisy recovery; capacity grows
 with dimensionality (the scale dial).
+
+**Wired LIVE (dual-process).** `SynthesusReasoningCore` now runs both
+hemispheres in the kernel tick: LEFT (symbolic VSA) grounds; if it can't, RIGHT
+imagines — first by abstraction (inference), then by Hopfield settling
+(association into the nearest grounded attractor). Live trace:
+```
+Who bit the man?                    hemisphere=symbolic    -> [verified] dog
+Who chases the wolf?                hemisphere=abstraction -> [educated guess] ...canine level: wolf chases fox
+tell me about the wolf and the fox  hemisphere=hopfield    -> [educated guess] settles toward 'fox'
+Who flies the airplane?             hemisphere=none        -> (declined)
+```
+The full loop: imagination *proposes* → symbolic *verifies* → tagger *labels*
+(verified / educated guess) → (the amplification router can then govern when to
+spend each hemisphere). Demo: `tools/aivm_live_demo.py`.
 
 ## 6. Files
 

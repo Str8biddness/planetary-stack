@@ -38,10 +38,11 @@ async def main():
     kernel.spawn_npc(identity, permission=PermissionLevel.GUEST, reasoning_core=core)
 
     questions = [
-        "Who bit the man?",          # grounded -> [verified]
-        "Is a dog an animal?",       # grounded -> [verified]
-        "Who chases the wolf?",      # no direct fact -> imagination [educated guess]
-        "Who flies the airplane?",   # ungrounded -> coherence FAILS
+        "Who bit the man?",          # LEFT symbolic   -> grounded
+        "Is a dog an animal?",       # LEFT symbolic   -> grounded
+        "Who chases the wolf?",      # RIGHT abstraction-> imagination (inferred)
+        "tell me about the wolf and the fox",  # RIGHT Hopfield -> imagination (associative)
+        "Who flies the airplane?",   # neither         -> ungrounded (declined)
     ]
 
     for q in questions:
@@ -53,7 +54,8 @@ async def main():
         tag = core.last_groundedness.upper()
         shown = resp if resp != "[NO_GROUNDED_ANSWER]" else "(declined)"
         print(f"Q: {q}")
-        print(f"   tag={tag:12} coherence_post={post}")
+        print(f"   hemisphere={core.last_mechanism:11} tag={tag:12} "
+              f"conf={core.last_confidence:.2f} coherence_post={post}")
         print(f"   -> {shown}\n")
 
     kernel.stop()
