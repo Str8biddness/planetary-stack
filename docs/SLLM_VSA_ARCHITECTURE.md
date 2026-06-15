@@ -341,6 +341,24 @@ that did `return True` are now real: generation is grounded reasoning, and the
 coherence gate **refuses to emit an ungrounded answer** (the airplane query
 fails `coherence_post`). Demo: `tools/aivm_live_demo.py`.
 
+**Groundedness tagging (imagination upgrade).** Generation and hallucination are
+the same predictive act — the difference is support. So the gate is 3-way, not
+binary, and every answer is tagged:
+```
+Who bit the man?        tag=GROUNDED     -> [verified] dog
+Is a dog an animal?     tag=GROUNDED     -> [verified] yes
+Who chases the wolf?    tag=IMAGINATION  -> [educated guess] ...canine level: wolf chases fox
+Who flies the airplane? tag=UNGROUNDED   -> (declined, coherence_post=fail)
+```
+- **grounded** — verified by the symbolic operators → stated as fact.
+- **imagination** — no direct support, inferred by abstraction (the smelter
+  loop) → surfaced but FLAGGED as an educated guess, never as fact. This is the
+  mount point for a future GPU "imagination hemisphere" (dual-process: it
+  proposes, the symbolic layer verifies/tags).
+- **ungrounded** — neither → declined.
+
+The system always knows, and says, whether it is recalling or imagining.
+
 ## 6. Files
 
 | File | Role |

@@ -38,24 +38,23 @@ async def main():
     kernel.spawn_npc(identity, permission=PermissionLevel.GUEST, reasoning_core=core)
 
     questions = [
-        "Who bit the man?",
-        "Is a dog an animal?",
-        "What kind of thing is a wolf?",
-        "Who flies the airplane?",   # ungrounded -> coherence must FAIL
+        "Who bit the man?",          # grounded -> [verified]
+        "Is a dog an animal?",       # grounded -> [verified]
+        "Who chases the wolf?",      # no direct fact -> imagination [educated guess]
+        "Who flies the airplane?",   # ungrounded -> coherence FAILS
     ]
 
     for q in questions:
         result = await kernel.tick("npc-1", {"user_input": q})
-        # pull the live audit verdicts straight from the NPC's tick stream
         npc = kernel._npcs["npc-1"]
         verds = {e.step: e.details for e in npc.audit_stream[-12:]}
-        pre = verds.get("coherence_pre", {}).get("verdict")
         post = verds.get("coherence_post", {}).get("verdict")
         resp = result["response"]
-        shown = resp if resp != "[NO_GROUNDED_ANSWER]" else "(declined — ungrounded)"
+        tag = core.last_groundedness.upper()
+        shown = resp if resp != "[NO_GROUNDED_ANSWER]" else "(declined)"
         print(f"Q: {q}")
-        print(f"   VGD.generate -> {shown!r}")
-        print(f"   coherence_pre={pre}  coherence_post={post}\n")
+        print(f"   tag={tag:12} coherence_post={post}")
+        print(f"   -> {shown}\n")
 
     kernel.stop()
 
