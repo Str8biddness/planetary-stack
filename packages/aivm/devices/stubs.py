@@ -67,8 +67,15 @@ class VGD(Device):
 
 class VND(Device):
     """Virtual Narrative Device - §3.5"""
-    
+
+    def __init__(self, core: Any = None):
+        self._core = core
+
     def coherence_check(self, draft: str) -> bool:
+        # Delegate to the mounted reasoning core's real coherence gate when
+        # present; otherwise preserve the permissive default.
+        if self._core is not None and hasattr(self._core, "coherence_check"):
+            return self._core.coherence_check(draft)
         return True
 
     def snapshot(self) -> bytes:

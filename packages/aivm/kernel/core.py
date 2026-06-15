@@ -78,7 +78,7 @@ class AIVMKernel:
         npc.mounted_devices["VCD"] = VCD(identity.id)
         npc.mounted_devices["VWD"] = VWD(identity.id)
         npc.mounted_devices["VGD"] = VGD(reasoning_core)
-        npc.mounted_devices["VND"] = VND()
+        npc.mounted_devices["VND"] = VND(reasoning_core)
         npc.mounted_devices["VRD"] = VRD(reasoning_core)
         npc.mounted_devices["VSLLM"] = VSLLM()
 

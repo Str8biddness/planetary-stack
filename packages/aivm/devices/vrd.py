@@ -13,7 +13,9 @@ class VRD(Device):
         self._core = core
 
     def plan(self, intent: str, context: Dict[str, Any]) -> Any:
-        # In the existing core, this might be handled by the 'analyze' or 'decomposer'
+        # Delegate to the mounted reasoning core when present.
+        if self._core is not None and hasattr(self._core, "plan"):
+            return self._core.plan(intent, context)
         return f"Plan for: {intent}"
 
     def route(self, plan: Any) -> str:

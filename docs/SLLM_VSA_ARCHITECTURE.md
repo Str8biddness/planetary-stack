@@ -324,6 +324,23 @@ source to trust first — from real retrieval outcomes. Confirms the governance
 loop is substrate-general: the same metacognitive layer optimizes *reasoning*
 (§5.11) and *memory* (here).
 
+### 5.13 Live AIVM integration — reasoning runs in the real kernel tick
+The operators are no longer demo-only: `packages/aivm/devices/synthesus_core.py`
+(`SynthesusReasoningCore`) wraps the NL front end + routers and mounts as an
+NPC's `reasoning_core`. `VGD`/`VRD`/`VND` delegate to it **only when a core is
+mounted** (core-less path unchanged → existing tests green). Running the
+canonical 12-step `AIVMKernel.tick`:
+```
+Q: Who bit the man?            VGD.generate -> 'dog'                 coherence pre/post = pass/pass
+Q: Is a dog an animal?         VGD.generate -> 'yes'                 pass/pass
+Q: What kind of thing is a wolf? -> 'animal, canine, entity, mammal' pass/pass
+Q: Who flies the airplane?     VGD.generate -> (declined)            pre=pass POST=FAIL
+```
+The stubbed `VGD.generate` ("Generated response…") and the `VND.coherence_check`
+that did `return True` are now real: generation is grounded reasoning, and the
+coherence gate **refuses to emit an ungrounded answer** (the airplane query
+fails `coherence_post`). Demo: `tools/aivm_live_demo.py`.
+
 ## 6. Files
 
 | File | Role |

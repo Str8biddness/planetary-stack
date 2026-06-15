@@ -13,8 +13,10 @@ class VGD(Device):
         self._core = core
 
     def generate(self, request: Dict[str, Any]) -> str:
-        # Mediated call to the real model backend
-        # In this implementation, we delegate to the ReasoningCore's respond/synthesis
+        # Mediated call to the real model backend: delegate to the mounted
+        # reasoning core (SynthesusReasoningCore) when present.
+        if self._core is not None and hasattr(self._core, "generate"):
+            return self._core.generate(request)
         return "Generated response from AIVM VGD."
 
     def snapshot(self) -> bytes:
