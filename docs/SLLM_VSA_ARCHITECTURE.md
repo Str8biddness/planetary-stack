@@ -484,6 +484,26 @@ a photorealistic real object still needs a learned visual model. (The deeper for
 of this is harmonic/Fourier synthesis — also pi-based, resolution-free, more
 terms = more detail — the rigorous version of the original "interference" idea.)
 
+### 5.20 Coarse-to-fine pipeline: pattern document → geometric HD — `vsa_pipeline_image.py`
+The CPU-only path: request → (reasoning kernel) **pattern document** (a
+resolution-free scene graph of primitives + normalized dimensions + colour) →
+(Hopfield imagination fills unknowns) → (geometric engine, max-world-size + pi)
+→ crisp HD raster. The symbolic graph *is* the rough draft, so no intermediate
+raster is needed and it renders to any resolution deterministically.
+
+Result (`pipeline_scene.png`): a clean HD scene — gradient sky, glowing sun,
+cloud, tree, red apple on grass — from text, sequentially, CPU-only.
+
+**What the image proves (the honest line):** the engine perfected the *rendering*
+(smooth, anti-aliased, HD, grounded colour, glow) — but the apple is a red
+*disc* and the tree a green *circle*, because that is what the vocabulary
+(`SHAPES`) maps them to. Refinement + pi + imagination sharpen the form that was
+*specified*; they do not invent the apple's real form (dimple, stem, subsurface
+gradient). **Content = the vocabulary in the graph.** Photoreal novel objects
+need richer per-object geometry — hand-authored templates (bounded) or learned
+from images (open-ended, needs visual data). The ceiling is knowledge, not
+engineering.
+
 ## 6. Files
 
 | File | Role |
