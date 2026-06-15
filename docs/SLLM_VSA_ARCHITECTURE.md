@@ -69,7 +69,7 @@ in the same space:
 | analogy | vector translation (c + b − a) | **implemented & proven** (`vsa_analogy.py`) |
 | categorization / is-a | convex-region / cluster containment | subsumed by entailment (below) |
 | entailment / deduction | asymmetric **order-embedding** containment | **implemented & proven** (`vsa_entail.py`) |
-| negation / contrast | reflection through a hyperplane | open |
+| negation / contrast | hyperplane reflection + set complement | **implemented** (`vsa_negation.py`) |
 | **composition / binding** | **circular convolution (HRR)** | **implemented & proven (this doc)** |
 
 Composition was the blocking gap — averaging word vectors destroys order. It is
@@ -223,6 +223,91 @@ This is the step where isolated operators become *reasoning*: composition →
 entailment, multi-hop relational chains, and type-filtered queries, all over one
 substrate, fully traced, and the no-hallucination property survives chaining.
 
+### 5.7 Negation — `vsa_negation.py`
+Two faces. **Geometric** (reflection across an antonym hyperplane): given an
+axis `d = v(pos)-v(neg)`, `negate(x) = x - 2((x-m)·d̂)d̂` flips polarity along
+the axis the concept lies on (auto-selected), leaving off-axis concepts
+unchanged:
+```
+negate(hot)   [axis hot/cold]  -> cold   (1.00)
+negate(big)   [axis big/small] -> small  (1.00)
+```
+**Logical** (set complement, composes with the reasoning system):
+```
+who did NOT bite the man?      -> fox, man, wolf, woman, child
+which animals are NOT canines? -> cat, feline
+```
+
+### 5.8 Natural-language front end — `vsa_nl.py`
+Pattern rules + a tiny verb lemmatizer map plain questions to operator chains —
+the system can be *talked to*, every step still traced:
+```
+"Who bit the man?"                    -> dog            [composition]
+"What did the wolf chase?"            -> fox            [composition]
+"Is a dog an animal?"                 -> yes            [entailment, 3 hops]
+"What kind of thing is a wolf?"       -> animal, canine, entity, mammal
+"Which canine chases the fox?"        -> wolf           [composition + entailment]
+"Who feeds the one that bit the man?" -> man            [composition o composition]
+"Who did not bite the man?"           -> child, fox, man, wolf, woman  [negation]
+"What kind of thing is a whale?"      -> unknown        (out-of-world; no hallucination)
+```
+
+### 5.9 Scaling the grounding — `vsa_scale.py`
+Identical PPMI+SVD method on a real ~292k-word corpus (Einstein's *Relativity*),
+1500 concepts × 64 dims in ~11s:
+```
+space  -> euclidean, dimensional, continuum, geometry
+light  -> velocity, propagation, ray
+mass   -> newton, energy, gravitation, gravitational
+theory -> relativity, general, mechanics, special, classical
+```
+Toy corpus gave `dog ~ bites`; real text gives physics-accurate concept
+geometry, derived automatically, **zero architectural change**. This is the
+grounding-quality dial (§1) turned up — the "100TB firehose" is just more of
+this.
+
+### 5.10 Abstractive Controller — the Smelter/Machinist loop — `vsa_abstract.py`
+Replaces the dialogue stack's "decline → generic fallback" cliff with an
+abstraction-escalating ramp (the Verb-Domain Abstractive Conversion idea),
+chaining composition (Rule 1) with entailment (Rules 2–3):
+```
+who chases the fox?  [Rule 1 · direct]      -> wolf chases the fox
+who chases the wolf? [Rule 2 · 1st convert] -> melt wolf->canine: wolf chases fox (a canine)
+who chases the man?  [Rule 3 · deep convert]-> human stalls; melt->mammal: wolf chases fox
+who flies airplane?  [Rule 4 · scrap]       -> honest "no record" (out of world)
+```
+Rule 1 machines the literal query; if out of tolerance, the query argument is
+melted up its taxonomy and re-machined at successively higher abstraction; only
+true out-of-world input scraps to fallback. This is what makes the system feel
+like it *thinks* ("not literally, but at the <category> level…") instead of
+*matching*.
+
+### 5.11 Amplified Reasoning Router — metacognitive governance — `vsa_amplify.py`
+A **refinement of the legacy `packages/core/amplification_bridge.py`** into the
+new system. The legacy bridge had two dead wires (nothing set `action_outcome`;
+it imported a TS config from Python). Both are fixed by re-pointing it at the
+reasoning operators: each operator is an "organ," and the VSA layer **supplies
+the outcome label** the bridge was starving for (an answer is checkable against
+the world). A per-domain promotion score (legacy-shaped: `0.4·success +
+0.6·confidence`, EMA) makes the router try the best operator first and combine
+the rest. Two design fixes vs. the port: **abstention ≠ failure** (only score an
+operator that actually answers), and **shadow evaluation** (score every operator
+off-policy during learning, killing the cold-start bias).
+```
+                     | coverage | avg answer conf | % via precise op
+  baseline (smelter) |   100%   |      0.50       |        0%
+  learned routing    |   100%   |      0.88       |       75%
+learned: direct-first for every domain it can answer; smelter kept as fallback.
+```
+Same coverage, but the loop learned to route 75% of answers through the precise
+operator (confidence 0.50→0.88), keeping the abstractive operator for what
+direct can't reach. This is the metacognitive layer made operational — the
+runtime monitoring and re-routing its own reasoning — learned from real
+outcomes. (It governs *which reasoning to trust*; it does not make operators
+smarter. On a toy world coverage saturates, so the shown win is precision/trust
+routing; accuracy gains appear where operators genuinely diverge, i.e. at scale.
+The same pattern extends to governing memory sources.)
+
 ## 6. Files
 
 | File | Role |
@@ -234,6 +319,11 @@ substrate, fully traced, and the no-hallucination property survives chaining.
 | `packages/reasoning/vsa_analogy.py` | analogy operator on the semantic layer (`AnalogyEngine.analogy`) |
 | `packages/reasoning/vsa_entail.py` | entailment/deduction via order embeddings (`EntailmentSpace`) |
 | `packages/reasoning/vsa_reason.py` | **chains operators into a reasoning system** (`ReasoningSystem`) |
+| `packages/reasoning/vsa_negation.py` | negation: hyperplane reflection + set complement (`NegationSpace`) |
+| `packages/reasoning/vsa_nl.py` | shallow NL front end mapping questions to operator chains (`NLReasoner`) |
+| `packages/reasoning/vsa_scale.py` | runs the grounding on a real 292k-word corpus |
+| `packages/reasoning/vsa_abstract.py` | Abstractive Controller / Smelter loop (`AbstractiveController`) |
+| `packages/reasoning/vsa_amplify.py` | Amplified Reasoning Router — legacy amplification_bridge refined into operator governance (`AmplifiedRouter`) |
 
 `TwoLayerVSA` (in `vsa_twolayer.py`) is the reusable core: builds both layers
 from a corpus and exposes `encode(s,v,o)`, `recover(S, role)`, `meaning_of(word)`.
@@ -251,10 +341,11 @@ from a corpus and exposes `encode(s,v,o)`, `recover(S, role)`, `meaning_of(word)
    higher dimensionality / resonator-network decoding. Not yet implemented.
 3. **Beyond SVO** — extend role inventory (TENSE, MANNER, nested clauses).
    HRR supports recursive binding; needs schema design.
-4. **The other operators** — analogy (§5.4), entailment (§5.5), and chaining
-   (§5.6) are done. Remaining: negation (hyperplane reflection) and
-   quantification ("do all canines chase something?"). Then a shallow NL parser
-   so raw questions auto-map to operator chains.
+4. **The other operators** — analogy (§5.4), entailment (§5.5), chaining
+   (§5.6), negation (§5.7), and a shallow NL front end (§5.8) are done.
+   Remaining: quantification ("do all canines chase something?"), and deriving
+   the entailment taxonomy from distributional inclusion at scale (§5.9) instead
+   of hand-given edges — closing the loop between the two grounding methods.
 5. **NL front end** — currently queries are hand-specified
    `{role: word}` constraints. A parser (even shallow) would turn raw questions
    into role constraints automatically.
@@ -272,4 +363,9 @@ cd /home/dakin/Synthesus_4.0
 ./venv/bin/python packages/reasoning/vsa_analogy.py  # analogy (a:b::c:?)
 ./venv/bin/python packages/reasoning/vsa_entail.py   # entailment / deduction
 ./venv/bin/python packages/reasoning/vsa_reason.py   # CHAINED reasoning system
+./venv/bin/python packages/reasoning/vsa_negation.py # negation (reflection + complement)
+./venv/bin/python packages/reasoning/vsa_nl.py       # natural-language front end
+./venv/bin/python packages/reasoning/vsa_scale.py    # grounding on a real corpus
+./venv/bin/python packages/reasoning/vsa_abstract.py # abstractive conversion loop
+./venv/bin/python packages/reasoning/vsa_amplify.py  # amplified metacognitive router
 ```
