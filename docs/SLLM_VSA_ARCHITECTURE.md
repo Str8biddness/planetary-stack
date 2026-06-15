@@ -359,6 +359,26 @@ Who flies the airplane? tag=UNGROUNDED   -> (declined, coherence_post=fail)
 
 The system always knows, and says, whether it is recalling or imagining.
 
+### 5.14 Energy / Hopfield settling reasoner — the imagination organ — `vsa_hopfield.py`
+Reasoning as energy minimisation: a modern Hopfield net (Ramsauer 2020) settles a
+noisy/partial cue into the nearest stored attractor. The stored attractors are
+the **grounded concept coordinates**, so it settles into real meaning — the
+rigorous, GPU-shaped form of "settle into a stable node," and the principled
+version of VSA cleanup / associative completion.
+```
+update: xi <- X^T softmax(beta·X xi)     energy: E = -lse(beta,X xi) + ½xi·xi
+A. noisy 'dog' cue -> energy descends monotonically -> settles to 'dog' (overlap 1.00, 14 steps)
+B. recovery vs noise: sigma 0.3->87%, 0.6->44%, 0.9->32%, 1.3->20%  (capacity scales with dims)
+C. beta = imagination temperature: beta=1 -> blended/imaginative; beta=16 -> decisive recall
+```
+Role: the GPU **imagination hemisphere**. It proposes a completed pattern; the
+symbolic layer verifies/tags it (high overlap → grounded, low → educated guess,
+feeding §5.13). Core op is dense matmul (`X@xi`, `X^T@softmax`), batchable over
+cues — CPU/NumPy here, a CuPy/torch swap parallelises it on GPU unchanged. It
+mounts as an organ in the amplification router (§5.11) and the `VSLLM` device slot.
+Honest scope: small-dim/few-pattern here limits noisy recovery; capacity grows
+with dimensionality (the scale dial).
+
 ## 6. Files
 
 | File | Role |
@@ -376,6 +396,7 @@ The system always knows, and says, whether it is recalling or imagining.
 | `packages/reasoning/vsa_abstract.py` | Abstractive Controller / Smelter loop (`AbstractiveController`) |
 | `packages/reasoning/vsa_amplify.py` | Amplified Reasoning Router — legacy amplification_bridge refined into operator governance (`AmplifiedRouter`) |
 | `packages/reasoning/vsa_memory.py` | Amplified Memory Router — same loop governing the 4-source memory cascade (`MemoryRouter`) |
+| `packages/reasoning/vsa_hopfield.py` | Energy/Hopfield settling reasoner — GPU-shaped imagination organ (`ModernHopfield`) |
 
 `TwoLayerVSA` (in `vsa_twolayer.py`) is the reusable core: builds both layers
 from a corpus and exposes `encode(s,v,o)`, `recover(S, role)`, `meaning_of(word)`.
@@ -421,4 +442,5 @@ cd /home/dakin/Synthesus_4.0
 ./venv/bin/python packages/reasoning/vsa_abstract.py # abstractive conversion loop
 ./venv/bin/python packages/reasoning/vsa_amplify.py  # amplified metacognitive router
 ./venv/bin/python packages/reasoning/vsa_memory.py   # amplified memory governance
+./venv/bin/python packages/reasoning/vsa_hopfield.py # energy/Hopfield settling (imagination organ)
 ```
