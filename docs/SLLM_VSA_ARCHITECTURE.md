@@ -446,6 +446,26 @@ thousands of parallel lanes). This is the GPU-optimization path for the
 imagination hemisphere — settle many cues at once. (`bind` is likewise
 convolution, the most GPU-optimized op of all.)
 
+### 5.18 Dual-process image generation — `vsa_imagine_image.py`
+Wires the imagination hemisphere to the pattern-based generator
+(`tools/scene_composer.py`):
+- **System 1 (imagination):** a vague/noisy visual cue → Hopfield settles it into
+  the nearest grounded, *renderable* concept(s), via the image-space batched fast
+  path (`ModernHopfield.recall_batch`, added here).
+- **System 2 (pattern-base):** `scene_composer` renders those concepts (shape
+  primitives + grounded colour + scene layout).
+```
+cue~[apple, grass]        -> imagined [apple, grass]        -> imagined_apple_grass.png
+cue~[sun, sky, cloud]     -> imagined [sun, sky, cloud]     -> imagined_sun_sky_cloud.png
+cue~[mountain,grass,sky]  -> imagined [mountain,grass,sky]  -> imagined_mountain_grass_sky.png
+```
+60%-corrupted cues recover the right concepts, then render real images (blue-sky
+gradient, green ground, grey mountain, grounded colours). The system "imagines
+what to draw," then draws it; output flagged as imagination. (Also fixed a stale
+absolute shard path in `scene_composer.py` so grounded colours load.) Honest
+ceiling unchanged: vector illustrations, not photographs — recognisable objects
+need a learned visual model.
+
 ## 6. Files
 
 | File | Role |
@@ -466,6 +486,7 @@ convolution, the most GPU-optimized op of all.)
 | `packages/reasoning/vsa_hopfield.py` | Energy/Hopfield settling reasoner — GPU-shaped imagination organ (`ModernHopfield`) |
 | `packages/reasoning/vsa_scaled_hemispheres.py` | grounding-dependent hemispheres on the real 292k-word corpus (1500 concepts) |
 | `packages/reasoning/vsa_gpu_imagespace.py` | image-space GPU optimization of settling (backend-agnostic NumPy/CuPy) |
+| `packages/reasoning/vsa_imagine_image.py` | dual-process image generation: imagination (Hopfield) → pattern-base render |
 
 `TwoLayerVSA` (in `vsa_twolayer.py`) is the reusable core: builds both layers
 from a corpus and exposes `encode(s,v,o)`, `recover(S, role)`, `meaning_of(word)`.
@@ -514,4 +535,5 @@ cd /home/dakin/Synthesus_4.0
 ./venv/bin/python packages/reasoning/vsa_hopfield.py # energy/Hopfield settling (imagination organ)
 ./venv/bin/python packages/reasoning/vsa_scaled_hemispheres.py  # hemispheres on the real corpus
 ./venv/bin/python packages/reasoning/vsa_gpu_imagespace.py      # image-space GPU optimization
+./venv/bin/python packages/reasoning/vsa_imagine_image.py      # dual-process image generation
 ```

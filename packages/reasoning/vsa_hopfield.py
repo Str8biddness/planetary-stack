@@ -74,6 +74,24 @@ class ModernHopfield:
         j = int(np.argmax(sims))
         return self.labels[j], float(sims[j]), traj
 
+    # ── image-space batched fast path (settle many cues as one tensor op) ──
+    # Identical math to settle(), reformulated so the whole batch settles in
+    # parallel; a NumPy->CuPy backend swap runs it on GPU unchanged.
+    def settle_batch(self, cues, steps: int = 50):
+        XI = cues / (np.linalg.norm(cues, axis=1, keepdims=True) + 1e-9)  # [B,d]
+        for _ in range(steps):
+            Z = self.beta * (XI @ self.X.T)                # [B,N]
+            Z -= Z.max(axis=1, keepdims=True)
+            W = np.exp(Z); W /= W.sum(axis=1, keepdims=True)
+            XI = W @ self.X                                # [B,d]
+        return XI
+
+    def recall_batch(self, cues, steps: int = 50):
+        XI = self.settle_batch(np.atleast_2d(cues), steps=steps)
+        sims = (XI / (np.linalg.norm(XI, axis=1, keepdims=True) + 1e-9)) @ self.X.T
+        idx = np.argmax(sims, axis=1)
+        return [(self.labels[int(j)], float(sims[i, int(j)])) for i, j in enumerate(idx)]
+
 
 def main():
     vsa = TwoLayerVSA()

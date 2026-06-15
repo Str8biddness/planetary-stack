@@ -19,7 +19,9 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
-SHARD_DIR = Path("/home/dakin/dev/Synthesus_4.0/data/geometric_shards")
+# repo-relative shard dir (was a stale absolute /home/dakin/dev/... path that
+# never resolved, so grounded colours silently fell back to defaults)
+SHARD_DIR = Path(__file__).resolve().parents[1] / "data" / "geometric_shards"
 
 # atomic visual vocabulary: entity -> primitive role
 SHAPES = {
