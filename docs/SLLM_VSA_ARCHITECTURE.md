@@ -308,6 +308,22 @@ smarter. On a toy world coverage saturates, so the shown win is precision/trust
 routing; accuracy gains appear where operators genuinely diverge, i.e. at scale.
 The same pattern extends to governing memory sources.)
 
+### 5.12 Amplified Memory Router — governance over memory sources — `vsa_memory.py`
+The §5.11 loop reused verbatim (`MetaController`), pointed at the legacy 4-module
+fallback cascade (Knowledge Graph → Cloud → Personality → Context). A fixed
+cascade has a failure mode: the greedy semantic source answers *almost*
+anything, intercepting queries it gets WRONG before the right source is reached.
+```
+                     | coverage | accuracy | avg conf
+  fixed cascade      |   100%   |    50%   |   0.71
+  learned routing    |   100%   |   100%   |   0.89
+learned: factual->kgraph, topical->cloud, personal->persona, contextual->context
+```
+Same coverage, accuracy recovered 50%→100% by learning per-query-type which
+source to trust first — from real retrieval outcomes. Confirms the governance
+loop is substrate-general: the same metacognitive layer optimizes *reasoning*
+(§5.11) and *memory* (here).
+
 ## 6. Files
 
 | File | Role |
@@ -324,6 +340,7 @@ The same pattern extends to governing memory sources.)
 | `packages/reasoning/vsa_scale.py` | runs the grounding on a real 292k-word corpus |
 | `packages/reasoning/vsa_abstract.py` | Abstractive Controller / Smelter loop (`AbstractiveController`) |
 | `packages/reasoning/vsa_amplify.py` | Amplified Reasoning Router — legacy amplification_bridge refined into operator governance (`AmplifiedRouter`) |
+| `packages/reasoning/vsa_memory.py` | Amplified Memory Router — same loop governing the 4-source memory cascade (`MemoryRouter`) |
 
 `TwoLayerVSA` (in `vsa_twolayer.py`) is the reusable core: builds both layers
 from a corpus and exposes `encode(s,v,o)`, `recover(S, role)`, `meaning_of(word)`.
@@ -368,4 +385,5 @@ cd /home/dakin/Synthesus_4.0
 ./venv/bin/python packages/reasoning/vsa_scale.py    # grounding on a real corpus
 ./venv/bin/python packages/reasoning/vsa_abstract.py # abstractive conversion loop
 ./venv/bin/python packages/reasoning/vsa_amplify.py  # amplified metacognitive router
+./venv/bin/python packages/reasoning/vsa_memory.py   # amplified memory governance
 ```
