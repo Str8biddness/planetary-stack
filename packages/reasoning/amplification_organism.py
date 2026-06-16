@@ -11,11 +11,14 @@ CRITICAL — organisms are DEPENDENCIES of Synthesus's abilities:
   Synthesus.ability "predict_next"  --requires-->  NextWordOrganism {context, transition}
   Synthesus.ability "converse"      --requires-->  ConversationOrganism {intent, ...}
 
-Without the organism (present + trained + measured-passing), the ability is
-UNAVAILABLE — hard-gated. No organism → Synthesus cannot predict the next word,
-cannot converse, etc. Capability is gated by PROOF (it must pass its measured
-bar), not by claim. New ability = new co-trained organism, plugged in as a
-module; the others stay coherent.
+The organism is a dependency OF ITS ABILITY: without it (present + trained +
+measured-passing), *that ability* is UNAVAILABLE — hard-gated. For some abilities
+(e.g. next-word) the organism is a hard FUNCTIONAL dependency — the next-word
+ability can't run correctly without it. This gates the ABILITY, not Synthesus as
+a whole: Synthesus is the host/runtime that provides whatever abilities its
+mounted organisms supply, and other abilities keep working. Capability is gated
+by PROOF (it must pass its measured bar), not by claim. New ability = new
+co-trained organism, plugged in as a module; the others stay coherent.
 
 Run:  ./venv/bin/python packages/reasoning/amplification_organism.py
 """
@@ -126,7 +129,7 @@ class Synthesus:
     def do(self, ability, *args):
         o = self.organisms.get(ability)
         if o is None:
-            raise CapabilityUnavailable(f"'{ability}': NO organism registered — ability does not exist.")
+            raise CapabilityUnavailable(f"'{ability}' ability unavailable — no organism mounted to provide it.")
         if not o.ready():
             raise CapabilityUnavailable(f"'{ability}': organism present but NOT ready "
                                         f"(organs trained={all(x.trained for x in o.organs.values())}, "
@@ -162,9 +165,9 @@ def main():
     print("  do('predict_next', ['the','river']) ->", s.do("predict_next", ["the", "river"]))
     print("  do('predict_next', ['the','sun']) ->", s.do("predict_next", ["the", "sun"]))
 
-    print("\nSynthesus CANNOT predict the next word without this organism — proven above")
-    print("(blocked before, works after). Each ability = one co-trained organism it")
-    print("depends on; it earns the ability by measurement. New ability = new organism.")
+    print("\nThe predict_next ABILITY requires this organism — unavailable without it (a")
+    print("functional dependency); blocked before, works after. The ability depends on the")
+    print("organism; Synthesus stays the host that runs whatever abilities its organisms supply.")
 
 
 if __name__ == "__main__":

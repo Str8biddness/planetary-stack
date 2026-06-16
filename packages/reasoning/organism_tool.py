@@ -4,7 +4,7 @@ Tool-Use Organism (ability #3) — Synthesus 5
 =============================================
 
 Detects which tool a query needs, extracts its arguments, and actually runs it.
-Gated by the framework: Synthesus cannot use tools without this organism.
+Gated by the framework: the use_tool ability requires this organism (unavailable without it).
 
   ability "use_tool" ──requires──▶ ToolUseOrganism
         organs (dependencies): tool_selector (query → which tool, or none)
@@ -105,7 +105,7 @@ def main():
     print("  organs (dependencies):", list(org.organs))
     for q in ["what is 7 times 8", "what is 100 divided by 5", "whats the time", "tell me about dragons"]:
         print(f"  do('use_tool', {q!r}) -> {s.do('use_tool', q)}")
-    print("\nSynthesus cannot use tools without this organism (blocked above). Ability #3,")
+    print("\nThe use_tool ability requires this organism (blocked above without it). Ability #3,")
     print("real tools execute (calculator genuinely computes), earned by measurement.")
 
 

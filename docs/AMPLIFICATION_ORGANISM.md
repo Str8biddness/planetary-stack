@@ -1,10 +1,13 @@
 # Amplification Organisms — Synthesus's Ability Dependencies
 
 **Core principle (enforced, not just stated):**
-Every Synthesus ability **depends on** an *amplification organism*. Without the
-organism, the ability does not exist. Synthesus **cannot** converse, predict the
-next word, etc. unless the corresponding organism is **registered, trained, and
-measured-passing**. Capability is gated by *proof*, never by claim.
+Every Synthesus ability **depends on** an *amplification organism*. An organism is
+a dependency **of its ability**: without it (registered, trained, measured-passing),
+**that ability** is unavailable. For some abilities — e.g. next-word generation —
+the organism is a hard **functional** dependency: the ability can't run correctly
+without it. This gates the **ability**, not Synthesus as a whole — Synthesus is the
+host/runtime that provides whatever abilities its mounted organisms supply, and the
+other abilities keep working. Capability is gated by *proof*, never by claim.
 
 ```
 Synthesus

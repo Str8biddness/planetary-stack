@@ -4,8 +4,8 @@ Image Generation Organism (ability #2) — Synthesus 5
 =====================================================
 
 Wraps the pattern-based, pi-driven, resolution-free renderer into an
-amplification organism, gated by the framework: Synthesus cannot generate an
-image without this organism (registered + trained + measured-passing).
+amplification organism, gated by the framework: the generate_image ability
+requires this organism (registered + trained + measured-passing) to run.
 
   ability "generate_image" ──requires──▶ ImageGenerationOrganism
         organs (dependencies): scene_parser (text→pattern document)
@@ -85,7 +85,7 @@ def main():
     print("  organs (dependencies):", list(org.organs))
     out, ents = s.do("generate_image", "a red apple on green grass under a blue sky with a sun")
     print(f"  do(...) -> rendered {ents}\n  -> {os.path.basename(out)}")
-    print("\nSynthesus cannot generate an image without this organism (blocked above).")
+    print("\nThe generate_image ability requires this organism (blocked above without it).")
     print("Ability #2 earned by measurement; pi-rendered, resolution-free, CPU.")
 
 
