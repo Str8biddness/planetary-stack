@@ -55,8 +55,19 @@ def load():
 class FusionGen:
     def __init__(self):
         self.bi, self.real_bg, self.E, self.vidx, self.vocab = load()
+        # coherence term (Mc/Ns) uses MiniLM embeddings when installed (universal,
+        # production-grade), else the local PPMI+SVD grounding. Transitions (Psi_f)
+        # are unchanged.
+        self.mini = None
+        try:
+            from embedding_backend import MiniLMBackend
+            self.mini = MiniLMBackend()
+        except Exception:
+            pass
 
     def vec(self, w):
+        if self.mini is not None:
+            return self.mini.encode(w)
         return self.E[self.vidx[w]] if w in self.vidx else None
 
     @staticmethod

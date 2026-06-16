@@ -92,6 +92,17 @@ class ModernHopfield:
         idx = np.argmax(sims, axis=1)
         return [(self.labels[int(j)], float(sims[i, int(j)])) for i, j in enumerate(idx)]
 
+    @classmethod
+    def from_concepts(cls, concepts, beta: float = 8.0, embedder=None):
+        """Build a Hopfield whose attractors are embeddings of `concepts` from the
+        embedding organ (MiniLM if installed, else grounded fallback)."""
+        import os as _os, sys as _sys
+        _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+        from embedding_backend import get_embedder
+        emb = embedder or get_embedder()
+        X = emb.encode_batch(list(concepts))
+        return cls(X, list(concepts), beta=beta)
+
 
 def main():
     vsa = TwoLayerVSA()
