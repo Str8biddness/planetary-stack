@@ -216,10 +216,26 @@ class KnowledgeCloud:
         """
         if self._embedder is None:
             start = time.time()
-            from ml.swarm_embedder import SwarmEmbedder
-            self._embedder = SwarmEmbedder(dim=128)
+            # Prefer the MiniLM embedding organ (production-grade, learned) when
+            # installed; otherwise fall back to the sovereign SwarmEmbedder.
+            mini = None
+            try:
+                import os as _os, sys as _sys
+                _sys.path.insert(0, _os.path.abspath(_os.path.join(
+                    _os.path.dirname(__file__), "..", "reasoning")))
+                from embedding_backend import kal_embedder
+                mini = kal_embedder()
+            except Exception as e:
+                logger.info(f"KnowledgeCloud: MiniLM organ unavailable ({e}); using SwarmEmbedder")
+            if mini is not None:
+                self._embedder = mini
+                logger.info("KnowledgeCloud: using MiniLM embedding organ (all-MiniLM-L6-v2)")
+            else:
+                from ml.swarm_embedder import SwarmEmbedder
+                self._embedder = SwarmEmbedder(dim=128)
+                logger.info(f"KnowledgeCloud: SwarmEmbedder ready in "
+                            f"{(time.time()-start)*1000:.0f}ms")
             self._embedder_load_time_ms = (time.time() - start) * 1000
-            logger.info(f"KnowledgeCloud: SwarmEmbedder ready in {self._embedder_load_time_ms:.0f}ms")
         return self._embedder
 
     def upsert_entry(self, entry: KnowledgeEntry, persist: bool = True):

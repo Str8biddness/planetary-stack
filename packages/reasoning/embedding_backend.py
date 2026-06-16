@@ -87,6 +87,30 @@ def get_embedder(prefer: str = "minilm", **kw) -> EmbeddingBackend:
     return GroundedBackend()
 
 
+class _KalAdapter:
+    """Exposes the KAL embedder interface (embed_texts / is_fitted / fit) over a
+    backend, so MiniLM drops into KnowledgeCloud/FAISS unchanged. Pretrained, so
+    fit() is a no-op; L2-normalizes for IndexFlatIP (== cosine)."""
+    def __init__(self, backend: EmbeddingBackend):
+        self.backend = backend
+        self.is_fitted = True
+    def fit(self, texts):  # pretrained — nothing to fit
+        return self
+    def embed_texts(self, texts):
+        V = self.backend.encode_batch(list(texts)).astype("float32")
+        n = np.linalg.norm(V, axis=1, keepdims=True); n[n == 0] = 1.0
+        return V / n
+
+
+def kal_embedder():
+    """A MiniLM-backed KAL embedder if MiniLM is installed, else None
+    (so KnowledgeCloud gracefully keeps its SwarmEmbedder)."""
+    try:
+        return _KalAdapter(MiniLMBackend())
+    except Exception:
+        return None
+
+
 def _cos(a, b):
     na, nb = np.linalg.norm(a), np.linalg.norm(b)
     return float(a @ b / (na * nb)) if na and nb else 0.0
