@@ -140,6 +140,38 @@ async function sendChatMessage() {
 function handleChatKey(event) { if(event.key === 'Enter') sendChatMessage(); }
 
 // ==========================================
+// TERMINAL IPC
+// ==========================================
+async function handleTerminalKey(event) {
+    if (event.key === 'Enter') {
+        const input = document.getElementById('terminal-input');
+        const cmd = input.value.trim();
+        const outputDiv = document.getElementById('terminal-output');
+        
+        outputDiv.innerHTML += `<div>root@planetary-os:~# ${cmd}</div>`;
+        input.value = '';
+        outputDiv.scrollTop = outputDiv.scrollHeight;
+        
+        if (!cmd) return;
+        
+        try {
+            const response = await fetch('http://127.0.0.1:8080/api/terminal/run', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command: cmd })
+            });
+            const data = await response.json();
+            const pre = document.createElement('pre');
+            pre.textContent = data.output;
+            pre.style.margin = "0";
+            pre.style.whiteSpace = "pre-wrap";
+            outputDiv.appendChild(pre);
+            outputDiv.scrollTop = outputDiv.scrollHeight;
+        } catch(err) {
+            outputDiv.innerHTML += `<div style="color: red;">Error connecting to subsystem.</div>`;
+        }
+    }
+}
+// ==========================================
 // TWIN SIMULATION
 // ==========================================
 async function startTwinSimulation() {

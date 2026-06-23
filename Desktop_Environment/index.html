@@ -85,10 +85,15 @@
                     <button class="win-btn close" onclick="toggleWindow('win-term')"></button>
                 </div>
             </div>
-            <div class="window-content terminal-container" id="terminal-content">
-                <div style="color: #4ade80;">root@planetary-os:~# _</div>
-            </div>
-        </div>
+            <div class="window-content terminal-container" style="display: flex; flex-direction: column;">
+                <div id="terminal-output" style="flex-grow: 1; overflow-y: auto; color: #4ade80; font-family: monospace; margin-bottom: 10px;">
+                    <div>root@planetary-os:~# Synthesus Subsystem Term Hooked.</div>
+                </div>
+                <div style="display: flex; align-items: center; color: #4ade80; font-family: monospace;">
+                    <span style="margin-right: 10px;">root@planetary-os:~#</span>
+                    <input type="text" id="terminal-input" style="flex-grow: 1; background: transparent; border: none; color: #4ade80; font-family: monospace; outline: none; width: 100%;" onkeypress="handleTerminalKey(event)">
+                </div>
+            </div>        </div>
 
         <!-- Digital Twin Window -->
         <div class="window glass-panel" id="win-twin" style="top: 50px; left: 600px; width: 700px; display: none; background: rgba(30, 0, 0, 0.6); border-color: rgba(239, 68, 68, 0.3);">
