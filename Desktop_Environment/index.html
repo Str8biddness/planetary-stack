@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synthesus AIVM Planetary OS</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="dynamic-background" class="bg-mode-desktop"></div>
+    <div class="glass-overlay"></div>
+
+    <!-- The Desktop Area where draggable windows live -->
+    <main id="desktop-area">
+        
+        <!-- Synthesus Core Window -->
+        <div class="window glass-panel" id="win-core" style="top: 50px; left: 50px; width: 450px;">
+            <div class="window-header" onmousedown="dragWindow(event, 'win-core')">
+                <span class="window-title">⚙️ Synthesus Core</span>
+                <div class="window-controls">
+                    <button class="win-btn close" onclick="toggleWindow('win-core')"></button>
+                </div>
+            </div>
+            <div class="window-content">
+                <p class="status-indicator">● Local LLM Online</p>
+                <p class="status-indicator" id="sys-drive">○ 3-Way Drive Offline</p>
+                <p class="status-indicator">● Unified System Image Booted</p>
+                <hr style="margin: 1rem 0; border: 0; border-top: 1px solid var(--glass-border);">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                    <span>Peripheral Bridge KVM</span>
+                    <span id="sys-bridge" style="background: #333; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;">INACTIVE</span>
+                </div>
+                <p style="font-size: 0.85rem; color: var(--text-secondary);">OS Subsystem running natively on Ring-0 C++ Kernel via PyBind11.</p>
+            </div>
+        </div>
+
+        <!-- Chat Window -->
+        <div class="window glass-panel" id="win-chat" style="top: 100px; left: 550px; width: 400px; height: 500px; display: none;">
+            <div class="window-header" onmousedown="dragWindow(event, 'win-chat')">
+                <span class="window-title">💬 LLM Reasoning Bridge</span>
+                <div class="window-controls">
+                    <button class="win-btn close" onclick="toggleWindow('win-chat')"></button>
+                </div>
+            </div>
+            <div class="window-content chat-container">
+                <div class="chat-history" id="chat-history">
+                    <div class="message ai-message" style="margin: 0.5rem 0;">
+                        <strong>Synthesus LLM:</strong> AIVM monorepo synchronized. Awaiting intent for Abstractive Conversion.
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <input type="text" id="chat-input" placeholder="Command intelligence..." class="glass-input" onkeypress="handleChatKey(event)">
+                    <button class="glass-btn" onclick="sendChatMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- IDE / File Explorer Window -->
+        <div class="window glass-panel" id="win-ide" style="top: 150px; left: 100px; width: 800px; height: 500px; display: none;">
+            <div class="window-header" onmousedown="dragWindow(event, 'win-ide')">
+                <span class="window-title">📁 Planetary File Explorer (IDE)</span>
+                <div class="window-controls">
+                    <button class="win-btn close" onclick="toggleWindow('win-ide')"></button>
+                </div>
+            </div>
+            <div class="window-content ide-container">
+                <div class="file-tree" id="ide-file-tree">
+                    <ul>Loading Planetary Drive...</ul>
+                </div>
+                <div class="editor-area">
+                    <div class="editor-tabs">
+                        <span class="tab active" id="ide-current-file">Welcome.md</span>
+                    </div>
+                    <textarea id="ide-code-editor" class="code-editor glass-input" spellcheck="false" placeholder="Select a file..."></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terminal Window -->
+        <div class="window glass-panel" id="win-term" style="top: 300px; left: 400px; width: 600px; height: 400px; display: none;">
+            <div class="window-header" onmousedown="dragWindow(event, 'win-term')">
+                <span class="window-title">_ Terminal (Subsystem)</span>
+                <div class="window-controls">
+                    <button class="win-btn close" onclick="toggleWindow('win-term')"></button>
+                </div>
+            </div>
+            <div class="window-content terminal-container" id="terminal-content">
+                <div style="color: #4ade80;">root@planetary-os:~# _</div>
+            </div>
+        </div>
+
+        <!-- Digital Twin Window -->
+        <div class="window glass-panel" id="win-twin" style="top: 50px; left: 600px; width: 700px; display: none; background: rgba(30, 0, 0, 0.6); border-color: rgba(239, 68, 68, 0.3);">
+            <div class="window-header" onmousedown="dragWindow(event, 'win-twin')">
+                <span class="window-title" style="color: #ef4444;">🩸 Emergency Protocol: Twin</span>
+                <div class="window-controls">
+                    <button class="win-btn close" onclick="toggleWindow('win-twin')"></button>
+                </div>
+            </div>
+            <div class="window-content twin-container">
+                <div class="widget-grid" style="grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+                    <div class="glass-panel" style="text-align: center; padding: 1rem;">
+                        <h3 style="font-size: 0.8rem; color: #94a3b8;">Prothrombin</h3>
+                        <p id="stat-pt" style="font-size: 1.5rem; color: #facc15; font-weight: bold;">-- s</p>
+                    </div>
+                    <div class="glass-panel" style="text-align: center; padding: 1rem;">
+                        <h3 style="font-size: 0.8rem; color: #94a3b8;">PCV</h3>
+                        <p id="stat-pcv" style="font-size: 1.5rem; color: #facc15; font-weight: bold;">-- %</p>
+                    </div>
+                    <div class="glass-panel" style="text-align: center; padding: 1rem;">
+                        <h3 style="font-size: 0.8rem; color: #94a3b8;">Toxin Load</h3>
+                        <p id="stat-toxin" style="font-size: 1.5rem; color: #ef4444; font-weight: bold;">-- %</p>
+                    </div>
+                    <div class="glass-panel" style="text-align: center; padding: 1rem;">
+                        <h3 style="font-size: 0.8rem; color: #94a3b8;">Pain</h3>
+                        <p id="stat-pain" style="font-size: 1.5rem; color: #f97316; font-weight: bold;">-- /10</p>
+                    </div>
+                </div>
+                <div class="twin-log" id="twin-log" style="margin-top: 1rem; font-family: 'Fira Code', monospace; font-size: 0.85rem; background: rgba(0,0,0,0.6); padding: 1rem; height: 150px; overflow-y: auto; border-radius: 8px;">
+                    <div style="color: #4ade80;">> HTC SIMULATION MOUNTED</div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- OS Taskbar (Dock) -->
+    <nav class="dock">
+        <button onclick="toggleWindow('win-core')" class="dock-btn" title="Core Dashboard">⚙️</button>
+        <button onclick="toggleWindow('win-chat')" class="dock-btn" title="Local LLM Chat">💬</button>
+        <button onclick="toggleWindow('win-ide')" class="dock-btn" title="Planetary IDE">📁</button>
+        <button onclick="toggleWindow('win-term')" class="dock-btn" title="Terminal">_</button>
+        <button onclick="toggleWindow('win-twin')" class="dock-btn" title="Digital Twin">🩸</button>
+    </nav>
+
+    <script src="script.js"></script>
+</body>
+</html>
