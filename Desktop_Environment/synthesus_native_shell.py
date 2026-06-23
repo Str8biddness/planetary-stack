@@ -5,30 +5,44 @@ import time
 import json
 import subprocess
 import webview
+import asyncio
 
 from flask import Flask, send_from_directory, jsonify, request
 from flask_cors import CORS
 
 # ===================================================================
-# SYNTHESUS C++ KERNEL IPC BRIDGE
+# SYNTHESUS C++ KERNEL IPC BRIDGE (QUADBRAIN INTEGRATION)
 # ===================================================================
+# Dynamically load the Synthesus "Ultra" codebase from /home/dakin/synthesus
+sys.path.append("/home/dakin/synthesus")
+
 class CognitiveKernelIPC:
     def __init__(self):
         self.kernel_status = "Sub-1GB Reasoning Engine: ACTIVE (Ring-0)"
-        
+        self.quadbrain = None
+        try:
+            from core.quadbrain_master import QuadbrainMaster
+            self.quadbrain = QuadbrainMaster()
+            self.kernel_status = "Synthesus QuadBrain Master: ONLINE & INTEGRATED"
+        except Exception as e:
+            print(f"[!] Quadbrain Integration Failed: {e}. Falling back to dummy logic.")
+
     def send_intent_to_kernel(self, intent_string):
-        """Sends an abstract string directly to the C++ reasoning engine"""
-        print(f"[KERNEL IPC] Routing intent to C++ Metal: {intent_string}")
+        print(f"[KERNEL IPC] Routing intent: {intent_string}")
         
-        intent_lower = intent_string.lower()
-        if "hello" in intent_lower or "status" in intent_lower:
-            return "Synthesus Quad Brain is online. CGPU rendering active. AIVM bridge hooked."
-        elif "twin" in intent_lower or "dog" in intent_lower:
-            return "Digital Twin (HTC) simulation mounted. Reading biological telemetrics from Knowledge Cloud."
-        elif "error" in intent_lower or "fail" in intent_lower:
-            return "Rule 2 (First Conversion): Paradox detected. Melting down abstract intent -> Rerouting to safe cognitive buffer."
-        else:
-            return f"Abstractive Conversion (Rule 1): Intent '{intent_string}' verified and executed at Ring-0."
+        if self.quadbrain:
+            # Run the formal Quadbrain async cycle
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                result = loop.run_until_complete(self.quadbrain.think(intent_string))
+                loop.close()
+                return result.get("answer", "Quadbrain failed to generate an answer.")
+            except Exception as e:
+                return f"[QuadBrain Error]: {str(e)}"
+        
+        # Fallback if quadbrain fails to load
+        return f"Fallback Conversion: Intent '{intent_string}' received."
 
 kernel_ipc = CognitiveKernelIPC()
 
