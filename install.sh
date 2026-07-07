@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# ==========================================================================
+# Synthesus — installer for the local, private AI desktop.
+#
+# Run this from inside an unpacked Synthesus release (a directory that
+# contains ./desktop and ./runtime — see build_release.sh). It sets up
+# everything a fresh machine needs and leaves you with a `synthesus` command.
+#
+#   ./install.sh
+#
+# What it does (and what needs root — stated up front, no surprises):
+#   * system packages (needs sudo): python venv/pip, git, curl, and the
+#     pywebview GTK/WebKit backend so the desktop window can render
+#   * Ollama + the local model (Ollama's own installer uses sudo)
+#   * a private Python venv with the Synthesus deps (no root)
+#   * a per-install API key (no root)
+#   * a `synthesus` launcher + app menu entry (no root)
+# ==========================================================================
+set -euo pipefail
+
+# ---- config (override via env) -------------------------------------------
+SYNTHESUS_HOME="${SYNTHESUS_HOME:-$HOME/.local/share/synthesus}"
+SYNTHESUS_MODEL="${SYNTHESUS_MODEL:-llama3.2:3b}"
+BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
+SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+c()  { printf "\033[1;36m%s\033[0m\n" "$*"; }   # cyan step
+ok() { printf "\033[1;32m  ✓ %s\033[0m\n" "$*"; }
+warn(){ printf "\033[1;33m  ! %s\033[0m\n" "$*"; }
+die(){ printf "\033[1;31m  ✗ %s\033[0m\n" "$*" >&2; exit 1; }
+
+c "Synthesus installer"
+echo "  install dir: $SYNTHESUS_HOME"
+echo "  model:       $SYNTHESUS_MODEL"
+echo
+
+# ---- 0. locate the release code ------------------------------------------
+[ -d "$SRC_DIR/desktop" ] && [ -d "$SRC_DIR/runtime" ] \
+  || die "run this from an unpacked Synthesus release (expected ./desktop and ./runtime next to install.sh)"
+
+# ---- 1. OS / package manager --------------------------------------------
+if ! command -v apt-get >/dev/null 2>&1; then
+  die "this installer targets Debian/Ubuntu/Mint (apt). For other distros, install the deps in README manually."
+fi
+
+# ---- 2. system packages (sudo) ------------------------------------------
+c "1/6  System packages (needs sudo)"
+# Runtime GTK/WebKit libs for pywebview + the -dev headers pip needs to BUILD
+# pygobject/pycairo from source, + zstd (Ollama's installer needs it), + a compiler.
+SYS_PKGS="python3 python3-venv python3-pip python3-dev git curl zstd gcc pkg-config \
+python3-gi python3-gi-cairo gir1.2-gtk-3.0 libcairo2-dev libgirepository1.0-dev"
+# WebKit GTK: package name differs across releases (4.1 newer, 4.0 older)
+if apt-cache show gir1.2-webkit2-4.1 >/dev/null 2>&1; then SYS_PKGS="$SYS_PKGS gir1.2-webkit2-4.1"; else SYS_PKGS="$SYS_PKGS gir1.2-webkit2-4.0"; fi
+sudo apt-get update -qq
+sudo apt-get install -y -qq $SYS_PKGS
+ok "system packages installed"
+
+# ---- 3. Ollama + model ---------------------------------------------------
+c "3/6  Ollama + local model"
+if ! command -v ollama >/dev/null 2>&1; then
+  warn "Ollama not found — installing (uses sudo)"
+  curl -fsSL https://ollama.com/install.sh | sh
+fi
+command -v ollama >/dev/null 2>&1 || die "Ollama install failed — see https://ollama.com/download"
+# make sure the daemon is up, then pull the model (idempotent — skips if present)
+ollama list >/dev/null 2>&1 || (nohup ollama serve >/dev/null 2>&1 & sleep 3)
+if ollama list 2>/dev/null | grep -q "${SYNTHESUS_MODEL%%:*}"; then
+  ok "model $SYNTHESUS_MODEL already present"
+else
+  echo "  pulling $SYNTHESUS_MODEL (~2GB, one time)…"
+  ollama pull "$SYNTHESUS_MODEL"
+  ok "model pulled"
+fi
+
+# ---- 4. copy code + create venv -----------------------------------------
+c "4/6  Installing app + Python environment"
+mkdir -p "$SYNTHESUS_HOME"
+rsync -a --delete --exclude '.git' --exclude '__pycache__' --exclude '*.pyc' \
+      --exclude '.venv' --exclude 'venv' --exclude 'node_modules' \
+      "$SRC_DIR/desktop/" "$SYNTHESUS_HOME/desktop/"
+rsync -a --delete --exclude '.git' --exclude '__pycache__' --exclude '*.pyc' \
+      --exclude '.venv' --exclude 'venv' --exclude 'node_modules' \
+      "$SRC_DIR/runtime/" "$SYNTHESUS_HOME/runtime/"
+
+python3 -m venv "$SYNTHESUS_HOME/.venv"
+VPIP="$SYNTHESUS_HOME/.venv/bin/pip"
+"$VPIP" install --quiet --upgrade pip
+# runtime deps (from its requirements) + the desktop shell deps
+if [ -f "$SYNTHESUS_HOME/runtime/requirements.txt" ]; then
+  "$VPIP" install --quiet -r "$SYNTHESUS_HOME/runtime/requirements.txt" || warn "some runtime reqs failed — continuing"
+fi
+# NOTE: pin pygobject<3.52 — 3.52+ requires girepository-2.0, but Debian 12
+# (bookworm) only ships girepository-1.0, so the latest pygobject fails to build
+# there. <3.52 builds against 1.0 and works on both bookworm and Ubuntu 24.04.
+"$VPIP" install --quiet faiss-cpu fastembed fastapi "uvicorn[standard]" flask requests \
+        websockets pywebview "pygobject<3.52" numpy pydantic sqlalchemy httpx onnxruntime
+ok "environment ready"
+
+# ---- 5. per-install key --------------------------------------------------
+c "5/6  Generating a private per-install key"
+KEY="$(python3 -c 'import secrets; print("syn_"+secrets.token_urlsafe(32))')"
+mkdir -p "$SYNTHESUS_HOME"
+cat > "$SYNTHESUS_HOME/synthesus.env" <<ENV
+# Auto-generated at install. Do not share.
+SYNTHESUS_API_KEY=$KEY
+SYNTHESUS_MODEL=$SYNTHESUS_MODEL
+SYNTHESUS_HOST=127.0.0.1
+ENV
+chmod 600 "$SYNTHESUS_HOME/synthesus.env"
+ok "unique key written to synthesus.env (localhost only)"
+
+# ---- 6. launcher + menu entry -------------------------------------------
+c "6/6  Launcher"
+mkdir -p "$BIN_DIR"
+cat > "$BIN_DIR/synthesus" <<'LAUNCH'
+#!/usr/bin/env bash
+# Synthesus launcher — boots terminal backend + runtime + desktop, together.
+set -uo pipefail
+H="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+HOME_DIR="${SYNTHESUS_HOME:-$HOME/.local/share/synthesus}"
+set -a; . "$HOME_DIR/synthesus.env"; set +a
+export SYNTHESUS_RUNTIME_URL="http://127.0.0.1:5010"
+export SYNTHESUS_RUNTIME_CMD="$HOME_DIR/run_runtime.sh"
+PY="$HOME_DIR/.venv/bin/python"
+
+pkill -f "production_server.py" 2>/dev/null; sleep 1
+# terminal backend (real pty, localhost)
+"$PY" "$HOME_DIR/desktop/terminal_server.py" >/dev/null 2>&1 &
+TPID=$!; trap 'kill $TPID 2>/dev/null' EXIT INT TERM
+cd "$HOME_DIR/desktop"
+exec "$PY" synthesus_native_shell.py
+LAUNCH
+# the runtime boot helper the desktop calls
+cat > "$SYNTHESUS_HOME/run_runtime.sh" <<RUNTIME
+#!/usr/bin/env bash
+cd "$SYNTHESUS_HOME/runtime" || exit 1
+set -a; . "$SYNTHESUS_HOME/synthesus.env"; set +a
+export PYTHONPATH="packages/reasoning:packages/kernel:packages/knowledge:packages/core:packages:."
+export PORT=5010 SYNTHESUS_CGPU_REALIZER=llm SYNTHESUS_EMBEDDER=semantic
+exec "$SYNTHESUS_HOME/.venv/bin/python" packages/api/production_server.py "\$@"
+RUNTIME
+chmod +x "$BIN_DIR/synthesus" "$SYNTHESUS_HOME/run_runtime.sh"
+
+# app menu entry
+APPS="$HOME/.local/share/applications"; mkdir -p "$APPS"
+cat > "$APPS/synthesus.desktop" <<DESK
+[Desktop Entry]
+Name=Synthesus
+Comment=Local, private AI desktop
+Exec=$BIN_DIR/synthesus
+Terminal=false
+Type=Application
+Categories=Utility;
+DESK
+ok "installed"
+
+echo
+c "Done."
+echo "  Launch:   $BIN_DIR/synthesus   (or find 'Synthesus' in your app menu)"
+case ":$PATH:" in *":$BIN_DIR:"*) : ;; *) warn "add $BIN_DIR to PATH, or run it by full path";; esac
+echo "  Your data + key live in: $SYNTHESUS_HOME"

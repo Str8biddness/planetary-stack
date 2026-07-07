@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "strict": true,
+    "jsx": "react-jsx",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "types": ["node", "jest"],
+
+    "paths": {
+      "@/*": ["./frontend/src/*"]
+    }
+  },
+  "include": [
+    "*.ts",
+    "chat/**/*.ts",
+    "gm/**/*.ts",
+    "shared/**/*.ts",
+    "sysops/**/*.ts",
+    "../../tools/runTrainingSessions.ts",
+    "../../tools/selfImprove.ts"
+  ]
+}

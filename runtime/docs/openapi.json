@@ -1,0 +1,3865 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Synthesus 5 CHAL API",
+    "description": "Legacy-compatible Synthesus query and control API for the active Synthesus 5 CHAL runtime. The public query path currently exposes explicit Cognitive Hypervisor routing through mode=chal, the business_bot CHAL preset, plus generation-spine, cognitive, RAG, kernel, and amplification telemetry. CognitiveHypervisorTrace documents debug.cognitive_hypervisor for CHAL requests, including reasoning-quality verifier telemetry, grounding-reranker telemetry, QuadBrainArbitration, state-contract arbitration_steps, QuadBrainReplayRecord, and QuadBrainTraceStorage when route=quad_brain_path, plus memory-writeback telemetry after API arbitration; CGPU traces are documented as CHAL contracts until candidate-set payloads are surfaced by this endpoint. OrganReplayTrace documents compact CHAL organ evaluator replay/storage records emitted by tooling, not /api/v1/query responses.",
+    "version": "5.0.0"
+  },
+  "paths": {
+    "/parameter-cloud/v2/fetch-batch": {
+      "post": {
+        "tags": [
+          "parameter-cloud-v2"
+        ],
+        "summary": "Fetch Batch Params",
+        "description": "Fetch parameters matching namespace patterns across shards",
+        "operationId": "fetch_batch_params_parameter_cloud_v2_fetch_batch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchParameterFetch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Fetch Batch Params Parameter Cloud V2 Fetch Batch Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/parameter-cloud/v2/query": {
+      "post": {
+        "tags": [
+          "parameter-cloud-v2"
+        ],
+        "summary": "Query Params",
+        "description": "Advanced parameter query with filtering and vector search",
+        "operationId": "query_params_parameter_cloud_v2_query_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParameterQuery"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Query Params Parameter Cloud V2 Query Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/parameter-cloud/v2/update-batch": {
+      "post": {
+        "tags": [
+          "parameter-cloud-v2"
+        ],
+        "summary": "Update Batch Params",
+        "description": "Batch update parameters with merge/replace/gradient strategies",
+        "operationId": "update_batch_params_parameter_cloud_v2_update_batch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchParameterUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Update Batch Params Parameter Cloud V2 Update Batch Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/parameter-cloud/v2/apply-gradients": {
+      "post": {
+        "tags": [
+          "parameter-cloud-v2"
+        ],
+        "summary": "Apply Gradients",
+        "description": "Apply accumulated gradients to parameters (background batch job)",
+        "operationId": "apply_gradients_parameter_cloud_v2_apply_gradients_post",
+        "parameters": [
+          {
+            "name": "max_gradients",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10000,
+              "title": "Max Gradients"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Apply Gradients Parameter Cloud V2 Apply Gradients Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/parameter-cloud/v2/shards": {
+      "get": {
+        "tags": [
+          "parameter-cloud-v2"
+        ],
+        "summary": "List Shards",
+        "description": "List all configured shards",
+        "operationId": "list_shards_parameter_cloud_v2_shards_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response List Shards Parameter Cloud V2 Shards Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/parameter-cloud/v2/stats": {
+      "get": {
+        "tags": [
+          "parameter-cloud-v2"
+        ],
+        "summary": "Get Stats",
+        "description": "Get parameter storage statistics",
+        "operationId": "get_stats_parameter_cloud_v2_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Stats Parameter Cloud V2 Stats Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/search": {
+      "get": {
+        "tags": [
+          "knowledge-cloud"
+        ],
+        "summary": "Search Knowledge",
+        "description": "Semantic search across the Knowledge Cloud.",
+        "operationId": "search_knowledge_api_v1_knowledge_search_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Search query text",
+              "title": "Q"
+            },
+            "description": "Search query text"
+          },
+          {
+            "name": "top_k",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Number of results",
+              "default": 5,
+              "title": "Top K"
+            },
+            "description": "Number of results"
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated tag filter",
+              "title": "Tags"
+            },
+            "description": "Comma-separated tag filter"
+          },
+          {
+            "name": "trust",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 100,
+              "minimum": 0,
+              "description": "Player trust level",
+              "default": 50.0,
+              "title": "Trust"
+            },
+            "description": "Player trust level"
+          },
+          {
+            "name": "emotion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Current NPC emotion",
+              "default": "neutral",
+              "title": "Emotion"
+            },
+            "description": "Current NPC emotion"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Search Knowledge Api V1 Knowledge Search Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/entries": {
+      "get": {
+        "tags": [
+          "knowledge-cloud"
+        ],
+        "summary": "List Entries",
+        "description": "List all knowledge entries with optional filters.",
+        "operationId": "list_entries_api_v1_knowledge_entries_get",
+        "parameters": [
+          {
+            "name": "entity_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by entity type",
+              "title": "Entity Type"
+            },
+            "description": "Filter by entity type"
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated tag filter",
+              "title": "Tags"
+            },
+            "description": "Comma-separated tag filter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response List Entries Api V1 Knowledge Entries Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "knowledge-cloud"
+        ],
+        "summary": "Create Entry",
+        "description": "Add a new knowledge entry to the cloud.",
+        "operationId": "create_entry_api_v1_knowledge_entries_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeEntryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Create Entry Api V1 Knowledge Entries Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/entries/{entity_id}": {
+      "get": {
+        "tags": [
+          "knowledge-cloud"
+        ],
+        "summary": "Get Entry",
+        "description": "Get a specific knowledge entry by ID.",
+        "operationId": "get_entry_api_v1_knowledge_entries__entity_id__get",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Entry Api V1 Knowledge Entries  Entity Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "knowledge-cloud"
+        ],
+        "summary": "Update Entry",
+        "description": "Update an existing knowledge entry.",
+        "operationId": "update_entry_api_v1_knowledge_entries__entity_id__put",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeEntryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Update Entry Api V1 Knowledge Entries  Entity Id  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "knowledge-cloud"
+        ],
+        "summary": "Delete Entry",
+        "description": "Remove a knowledge entry from the cloud.",
+        "operationId": "delete_entry_api_v1_knowledge_entries__entity_id__delete",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Entry Api V1 Knowledge Entries  Entity Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/rebuild-index": {
+      "post": {
+        "tags": [
+          "knowledge-cloud"
+        ],
+        "summary": "Rebuild Index",
+        "description": "Force rebuild the FAISS semantic index.",
+        "operationId": "rebuild_index_api_v1_knowledge_rebuild_index_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Rebuild Index Api V1 Knowledge Rebuild Index Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/stats": {
+      "get": {
+        "tags": [
+          "knowledge-cloud"
+        ],
+        "summary": "Get Stats",
+        "description": "Get Knowledge Cloud statistics.",
+        "operationId": "get_stats_api_v1_knowledge_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Stats Api V1 Knowledge Stats Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/patterns": {
+      "post": {
+        "summary": "Add Patterns",
+        "description": "Add or update patterns in the RAG pipeline.",
+        "operationId": "add_patterns_api_v1_admin_patterns_post",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Root",
+        "description": "Dashboard UI.",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/query": {
+      "post": {
+        "summary": "Query Endpoint",
+        "description": "Main query endpoint \u2014 ML Swarm \u2192 Cognitive \u2192 RAG \u2192 Fallback.",
+        "operationId": "query_endpoint_api_v1_query_post",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/characters": {
+      "get": {
+        "summary": "List Characters",
+        "operationId": "list_characters_api_v1_characters_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/characters/{char_id}": {
+      "get": {
+        "summary": "Get Character",
+        "operationId": "get_character_api_v1_characters__char_id__get",
+        "parameters": [
+          {
+            "name": "char_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Char Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/feedback": {
+      "post": {
+        "summary": "Store Feedback",
+        "description": "Store user feedback for quality monitoring.",
+        "operationId": "store_feedback_api_v1_feedback_post",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/kernel/status": {
+      "get": {
+        "summary": "Get Kernel Status",
+        "description": "Get detailed kernel statistics via HemisphereBridge.",
+        "operationId": "get_kernel_status_api_v1_kernel_status_get",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "summary": "Health",
+        "description": "System health and stats.",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/api-keys": {
+      "get": {
+        "summary": "List Api Keys",
+        "description": "List all active API keys. Requires master admin key.",
+        "operationId": "list_api_keys_api_v1_admin_api_keys_get",
+        "parameters": [
+          {
+            "name": "x-admin-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "X-Admin-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminAPIKeyResponse"
+                  },
+                  "title": "Response List Api Keys Api V1 Admin Api Keys Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Api Key",
+        "description": "Generate a new API key.",
+        "operationId": "create_api_key_api_v1_admin_api_keys_post",
+        "parameters": [
+          {
+            "name": "x-admin-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "X-Admin-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminAPIKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAPIKeyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/usage": {
+      "get": {
+        "summary": "Get Usage Stats",
+        "description": "Get aggregated system usage statistics.",
+        "operationId": "get_usage_stats_api_v1_admin_usage_get",
+        "parameters": [
+          {
+            "name": "x-admin-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "X-Admin-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUsageStatistics"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conscious_state": {
+      "get": {
+        "summary": "Conscious State",
+        "operationId": "conscious_state_api_v1_conscious_state_get",
+        "parameters": [
+          {
+            "name": "character_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "synth",
+              "title": "Character Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/evolve/{character_id}": {
+      "post": {
+        "summary": "Evolve Character",
+        "description": "Triggers a synthesis session to evolve a character's traits and knowledge.",
+        "operationId": "evolve_character_api_v1_admin_evolve__character_id__post",
+        "parameters": [
+          {
+            "name": "character_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Character Id"
+            }
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterEvolutionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/modules": {
+      "get": {
+        "summary": "Modules Report",
+        "operationId": "modules_report_api_v1_modules_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stats": {
+      "get": {
+        "summary": "Stats",
+        "description": "Detailed system statistics.",
+        "operationId": "stats_api_v1_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/amplification/status": {
+      "get": {
+        "summary": "Amplification Status",
+        "description": "Detailed status of the Amplification Plane.",
+        "operationId": "amplification_status_api_v1_amplification_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/amplification/metrics": {
+      "get": {
+        "summary": "Amplification Metrics",
+        "description": "Detailed Amplification Plane performance metrics with real counters from Generation Spine.",
+        "operationId": "amplification_metrics_api_v1_amplification_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/monitoring/dashboard": {
+      "get": {
+        "summary": "Monitoring Dashboard",
+        "description": "Unified monitoring dashboard with all system metrics.",
+        "operationId": "monitoring_dashboard_api_v1_monitoring_dashboard_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard": {
+      "get": {
+        "summary": "Dashboard Ui",
+        "description": "Simple HTML dashboard for monitoring.",
+        "operationId": "dashboard_ui_dashboard_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AdminAPIKeyRequest": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Description for this key"
+          },
+          "expiry_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiry Days",
+            "description": "Days until expiry"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "title": "AdminAPIKeyRequest",
+        "description": "Request to create a new API key."
+      },
+      "AdminAPIKeyResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "last_used": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "created_at"
+        ],
+        "title": "AdminAPIKeyResponse",
+        "description": "Information about an API key."
+      },
+      "AdminUsageStatistics": {
+        "properties": {
+          "total_requests": {
+            "type": "integer",
+            "title": "Total Requests"
+          },
+          "successful_requests": {
+            "type": "integer",
+            "title": "Successful Requests"
+          },
+          "failed_requests": {
+            "type": "integer",
+            "title": "Failed Requests"
+          },
+          "avg_latency_ms": {
+            "type": "number",
+            "title": "Avg Latency Ms"
+          },
+          "organ_usage_breakdown": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Organ Usage Breakdown"
+          },
+          "daily_traffic": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Daily Traffic"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_requests",
+          "successful_requests",
+          "failed_requests",
+          "avg_latency_ms",
+          "organ_usage_breakdown",
+          "daily_traffic"
+        ],
+        "title": "AdminUsageStatistics",
+        "description": "System-wide usage statistics."
+      },
+      "BatchParameterFetch": {
+        "properties": {
+          "namespace_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Namespace Patterns",
+            "description": "List of namespace patterns (e.g. ['model.layers.*', 'organ.chat.*'])"
+          },
+          "include_metadata": {
+            "type": "boolean",
+            "title": "Include Metadata",
+            "default": true
+          },
+          "max_results": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "title": "Max Results",
+            "default": 10000
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "namespace_patterns"
+        ],
+        "title": "BatchParameterFetch",
+        "description": "Request to fetch multiple parameters by pattern"
+      },
+      "BatchParameterUpdate": {
+        "properties": {
+          "updates": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ParameterValue"
+            },
+            "type": "object",
+            "title": "Updates"
+          },
+          "strategy": {
+            "type": "string",
+            "pattern": "^(merge|replace|gradient)$",
+            "title": "Strategy",
+            "default": "merge"
+          },
+          "learning_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Learning Rate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "updates"
+        ],
+        "title": "BatchParameterUpdate",
+        "description": "Batch update multiple parameters"
+      },
+      "CharacterEvolutionResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "character_id": {
+            "type": "string",
+            "title": "Character Id"
+          },
+          "directives": {
+            "$ref": "#/components/schemas/EvolutionDirective"
+          },
+          "files_updated": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files Updated"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "character_id",
+          "directives",
+          "files_updated"
+        ],
+        "title": "CharacterEvolutionResponse"
+      },
+      "EvolutionDirective": {
+        "properties": {
+          "add_knowledge": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Add Knowledge"
+          },
+          "update_traits": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Update Traits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "add_knowledge",
+          "update_traits"
+        ],
+        "title": "EvolutionDirective"
+      },
+      "FeedbackRequest": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "response": {
+            "type": "string",
+            "title": "Response"
+          },
+          "rating": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Rating"
+          },
+          "comments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "query",
+          "response",
+          "rating"
+        ],
+        "title": "FeedbackRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "KnowledgeEntryRequest": {
+        "properties": {
+          "entity_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Id"
+          },
+          "entity": {
+            "type": "string",
+            "title": "Entity",
+            "description": "Display name of the entity"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type",
+            "description": "creature, location, item, faction, event, concept",
+            "default": "concept"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Full prose description",
+            "default": ""
+          },
+          "attributes": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Attributes"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts"
+          },
+          "relations": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Relations"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases"
+          },
+          "depth": {
+            "type": "string",
+            "title": "Depth",
+            "description": "intimate, familiar, acquainted, rumor",
+            "default": "acquainted"
+          },
+          "trust_threshold": {
+            "type": "number",
+            "title": "Trust Threshold",
+            "description": "Trust level required (0 = public)",
+            "default": 0.0
+          },
+          "emotion_variants": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Emotion Variants"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity"
+        ],
+        "title": "KnowledgeEntryRequest",
+        "description": "Request body for creating/updating a knowledge entry."
+      },
+      "ParameterQuery": {
+        "properties": {
+          "namespace_prefix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Namespace Prefix"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "min_importance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Importance"
+          },
+          "updated_after_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated After Ms"
+          },
+          "vector_similarity": {
+            "anyOf": [
+              {
+                "prefixItems": [
+                  {
+                    "items": {
+                      "type": "number"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array",
+                "maxItems": 2,
+                "minItems": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vector Similarity"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "title": "Limit",
+            "default": 1000
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          }
+        },
+        "type": "object",
+        "title": "ParameterQuery",
+        "description": "Advanced parameter query with filtering"
+      },
+      "ParameterValue": {
+        "properties": {
+          "value": {
+            "title": "Value"
+          },
+          "value_type": {
+            "type": "string",
+            "pattern": "^(float|vector|sparse|json)$",
+            "title": "Value Type"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "value_type"
+        ],
+        "title": "ParameterValue",
+        "description": "Single parameter value with type information"
+      },
+      "TemplateSurface": {
+        "type": "object",
+        "title": "TemplateSurface",
+        "description": "Labeled template or fallback-surface metadata emitted under QueryResponse.debug.template_surface when a legacy-compatible API path returns an explicit safety/platform/identity/NPC-script exception or stores non-user-facing candidate text.",
+        "required": [
+          "surface",
+          "status",
+          "boundary",
+          "user_facing",
+          "normal_assistant_path"
+        ],
+        "properties": {
+          "surface": {
+            "type": "string",
+            "description": "Runtime surface that produced or stored the text, such as legacy_fastapi_character_router or production_api_pattern_recall."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "allowed_labeled_exception",
+              "non_user_facing"
+            ],
+            "description": "Classification after template-surface audit."
+          },
+          "boundary": {
+            "type": "string",
+            "enum": [
+              "safety",
+              "platform",
+              "identity_rights",
+              "explicit_npc_script",
+              "legacy_api_pattern_storage",
+              "non_user_facing_storage"
+            ],
+            "description": "Reason this surface is allowed outside the normal Synthesus 5 assistant path."
+          },
+          "user_facing": {
+            "type": "boolean",
+            "description": "Whether this compatibility surface can be returned directly to a caller."
+          },
+          "normal_assistant_path": {
+            "type": "boolean",
+            "description": "Always false for labeled legacy/template exceptions; normal Synthesus 5 assistant wording remains owned by CHAL, the Cognitive Hypervisor, generation, and critic arbitration."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Surface-specific subtype, for example character_fallback, character_pattern, pattern_recall, or pattern_ingest."
+          },
+          "character": {
+            "type": "string"
+          },
+          "pattern_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "CGPUFrame": {
+        "type": "object",
+        "title": "CGPUFrame",
+        "description": "CHAL input frame for the chal://cgpu/render device implemented in packages/reasoning/generation/cgpu.py.",
+        "required": [
+          "frame_id",
+          "trace_id",
+          "query",
+          "plan"
+        ],
+        "properties": {
+          "frame_id": {
+            "type": "string"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "plan": {
+            "additionalProperties": true,
+            "type": "object",
+            "description": "Serialized ResponsePlan with intent, safety level, key points, required phrases, forbidden phrases, and domain/style constraints."
+          },
+          "grounded_state": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "mode": {
+            "type": "string",
+            "default": "general",
+            "description": "Render mode such as general, npc, persona, dialogue, business, or business_bot."
+          },
+          "candidate_count": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          },
+          "critic_passes": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 1
+          },
+          "constraints": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "persona": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "provenance": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        }
+      },
+      "CGPUOutputFrame": {
+        "type": "object",
+        "title": "CGPUOutputFrame",
+        "description": "Candidate-set output from the chal://cgpu/render device. The selected text is still subject to hypervisor or arbiter safety approval.",
+        "required": [
+          "frame_id",
+          "parent_frame_id",
+          "trace_id",
+          "device",
+          "kind",
+          "candidates",
+          "confidence",
+          "cost",
+          "trace"
+        ],
+        "properties": {
+          "frame_id": {
+            "type": "string"
+          },
+          "parent_frame_id": {
+            "type": "string"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "device": {
+            "type": "string",
+            "const": "chal://cgpu/render"
+          },
+          "kind": {
+            "type": "string",
+            "const": "candidate_set"
+          },
+          "candidates": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "selected_candidate_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "selected_text": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "cost": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "trace": {
+            "additionalProperties": true,
+            "type": "object",
+            "description": "Includes mode, constraints, provenance, grounding_required, and safety_arbitration_required."
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        }
+      },
+      "QuadBrainArbitration": {
+        "type": "object",
+        "title": "QuadBrainArbitration",
+        "description": "Serialized four-brain arbitration emitted inside CognitiveHypervisorTrace.quad_brain when the Synthesus 5 hypervisor selects route=quad_brain_path.",
+        "required": [
+          "schema",
+          "trace_id",
+          "selected_response",
+          "selected_source",
+          "outputs",
+          "serial_order",
+          "state_contract",
+          "latency_ms"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "synthesus.chal.quad_brain_arbitration.v1",
+            "description": "Trace schema identifier emitted by QuadBrainArbitration."
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "selected_response": {
+            "type": "string",
+            "description": "Response selected by critic/metacognition or the bridge fallback."
+          },
+          "selected_source": {
+            "type": "string",
+            "enum": [
+              "critic_metacognition",
+              "hemisphere_bridge_fallback"
+            ]
+          },
+          "outputs": {
+            "type": "array",
+            "description": "Serialized outputs for knowledge, executive, CGPU, and critic roles in fixed arbitration order.",
+            "items": {
+              "type": "object",
+              "required": [
+                "role",
+                "device",
+                "content",
+                "confidence"
+              ],
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "knowledge_grounding",
+                    "executive_reasoning",
+                    "cgpu_rendering",
+                    "critic_metacognition"
+                  ]
+                },
+                "device": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "confidence": {
+                  "type": "number"
+                },
+                "trace": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "state_transition": {
+                      "$ref": "#/components/schemas/QuadBrainStateTransition"
+                    }
+                  },
+                  "description": "Role-local trace metadata. Runtime output includes the matching state_transition record for this role."
+                },
+                "warnings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "serial_order": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "knowledge_grounding",
+                "executive_reasoning",
+                "cgpu_rendering",
+                "critic_metacognition"
+              ]
+            }
+          },
+          "state_contract": {
+            "type": "object",
+            "required": [
+              "topology",
+              "parallel_brain_spawn",
+              "serialized_arbitration",
+              "template_leakage_allowed",
+              "route",
+              "required_roles",
+              "arbitration_steps",
+              "state_transitions",
+              "critic_input_ref",
+              "final_output_ref",
+              "final_output_owner",
+              "integrity"
+            ],
+            "properties": {
+              "topology": {
+                "type": "string",
+                "const": "knowledge->executive->cgpu->critic"
+              },
+              "parallel_brain_spawn": {
+                "type": "boolean",
+                "const": false
+              },
+              "serialized_arbitration": {
+                "type": "boolean",
+                "const": true
+              },
+              "template_leakage_allowed": {
+                "type": "boolean"
+              },
+              "bridge_trace_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "route": {
+                "type": "string",
+                "const": "quad_brain_path"
+              },
+              "required_roles": {
+                "type": "array",
+                "description": "The four required Quad Brain roles in fixed serialized arbitration order.",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "knowledge_grounding",
+                    "executive_reasoning",
+                    "cgpu_rendering",
+                    "critic_metacognition"
+                  ]
+                }
+              },
+              "arbitration_steps": {
+                "type": "array",
+                "description": "Compact serialized arbitration ledger for the four Quad Brain roles. Each step mirrors the corresponding role output and state transition without requiring consumers to infer execution order from the full output payload.",
+                "minItems": 4,
+                "maxItems": 4,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "step",
+                    "role",
+                    "device",
+                    "input_refs",
+                    "output_refs",
+                    "confidence",
+                    "warnings"
+                  ],
+                  "properties": {
+                    "step": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 4
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "knowledge_grounding",
+                        "executive_reasoning",
+                        "cgpu_rendering",
+                        "critic_metacognition"
+                      ]
+                    },
+                    "device": {
+                      "type": "string"
+                    },
+                    "input_refs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "output_refs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "confidence": {
+                      "type": "number"
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "state_transitions": {
+                "type": "array",
+                "description": "Inspectable state handoffs for knowledge, executive, CGPU, and critic roles. Each role output trace mirrors its corresponding transition.",
+                "items": {
+                  "$ref": "#/components/schemas/QuadBrainStateTransition"
+                },
+                "minItems": 4,
+                "maxItems": 4
+              },
+              "critic_input_ref": {
+                "type": "string",
+                "const": "cgpu.selected_candidate",
+                "description": "State reference reviewed by Critic/Metacognition before final response ownership."
+              },
+              "critic_reviewed_candidate_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Concrete CGPU candidate id reviewed by Critic/Metacognition."
+              },
+              "final_output_ref": {
+                "type": "string",
+                "const": "critic.selected_response",
+                "description": "State reference that owns the final selected response after critic/metacognition arbitration."
+              },
+              "final_output_owner": {
+                "type": "string",
+                "enum": [
+                  "critic_metacognition",
+                  "hemisphere_bridge_fallback"
+                ],
+                "description": "Runtime source that supplied the selected response."
+              },
+              "integrity": {
+                "type": "object",
+                "required": [
+                  "status",
+                  "checks"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "passed",
+                      "failed"
+                    ],
+                    "description": "Aggregate state-contract verification result for the serialized Quad Brain handoff chain."
+                  },
+                  "checks": {
+                    "type": "object",
+                    "required": [
+                      "roles_complete",
+                      "serial_order_valid",
+                      "transitions_complete",
+                      "arbitration_steps_complete",
+                      "arbitration_steps_mirror_transitions",
+                      "output_transition_mirrors",
+                      "critic_handoff_valid",
+                      "final_output_owned_by_critic"
+                    ],
+                    "properties": {
+                      "roles_complete": {
+                        "type": "boolean"
+                      },
+                      "serial_order_valid": {
+                        "type": "boolean"
+                      },
+                      "transitions_complete": {
+                        "type": "boolean"
+                      },
+                      "arbitration_steps_complete": {
+                        "type": "boolean"
+                      },
+                      "arbitration_steps_mirror_transitions": {
+                        "type": "boolean",
+                        "description": "True only when every compact arbitration step mirrors the matching role output and state transition for role, device, input refs, output refs, rounded confidence, and warnings."
+                      },
+                      "output_transition_mirrors": {
+                        "type": "boolean"
+                      },
+                      "critic_handoff_valid": {
+                        "type": "boolean"
+                      },
+                      "final_output_owned_by_critic": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "selected_candidate_id": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "CGPU candidate id selected before critic review."
+                  },
+                  "reviewed_candidate_id": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Candidate id reviewed by Critic/Metacognition."
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": true
+          },
+          "latency_ms": {
+            "type": "number"
+          }
+        }
+      },
+      "QuadBrainReplayRecord": {
+        "type": "object",
+        "title": "QuadBrainReplayRecord",
+        "description": "Compact replay/storage metadata emitted inside CognitiveHypervisorTrace.quad_brain_replay and bridge_result.quad_brain_replay for quad_brain_path traces. It stores response hashes, role/device identity, state-contract evidence, and latency without persisting raw response text.",
+        "required": [
+          "schema",
+          "trace_id",
+          "selected_source",
+          "selected_response_sha256",
+          "selected_response_chars",
+          "serial_order",
+          "output_roles",
+          "output_devices",
+          "output_confidence",
+          "state_contract",
+          "latency_ms",
+          "record_hash"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "synthesus.chal.quad_brain_replay.v1"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "prompt_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Runtime prompt reference used to create the replay record, such as hypervisor.query."
+          },
+          "runtime_preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Active Synthesus 5 runtime preset after normalization."
+          },
+          "selected_source": {
+            "type": "string",
+            "enum": [
+              "critic_metacognition",
+              "hemisphere_bridge_fallback"
+            ]
+          },
+          "selected_response_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "SHA-256 hash of the selected response. The replay record intentionally omits raw response text."
+          },
+          "selected_response_chars": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "serial_order": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "knowledge_grounding",
+                "executive_reasoning",
+                "cgpu_rendering",
+                "critic_metacognition"
+              ]
+            }
+          },
+          "output_roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "knowledge_grounding",
+                "executive_reasoning",
+                "cgpu_rendering",
+                "critic_metacognition"
+              ]
+            }
+          },
+          "output_devices": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Mapping from Quad Brain role to CHAL device URI."
+          },
+          "output_confidence": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Mapping from Quad Brain role to rounded output confidence."
+          },
+          "state_contract": {
+            "type": "object",
+            "required": [
+              "topology",
+              "parallel_brain_spawn",
+              "serialized_arbitration",
+              "required_roles",
+              "arbitration_steps",
+              "state_transitions",
+              "critic_input_ref",
+              "final_output_ref",
+              "final_output_owner",
+              "integrity"
+            ],
+            "properties": {
+              "topology": {
+                "type": "string",
+                "const": "knowledge->executive->cgpu->critic"
+              },
+              "parallel_brain_spawn": {
+                "type": "boolean",
+                "const": false
+              },
+              "serialized_arbitration": {
+                "type": "boolean",
+                "const": true
+              },
+              "required_roles": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "knowledge_grounding",
+                    "executive_reasoning",
+                    "cgpu_rendering",
+                    "critic_metacognition"
+                  ]
+                }
+              },
+              "arbitration_steps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "step",
+                    "role",
+                    "device",
+                    "input_refs",
+                    "output_refs",
+                    "confidence",
+                    "warnings"
+                  ],
+                  "properties": {
+                    "step": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 4
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "knowledge_grounding",
+                        "executive_reasoning",
+                        "cgpu_rendering",
+                        "critic_metacognition"
+                      ]
+                    },
+                    "device": {
+                      "type": "string"
+                    },
+                    "input_refs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "output_refs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "confidence": {
+                      "type": "number"
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "minItems": 4,
+                "maxItems": 4
+              },
+              "state_transitions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/QuadBrainStateTransition"
+                },
+                "minItems": 4,
+                "maxItems": 4
+              },
+              "critic_input_ref": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "State reference reviewed by Critic/Metacognition before final response ownership."
+              },
+              "critic_reviewed_candidate_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "final_output_ref": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "final_output_owner": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Runtime source that supplied the selected response."
+              },
+              "integrity": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "additionalProperties": true
+          },
+          "latency_ms": {
+            "type": "number"
+          },
+          "record_hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "SHA-256 hash over the canonical replay record excluding record_hash itself, used to detect trace-storage drift or tampering."
+          }
+        }
+      },
+      "QuadBrainTraceStorage": {
+        "type": "object",
+        "title": "QuadBrainTraceStorage",
+        "description": "Telemetry for the CHAL Quad Brain replay trace-storage sink. The storage boundary records status, backend result metadata, and the compact replay record hash while asserting that raw prompts and raw responses were not stored by the hypervisor.",
+        "required": [
+          "schema",
+          "trace_id",
+          "route",
+          "device",
+          "status",
+          "stored",
+          "raw_prompt_stored",
+          "raw_response_stored"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "synthesus.chal.quad_brain_trace_storage.v1"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "route": {
+            "type": "string",
+            "enum": [
+              "fast_path",
+              "grounded_path",
+              "deep_reasoning_path",
+              "quad_brain_path",
+              "safety_path"
+            ]
+          },
+          "runtime_preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "device": {
+            "type": "string",
+            "const": "chal://telemetry/quad_brain_replay_store"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "skipped",
+              "stored",
+              "fault"
+            ]
+          },
+          "stored": {
+            "type": "boolean"
+          },
+          "raw_prompt_stored": {
+            "type": "boolean",
+            "const": false
+          },
+          "raw_response_stored": {
+            "type": "boolean",
+            "const": false
+          },
+          "record_hash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Hash of the compact QuadBrainReplayRecord that was offered to the mounted trace sink; null when no replay record exists."
+          },
+          "reason": {
+            "type": "string"
+          },
+          "recorder_result": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Optional backend acknowledgement from the mounted trace sink."
+          },
+          "error": {
+            "type": "string",
+            "description": "Recorder exception text when status=fault."
+          }
+        }
+      },
+      "OrganReplayTrace": {
+        "type": "object",
+        "title": "OrganReplayTrace",
+        "description": "Compact CHAL organ replay storage record emitted by tools/evaluate_organs.py when --replay-jsonl is used. It preserves organ accelerator frame identity, candidate refs, critic refs, shared-backbone contract identity, and a canonical record hash without storing raw state/action/trajectory feature vectors. This is a tooling/storage contract, not a /api/v1/query response payload.",
+        "required": [
+          "schema",
+          "generator",
+          "sourceRecordHash",
+          "seed",
+          "scenarioId",
+          "step",
+          "simulatedTime",
+          "domain",
+          "organ",
+          "phase",
+          "device",
+          "role",
+          "route",
+          "frameId",
+          "parentFrameId",
+          "outputRef",
+          "backbone",
+          "candidateRefs",
+          "selectedCandidateRef",
+          "criticFeedbackRef",
+          "accepted",
+          "quality",
+          "recordHash"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "synthesus.organ_replay_trace.v1"
+          },
+          "generator": {
+            "type": "string",
+            "const": "organ-triad-replay-v4"
+          },
+          "sourceRecordHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Hash of the compact organ_training_replay.v1 source identity record."
+          },
+          "seed": {
+            "type": "integer"
+          },
+          "scenarioId": {
+            "type": "string"
+          },
+          "step": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "simulatedTime": {
+            "type": "string",
+            "description": "Deterministic simulated timestamp copied from the source replay metadata."
+          },
+          "domain": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "sysops",
+              "gm"
+            ]
+          },
+          "organ": {
+            "type": "string",
+            "enum": [
+              "policy_prior",
+              "risk_outcome",
+              "attention"
+            ]
+          },
+          "phase": {
+            "type": "string"
+          },
+          "device": {
+            "type": "string",
+            "pattern": "^chal://organs/(chat|sysops|gm)/(policy_prior|risk_outcome|attention)$"
+          },
+          "role": {
+            "type": "string",
+            "const": "organ_accelerator"
+          },
+          "route": {
+            "type": "string",
+            "const": "organ_training_replay"
+          },
+          "frameId": {
+            "type": "string"
+          },
+          "parentFrameId": {
+            "type": "string"
+          },
+          "outputRef": {
+            "type": "string"
+          },
+          "backbone": {
+            "type": "object",
+            "required": [
+              "schema",
+              "contractVersion",
+              "domain",
+              "organ",
+              "width",
+              "scopes",
+              "device",
+              "contractHash"
+            ],
+            "properties": {
+              "schema": {
+                "type": "string",
+                "const": "shared_organ_backbone.v1"
+              },
+              "contractVersion": {
+                "type": "string",
+                "const": "shared-organ-backbone-v1"
+              },
+              "domain": {
+                "type": "string"
+              },
+              "organ": {
+                "type": "string"
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "scopes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "device": {
+                "type": "string"
+              },
+              "contractHash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "additionalProperties": false
+          },
+          "candidateRefs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "selectedCandidateRef": {
+            "type": "string",
+            "description": "Must match one of candidateRefs before the compact replay record is admitted by the integrity gate."
+          },
+          "criticFeedbackRef": {
+            "type": "string"
+          },
+          "accepted": {
+            "type": "boolean"
+          },
+          "quality": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "recordHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "SHA-256 hash over the canonical compact record excluding recordHash itself."
+          }
+        },
+        "additionalProperties": false
+      },
+      "QueryRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Query",
+            "description": "The query text"
+          },
+          "character": {
+            "type": "string",
+            "title": "Character",
+            "description": "Character ID to route to",
+            "default": "synth"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "description": "Processing mode: auto|chal|business_bot|cognitive|rag|pattern. Use chal to route explicitly through the Synthesus 5 Cognitive Hypervisor; business_bot is a CHAL preset for concise action-oriented answers; auto preserves the legacy-compatible production pipeline.",
+            "default": "auto"
+          },
+          "runtime_preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runtime Preset",
+            "description": "Optional Synthesus 5 runtime preset. The only named preset with specialized behavior is business_bot; aliases business, business-bot, and businessbot normalize to business_bot, while default/none/null means default CHAL routing."
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id",
+            "description": "Session ID for multi-turn"
+          },
+          "player_id": {
+            "type": "string",
+            "title": "Player Id",
+            "description": "Player/user ID for relationship tracking",
+            "default": "default"
+          },
+          "include_sources": {
+            "type": "boolean",
+            "title": "Include Sources",
+            "description": "Include RAG source citations",
+            "default": false
+          },
+          "include_debug": {
+            "type": "boolean",
+            "title": "Include Debug",
+            "description": "Include debug telemetry",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "QueryRequest"
+      },
+      "QueryResponse": {
+        "properties": {
+          "response": {
+            "type": "string",
+            "title": "Response"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "character": {
+            "type": "string",
+            "title": "Character"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Runtime source that produced the response, such as zo_kernel, symbolic_core, cognitive_hypervisor, cognitive, synthesus_master, rag, or fallback."
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "latency_ms": {
+            "type": "number",
+            "title": "Latency Ms"
+          },
+          "sources": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sources"
+          },
+          "emotion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emotion"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship"
+          },
+          "debug": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Debug",
+            "description": "Optional implementation telemetry returned only when include_debug is true. Current keys include kernel_triggered, symbolic_triggered, trace, rag, ml_swarm, cognitive_hypervisor, and fallback diagnostics. For explicit mode=chal calls, cognitive_hypervisor follows the CognitiveHypervisorTrace OpenAPI component, including typed QuadBrainArbitration records when route=quad_brain_path with state-contract arbitration_steps, QuadBrainReplayRecord, and QuadBrainTraceStorage metadata for compact replay/storage traces, plus CHALMemoryWritebackResult records when the API attempts post-arbitration memory writeback. CGPU candidate-set trace records should also live here as the runtime wiring expands without changing the stable response envelope. Legacy-compatible template exceptions are labeled under debug.template_surface using the TemplateSurface schema."
+          }
+        },
+        "type": "object",
+        "required": [
+          "response",
+          "confidence",
+          "character",
+          "source",
+          "session_id",
+          "latency_ms"
+        ],
+        "title": "QueryResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "CognitiveHypervisorTrace": {
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "synthesus.chal.hypervisor_trace.v1",
+            "description": "Trace schema identifier emitted by CognitiveHypervisor."
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "route": {
+            "type": "string",
+            "enum": [
+              "fast_path",
+              "grounded_path",
+              "deep_reasoning_path",
+              "quad_brain_path",
+              "safety_path"
+            ]
+          },
+          "hemisphere_mode": {
+            "type": "string"
+          },
+          "latency_ms": {
+            "type": "number"
+          },
+          "budget": {
+            "type": "object",
+            "properties": {
+              "latency_ms": {
+                "type": "number"
+              },
+              "retrieval_depth": {
+                "type": "integer"
+              },
+              "candidate_count": {
+                "type": "integer"
+              },
+              "critic_passes": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "latency_ms",
+              "retrieval_depth",
+              "candidate_count",
+              "critic_passes"
+            ],
+            "additionalProperties": true
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "runtime_preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Active Synthesus 5 runtime preset after normalization. The business, business-bot, and businessbot request aliases are reported as business_bot; null means default CHAL routing."
+          },
+          "bridge_latency_ms": {
+            "type": "number"
+          },
+          "device_isolation": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "AIVM execution guard result for the CHAL device dispatch."
+          },
+          "budget_exhausted": {
+            "type": "boolean"
+          },
+          "degraded": {
+            "type": "boolean"
+          },
+          "degraded_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CHALDegradedState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Typed Synthesus 5 degraded-state record emitted when a CHAL device fault, budget exhaustion, or template quarantine prevents normal assistant-path emission; null when the route completes cleanly."
+          },
+          "template_guard": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Template leakage guard decision and matched signatures."
+          },
+          "knowledge_provenance": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mounted Knowledge Cloud provenance trace for grounded CHAL routes, including KAL operation, source mount, cache state, and artifact integrity metadata; null when no grounded hardware lookup was attempted."
+          },
+          "grounding_reranker": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CHALGroundingRerankerTrace"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Compact `chal://reasoning/reranker` telemetry emitted for grounded routes when context chunks are reranked before bridge dispatch; null when no grounding context is available or reranking was not attempted."
+          },
+          "reasoning_quality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CHALReasoningQualityTrace"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Compact `chal://critic/verifier` telemetry emitted after template-guarded final surface generation. It audits answer quality and exposes critic-budget rewrite pressure without owning final language."
+          },
+          "reasoning_revision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CHALReasoningRevisionTrace"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Bounded CGPU/critic revision telemetry emitted when verifier route pressure is consumed inside the active critic budget; null when no revision is requested."
+          },
+          "quad_brain": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuadBrainArbitration"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Serialized Quad Brain arbitration trace when route is quad_brain_path; null otherwise."
+          },
+          "quad_brain_replay": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuadBrainReplayRecord"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Compact Quad Brain replay record emitted when route is quad_brain_path; null otherwise. It mirrors telemetry.quad_brain_replay and omits raw response text."
+          },
+          "quad_brain_trace_storage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuadBrainTraceStorage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "CHAL telemetry for the mounted Quad Brain replay trace-storage sink. It records skipped/stored/fault status, the compact replay record hash, and no-raw-prompt/no-raw-response assertions without changing final response ownership."
+          },
+          "memory_writeback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CHALMemoryWritebackResult"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Post-arbitration CHAL memory writeback telemetry for explicit API CHAL/business-bot calls; null or absent when the endpoint does not attempt writeback."
+          }
+        },
+        "type": "object",
+        "required": [
+          "schema",
+          "trace_id",
+          "route",
+          "hemisphere_mode",
+          "latency_ms",
+          "budget",
+          "reasons",
+          "constraints",
+          "device_isolation",
+          "budget_exhausted",
+          "degraded",
+          "template_guard"
+        ],
+        "title": "CognitiveHypervisorTrace",
+        "description": "Debug trace emitted under QueryResponse.debug.cognitive_hypervisor for explicit mode=chal requests."
+      },
+      "CHALGroundingRerankerTrace": {
+        "type": "object",
+        "title": "CHALGroundingRerankerTrace",
+        "description": "Compact Cognitive Hypervisor telemetry for the CHAL grounding reranker. The reranker selects/reorders grounded context before bridge dispatch and never emits final user-facing language.",
+        "required": [
+          "schema",
+          "trace_id",
+          "device",
+          "status",
+          "input_chunks",
+          "selected_chunks",
+          "selected_indices",
+          "scores"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "synthesus.chal.grounding_reranker.v1"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "device": {
+            "type": "string",
+            "const": "chal://reasoning/reranker"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "fault"
+            ]
+          },
+          "input_chunks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "selected_chunks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "selected_indices": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Indices selected from the original grounding chunk list."
+          },
+          "scores": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "Reranker scores aligned with selected_indices."
+          },
+          "error": {
+            "type": "string",
+            "description": "Present only when status=fault."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CHALReasoningQualityIssue": {
+        "type": "object",
+        "title": "CHALReasoningQualityIssue",
+        "description": "One verifier issue surfaced in CHAL reasoning-quality telemetry.",
+        "required": [
+          "issue_id",
+          "severity",
+          "category",
+          "description"
+        ],
+        "properties": {
+          "issue_id": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CHALReasoningRevisionRouteHint": {
+        "type": "object",
+        "title": "CHALReasoningRevisionRouteHint",
+        "description": "Scheduler-only route pressure emitted when verifier revision pressure should be serviced by the current route or a bounded follow-up route. This is not verifier-owned final language.",
+        "required": [
+          "schema",
+          "trace_id",
+          "device",
+          "required",
+          "reason",
+          "verifier_status",
+          "current_route",
+          "recommended_route",
+          "budget_delta",
+          "issue_ids",
+          "firmware_boundary",
+          "final_language_owner",
+          "verifier_may_emit_final_language"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "synthesus.chal.reasoning_revision_route_hint.v1"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "device": {
+            "type": "string",
+            "const": "chal://hypervisor/route_planner"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "active_route_has_critic_budget",
+              "critic_budget_exhausted"
+            ]
+          },
+          "verifier_status": {
+            "type": "string"
+          },
+          "current_route": {
+            "type": "string"
+          },
+          "recommended_route": {
+            "type": "string"
+          },
+          "budget_delta": {
+            "type": "object",
+            "required": [
+              "critic_passes",
+              "candidate_count"
+            ],
+            "properties": {
+              "critic_passes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "candidate_count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "issue_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "firmware_boundary": {
+            "type": "string",
+            "const": "scheduler_hint_only"
+          },
+          "final_language_owner": {
+            "type": "string",
+            "const": "generation_spine_or_cgpu_critic"
+          },
+          "verifier_may_emit_final_language": {
+            "type": "boolean",
+            "const": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "CHALReasoningRevisionTrace": {
+        "type": "object",
+        "title": "CHALReasoningRevisionTrace",
+        "description": "Bounded revision telemetry emitted when the Cognitive Hypervisor consumes a verifier route hint through CGPU/critic arbitration. The verifier and reranker remain signal-only devices and cannot emit final language.",
+        "required": [
+          "schema",
+          "trace_id",
+          "device",
+          "status",
+          "route",
+          "verifier_may_emit_final_language",
+          "reranker_may_emit_final_language",
+          "final_language_owner"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "synthesus.chal.reasoning_revision.v1"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "device": {
+            "type": "string",
+            "const": "chal://cgpu/revision_render"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "skipped",
+              "revised",
+              "blocked",
+              "fault"
+            ]
+          },
+          "route": {
+            "type": "string"
+          },
+          "source_verifier_status": {
+            "type": "string"
+          },
+          "source_issue_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "route_hint": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CHALReasoningRevisionRouteHint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "selected_text": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Revised final text only when status=revised and final_language_owner is cgpu_critic_arbitration."
+          },
+          "selected_candidate_id": {
+            "type": "string"
+          },
+          "candidate_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "critic_passes_used": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cgpu_output": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "issue_suggestions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "verifier_may_emit_final_language": {
+            "type": "boolean",
+            "const": false
+          },
+          "reranker_may_emit_final_language": {
+            "type": "boolean",
+            "const": false
+          },
+          "final_language_owner": {
+            "type": "string",
+            "enum": [
+              "generation_spine_or_cgpu_critic",
+              "cgpu_critic_arbitration"
+            ]
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CHALReasoningQualityTrace": {
+        "type": "object",
+        "title": "CHALReasoningQualityTrace",
+        "description": "Compact Cognitive Hypervisor telemetry for the CHAL answer verifier. It audits the final post-template-guard surface and reports rewrite pressure to CGPU/critic callers without becoming a final-language source.",
+        "required": [
+          "schema",
+          "trace_id",
+          "device",
+          "status",
+          "score",
+          "issues",
+          "context_chunks",
+          "critic_passes_budgeted",
+          "critic_revision_required"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "synthesus.chal.reasoning_quality.v1"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "device": {
+            "type": "string",
+            "const": "chal://critic/verifier"
+          },
+          "status": {
+            "type": "string",
+            "description": "Verifier status, for example passed, failed, needs_revision, uncertain, or fault."
+          },
+          "score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CHALReasoningQualityIssue"
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "context_chunks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "critic_passes_budgeted": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "critic_revision_required": {
+            "type": "boolean",
+            "description": "True when verifier status requests revision and the hypervisor route still has critic-pass budget available."
+          },
+          "revision_route_hint": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CHALReasoningRevisionRouteHint"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Scheduler-only route hint emitted when verifier pressure requests revision; it cannot emit or rewrite final language."
+          },
+          "error": {
+            "type": "string",
+            "description": "Present only when status=fault."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CHALDegradedState": {
+        "type": "object",
+        "title": "CHALDegradedState",
+        "description": "Explicit non-template degraded-state payload used when the Cognitive Hypervisor cannot safely emit a normal Synthesus 5 response.",
+        "required": [
+          "schema",
+          "trace_id",
+          "reason",
+          "route",
+          "device",
+          "device_status",
+          "budget_exhausted",
+          "normal_assistant_path",
+          "legacy_template_leakage_allowed",
+          "message"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "synthesus.chal.degraded_state.v1"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "budget_exhausted",
+              "device_fault",
+              "legacy_template_quarantine"
+            ]
+          },
+          "route": {
+            "type": "string"
+          },
+          "device": {
+            "type": "string"
+          },
+          "device_status": {
+            "type": "string"
+          },
+          "budget_exhausted": {
+            "type": "boolean"
+          },
+          "normal_assistant_path": {
+            "type": "boolean",
+            "const": false
+          },
+          "legacy_template_leakage_allowed": {
+            "type": "boolean",
+            "const": false
+          },
+          "message": {
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "matched_signatures": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "QuadBrainStateTransition": {
+        "type": "object",
+        "title": "QuadBrainStateTransition",
+        "description": "One serialized state handoff in the fixed Synthesus 5 Quad Brain arbitration chain.",
+        "required": [
+          "role",
+          "input_refs",
+          "output_refs",
+          "device"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "knowledge_grounding",
+              "executive_reasoning",
+              "cgpu_rendering",
+              "critic_metacognition"
+            ]
+          },
+          "input_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Named state references consumed by this brain role."
+          },
+          "output_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Named state references produced by this brain role."
+          },
+          "device": {
+            "type": "string",
+            "description": "CHAL device URI responsible for this transition."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CHALMemoryWritebackDecision": {
+        "type": "object",
+        "title": "CHALMemoryWritebackDecision",
+        "description": "Decision returned by the CHAL memory writeback admission policy before any memory-store mutation.",
+        "required": [
+          "accepted",
+          "reason",
+          "target_mount"
+        ],
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Admission or fail-closed reason, for example critic_and_provenance_validated, critic_rejected, missing_provenance, low_provenance_confidence, memory_store_unavailable, empty_response, writeback_bridge_unavailable, missing_hypervisor_trace, or writeback_exception."
+          },
+          "target_mount": {
+            "type": "string",
+            "const": "/mnt/mem/writeback",
+            "description": "CHAL memory writeback mount targeted by the API hook."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Trace, provenance, stored-memory, and target-memory metadata when available."
+          }
+        },
+        "additionalProperties": true
+      },
+      "CHALMemoryWritebackResult": {
+        "type": "object",
+        "title": "CHALMemoryWritebackResult",
+        "description": "Telemetry emitted at debug.cognitive_hypervisor.memory_writeback for explicit mode=chal and business_bot API calls after final Cognitive Hypervisor arbitration. Accepted traces write through /mnt/mem/writeback; degraded, template-rewritten, unavailable-sink, empty, or exception paths fail closed and do not block response emission.",
+        "required": [
+          "schema"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "synthesus.chal.memory_writeback_result.v1"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CHALMemoryWritebackDecision"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nested admission decision returned by apply_memory_writeback when the bridge reaches the policy layer."
+          },
+          "accepted": {
+            "type": "boolean",
+            "description": "Flat fail-closed admission flag used by early API exits before a MemoryWritebackDecision can be created."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Flat fail-closed reason used by early API exits before a MemoryWritebackDecision can be created."
+          },
+          "target_mount": {
+            "type": "string",
+            "const": "/mnt/mem/writeback"
+          },
+          "stored_memory_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Memory-store record id when an accepted writeback was persisted."
+          },
+          "target_memory_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "episodic",
+                  "semantic",
+                  "procedural",
+                  "working",
+                  "crystallized"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conscious_state_updated": {
+            "type": "boolean"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Stored CHAL writeback metadata, including trace id, provenance refs, TTL, importance, and crystallized staging flags when present."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Exception text when the API writeback hook fails closed."
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  }
+}

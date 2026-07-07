@@ -1,0 +1,308 @@
+:root {
+    --glass-bg: rgba(20, 25, 40, 0.4);
+    --glass-border: rgba(255, 255, 255, 0.15);
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --accent: #38bdf8;
+    --bg-desktop: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+    --bg-space: #0b0c10;
+    --accent-blue: #38bdf8;
+    --accent-blue-glow: rgba(56, 189, 248, 0.5);
+    --accent-amber: #fbbf24;
+    --accent-amber-glow: rgba(251, 191, 36, 0.5);
+    --accent-pink: #f472b6;
+    --accent-pink-glow: rgba(244, 114, 182, 0.5);
+    --accent-orange: #f97316;
+    --accent-orange-glow: rgba(249, 115, 22, 0.5);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    margin: 0;
+    overflow: hidden;
+    font-family: 'Outfit', sans-serif;
+    color: var(--text-primary);
+    background-color: #0f172a;
+}
+
+#hyperspace-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -3;
+    display: block;
+    background: radial-gradient(ellipse at 50% 38%, #1b2c58 0%, #0d1533 55%, #060a1c 100%);
+}
+
+.wp-swatch {
+    border: 2px solid transparent;
+    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.wp-swatch:hover { transform: scale(1.06); }
+.wp-selected {
+    border-color: #38bdf8 !important;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+}
+
+/* ===================== DESKTOP POLISH ===================== */
+/* Thinking lightbulb: flickers while the idea forms, then lights up solid. */
+@keyframes bulb-blink {
+    0%, 100% { opacity: 0.25; filter: grayscale(1) brightness(0.55); }
+    50%      { opacity: 1;    filter: none; text-shadow: 0 0 10px #facc15, 0 0 22px #facc15; }
+}
+.thinking-bulb { display: inline-block; font-size: 1.3rem; vertical-align: middle; animation: bulb-blink 0.85s ease-in-out infinite; }
+.thinking-bulb.lit { animation: none; opacity: 1; filter: none; text-shadow: 0 0 10px #facc15, 0 0 22px #facc15; }
+@keyframes cursor-blink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+.stream-cursor { color: #facc15; animation: cursor-blink 0.7s steps(1) infinite; margin-left: 1px; }
+
+/* Chat messages fade/slide in. */
+.message { animation: msg-in 0.25s ease-out; }
+@keyframes msg-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.welcome-message { border-left: 3px solid #38bdf8; background: rgba(56, 189, 248, 0.07); }
+
+/* Login screen: OS-style clock + tagline + password toggle + entrance. */
+.login-card { animation: card-in 0.5s cubic-bezier(.2,.8,.2,1); }
+@keyframes card-in { from { opacity: 0; transform: translateY(18px) scale(0.98); } to { opacity: 1; transform: none; } }
+#login-clock { position: absolute; top: 7%; left: 0; right: 0; text-align: center; pointer-events: none; }
+#login-time { font-size: 3.4rem; font-weight: 200; letter-spacing: 3px; color: #f1f5f9; text-shadow: 0 2px 30px rgba(56,189,248,0.45); }
+#login-date { font-size: 1rem; color: #94a3b8; margin-top: 2px; letter-spacing: 1px; }
+.login-tagline { color: #64748b; font-size: 0.7rem; letter-spacing: 3px; text-transform: uppercase; margin: 0 0 20px; }
+.pwd-wrap { position: relative; width: 85%; margin: 0 auto 10px; }
+.pwd-wrap input { width: 100%; box-sizing: border-box; }
+.pwd-toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; opacity: 0.55; user-select: none; }
+.pwd-toggle:hover { opacity: 1; }
+
+/* Suggested-prompt chips */
+.prompt-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+.prompt-chip {
+    display: inline-block; padding: 6px 12px; border-radius: 14px; cursor: pointer;
+    font-size: 0.82rem; color: #cbd5e1;
+    background: rgba(56,189,248,0.08); border: 1px solid rgba(56,189,248,0.3);
+    transition: all 0.15s ease;
+}
+.prompt-chip:hover { background: rgba(56,189,248,0.2); border-color: #38bdf8; transform: translateY(-1px); }
+
+/* Markdown in chat replies */
+.md-inline { background: rgba(255,255,255,0.1); padding: 1px 5px; border-radius: 4px; font-family: 'Fira Code', monospace; font-size: 0.88em; }
+.md-code {
+    background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+    padding: 10px 12px; margin: 6px 0; overflow-x: auto; white-space: pre-wrap;
+    font-family: 'Fira Code', monospace; font-size: 0.85em; color: #e2e8f0;
+}
+.md-h { font-weight: 600; color: #38bdf8; margin: 6px 0 2px; }
+
+.wallpaper-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-size: cover;
+    background-position: center;
+    z-index: -2;
+    transition: background-image 0.5s ease-in-out;
+}
+
+.glass-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: radial-gradient(circle at center, transparent 0%, rgba(15,23,42,0.28) 100%);
+    z-index: -1;
+}
+
+/* Modal Overlay for Guided Installer */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    width: 600px;
+    max-width: 90%;
+    text-align: center;
+    padding: 40px !important;
+}
+
+.primary-btn {
+    background: linear-gradient(90deg, #38bdf8 0%, #818cf8 100%) !important;
+    color: #fff !important;
+    font-weight: 800;
+    letter-spacing: 1px;
+    border: none !important;
+    padding: 10px 20px;
+    width: 100%;
+}
+
+.primary-btn:hover {
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.5) !important;
+}
+
+/* Hyperspace Background System */
+.hyperspace-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+    overflow: hidden;
+    background: radial-gradient(ellipse at center, var(--bg-space) 0%, #000000 100%);
+}
+
+.starfield {
+    position: absolute; width: 100%; height: 100%;
+    background-image:
+        radial-gradient(2px 2px at 20px 30px, var(--accent-blue), transparent),
+        radial-gradient(2px 2px at 40px 70px, var(--accent-amber), transparent),
+        radial-gradient(1px 1px at 90px 40px, var(--accent-pink), transparent),
+        radial-gradient(1px 1px at 130px 80px, var(--accent-orange), transparent),
+        radial-gradient(2px 2px at 160px 30px, var(--accent-blue), transparent);
+    background-repeat: repeat; background-size: 200px 100px;
+    animation: starfield-twinkle 4s ease-in-out infinite alternate;
+}
+@keyframes starfield-twinkle { 0% { opacity: 0.3; transform: scale(1); } 100% { opacity: 1; transform: scale(1.05); } }
+
+.warp-stars { position: absolute; width: 100%; height: 100%; }
+.warp-stars::before {
+    content: ''; position: absolute; top: 20%; left: -100%; width: 100%; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-blue), transparent);
+    animation: warp-streak 8s linear infinite;
+}
+.warp-stars::after {
+    content: ''; position: absolute; top: 70%; right: -100%; width: 100%; height: 1px;
+    background: linear-gradient(270deg, transparent, var(--accent-amber), transparent);
+    animation: warp-streak-reverse 6s linear infinite;
+}
+@keyframes warp-streak { 0% { left: -100%; } 100% { left: 100%; } }
+@keyframes warp-streak-reverse { 0% { right: -100%; } 100% { right: 100%; } }
+
+.chemical-asteroids { position: absolute; width: 100%; height: 100%; }
+.chemical-asteroids::before {
+    content: ''; position: absolute; top: 40%; left: -50px; width: 50px; height: 50px;
+    background: radial-gradient(circle, var(--accent-orange) 20%, transparent 70%);
+    border-radius: 50%; animation: asteroid-drift 15s ease-in-out infinite;
+    box-shadow: 0 0 20px var(--accent-orange-glow);
+}
+.chemical-asteroids::after {
+    content: ''; position: absolute; bottom: 30%; right: -30px; width: 30px; height: 30px;
+    background: radial-gradient(circle, var(--accent-pink) 30%, transparent 80%);
+    border-radius: 50%; animation: asteroid-drift-reverse 12s ease-in-out infinite;
+    box-shadow: 0 0 15px var(--accent-pink-glow);
+}
+@keyframes asteroid-drift { 0% { transform: translateX(-100px) translateY(0px) rotate(0deg); } 50% { transform: translateX(50vw) translateY(-50px) rotate(180deg); } 100% { transform: translateX(100vw) translateY(0px) rotate(360deg); } }
+@keyframes asteroid-drift-reverse { 0% { transform: translateX(100px) translateY(0px) rotate(0deg); } 50% { transform: translateX(-50vw) translateY(50px) rotate(180deg); } 100% { transform: translateX(-100vw) translateY(0px) rotate(360deg); } }
+
+.animated-planets { position: absolute; width: 100%; height: 100%; }
+.planet { position: absolute; border-radius: 50%; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), var(--accent-blue)); box-shadow: 0 0 20px var(--accent-blue-glow); }
+.planet-1 { width: 80px; height: 80px; top: 15%; right: 10%; animation: planet-orbit 20s linear infinite; }
+.planet-2 { width: 60px; height: 60px; bottom: 20%; left: 15%; animation: planet-orbit-reverse 25s linear infinite; background: radial-gradient(circle at 40% 40%, rgba(255,255,255,0.6), var(--accent-amber)); box-shadow: 0 0 15px var(--accent-amber-glow); }
+.planet-3 { width: 40px; height: 40px; top: 60%; right: 25%; animation: planet-wobble 15s ease-in-out infinite; background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.7), var(--accent-orange)); box-shadow: 0 0 10px var(--accent-orange-glow); }
+@keyframes planet-orbit { 0% { transform: rotate(0deg) translateX(100px) rotate(0deg); } 100% { transform: rotate(360deg) translateX(100px) rotate(-360deg); } }
+@keyframes planet-orbit-reverse { 0% { transform: rotate(360deg) translateX(80px) rotate(0deg); } 100% { transform: rotate(0deg) translateX(80px) rotate(-360deg); } }
+@keyframes planet-wobble { 0%, 100% { transform: translateY(0px) rotate(0deg); } 25% { transform: translateY(-10px) rotate(5deg); } 50% { transform: translateY(0px) rotate(0deg); } 75% { transform: translateY(10px) rotate(-5deg); } }
+
+
+#desktop-area { position: absolute; top: 0; left: 0; width: 100%; height: calc(100% - 80px); overflow: hidden; }
+
+/* WINDOW MANAGER CSS */
+.window {
+    position: absolute;
+    display: flex; flex-direction: column;
+    background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s;
+    resize: none; overflow: hidden;
+    will-change: transform, left, top;
+}
+/* Visible resize grip in the bottom-right corner (driven by JS corner hit-test).
+   The native `resize: both` handle was invisible against the dark glass and
+   clipped by the rounded corner, so it's replaced with this drawn grip. */
+.window::after {
+    content: "";
+    position: absolute;
+    right: 3px; bottom: 3px;
+    width: 15px; height: 15px;
+    border-right: 2px solid rgba(56, 189, 248, 0.55);
+    border-bottom: 2px solid rgba(56, 189, 248, 0.55);
+    border-bottom-right-radius: 9px;
+    background:
+        linear-gradient(135deg, transparent 46%, rgba(56, 189, 248, 0.7) 46%, rgba(56, 189, 248, 0.7) 54%, transparent 54%),
+        linear-gradient(135deg, transparent 70%, rgba(56, 189, 248, 0.9) 70%, rgba(56, 189, 248, 0.9) 80%, transparent 80%);
+    cursor: nwse-resize;
+    pointer-events: none;
+    z-index: 3;
+}
+.window.focused::after {
+    border-right-color: rgba(56, 189, 248, 0.9);
+    border-bottom-color: rgba(56, 189, 248, 0.9);
+}
+.window.focused {
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.9);
+    border-color: rgba(255, 140, 0, 0.4);
+}
+.window-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.5rem 1rem; border-bottom: 1px solid #1e293b;
+    background: #0a0a0f; cursor: grab; border-radius: 12px 12px 0 0;
+}
+.window-header:active { cursor: grabbing; }
+.window-title { font-size: 0.9rem; font-weight: 600; letter-spacing: 1px; color: #b0b0b0; text-transform: uppercase; }
+.window-controls { display: flex; gap: 8px; }
+.win-btn { width: 14px; height: 14px; border-radius: 50%; border: none; cursor: pointer; }
+.win-btn.close { background: #ef4444; }
+.win-btn.close:hover { background: #dc2626; }
+
+.window-content { padding: 1rem; flex-grow: 1; overflow: auto; display: flex; flex-direction: column; }
+
+/* REUSABLE GLASS COMPONENTS */
+.glass-panel { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; backdrop-filter: blur(10px); }
+.status-indicator { color: #4ade80; margin-top: 0.5rem; font-size: 0.9rem; }
+.widget-grid { display: grid; }
+
+/* Chat Layout */
+.chat-container { display: flex; flex-direction: column; height: 100%; }
+.chat-history { flex-grow: 1; overflow-y: auto; padding-right: 10px; }
+.message { padding: 0.8rem; border-radius: 8px; background: rgba(0, 0, 0, 0.3); font-size: 0.9rem; }
+.chat-input-area { display: flex; gap: 0.5rem; margin-top: 1rem; }
+
+/* IDE Layout */
+.ide-container { display: flex; height: 100%; gap: 1rem; flex-direction: row; }
+.file-tree { width: 220px; border-right: 1px solid var(--glass-border); padding-right: 1rem; overflow-y: auto; }
+.file-tree ul { list-style: none; }
+.editor-area { flex-grow: 1; display: flex; flex-direction: column; }
+.editor-tabs { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+.tab { padding: 0.3rem 0.8rem; background: rgba(0,0,0,0.3); border-radius: 4px; font-size: 0.8rem; }
+.tab.active { background: var(--accent); color: #000; font-weight: bold; }
+.code-editor { flex-grow: 1; background: rgba(0, 0, 0, 0.6); color: #a78bfa; font-family: 'Fira Code', monospace; font-size: 0.9rem; resize: none; border-radius: 8px; padding: 1rem; }
+
+/* Terminal */
+.terminal-container { background: rgba(0,0,0,0.8); color: #a78bfa; font-family: 'Fira Code', monospace; font-size: 0.9rem; padding: 1rem; border-radius: 8px; }
+
+/* Forms & Inputs */
+input, textarea { user-select: text; -webkit-user-select: text; }
+.glass-input { background: rgba(0, 0, 0, 0.4); border: 1px solid var(--glass-border); color: var(--text-primary); padding: 0.8rem; border-radius: 8px; width: 100%; outline: none; }
+.glass-input:focus { border-color: var(--accent); }
+.glass-btn { background: var(--accent); color: #000; border: none; padding: 0 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; }
+
+/* Dock Navigation */
+.dock { position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border); backdrop-filter: blur(20px); padding: 0.5rem 1rem; border-radius: 20px; display: flex; gap: 1rem; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 9999; }
+.dock-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; width: 45px; height: 45px; border-radius: 12px; cursor: pointer; font-size: 1.2rem; transition: all 0.2s; }
+.dock-btn:hover { background: rgba(255,255,255,0.2); transform: translateY(-3px); }

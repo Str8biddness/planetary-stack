@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synthesus Query Interface</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Synthesus Query Interface</h1>
+
+        <div class="domain-selector">
+            <label for="domain-select">Mode:</label>
+            <select id="domain-select">
+                <option value="sysops">SysOps</option>
+                <option value="gm">GM</option>
+                <option value="assistant">Assistant</option>
+                <option value="legal">Legal</option>
+            </select>
+        </div>
+
+        {% if domain == 'sysops' %}
+        <div class="warning">
+            <strong>SysOps Warning:</strong> This system only recommends system actions. It will not kill processes or modify the OS without explicit confirmation and sandboxing.
+        </div>
+        {% endif %}
+
+        <form id="query-form">
+            <textarea id="query-input" placeholder="Enter your query here..."></textarea>
+            <br><br>
+            <button type="submit">Submit Query</button>
+        </form>
+
+        <div id="response-area" style="display: none;">
+            <h2>Response</h2>
+            <div id="answer"></div>
+
+            <div class="feedback-buttons">
+                <button id="helpful-btn">👍 Helpful</button>
+                <button id="not-helpful-btn">👎 Not helpful</button>
+            </div>
+
+            <button id="insight-toggle">Show Reasoning Details</button>
+            <div id="insight-panel" class="insight-panel" style="display: none;">
+                <p><strong>Role / Tone:</strong> <span id="role-tone"></span></p>
+                <p><strong>Engines Used:</strong> <span id="engines"></span></p>
+                <p><strong>Key Explanations:</strong></p>
+                <ul id="explanations"></ul>
+                <p><strong>Actions Taken:</strong></p>
+                <ul id="actions"></ul>
+            </div>
+        </div>
+
+        <div class="status">
+            <p><strong>Trainer Status:</strong></p>
+            <p>Last Batch: <span id="last-batch">Never</span></p>
+            <p>Learned Rules: <span id="learned-rules">0</span></p>
+            <p>Sandbox Mode: <span id="sandbox-mode">Yes</span></p>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

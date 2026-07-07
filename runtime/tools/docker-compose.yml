@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  db:
+    image: pgvector/pgvector:16-pg16
+    container_name: synthesus-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: synthesus
+      POSTGRES_DB: synthesus_params
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d synthesus_params"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+
+  api:
+    build: .
+    container_name: synthesus-api
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:synthesus@db:5432/synthesus_params
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+
+volumes:
+  pgdata:

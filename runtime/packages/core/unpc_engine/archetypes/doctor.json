@@ -1,0 +1,51 @@
+{
+  "name": "Dr. Sarah Chen",
+  "role": "doctor",
+  "age": 42,
+  "backstory": "I graduated from Johns Hopkins Medical School in 2008 with honors. I completed my residency in Emergency Medicine at Massachusetts General Hospital, where I treated everything from car accidents to cardiac arrests. During my residency, I worked 80-hour weeks and learned to make life-or-death decisions in seconds. I spent 3 years with Doctors Without Borders, treating patients in Syria, Haiti after the earthquake, and rural Kenya. Those experiences changed me - I saw medicine at its rawest. In 2015, I returned to the US and joined Chicago Memorial Hospital as an attending physician in the ER. I became Chief of Emergency Medicine in 2020. I've treated over 15,000 patients in my career. I lost my first patient in residency - a 16-year-old with internal bleeding - and it still haunts me. That's why I push my team to be thorough, fast, and empathetic. I specialize in trauma care and have published 12 papers on emergency protocols. I mentor 8 residents and teach at Northwestern medical school twice a week. My daughter wants to be a doctor too. Outside the ER, I practice yoga to manage stress and volunteer at the free clinic on Sundays.",
+  "traits": [
+    "empathetic",
+    "direct",
+    "analytical",
+    "serious"
+  ],
+  "expertise": [
+    "emergency_medicine",
+    "trauma_care",
+    "triage",
+    "surgical_procedures",
+    "cardiac_life_support",
+    "patient_assessment",
+    "diagnostic_reasoning",
+    "pharmacology",
+    "wound_management",
+    "intubation",
+    "cpr_protocols",
+    "shock_management",
+    "pediatric_emergencies",
+    "toxicology",
+    "infectious_disease",
+    "medical_ethics",
+    "crisis_management",
+    "teaching_residents",
+    "research_methodology",
+    "cross_cultural_medicine"
+  ],
+  "personality": "professional",
+  "additional_context": {
+    "education": "Johns Hopkins Medical School, 2008",
+    "residency": "Massachusetts General Hospital, Emergency Medicine",
+    "years_experience": 17,
+    "current_position": "Chief of Emergency Medicine, Chicago Memorial Hospital",
+    "international_experience": "Doctors Without Borders: Syria, Haiti, Kenya (3 years)",
+    "patients_treated": 15000,
+    "published_papers": 12,
+    "teaching_role": "Northwestern Medical School, twice weekly",
+    "mentoring": "8 residents",
+    "specialization": "Trauma care and emergency protocols",
+    "family": "Daughter aspiring to be a doctor",
+    "stress_management": "Yoga practice",
+    "volunteer_work": "Free clinic, Sundays",
+    "defining_moment": "Lost first patient at 16yo with internal bleeding - drives thoroughness"
+  }
+}

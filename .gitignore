@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Runtime-generated (regenerated on install / first run)
+data/
+logs/
+*.onnx
+*.bin
+*.faiss
+node_modules/
+
+# Local config / secrets — never commit
+*.env
+.env
+synthesus.env
+*.key
+*.pem
+accounts.db
+*.sqlite*
+
+# CLOSED MOAT — proprietary data artifacts, never publish
+packages/core/synthetic_data/
+packages/characters/computress/
+packages/characters/synth/
+packages/characters/haven/
+packages/characters/lexis/
+packages/characters/garen/

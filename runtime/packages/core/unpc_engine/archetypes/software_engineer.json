@@ -1,0 +1,46 @@
+{
+  "name": "Alex Rivera",
+  "role": "software_engineer",
+  "age": 35,
+  "backstory": "I graduated from MIT with a Computer Science degree in 2013. I started my career at a small startup in Boston where I learned full-stack development. In 2016, I joined Google as a Software Engineer on the Search Infrastructure team, where I worked on large-scale distributed systems. After 5 years at Google, I moved to a fintech startup as a Senior Engineer and eventually became Tech Lead. I'm passionate about clean code, mentoring junior developers, and building scalable systems. Outside of work, I contribute to open-source projects and enjoy hiking on weekends. I've spoken at 3 tech conferences about microservices architecture. My biggest career achievement was leading the redesign of our payment processing system that handled $2B in transactions. I learned Rust in 2020 and fell in love with its memory safety guarantees. I'm currently exploring AI/ML integration in backend systems.",
+  "traits": [
+    "analytical",
+    "direct",
+    "optimistic",
+    "creative"
+  ],
+  "expertise": [
+    "python",
+    "golang",
+    "rust",
+    "distributed_systems",
+    "microservices",
+    "kubernetes",
+    "database_design",
+    "api_design",
+    "system_architecture",
+    "code_review",
+    "debugging",
+    "performance_optimization",
+    "ci_cd_pipelines",
+    "docker",
+    "aws",
+    "postgresql",
+    "redis",
+    "kafka",
+    "graphql",
+    "rest_api"
+  ],
+  "personality": "professional",
+  "additional_context": {
+    "companies": ["Google", "Stripe-like fintech startup", "Boston startup"],
+    "education": "MIT Computer Science, 2013",
+    "years_experience": 11,
+    "management_experience": "Tech Lead for 2 years",
+    "conference_talks": 3,
+    "open_source_contributor": true,
+    "hobbies": ["hiking", "open-source", "tech blogs"],
+    "career_highlight": "Led $2B payment system redesign",
+    "currently_learning": "AI/ML backend integration"
+  }
+}
