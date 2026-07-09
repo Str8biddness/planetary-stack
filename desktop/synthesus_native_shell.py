@@ -19,6 +19,7 @@ from flask import Flask, send_from_directory, jsonify, request
 from flask_cors import CORS
 
 import accounts  # real email/password account system (sibling module)
+import pro       # Synthesus Pro: license activation + premium unlock (sibling module)
 
 # ===================================================================
 # SYNTHESUS C++ KERNEL IPC BRIDGE (QUADBRAIN INTEGRATION)
@@ -216,7 +217,8 @@ def auth_login():
 # frameless webview from being hijacked by the Stripe page.
 # ===================================================================
 PAYMENT_LINKS = {
-    "pro":   os.environ.get("STRIPE_LINK_PRO",   "https://buy.stripe.com/test_28E8wRfhNgFa56geUB8EM00"),
+    # The live Gumroad Pro checkout (env overrides).
+    "pro":   os.environ.get("PRO_PRODUCT_URL") or "https://dakinelle.gumroad.com/l/xkvtl",
     "ultra": os.environ.get("STRIPE_LINK_ULTRA", "https://buy.stripe.com/test_6oU4gB2v1dsY56g6o58EM01"),
 }
 
@@ -232,6 +234,26 @@ def checkout(tier):
         print(f"[checkout] webbrowser.open failed: {e}")
     # Always return the URL so the frontend can fall back to opening it itself.
     return jsonify({"status": "success", "opened": bool(opened), "url": url})
+
+@app.route('/api/pro/status', methods=['GET'])
+def pro_status():
+    """Is Pro active on this machine, and which premium personas are installed?"""
+    try:
+        return jsonify(pro.status())
+    except Exception as e:
+        return jsonify({"pro": False, "error": str(e)}), 500
+
+@app.route('/api/pro/activate', methods=['POST'])
+def pro_activate():
+    """Activate Pro: verify the license key with Gumroad, then install the premium pack."""
+    data = request.json or {}
+    key = (data.get("key") or "").strip()
+    pack = (data.get("pack_path") or "").strip() or None
+    try:
+        result = pro.activate(key, pack)
+        return jsonify(result), (200 if result.get("pro") else 400)
+    except Exception as e:
+        return jsonify({"pro": False, "error": str(e)}), 500
 
 @app.route('/api/ide/files', methods=['GET'])
 def list_files():

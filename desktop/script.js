@@ -975,10 +975,37 @@ async function selectTier(tierName) {
 
     alert(
         "Opening secure checkout in your browser.\n\n" +
-        "After payment, your account will be upgraded to " + tierName +
-        " (confirmed manually for early members). You can start using Synthesus now on the Free plan."
+        "After you buy, Gumroad emails you a license key. Come back here, open Unlock Pro (⭐ in the dock), " +
+        "and paste the key to activate your personas instantly."
     );
-    enterDesktop();
+}
+
+// Activate a purchased Pro license: send the key to the backend, which verifies it
+// with Gumroad and installs the premium personas. Shows the real result.
+async function activatePro() {
+    const input = document.getElementById('pro-key');
+    const statusEl = document.getElementById('pro-activate-status');
+    const key = (input && input.value || '').trim();
+    if (!key) { if (statusEl) { statusEl.style.color = '#f87171'; statusEl.textContent = 'Paste your license key first.'; } return; }
+    if (statusEl) { statusEl.style.color = '#94a3b8'; statusEl.textContent = 'Activating…'; }
+    try {
+        const r = await fetch('/api/pro/activate', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key })
+        });
+        const d = await r.json().catch(() => ({}));
+        if (d && d.pro) {
+            const names = (d.installed || []).join(', ') || 'your personas';
+            statusEl.style.color = '#22c55e';
+            statusEl.textContent = '✓ Pro unlocked! Installed: ' + names + '.' + (d.note ? ' ' + d.note : ' Open a new chat to use them.');
+        } else {
+            statusEl.style.color = '#f87171';
+            statusEl.textContent = '✗ ' + ((d && d.error) || 'Could not activate that key.');
+        }
+    } catch (e) {
+        statusEl.style.color = '#f87171';
+        statusEl.textContent = '✗ ' + e;
+    }
 }
 
 

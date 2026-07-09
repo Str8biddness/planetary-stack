@@ -55,7 +55,7 @@
             <h1 style="color: #a78bfa; text-transform: uppercase; letter-spacing: 2px;">Choose Your Plan</h1>
             <p style="color: #94a3b8; margin-bottom: 25px;">Start free. Upgrade anytime to support development and get early access to new features.</p>
 
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px;">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 25px;">
                 <!-- Free -->
                 <div class="glass-panel" style="padding: 18px; display: flex; flex-direction: column; justify-content: space-between;">
                     <div>
@@ -73,32 +73,29 @@
                 <!-- Pro -->
                 <div class="glass-panel" style="padding: 18px; border-color: rgba(56, 189, 248, 0.6); display: flex; flex-direction: column; justify-content: space-between;">
                     <div>
-                        <h3 style="color: #38bdf8; margin-top: 0;">Pro</h3>
-                        <h2 style="margin: 10px 0;">$11<span style="font-size: 0.8rem;">/mo</span></h2>
+                        <h3 style="color: #38bdf8; margin-top: 0;">Pro Personas</h3>
+                        <h2 style="margin: 10px 0;">$50<span style="font-size: 0.8rem;"> one-time</span></h2>
                         <ul style="text-align: left; font-size: 0.82rem; padding-left: 20px; color: #cbd5e1;">
                             <li>Everything in Free</li>
-                            <li>Support ongoing development</li>
-                            <li>Early access to new features</li>
-                            <li>Priority support</li>
+                            <li><strong>Lexis</strong> — technical / coding expert</li>
+                            <li><strong>Haven</strong> — private wellness companion</li>
+                            <li>Yours forever, runs 100% offline</li>
                         </ul>
                     </div>
-                    <button class="glass-btn" style="width: 100%; margin-top: 15px; background: rgba(56, 189, 248, 0.2);" onclick="selectTier('Pro')">Get Pro — $11/mo</button>
+                    <button class="glass-btn" style="width: 100%; margin-top: 15px; background: rgba(56, 189, 248, 0.2);" onclick="selectTier('Pro')">Get Pro — $50</button>
                 </div>
 
-                <!-- Ultra -->
-                <div class="glass-panel" style="padding: 18px; border-color: rgba(250, 204, 21, 0.6); display: flex; flex-direction: column; justify-content: space-between;">
-                    <div>
-                        <h3 style="color: #facc15; margin-top: 0;">Ultra</h3>
-                        <h2 style="margin: 10px 0;">$24<span style="font-size: 0.8rem;">/mo</span></h2>
-                        <ul style="text-align: left; font-size: 0.82rem; padding-left: 20px; color: #cbd5e1;">
-                            <li>Everything in Pro</li>
-                            <li>First access to upcoming multi-model &amp; expansion features</li>
-                            <li>Founding-member status</li>
-                            <li>Direct line to the founder</li>
-                        </ul>
-                    </div>
-                    <button class="glass-btn" style="width: 100%; margin-top: 15px; background: rgba(250, 204, 21, 0.2);" onclick="selectTier('Ultra')">Get Ultra — $24/mo</button>
+            </div>
+
+            <!-- Activate an already-purchased Pro license -->
+            <div class="glass-panel" style="padding:16px; margin-bottom:18px; text-align:left;">
+                <h3 style="color:#38bdf8; margin:0 0 6px;">Already bought Pro? Activate it</h3>
+                <p style="color:#94a3b8; font-size:0.82rem; margin:0 0 10px;">Paste the license key from your Gumroad receipt to unlock your personas.</p>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="pro-key" class="glass-input" placeholder="XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" style="flex:1; margin:0;">
+                    <button class="glass-btn" style="background:rgba(56,189,248,0.2);" onclick="activatePro()">Activate</button>
                 </div>
+                <div id="pro-activate-status" style="min-height:1.2em; font-size:0.85rem; color:#94a3b8; margin-top:8px;"></div>
             </div>
 
             <button class="glass-btn" style="width: 220px;" onclick="selectTier('Basic')">Skip — continue with Free</button>
@@ -299,9 +296,10 @@
         <button onclick="toggleWindow('win-drive')" class="dock-btn" title="Expansion Drive — ground on your sources">💽</button>
         <button onclick="toggleWindow('win-explorer')" class="dock-btn" title="File Explorer">📁</button>
         <button onclick="spawnTerminalWindow()" class="dock-btn" title="Ring-0 Command Interface">_</button>
+        <button onclick="showTiers()" class="dock-btn" title="Unlock Pro — premium personas">⭐</button>
     </nav>
 
-    <script src="script.js?v=10017"></script>
+    <script src="script.js?v=10018"></script>
     <script src="hyperspace.js?v=4"></script>
 
     <!-- OTA Update Screen -->
