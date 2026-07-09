@@ -137,6 +137,26 @@ cd "$SYNTHESUS_HOME/runtime" || exit 1
 set -a; . "$SYNTHESUS_HOME/synthesus.env"; set +a
 export PYTHONPATH="packages/reasoning:packages/kernel:packages/knowledge:packages/core:packages:."
 export PORT=5010 SYNTHESUS_CGPU_REALIZER=llm SYNTHESUS_EMBEDDER=semantic
+
+# --- Ollama readiness: chat needs a live model at :11434 or it silently
+#     falls back to canned responses. Ensure it is up and the model is pulled.
+SYNTHESUS_MODEL="\${SYNTHESUS_MODEL:-llama3.2:3b}"
+if ! curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then
+  echo "Ollama not reachable at http://localhost:11434 — starting it..."
+  ollama serve >/dev/null 2>&1 &
+  for _ in \$(seq 1 15); do
+    curl -s http://localhost:11434/api/tags >/dev/null 2>&1 && break
+    sleep 1
+  done
+  if ! curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then
+    echo "Warning: Ollama still not responding after 15s; chat may use canned responses."
+  fi
+fi
+if ! ollama list 2>/dev/null | grep -q "\$SYNTHESUS_MODEL"; then
+  echo "Pulling \$SYNTHESUS_MODEL (first-time, ~2GB)…"
+  ollama pull "\$SYNTHESUS_MODEL"
+fi
+
 exec "$SYNTHESUS_HOME/.venv/bin/python" packages/api/production_server.py "\$@"
 RUNTIME
 chmod +x "$BIN_DIR/synthesus" "$SYNTHESUS_HOME/run_runtime.sh"

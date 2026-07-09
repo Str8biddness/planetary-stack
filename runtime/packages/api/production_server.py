@@ -1256,7 +1256,7 @@ def _normalize_legacy_query_payload(payload: LegacyQueryRequest) -> QueryRequest
 
     return QueryRequest(
         query=query_text,
-        character=(payload.character or "synth"),
+        character=(payload.character or "synthesus"),
         mode=mode,
         runtime_preset=payload.runtime_preset,
     )
@@ -1381,9 +1381,29 @@ async def drive_ingest(req: Request, auth=Depends(get_auth)):
     if rag is None:
         raise HTTPException(500, "RAG pipeline unavailable")
 
+    # BUG 6: for the local-folder connector, fail fast with a clear, actionable
+    # 400 when the target folder doesn't exist on disk, instead of surfacing a
+    # generic ValueError string (or a 500 stack trace) from deep in the loader.
+    if connector == "folder":
+        folder_path = Path(target).expanduser()
+        if not folder_path.exists() or not folder_path.is_dir():
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "folder_not_found",
+                    "message": f"The folder '{target}' does not exist or isn't accessible.",
+                },
+            )
+
+    # BUG 5: the drive's stored/returned name is the user's chosen name AS-IS —
+    # never the connector type prepended to it. The desktop UI sends the user's
+    # name in `namespace`; use it verbatim for the stored namespace, and keep the
+    # connector TYPE as its own separate field in the response (do NOT fold it
+    # into the name, which produced e.g. "foldergdrive" from name "gdrive").
+    requested_name = (body.get("namespace") or body.get("name") or "").strip()
     kwargs = {}
-    if body.get("namespace") is not None:
-        kwargs["namespace"] = body["namespace"]
+    if requested_name:
+        kwargs["namespace"] = requested_name  # user's name AS-IS, no connector prefix
     if connector == "github" and body.get("token"):
         kwargs["token"] = body["token"]
     try:
@@ -1396,8 +1416,10 @@ async def drive_ingest(req: Request, auth=Depends(get_auth)):
 
     return {
         "status": "ok",
-        "connector": connector,
-        "label": label,
+        "connector": connector,             # connector TYPE — kept as a separate field
+        "name": requested_name or label,    # user's chosen name AS-IS (never prefixed)
+        "label": label,                     # loader-derived basename (repo/folder name)
+        "namespace": requested_name or None,
         "chunks_added": added,
         "files_ingested": files,
         "total_vectors": rag.total_vectors,
@@ -1551,22 +1573,29 @@ async def query_endpoint(req: QueryRequest, auth=Depends(get_auth)):
         raise HTTPException(429, "Rate limit exceeded. Add X-API-Key header for higher limits.")
 
     session_id = req.session_id or str(uuid.uuid4())
-    char_id = (req.character or "synth").strip().lower()
+    char_id = (req.character or "synthesus").strip().lower()
     query_text = req.query.strip()
 
     if not query_text:
         raise HTTPException(400, "Query must not be empty")
 
     if not _load_character(char_id):
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "error": "character_not_found",
-                "message": f"Character '{char_id}' not found",
-                "character": char_id,
-                "session_id": session_id,
-            },
-        )
+        # Degrade gracefully to the base identity rather than 404ing the whole chat
+        # (e.g. a premium persona isn't installed in this build). Only 404 if even
+        # the base 'synthesus' character is missing.
+        if char_id != "synthesus" and _load_character("synthesus"):
+            logger.info("Character '%s' not found; falling back to 'synthesus'.", char_id)
+            char_id = "synthesus"
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": "character_not_found",
+                    "message": f"Character '{char_id}' not found",
+                    "character": char_id,
+                    "session_id": session_id,
+                },
+            )
 
     _conversations.setdefault(session_id, [])
 
@@ -1594,11 +1623,15 @@ async def query_endpoint(req: QueryRequest, auth=Depends(get_auth)):
         # Ground on the local user index (dim-matched RAG) and feed the retrieved
         # context into the CHAL pipeline -> it flows to the grounded LLM render.
         _chal_rag_context = ""
-        if _rag is not None:
+        _chal_rag_sources: List[Dict[str, Any]] = []
+        _chal_rag = _rag if _rag is not None else _ensure_rag()
+        if _chal_rag is not None:
             try:
-                _r = await _rag.retrieve(query_text)
+                _r = await _chal_rag.retrieve(query_text)
                 if isinstance(_r, dict):
                     _chal_rag_context = _r.get("context", "") or ""
+                    # Surface the REAL retrieved sources for UI grounding — never faked.
+                    _chal_rag_sources = _r.get("sources", []) or []
             except Exception as _e:
                 logger.warning(f"CHAL grounding retrieval failed: {_e}")
 
@@ -1647,6 +1680,7 @@ async def query_endpoint(req: QueryRequest, auth=Depends(get_auth)):
             source="cognitive_hypervisor",
             session_id=session_id,
             latency_ms=_linter_safe_round(latency, 2),
+            sources=_chal_rag_sources or None,
             debug=debug_data,
         )
 
@@ -2034,8 +2068,13 @@ async def query_endpoint(req: QueryRequest, auth=Depends(get_auth)):
                         debug=debug_data,
                     )
 
-        if _rag and req.mode in ("rag", "auto"):
-            rag_result = await _rag.retrieve(query_text, character_id=char_id)
+        # BUG 3: lazily initialize the RAG pipeline so an explicit mode="rag"
+        # query actually runs vector similarity search when a user index exists,
+        # instead of short-circuiting straight to the low-confidence fallback
+        # because the module-level _rag was never loaded in this process.
+        _query_rag = _rag if _rag is not None else _ensure_rag()
+        if _query_rag and req.mode in ("rag", "auto"):
+            rag_result = await _query_rag.retrieve(query_text, character_id=char_id)
             if rag_result.get("context"):
                 sources = rag_result.get("sources", [])
                 top = sources[0] if sources else {}
@@ -2089,7 +2128,7 @@ async def query_endpoint(req: QueryRequest, auth=Depends(get_auth)):
                         source="rag",
                         session_id=session_id,
                         latency_ms=_linter_safe_round(latency, 2),
-                        sources=sources if req.include_sources else None,
+                        sources=sources or None,  # REAL retrieved sources for UI grounding
                         emotion=memory_context.get("emotion") or ml_context.get("player_emotion"),
                         relationship=None,
                         debug=debug_data,

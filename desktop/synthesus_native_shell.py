@@ -118,7 +118,7 @@ def chat_with_llm():
     try:
         r = requests.post(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/query",
-            json={"query": user_message, "mode": "chal"},
+            json={"query": user_message, "mode": "chal", "character": "synthesus"},
             headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
             timeout=90,
         )

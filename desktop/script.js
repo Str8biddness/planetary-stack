@@ -409,7 +409,27 @@ async function sendChatMessage() {
             </div>`;
             chatHistory.innerHTML += planHtml;
         }
-        
+
+        // IMPROVEMENT 4: show RAG sources under grounded answers.
+        // Only render when the response carries a non-empty `sources` list.
+        if (Array.isArray(data.sources) && data.sources.length) {
+            const items = data.sources.map(s => {
+                const label = (typeof s === 'string')
+                    ? s
+                    : (s && (s.file || s.name || s.path || s.source || s.title)) || JSON.stringify(s);
+                return '<li style="margin:2px 0;">' + escapeHtml(String(label)) + '</li>';
+            }).join('');
+            const sourcesHtml =
+                '<details class="rag-sources" style="margin-top:8px; background:rgba(20,25,40,0.6); ' +
+                'border:1px solid rgba(56,189,248,.3); border-radius:8px; padding:6px 10px;">' +
+                '<summary style="cursor:pointer; color:#38bdf8; font-size:0.8rem;">' +
+                '&#128206; Sources (' + data.sources.length + ')</summary>' +
+                '<ul style="margin:6px 0 2px 18px; padding:0; color:#94a3b8; font-size:0.8rem; list-style:disc;">' +
+                items + '</ul></details>';
+            // insertAdjacentHTML keeps the streaming bubble node intact (unlike innerHTML +=).
+            chatHistory.insertAdjacentHTML('beforeend', sourcesHtml);
+        }
+
         chatHistory.scrollTop = chatHistory.scrollHeight;
     } catch(err) {
         const bubble = document.getElementById(thinkId);
@@ -1372,6 +1392,13 @@ const DRIVE_ICONS = {
     dropbox:'📦', box:'🗄️', s3:'🪣', icloud:'🍏'
 };
 
+// BUG 5 (display guard): drives sometimes arrive with a stray connector-type
+// prefix (e.g. "foldergdrive" instead of "gdrive"). Strip a leading
+// "folder"/"github"/"cloud" prefix, but only when real name text remains.
+function cleanDriveName(n) {
+    return String(n || '').replace(/^(folder|github|cloud)(?=.+)/i, '');
+}
+
 async function loadDriveSources() {
     const status = document.getElementById('drive-status');
     try {
@@ -1539,7 +1566,16 @@ async function driveBuild() {
     let w = 8; const pulse = setInterval(() => { w = 8 + ((w + 3) % 80); bar.style.transition='width .3s'; bar.style.width = w + '%'; }, 350);
     status.innerHTML = '⏳ Mounting &amp; indexing <strong>' + primary + '</strong> locally…';
 
-    const payload = { connector: DRIVE_SELECTED.key, target: primary };
+    // BUG 4: the ingest target is the user's RAW input — never basePath + input.
+    // Defensively collapse an accidentally self-duplicated path
+    // (e.g. "/mnt/c/.../Google Drive/mnt/c/.../Google Drive" -> the single path).
+    let target = primary;
+    if (target.length % 2 === 0) {
+        const half = target.length / 2;
+        if (target.slice(0, half) === target.slice(half)) target = target.slice(0, half);
+    }
+
+    const payload = { connector: DRIVE_SELECTED.key, target: target };
     if (name) payload.namespace = name;
     if (token) payload.token = token;
 
@@ -1552,22 +1588,34 @@ async function driveBuild() {
         clearInterval(pulse);
         if (!r.ok || data.status === 'error') {
             bar.style.width = '0%'; wrap.style.display = 'none';
-            status.textContent = '❌ ' + (data.message || data.detail || ('failed (HTTP ' + r.status + ')'));
+            const rawMsg = String(data.message || data.detail || '');
+            // BUG 6: a missing folder is most often Google Drive for Desktop's
+            // virtual drive, which WSL cannot see under /mnt/. Give a specific fix.
+            const notFound = /not a directory|no such file|not found|does not exist|cannot find|enoent/i.test(rawMsg);
+            if (DRIVE_SELECTED.key === 'folder' && (notFound || !rawMsg)) {
+                status.innerHTML = '❌ Folder not found. If this is Google Drive for Desktop, ' +
+                    'WSL can\'t see its virtual drive — either set Google Drive to ' +
+                    '&ldquo;Mirror files&rdquo; to a real local folder, or copy the folder into ' +
+                    'your Linux home directory (~/) first, then ingest that.';
+            } else {
+                status.textContent = '❌ ' + (rawMsg || ('failed (HTTP ' + r.status + ')'));
+            }
             btn.disabled = false;
             return;
         }
         bar.style.width = '100%';
-        status.innerHTML = '✅ Built <strong>' + (name || data.label) + '</strong> — ' +
+        const shownName = cleanDriveName(name || data.label);   // BUG 5 display guard
+        status.innerHTML = '✅ Built <strong>' + shownName + '</strong> — ' +
             data.chunks_added + ' chunk(s) from ' + data.files_ingested +
             ' file(s). Grounding index now <strong>' + data.total_vectors + '</strong> vectors.';
         const list = document.getElementById('drive-ingested');
         const row = document.createElement('div');
-        row.innerHTML = '💽 <strong>' + (name || data.label) + '</strong> · ' + data.connector +
+        row.innerHTML = '💽 <strong>' + shownName + '</strong> · ' + data.connector +
             ' · ' + data.chunks_added + ' chunks';
         list.prepend(row);
         // drop a drive icon on the desktop if present
         const icon = document.getElementById('desktop-drive-icon');
-        if (icon) { icon.style.display = 'block'; const lbl = document.getElementById('drive-label'); if (lbl) lbl.innerText = (name || data.label) + ' Drive'; }
+        if (icon) { icon.style.display = 'block'; const lbl = document.getElementById('drive-label'); if (lbl) lbl.innerText = shownName + ' Drive'; }
         btn.disabled = false;
     } catch (e) {
         clearInterval(pulse); wrap.style.display = 'none';
