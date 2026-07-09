@@ -12,6 +12,12 @@
     <script src="xterm-addon-fit.js"></script>
 </head>
 <body id="os-body">
+    <!-- LLM Health Banner -->
+    <div id="llm-health-banner" style="display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(239, 68, 68, 0.9); color: white; padding: 10px 20px; border-radius: 8px; z-index: 999999; box-shadow: 0 4px 6px rgba(0,0,0,0.3); align-items: center; gap: 15px; font-size: 0.95rem; border: 1px solid #fca5a5;">
+        <span>⚠️ Local model not loaded — chat is in fallback mode.</span>
+        <button onclick="this.parentElement.style.display='none'" style="background: transparent; border: 1px solid white; color: white; border-radius: 4px; padding: 3px 8px; cursor: pointer; margin-left: 10px;">Dismiss</button>
+    </div>
+
     <!-- Live Hyperspace Background (animated). Static wallpaper still selectable from Settings. -->
     <canvas id="hyperspace-bg"></canvas>
     <div class="wallpaper-bg" id="wallpaper-bg"></div>
@@ -299,7 +305,7 @@
         <button onclick="showTiers()" class="dock-btn" title="Unlock Pro — premium personas">⭐</button>
     </nav>
 
-    <script src="script.js?v=10019"></script>
+    <script src="script.js?v=10020"></script>
     <script src="hyperspace.js?v=4"></script>
 
     <!-- OTA Update Screen -->

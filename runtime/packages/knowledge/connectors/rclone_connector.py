@@ -26,9 +26,9 @@ import re
 import subprocess
 import time
 from pathlib import Path
-from typing import Optional, Set, Tuple
+from typing import Callable, Optional, Set, Tuple
 
-from .base import ingest_local_tree
+from .base import ingest_local_tree, IngestResult
 
 MOUNTS_ROOT = Path.home() / ".synthesus" / "drive-mounts"
 LOG_ROOT = Path.home() / ".synthesus"
@@ -92,10 +92,11 @@ def ingest_rclone(
     target: str,
     namespace: Optional[str] = None,
     max_file_kb: int = 256,
-) -> Tuple[int, int, str]:
+    progress_cb: Optional[Callable[[int, int, str], None]] = None,
+) -> Tuple[IngestResult, str]:
     """Mount a cloud remote and ingest it into ``rag``.
 
-    Returns (chunks_added, files_ingested, label). Appends (never wipes) + saves.
+    Returns (result, label). Appends (never wipes) + saves.
     """
     target = (target or "").strip()
     if not target:
@@ -105,7 +106,7 @@ def ingest_rclone(
     is_remote = ":" in target and not target.startswith(("/", "~", "."))
     if not is_remote:
         from .folder_connector import ingest_folder
-        return ingest_folder(rag, target, namespace=namespace, max_file_kb=max_file_kb)
+        return ingest_folder(rag, target, namespace=namespace, max_file_kb=max_file_kb, progress_cb=progress_cb)
 
     remote = target.split(":", 1)[0]
     remotes = _list_remotes()
@@ -119,7 +120,7 @@ def ingest_rclone(
     mount_path = ensure_mount(target)
     label = target.rstrip(":") or remote
     ns = namespace or f"cloud:{label}"
-    added, files = ingest_local_tree(
-        rag, mount_path, label=label, namespace=ns, domain="cloud", max_file_kb=max_file_kb
+    added = ingest_local_tree(
+        rag, mount_path, label=label, namespace=ns, domain="cloud", max_file_kb=max_file_kb, progress_cb=progress_cb
     )
-    return added, files, label
+    return added, label

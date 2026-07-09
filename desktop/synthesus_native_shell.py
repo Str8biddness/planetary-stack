@@ -95,19 +95,49 @@ def serve_index():
 def serve_static(path):
     return send_from_directory(SCRIPT_DIR, path)
 
+SYNTHESUS_RUNTIME_URL = os.environ.get("SYNTHESUS_RUNTIME_URL", "http://127.0.0.1:5010")
+
 @app.route('/api/system/status', methods=['GET'])
 def get_status():
-    return jsonify({
+    status_data = {
         "3way_drive_active": True,
         "peripheral_bridge_active": True,
         "llm_status": kernel_ipc.kernel_status
-    })
+    }
+    
+    # Pass through the health llm field from backend in the health proxy route if applicable
+    try:
+        r = requests.get(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/health",
+            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            timeout=2,
+        )
+        if r.status_code == 200:
+            payload = r.json()
+            if "llm" in payload:
+                status_data["llm"] = payload["llm"]
+    except Exception as e:
+        print(f"[system/status] health proxy unavailable ({e})")
+
+    return jsonify(status_data)
+
+@app.route('/api/health', methods=['GET'])
+def health_proxy():
+    try:
+        r = requests.get(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/health",
+            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            timeout=5,
+        )
+        return (r.text, r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        print(f"[health] proxy unavailable ({e})")
+        return jsonify({"status": "error", "message": f"runtime unavailable: {e}"}), 503
 
 # Section E (C-401): the desktop chat routes through the CHAL runtime — the full
 # merged Synthesus brain (grounding + quad-brain + LLM + critic). If the runtime
 # is unavailable it DEGRADES LOUDLY to the direct kernel path (still real local AI,
 # never a fabricated reply).
-SYNTHESUS_RUNTIME_URL = os.environ.get("SYNTHESUS_RUNTIME_URL", "http://127.0.0.1:5010")
 
 @app.route('/api/chat', methods=['POST'])
 def chat_with_llm():
@@ -186,6 +216,47 @@ def drive_ingest():
     except Exception as e:
         print(f"[drive] ingest failed ({e})")
         return jsonify({"status": "error", "message": f"runtime unavailable: {e}"}), 503
+
+@app.route('/api/drive/progress/<job_id>', methods=['GET'])
+def drive_progress(job_id):
+    try:
+        r = requests.get(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/drive/progress/{job_id}",
+            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            timeout=15,
+        )
+        return (r.text, r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        print(f"[drive] progress unavailable ({e})")
+        return jsonify({"status": "error", "message": f"runtime unavailable: {e}"}), 503
+
+@app.route('/api/drive/preview', methods=['POST'])
+def drive_preview():
+    data = request.get_json(silent=True) or {}
+    try:
+        r = requests.post(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/drive/preview",
+            json=data,
+            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            timeout=30,
+        )
+        return (r.text, r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        print(f"[drive] preview unavailable ({e})")
+        return jsonify({"chunks": [], "error": f"runtime unavailable: {e}"}), 503
+
+@app.route('/api/drive/rclone/status', methods=['GET'])
+def drive_rclone_status():
+    try:
+        r = requests.get(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/drive/rclone/status",
+            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            timeout=15,
+        )
+        return (r.text, r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        print(f"[drive] rclone status unavailable ({e})")
+        return jsonify({"installed": False, "remotes": [], "error": f"runtime unavailable: {e}"}), 503
 
 # ===================================================================
 # REAL AUTH (email + password)

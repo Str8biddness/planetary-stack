@@ -14,9 +14,9 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
-from .base import ingest_local_tree
+from .base import ingest_local_tree, IngestResult
 
 
 def _clone(repo: str, token: Optional[str], ref: Optional[str]) -> str:
@@ -42,10 +42,11 @@ def ingest_github_repo(
     ref: Optional[str] = None,
     max_file_kb: int = 256,
     namespace: Optional[str] = None,
-) -> Tuple[int, int, str]:
+    progress_cb: Optional[Callable[[int, int, str], None]] = None,
+) -> Tuple[IngestResult, str]:
     """Ingest a GitHub repo (owner/repo, URL, or local path) into ``rag``'s index.
 
-    Returns (chunks_added, files_ingested, repo_label). Appends (never wipes) and
+    Returns (result, repo_label). Appends (never wipes) and
     saves the index. Fetch = the user's repo; embedding/indexing = local.
     """
     local = Path(repo)
@@ -59,10 +60,10 @@ def ingest_github_repo(
     ns = namespace or f"github:{label}"
 
     try:
-        added, files = ingest_local_tree(
-            rag, root, label=label, namespace=ns, domain="github", max_file_kb=max_file_kb
+        result = ingest_local_tree(
+            rag, root, label=label, namespace=ns, domain="github", max_file_kb=max_file_kb, progress_cb=progress_cb
         )
-        return added, files, label
+        return result, label
     finally:
         if cloned:
             shutil.rmtree(cloned, ignore_errors=True)

@@ -160,11 +160,21 @@ function onResizeUp() {
 }
 
 // Attach focus events to window bodies
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('.window').forEach(win => {
         win.addEventListener('mousedown', () => focusWindow(win));
     });
     setInterval(fetchOSStatus, 2000);
+    
+    // LLM Health Banner Check
+    try {
+        const hRes = await fetch('/api/v1/health');
+        const hData = await hRes.json();
+        if (hData && hData.llm && (hData.llm.realizer !== 'llm' || !hData.llm.ollama_reachable)) {
+            const b = document.getElementById('llm-health-banner');
+            if (b) b.style.display = 'flex';
+        }
+    } catch(e) {}
 
     // Development Auto-Refresh Watcher
     let lastModified = null;
@@ -1404,10 +1414,10 @@ async function loadDriveSources() {
     try {
         const [rs, rr] = await Promise.all([
             fetch('/api/drive/sources').then(r => r.json()),
-            fetch('/api/drive/remotes').then(r => r.json()).catch(() => ({remotes:[]}))
+            fetch('/api/v1/drive/rclone/status').then(r => r.json()).catch(() => ({installed:false, remotes:[]}))
         ]);
         DRIVE_SOURCES = rs.sources || [];
-        DRIVE_REMOTES = rr || { rclone_available:false, remotes:[] };
+        DRIVE_REMOTES = rr || { installed:false, remotes:[] };
         renderDriveTiles();
         driveGoStep(1);
         if (status) status.textContent = DRIVE_SOURCES.length ? '' :
@@ -1485,36 +1495,43 @@ function renderConnectBody() {
 function renderCloudConnect(key) {
     const remotes = DRIVE_REMOTES.remotes || [];
     let html = '';
-    if (!DRIVE_REMOTES.rclone_available) {
+    if (!DRIVE_REMOTES.installed) {
         return '<div style="padding:10px;border:1px solid rgba(239,68,68,.35);border-radius:8px;' +
                'background:rgba(239,68,68,.08);font-size:.82rem;color:#fca5a5;">' +
-               'rclone isn\'t installed. Install it once (<code>sudo apt install rclone</code> or ' +
-               'rclone.org/downloads), then reopen this window.</div>';
+               'rclone isn\'t installed. Run this to install:<br>' +
+               '<code style="user-select:all;cursor:pointer;color:#22d3ee;display:block;margin:6px 0;padding:4px;background:rgba(0,0,0,0.3);border-radius:4px;">curl https://rclone.org/install.sh | sudo bash</code>' +
+               '<button class="glass-btn" style="font-size:.8rem;" onclick="driveRecheckRemotes()">↻ Re-check</button></div>';
     }
+    
+    html += '<label style="color:#cbd5e1;font-size:.82rem;">Connected clouds — pick one</label>';
     if (remotes.length) {
-        html += '<label style="color:#cbd5e1;font-size:.82rem;">Connected clouds — pick one</label>' +
-                '<div id="drive-remote-chips" style="display:flex;flex-wrap:wrap;gap:6px;">';
+        html += '<div id="drive-remote-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">';
         remotes.forEach(rm => {
             html += '<button type="button" class="glass-btn drive-chip" data-remote="' + rm + '" ' +
                     'onclick="drivePickRemote(this)" style="font-size:.8rem;padding:4px 10px;">☁️ ' + rm + '</button>';
         });
-        html += '</div>' +
-                '<label style="color:#cbd5e1;font-size:.82rem;margin-top:6px;">Remote &amp; optional subfolder</label>' +
-                '<input id="drive-in-primary" class="glass-input" placeholder="e.g. onedrive: or gdrive:Work/notes">';
+        html += '</div>';
     } else {
-        html += '<div style="padding:10px;border:1px solid rgba(148,163,184,.25);border-radius:8px;' +
-                'background:rgba(255,255,255,.03);font-size:.82rem;color:#cbd5e1;">' +
-                '<div style="margin-bottom:6px;">No clouds connected yet. One-time setup:</div>' +
-                '<ol style="margin:0 0 6px 16px;padding:0;color:#94a3b8;line-height:1.5;">' +
-                '<li>Open a terminal</li><li>Run <code style="color:#22d3ee;">rclone config</code></li>' +
-                '<li>Choose <strong>n</strong> (new), name it (e.g. <code>' + key + '</code>), pick your provider, sign in</li>' +
-                '</ol>' +
-                '<button class="glass-btn" style="font-size:.8rem;" onclick="driveRecheckRemotes()">↻ Re-check connections</button>' +
-                '</div>' +
-                '<label style="color:#cbd5e1;font-size:.82rem;margin-top:6px;">…or type the remote manually</label>' +
-                '<input id="drive-in-primary" class="glass-input" placeholder="e.g. onedrive:">';
+        html += '<div style="font-size:0.8rem; color:#94a3b8; margin-bottom: 8px;">No remotes configured yet.</div>';
     }
+    
+    html += '<div style="margin-bottom: 10px;"><button class="glass-btn primary-btn" style="font-size:.8rem;" onclick="addCloudDrive()">➕ Add a cloud drive</button> ' +
+            '<button class="glass-btn" style="font-size:.8rem;" onclick="driveRecheckRemotes()">↻ Refresh remotes</button></div>';
+            
+    html += '<label style="color:#cbd5e1;font-size:.82rem;display:block;">Remote &amp; optional subfolder</label>' +
+            '<input id="drive-in-primary" class="glass-input" placeholder="e.g. onedrive: or gdrive:Work/notes">';
     return html;
+}
+
+function addCloudDrive() {
+    spawnTerminalWindow();
+    const existingTerms = document.querySelectorAll('[id^="win-term-"]');
+    if (existingTerms.length > 0) {
+        focusWindow(existingTerms[existingTerms.length - 1]);
+    }
+    setTimeout(() => {
+        alert("A terminal has been opened.\\n\\nPlease run 'rclone config' to add a new cloud drive (choose 'n').\\nOAuth setup is interactive. When finished, click 'Refresh remotes'.");
+    }, 100);
 }
 
 function drivePickRemote(btn) {
@@ -1526,7 +1543,7 @@ function drivePickRemote(btn) {
 
 async function driveRecheckRemotes() {
     try {
-        DRIVE_REMOTES = await fetch('/api/drive/remotes').then(r => r.json());
+        DRIVE_REMOTES = await fetch('/api/v1/drive/rclone/status').then(r => r.json());
     } catch (e) { /* keep old */ }
     renderConnectBody();
 }
@@ -1575,15 +1592,26 @@ async function driveBuild() {
         if (target.slice(0, half) === target.slice(half)) target = target.slice(0, half);
     }
 
-    const payload = { connector: DRIVE_SELECTED.key, target: target };
+    const payload = { connector: DRIVE_SELECTED.key, target: target, async: true };
     if (name) payload.namespace = name;
     if (token) payload.token = token;
+    
+    // Remember namespace for preview
+    const targetNs = name || target.replace(/[:/].*$/, '') || DRIVE_SELECTED.key;
 
     try {
-        const r = await fetch('/api/drive/ingest', {
+        const r = await fetch('/api/v1/drive/ingest', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
+        
+        if (r.status === 202) {
+            const data = await r.json();
+            clearInterval(pulse);
+            pollDriveProgress(data.job_id, targetNs);
+            return;
+        }
+        
         const data = await r.json();
         clearInterval(pulse);
         if (!r.ok || data.status === 'error') {
@@ -1604,25 +1632,129 @@ async function driveBuild() {
             return;
         }
         bar.style.width = '100%';
-        const shownName = cleanDriveName(name || data.label);   // BUG 5 display guard
-        status.innerHTML = '✅ Built <strong>' + shownName + '</strong> — ' +
-            data.chunks_added + ' chunk(s) from ' + data.files_ingested +
-            ' file(s). Grounding index now <strong>' + data.total_vectors + '</strong> vectors.';
-        const list = document.getElementById('drive-ingested');
-        const row = document.createElement('div');
-        row.innerHTML = '💽 <strong>' + shownName + '</strong> · ' + data.connector +
-            ' · ' + data.chunks_added + ' chunks';
-        list.prepend(row);
-        // drop a drive icon on the desktop if present
-        const icon = document.getElementById('desktop-drive-icon');
-        if (icon) { icon.style.display = 'block'; const lbl = document.getElementById('drive-label'); if (lbl) lbl.innerText = shownName + ' Drive'; }
-        btn.disabled = false;
+        const shownName = cleanDriveName(name || data.label || targetNs);
+        renderDriveResult(data, shownName, targetNs);
     } catch (e) {
         clearInterval(pulse); wrap.style.display = 'none';
         status.textContent = '❌ Build failed: ' + e;
         btn.disabled = false;
     }
 }
+
+function pollDriveProgress(jobId, targetNs) {
+    const status = document.getElementById('drive-status');
+    const bar = document.getElementById('drive-progress-bar');
+    const wrap = document.getElementById('drive-progress-wrap');
+    const btn = document.getElementById('drive-build-btn');
+    
+    const poll = setInterval(async () => {
+        try {
+            const res = await fetch(`/api/v1/drive/progress/${jobId}`);
+            if (res.status === 404) return;
+            const data = await res.json();
+            
+            if (data.status === 'running') {
+                bar.style.transition = 'width 0.5s';
+                const pct = data.total > 0 ? (data.current / data.total) * 100 : 8;
+                bar.style.width = Math.max(8, pct) + '%';
+                status.innerHTML = `⏳ Indexing file ${data.current} of ${data.total} — <strong>${escapeHtml(data.file || '')}</strong>`;
+            } else if (data.status === 'done') {
+                clearInterval(poll);
+                bar.style.width = '100%';
+                const shownName = cleanDriveName(targetNs);
+                renderDriveResult(data.result, shownName, targetNs);
+            } else if (data.status === 'error') {
+                clearInterval(poll);
+                wrap.style.display = 'none';
+                status.textContent = '❌ Build failed: ' + data.error;
+                btn.disabled = false;
+            }
+        } catch(e) {}
+    }, 600);
+}
+
+function renderDriveResult(data, shownName, targetNs) {
+    const status = document.getElementById('drive-status');
+    const btn = document.getElementById('drive-build-btn');
+    
+    let html = `✅ Built <strong>${shownName}</strong> — ${data.chunks_added || 0} chunk(s) from ${data.files_ingested || 0} file(s).`;
+    
+    if (data.by_ext && Object.keys(data.by_ext).length > 0) {
+        const exts = Object.entries(data.by_ext).sort((a,b) => b[1] - a[1]);
+        html += `<div style="margin-top: 10px; font-size: 0.8rem; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px;">`;
+        html += `<div style="color: #cbd5e1; margin-bottom: 4px;"><strong>Ingested Breakdown:</strong></div>`;
+        html += `<table style="width: 100%; text-align: left; color: #94a3b8;">`;
+        exts.forEach(([ext, count]) => {
+            html += `<tr><td>${escapeHtml(ext)}</td><td>${count}</td></tr>`;
+        });
+        html += `</table></div>`;
+    }
+    
+    let skippedCount = 0;
+    let skippedReasons = [];
+    if (data.skipped_by_ext) skippedCount = Object.values(data.skipped_by_ext).reduce((a,b) => a+b, 0);
+    if (data.skipped_reasons) {
+        for (const [reason, count] of Object.entries(data.skipped_reasons)) {
+            skippedReasons.push(`${reason}: ${count}`);
+        }
+    }
+    
+    if (skippedCount > 0) {
+        html += `<div style="margin-top: 6px; font-size: 0.8rem; color: #fca5a5;">`;
+        html += `Skipped ${skippedCount} file(s). Reasons: ${escapeHtml(skippedReasons.join(', '))}`;
+        html += `</div>`;
+    }
+    
+    status.innerHTML = html;
+    
+    const list = document.getElementById('drive-ingested');
+    const row = document.createElement('div');
+    row.style.marginBottom = "8px";
+    row.style.paddingBottom = "8px";
+    row.style.borderBottom = "1px solid rgba(255,255,255,0.05)";
+    
+    row.innerHTML = `💽 <strong>${shownName}</strong> · ${data.connector || 'Unknown'} · ${data.chunks_added || 0} chunks<br>`;
+    
+    const previewBtn = document.createElement('button');
+    previewBtn.className = 'glass-btn';
+    previewBtn.style.fontSize = '0.75rem';
+    previewBtn.style.padding = '4px 8px';
+    previewBtn.style.marginTop = '4px';
+    previewBtn.innerText = '🔍 Preview chunks';
+    previewBtn.onclick = () => previewDrive(targetNs);
+    
+    row.appendChild(previewBtn);
+    list.prepend(row);
+    
+    const icon = document.getElementById('desktop-drive-icon');
+    if (icon) { icon.style.display = 'block'; const lbl = document.getElementById('drive-label'); if (lbl) lbl.innerText = shownName + ' Drive'; }
+    btn.disabled = false;
+}
+
+async function previewDrive(namespace) {
+    const query = prompt(`Enter a search query to preview chunks from ${namespace}:`);
+    if (!query) return;
+    try {
+        const res = await fetch('/api/v1/drive/preview', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ namespace, query })
+        });
+        const data = await res.json();
+        if (data.chunks && data.chunks.length > 0) {
+            let msg = `Top chunks for "${query}":\n\n`;
+            data.chunks.forEach((c, i) => {
+                msg += `[${i+1}] Score: ${c.score.toFixed(3)} | Source: ${c.source}\n${c.text.substring(0, 150)}...\n\n`;
+            });
+            alert(msg);
+        } else {
+            alert("No chunks found or index empty.");
+        }
+    } catch(e) {
+        alert("Preview failed: " + e);
+    }
+}
+
 
 window.onload = function() {
     const urlParams = new URLSearchParams(window.location.search);

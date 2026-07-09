@@ -466,6 +466,7 @@ _request_count = 0
 _start_time = time.time()
 _substrate: Optional[UniversalSubstrate] = None
 _knowledge_cloud: Optional[KnowledgeCloud] = None
+_ingest_jobs: Dict[str, Dict[str, Any]] = {}
 
 API_PATTERN_STORAGE_SURFACE = {
     "surface": "production_api_pattern_storage",
@@ -1353,6 +1354,83 @@ async def drive_remotes(auth=Depends(get_auth)):
     return {"rclone_available": True, "remotes": remotes}
 
 
+@app.get("/api/v1/drive/rclone/status")
+async def drive_rclone_status(auth=Depends(get_auth)):
+    import shutil as _sh
+    import subprocess as _sp
+    if not _sh.which("rclone"):
+        return {"installed": False, "version": None, "remotes": []}
+    
+    version = None
+    try:
+        ver_out = _sp.run(["rclone", "version"], capture_output=True, text=True, timeout=5)
+        if ver_out.returncode == 0:
+            version = ver_out.stdout.splitlines()[0].strip() if ver_out.stdout else None
+    except Exception as e:
+        logger.warning(f"rclone version failed: {e}")
+        
+    remotes = []
+    try:
+        out = _sp.run(["rclone", "listremotes"], capture_output=True, text=True, timeout=15)
+        if out.returncode == 0:
+            remotes = [ln.rstrip(":").strip() for ln in out.stdout.splitlines() if ln.strip()]
+    except Exception as e:
+        logger.warning(f"rclone listremotes failed: {e}")
+        
+    return {"installed": True, "version": version, "remotes": remotes}
+
+
+@app.get("/api/v1/drive/progress/{job_id}")
+async def drive_progress(job_id: str, auth=Depends(get_auth)):
+    job = _ingest_jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    return job
+
+
+@app.post("/api/v1/drive/preview")
+async def drive_preview(req: Request, auth=Depends(get_auth)):
+    try:
+        body = await req.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+        
+    namespace = body.get("namespace", "")
+    query = body.get("query", "")
+    rag = _ensure_rag()
+    
+    if not rag or not hasattr(rag, "_index") or rag._index is None or rag._index.ntotal == 0:
+        return {"chunks": []}
+        
+    # Run synchronous search in executor
+    loop = asyncio.get_event_loop()
+    namespaces_arg = [namespace] if namespace else None
+    
+    try:
+        results = await loop.run_in_executor(
+            None,
+            lambda: rag._search(query, character_id=None, namespaces=namespaces_arg, k=5, threshold=0.0)
+        )
+    except Exception as e:
+        logger.warning(f"drive_preview search failed: {e}")
+        results = []
+        
+    chunks = []
+    for score, meta in results:
+        text = meta.get("text") or meta.get("pattern", "")
+        if not text and meta.get("response"):
+            text = meta.get("response", "")
+            
+        source = meta.get("source") or meta.get("file") or meta.get("namespace", "unknown")
+        chunks.append({
+            "source": source,
+            "text": text,
+            "score": score
+        })
+        
+    return {"chunks": chunks[:5]}
+
+
 @app.post("/api/v1/drive/ingest")
 async def drive_ingest(req: Request, auth=Depends(get_auth)):
     """Expansion drive: ingest a source into the user's local grounding index.
@@ -1406,24 +1484,77 @@ async def drive_ingest(req: Request, auth=Depends(get_auth)):
         kwargs["namespace"] = requested_name  # user's name AS-IS, no connector prefix
     if connector == "github" and body.get("token"):
         kwargs["token"] = body["token"]
-    try:
-        added, files, label = loader(rag, target, **kwargs)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    except Exception as e:
-        logger.error(f"drive ingest failed ({connector}:{target}): {e}")
-        raise HTTPException(500, f"ingest failed: {e}")
+        
+    is_async = body.get("async", False)
+    if is_async:
+        job_id = uuid.uuid4().hex
+        _ingest_jobs[job_id] = {
+            "status": "running",
+            "current": 0,
+            "total": 0,
+            "file": "",
+            "result": None,
+            "error": None
+        }
 
-    return {
-        "status": "ok",
-        "connector": connector,             # connector TYPE — kept as a separate field
-        "name": requested_name or label,    # user's chosen name AS-IS (never prefixed)
-        "label": label,                     # loader-derived basename (repo/folder name)
-        "namespace": requested_name or None,
-        "chunks_added": added,
-        "files_ingested": files,
-        "total_vectors": rag.total_vectors,
-    }
+        def _run_ingest():
+            def progress_cb(current: int, total: int, current_file: str):
+                _ingest_jobs[job_id].update({
+                    "current": current,
+                    "total": total,
+                    "file": current_file,
+                })
+            kwargs["progress_cb"] = progress_cb
+            try:
+                res, lbl = loader(rag, target, **kwargs)
+                _ingest_jobs[job_id].update({
+                    "status": "done",
+                    "result": {
+                        "status": "ok",
+                        "connector": connector,
+                        "name": requested_name or lbl,
+                        "label": lbl,
+                        "namespace": requested_name or None,
+                        "chunks_added": res.chunks_added,
+                        "files_ingested": res.files_ingested,
+                        "by_ext": getattr(res, "by_ext", {}),
+                        "skipped_by_ext": getattr(res, "skipped_by_ext", {}),
+                        "skipped_reasons": getattr(res, "skipped_reasons", {}),
+                        "total_vectors": rag.total_vectors,
+                    }
+                })
+            except Exception as ex:
+                logger.error(f"Async ingest failed: {ex}")
+                _ingest_jobs[job_id].update({
+                    "status": "error",
+                    "error": str(ex)
+                })
+
+        import threading
+        threading.Thread(target=_run_ingest, daemon=True).start()
+        return JSONResponse(status_code=202, content={"job_id": job_id})
+    else:
+        try:
+            res, label = loader(rag, target, **kwargs)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except Exception as e:
+            logger.error(f"drive ingest failed ({connector}:{target}): {e}")
+            raise HTTPException(500, f"ingest failed: {e}")
+
+        return {
+            "status": "ok",
+            "connector": connector,             # connector TYPE — kept as a separate field
+            "name": requested_name or label,    # user's chosen name AS-IS (never prefixed)
+            "label": label,                     # loader-derived basename (repo/folder name)
+            "namespace": requested_name or None,
+            "chunks_added": res.chunks_added,
+            "files_ingested": res.files_ingested,
+            "by_ext": getattr(res, "by_ext", {}),
+            "skipped_by_ext": getattr(res, "skipped_by_ext", {}),
+            "skipped_reasons": getattr(res, "skipped_reasons", {}),
+            "total_vectors": rag.total_vectors,
+        }
 
 
 @app.post("/api/v1/admin/patterns")
@@ -2285,6 +2416,15 @@ async def get_kernel_status(auth=Depends(get_auth)):
 async def health():
     """System health and stats."""
     uptime = time.time() - _start_time
+    import urllib.request
+    ollama_url = os.environ.get("OLLAMA_API_URL", "http://localhost:11434")
+    ollama_reachable = False
+    try:
+        req_obj = urllib.request.Request(f"{ollama_url}/api/tags", method="GET")
+        with urllib.request.urlopen(req_obj, timeout=2.0) as resp:
+            ollama_reachable = resp.status == 200
+    except Exception:
+        pass
     return {
         "status": "healthy",
         "version": "2.0.0",
@@ -2297,6 +2437,11 @@ async def health():
         "rag": {
             "enabled": _rag is not None,
             "vectors": _rag.total_vectors if _rag else 0,
+        },
+        "llm": {
+            "realizer": os.environ.get("SYNTHESUS_REALIZER", "llm"),
+            "model": os.environ.get("OLLAMA_MODEL", "llama3"),
+            "ollama_reachable": ollama_reachable,
         },
         "characters_loaded": len(_character_cache),
         "cognitive_engines_active": len(_cognitive_engines),
