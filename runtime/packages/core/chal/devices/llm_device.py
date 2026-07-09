@@ -36,7 +36,10 @@ class LLMGenerationDevice(SllmCoordinator):
         start_time = time.time()
 
         # Get budget (default 8000ms if not specified)
-        budget_ms = task.budgets.get("latency_ms", 8000.0)
+        # Default generous enough to survive an Ollama COLD start (model load can take
+        # ~12s+ on first call / after idle unload). An 8s default timed out on cold
+        # models and silently dropped to the seed realizer — the "canned responses" bug.
+        budget_ms = task.budgets.get("latency_ms", 60000.0)
         timeout_s = budget_ms / 1000.0
 
         try:

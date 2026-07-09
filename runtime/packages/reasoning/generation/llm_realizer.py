@@ -19,7 +19,7 @@ from .surface_realizer import RealizationRequest, RealizationResult, SurfaceReal
 class LLMSurfaceRealizer(SurfaceRealizer):
     """Realize candidate text via the Ollama-backed ``LLMGenerationDevice``."""
 
-    def __init__(self, device=None, budget_ms: float = 30000.0):
+    def __init__(self, device=None, budget_ms: float = 60000.0):
         # Lazy import avoids any core<->reasoning import cycle at module load.
         if device is None:
             from packages.core.chal.devices.llm_device import LLMGenerationDevice
