@@ -53,8 +53,17 @@ class HealthResponse(BaseModel):
     """Response model for the /health endpoint."""
     status: str = "ok"
     version: str = "2.0.0"
-    uptime_seconds: float
-    subsystems: Dict[str, str]
+    uptime_seconds: float = 0.0
+    subsystems: Dict[str, str] = Field(default_factory=dict)
+    # 5.0 detailed health — all optional so the endpoint can report rich status
+    # (get_health populates these; the frontend LLM banner reads `llm`).
+    ml_swarm_active: bool = False
+    ml_models_loaded: Dict[str, Any] = Field(default_factory=dict)
+    llm: Dict[str, Any] = Field(default_factory=dict)
+    cognitive_engine_active: bool = False
+    rag_active: bool = False
+    active_sessions: int = 0
+    total_requests: int = 0
 
 
 class ErrorResponse(BaseModel):

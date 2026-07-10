@@ -37,7 +37,10 @@ class CognitiveKernelIPC:
             self.quadbrain = QuadbrainMaster()
             self.kernel_status = "Synthesus QuadBrain Master: ONLINE & INTEGRATED"
         except Exception as e:
-            print(f"[!] Quadbrain Integration Failed: {e}. Falling back to dummy logic.")
+            # The in-process Quadbrain is only the DEGRADED fallback brain (used if the
+            # CHAL runtime on :5010 is unreachable). In the normal path the runtime is the
+            # brain, so this not loading is expected noise — not an error.
+            print(f"[info] In-process fallback brain not loaded ({e}); using the CHAL runtime as the primary brain (expected).")
 
     def send_intent_to_kernel(self, intent_string):
         print(f"[KERNEL IPC] Routing intent: {intent_string}")
@@ -122,6 +125,7 @@ def get_status():
     return jsonify(status_data)
 
 @app.route('/api/health', methods=['GET'])
+@app.route('/api/v1/health', methods=['GET'])  # the frontend calls /api/v1/health relative to the shell
 def health_proxy():
     try:
         r = requests.get(

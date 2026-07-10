@@ -85,14 +85,22 @@ rsync -a --delete --exclude '.git' --exclude '__pycache__' --exclude '*.pyc' \
 python3 -m venv "$SYNTHESUS_HOME/.venv"
 VPIP="$SYNTHESUS_HOME/.venv/bin/pip"
 "$VPIP" install --quiet --upgrade pip
+# Install CPU-only PyTorch FIRST so requirements.txt's unpinned torch>=2.1.0 does NOT
+# pull the multi-GB CUDA build (which fills small disks and fails the whole install).
+# Inference runs through Ollama, not torch, so the CPU wheel is all that's needed.
+"$VPIP" install --quiet torch --index-url https://download.pytorch.org/whl/cpu \
+  || warn "CPU torch install failed — some heavy ML features may be degraded (core chat unaffected)"
 # runtime deps (from its requirements) + the desktop shell deps
 if [ -f "$SYNTHESUS_HOME/runtime/requirements.txt" ]; then
-  "$VPIP" install --quiet -r "$SYNTHESUS_HOME/runtime/requirements.txt" || warn "some runtime reqs failed — continuing"
+  "$VPIP" install --quiet -r "$SYNTHESUS_HOME/runtime/requirements.txt" \
+    || warn "some ML requirements failed (torch/qiskit/transformers/etc.) — core chat still works; the critical deps are installed explicitly below"
 fi
 # NOTE: pin pygobject<3.52 — 3.52+ requires girepository-2.0, but Debian 12
 # (bookworm) only ships girepository-1.0, so the latest pygobject fails to build
 # there. <3.52 builds against 1.0 and works on both bookworm and Ubuntu 24.04.
-"$VPIP" install --quiet faiss-cpu fastembed fastapi "uvicorn[standard]" flask requests \
+# flask-cors (shell CORS) and PyJWT (accounts.py) are HARD boot requirements — a fresh
+# install without them dies with ModuleNotFoundError before the app can start.
+"$VPIP" install --quiet faiss-cpu fastembed fastapi "uvicorn[standard]" flask flask-cors PyJWT requests \
         websockets pywebview "pygobject<3.52" numpy pydantic sqlalchemy httpx onnxruntime
 ok "environment ready"
 
