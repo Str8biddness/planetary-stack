@@ -1,4 +1,5 @@
 import subprocess
+import secrets
 from .audit import log_audit
 
 class Executor:
@@ -6,7 +7,9 @@ class Executor:
         self.valid_tokens = set()
         
     def generate_token(self, step_id: str) -> str:
-        token = f"token_{step_id}_{id(self)}"
+        # Cryptographically random + unguessable. Must NOT be derivable from step_id or
+        # any value the orchestrator knows, or the human gate is defeated.
+        token = secrets.token_urlsafe(32)
         self.valid_tokens.add((step_id, token))
         return token
         
