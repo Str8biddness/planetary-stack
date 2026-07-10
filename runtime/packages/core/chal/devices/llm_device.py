@@ -34,29 +34,78 @@ class LLMGenerationDevice(SllmCoordinator):
 
     def generate(self, task: CognitiveTask, system_prompt: str = None) -> Tuple[Union[str, Dict[str, Any]], TelemetryRecord]:
         start_time = time.time()
-
-        # Get budget (default 8000ms if not specified)
-        # Default generous enough to survive an Ollama COLD start (model load can take
-        # ~12s+ on first call / after idle unload). An 8s default timed out on cold
-        # models and silently dropped to the seed realizer — the "canned responses" bug.
         budget_ms = task.budgets.get("latency_ms", 60000.0)
         timeout_s = budget_ms / 1000.0
 
         try:
-            payload = {
-                "model": self.model_name,
-                # Composed per-turn system prompt when supplied by the realizer;
-                # else the static Synthesus identity.
-                "system": system_prompt or self.system_prompt,
-                "prompt": task.query,
-                "stream": False
-            }
+            import json
+            settings_path = os.path.join(
+                os.environ.get("SYNTHESUS_HOME", os.path.expanduser("~/.local/share/synthesus")),
+                "settings.json"
+            )
+            settings = {}
+            if os.path.exists(settings_path):
+                with open(settings_path, "r") as f:
+                    settings = json.load(f)
             
-            response = requests.post(self.api_url, json=payload, timeout=timeout_s)
-            response.raise_for_status()
+            provider = os.getenv("SYNTHESUS_LLM_PROVIDER") or settings.get("llm_provider", "ollama")
+            model_name = settings.get("model") or self.model_name
+            api_key = settings.get("api_key", "").strip()
             
-            data = response.json()
-            output = data.get("response", "")
+            sys_prompt = system_prompt or self.system_prompt
+            prompt = task.query
+
+            if provider != "ollama" and not api_key:
+                raise ValueError(f"API key missing for provider: {provider}")
+
+            if provider == "openai":
+                url = "https://api.openai.com/v1/chat/completions"
+                headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+                payload = {
+                    "model": model_name,
+                    "messages": [
+                        {"role": "system", "content": sys_prompt},
+                        {"role": "user", "content": prompt}
+                    ]
+                }
+                response = requests.post(url, headers=headers, json=payload, timeout=timeout_s)
+                response.raise_for_status()
+                output = response.json()["choices"][0]["message"]["content"]
+            elif provider == "anthropic":
+                url = "https://api.anthropic.com/v1/messages"
+                headers = {
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                }
+                payload = {
+                    "model": model_name,
+                    "max_tokens": 4096,
+                    "system": sys_prompt,
+                    "messages": [{"role": "user", "content": prompt}]
+                }
+                response = requests.post(url, headers=headers, json=payload, timeout=timeout_s)
+                response.raise_for_status()
+                output = response.json()["content"][0]["text"]
+            elif provider == "gemini":
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+                payload = {
+                    "systemInstruction": {"parts": [{"text": sys_prompt}]},
+                    "contents": [{"parts": [{"text": prompt}]}]
+                }
+                response = requests.post(url, json=payload, timeout=timeout_s)
+                response.raise_for_status()
+                output = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+            else: # ollama
+                payload = {
+                    "model": model_name,
+                    "system": sys_prompt,
+                    "prompt": prompt,
+                    "stream": False
+                }
+                response = requests.post(self.api_url, json=payload, timeout=timeout_s)
+                response.raise_for_status()
+                output = response.json().get("response", "")
             
             latency_ms = (time.time() - start_time) * 1000.0
             telemetry = TelemetryRecord(
@@ -64,7 +113,7 @@ class LLMGenerationDevice(SllmCoordinator):
                 component="llm_device",
                 latency_ms=latency_ms,
                 confidence=0.9,
-                metadata={"model": self.model_name, "status": "success"}
+                metadata={"model": model_name, "provider": provider, "status": "success"}
             )
             return output, telemetry
             
@@ -72,7 +121,7 @@ class LLMGenerationDevice(SllmCoordinator):
             latency_ms = (time.time() - start_time) * 1000.0
             error_frame = {
                 "error": "TimeoutError",
-                "message": f"Ollama generation exceeded budget of {budget_ms}ms"
+                "message": f"{provider} generation exceeded budget of {budget_ms}ms"
             }
             telemetry = TelemetryRecord(
                 trace_id=task.trace_id,
@@ -80,7 +129,7 @@ class LLMGenerationDevice(SllmCoordinator):
                 latency_ms=latency_ms,
                 confidence=0.0,
                 fallback_used=True,
-                metadata={"model": self.model_name, "status": "timeout"}
+                metadata={"model": model_name if 'model_name' in locals() else self.model_name, "status": "timeout"}
             )
             return error_frame, telemetry
             
@@ -96,6 +145,6 @@ class LLMGenerationDevice(SllmCoordinator):
                 latency_ms=latency_ms,
                 confidence=0.0,
                 fallback_used=True,
-                metadata={"model": self.model_name, "status": "error"}
+                metadata={"model": model_name if 'model_name' in locals() else self.model_name, "status": "error"}
             )
             return error_frame, telemetry

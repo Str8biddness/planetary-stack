@@ -1768,4 +1768,48 @@ window.onload = function() {
         const nodeLabel = document.getElementById('nodeLabel');
         if (nodeLabel) nodeLabel.innerText = `Connected: ${window.nodeId} (EXPANSION)`;
     }
+    loadLLMSettings();
 };
+
+async function loadLLMSettings() {
+    try {
+        const res = await fetch('/api/settings/llm');
+        const data = await res.json();
+        const providerSel = document.getElementById('llm-provider');
+        const modelInput = document.getElementById('llm-model');
+        const keyInput = document.getElementById('llm-key');
+        
+        if (providerSel && data.provider) providerSel.value = data.provider;
+        if (modelInput) modelInput.value = data.model || '';
+        if (keyInput) keyInput.placeholder = data.key_set ? 'API Key (Saved. Leave blank to keep)' : 'API Key (Required for cloud)';
+    } catch(e) {
+        console.error("Failed to load LLM settings:", e);
+    }
+}
+
+async function saveLLMSettings() {
+    const provider = document.getElementById('llm-provider').value;
+    const model = document.getElementById('llm-model').value;
+    const key = document.getElementById('llm-key').value;
+    const statusEl = document.getElementById('llm-settings-status');
+    
+    if (statusEl) statusEl.innerText = 'Saving...';
+    
+    try {
+        const res = await fetch('/api/settings/llm', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ provider, model, api_key: key })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80;">Saved successfully.</span>`;
+            document.getElementById('llm-key').value = '';
+            document.getElementById('llm-key').placeholder = data.key_set ? 'API Key (Saved. Leave blank to keep)' : 'API Key (Required for cloud)';
+        } else {
+            if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Error: ${data.message || data.error}</span>`;
+        }
+    } catch (e) {
+        if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Connection error.</span>`;
+    }
+}

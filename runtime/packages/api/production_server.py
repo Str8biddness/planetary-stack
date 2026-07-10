@@ -458,7 +458,52 @@ _security_agent_instance = None  # SecurityAgent for cybersecurity operations
 _character_cache: Dict[str, Dict[str, Any]] = {}
 _cognitive_engines: Dict[str, Optional[CognitiveEngine]] = {}
 MAX_ENGINES = 50
-_conversations: Dict[str, List[Dict[str, Any]]] = defaultdict(list)  # session_id -> messages
+class _PersistentList(list):
+    def __init__(self, data_dir, sid):
+        super().__init__()
+        self.path = os.path.join(data_dir, f"{sid}.json")
+    def append(self, item):
+        super().append(item)
+        self._save()
+    def extend(self, items):
+        super().extend(items)
+        self._save()
+    def _save(self):
+        try:
+            with open(self.path, "w") as f:
+                json.dump(list(self), f)
+        except Exception:
+            pass
+
+class PersistentConversations(dict):
+    def __init__(self, data_dir):
+        super().__init__()
+        self.data_dir = data_dir
+        os.makedirs(self.data_dir, exist_ok=True)
+        for fn in os.listdir(self.data_dir):
+            if fn.endswith(".json"):
+                sid = fn[:-5]
+                try:
+                    with open(os.path.join(self.data_dir, fn)) as f:
+                        self[sid] = _PersistentList(self.data_dir, sid)
+                        super(list, self[sid]).extend(json.load(f))
+                except Exception:
+                    pass
+    def __missing__(self, key):
+        self[key] = _PersistentList(self.data_dir, key)
+        return self[key]
+    def setdefault(self, key, default=None):
+        if key not in self:
+            self[key] = _PersistentList(self.data_dir, key)
+            if default:
+                self[key].extend(default)
+        return self[key]
+    def get(self, key, default=None):
+        if key not in self:
+            return default if default is not None else []
+        return self[key]
+
+_conversations = PersistentConversations(str(DATA_DIR / "conversations"))
 _active_games: Dict[str, Any] = {}  # session_id -> GameMasterAdapter
 _rate_limits: Dict[str, List[float]] = defaultdict(list)  # ip/key -> timestamps
 _rate_limit_lock = asyncio.Lock()
@@ -2359,6 +2404,142 @@ async def list_characters():
 
     chars = sorted(chars, key=lambda c: c.get("id", ""))
     return {"characters": chars, "count": len(chars)}
+
+
+@app.get("/api/v1/health")
+def get_health() -> HealthResponse:
+    """Return system health status."""
+    ml_status = {
+        "intent": _intent_classifier is not None,
+        "sentiment": _sentiment_analyzer is not None,
+        "emotion": _emotion_detector is not None,
+        "behavior": _behavior_predictor is not None,
+        "loot": _loot_balancer is not None,
+        "dialogue": _dialogue_ranker is not None
+    }
+    
+    # 2.0 addition: Probe actual Ollama reachability for the frontend health check
+    ollama_reachable = False
+    try:
+        import requests
+        requests.get(os.environ.get("OLLAMA_API_URL", "http://localhost:11434").replace("/api/generate", ""), timeout=2)
+        ollama_reachable = True
+    except Exception:
+        pass
+
+    return HealthResponse(
+        status="online",
+        version="5.0.0",
+        ml_swarm_active=HAS_ML_SWARM,
+        ml_models_loaded=ml_status,
+        llm={"realizer": os.environ.get("SYNTHESUS_REALIZER", "llm"), "model": os.environ.get("SYNTHESUS_MODEL", "llama3.2:3b"), "ollama_reachable": ollama_reachable},
+        cognitive_engine_active=HAS_COGNITIVE,
+        rag_active=(_rag is not None),
+        uptime_seconds=time.time() - _start_time,
+        active_sessions=len(_conversations),
+        total_requests=_request_count
+    )
+
+@app.get("/api/v1/settings/llm")
+def get_llm_settings():
+    settings_path = os.path.join(
+        os.environ.get("SYNTHESUS_HOME", os.path.expanduser("~/.local/share/synthesus")),
+        "settings.json"
+    )
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, "r") as f:
+                st = json.load(f)
+            return {"provider": st.get("llm_provider", "ollama"), "model": st.get("model", ""), "key_set": bool(st.get("api_key"))}
+        except Exception:
+            pass
+    return {"provider": "ollama", "model": "", "key_set": False}
+
+class LLMSettingsInput(BaseModel):
+    provider: str
+    model: str
+    api_key: Optional[str] = None
+
+@app.post("/api/v1/settings/llm")
+def post_llm_settings(data: LLMSettingsInput):
+    settings_path = os.path.join(
+        os.environ.get("SYNTHESUS_HOME", os.path.expanduser("~/.local/share/synthesus")),
+        "settings.json"
+    )
+    os.makedirs(os.path.dirname(settings_path), exist_ok=True)
+    
+    st = {}
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, "r") as f:
+                st = json.load(f)
+        except Exception:
+            pass
+            
+    st["llm_provider"] = data.provider
+    st["model"] = data.model
+    
+    if data.api_key is not None:
+        if not data.api_key.strip() and data.provider == "ollama":
+            st["api_key"] = ""
+        elif data.api_key.strip():
+            st["api_key"] = data.api_key.strip()
+            
+    with open(settings_path, "w") as f:
+        json.dump(st, f)
+    os.chmod(settings_path, 0o600)
+    
+    return {"provider": st["llm_provider"], "model": st["model"], "key_set": bool(st.get("api_key"))}
+
+@app.get("/api/v1/conversations/{sid}/export")
+def export_conversation(sid: str, format: str = "md"):
+    conv = _conversations.get(sid, [])
+    if format == "json":
+        return JSONResponse(content=conv)
+    
+    # markdown
+    lines = []
+    for turn in conv:
+        role = turn.get("role", "unknown").capitalize()
+        content = turn.get("content", "")
+        lines.append(f"**{role}**: {content}\n")
+    return HTMLResponse(content="\n".join(lines), media_type="text/markdown")
+
+@app.get("/api/v1/pro/packs")
+def get_pro_packs():
+    manifest_url = os.environ.get("SYNTHESUS_PACK_MANIFEST_URL", "").strip()
+    available = []
+    if manifest_url:
+        try:
+            import requests
+            r = requests.get(manifest_url, timeout=5)
+            if r.status_code == 200:
+                available = r.json().get("packs", [])
+        except Exception:
+            pass
+            
+    installed = []
+    try:
+        sys.path.insert(0, str(PROJ_ROOT / "desktop"))
+        import pro
+        installed = pro.status().get("installed", [])
+    except Exception:
+        pass
+        
+    return {"available": available, "installed": installed}
+
+class InstallPackInput(BaseModel):
+    id: str
+
+@app.post("/api/v1/pro/packs/install")
+def install_pro_pack(data: InstallPackInput):
+    try:
+        sys.path.insert(0, str(PROJ_ROOT / "desktop"))
+        import pro
+        pro.install_member_pack(data.id)
+        return pro.status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/v1/characters/{char_id}")

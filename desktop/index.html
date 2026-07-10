@@ -192,6 +192,20 @@
                 <div id="wallpaper-picker" style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px;"></div>
                 <input type="file" id="wallpaper-upload" accept="image/*" style="display: none;" onchange="changeWallpaper(event)">
                 <button class="glass-btn" onclick="document.getElementById('wallpaper-upload').click()">Upload your own…</button>
+
+                <h4 style="margin-top: 25px; margin-bottom: 5px; color: #38bdf8;">LLM Backend</h4>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <select id="llm-provider" class="glass-input">
+                        <option value="ollama">Ollama (Local)</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="gemini">Google Gemini</option>
+                    </select>
+                    <input type="text" id="llm-model" class="glass-input" placeholder="Model (e.g. gpt-4o, claude-3-5-sonnet-20240620)">
+                    <input type="password" id="llm-key" class="glass-input" placeholder="API Key (Leave blank to keep current)">
+                    <button class="glass-btn primary-btn" onclick="saveLLMSettings()">Save LLM Settings</button>
+                    <div id="llm-settings-status" style="font-size:0.85rem; color:#94a3b8; min-height:1.2em;"></div>
+                </div>
             </div>
         </div>
 
@@ -199,7 +213,10 @@
         <div class="window glass-panel" id="win-chat" style="top: 100px; left: 550px; width: 400px; height: 500px; display: none;">
             <div class="window-header" onmousedown="dragWindow(event, 'win-chat')">
                 <span class="window-title">💬 Quadbrain Interface</span>
-                <div class="window-controls"><button class="win-btn minimize" onclick="minimizeWindow(this)" style="background: #facc15;"></button><button class="win-btn maximize" onclick="maximizeWindow(this)" style="background: #22c55e;"></button><button class="win-btn close" onclick="toggleWindow('win-chat')"></button></div>
+                <div class="window-controls">
+                    <button class="win-btn" onclick="window.open('/api/conversations/synthesus/export?format=json')" style="background: transparent; color: #38bdf8; border:1px solid #38bdf8; border-radius:3px; padding:0 4px; font-size:10px; cursor:pointer;">JSON</button>
+                    <button class="win-btn" onclick="window.open('/api/conversations/synthesus/export?format=md')" style="background: transparent; color: #38bdf8; border:1px solid #38bdf8; border-radius:3px; padding:0 4px; font-size:10px; cursor:pointer; margin-right:8px;">MD</button>
+                    <button class="win-btn minimize" onclick="minimizeWindow(this)" style="background: #facc15;"></button><button class="win-btn maximize" onclick="maximizeWindow(this)" style="background: #22c55e;"></button><button class="win-btn close" onclick="toggleWindow('win-chat')"></button></div>
             </div>
             <div class="window-content chat-container">
                 <div class="chat-history" id="chat-history">

@@ -326,6 +326,78 @@ def pro_activate():
     except Exception as e:
         return jsonify({"pro": False, "error": str(e)}), 500
 
+@app.route('/api/settings/llm', methods=['GET'])
+def get_llm_settings():
+    try:
+        r = requests.get(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/settings/llm",
+            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            timeout=5,
+        )
+        return (r.text, r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        return jsonify({"provider": "ollama", "model": "", "key_set": False, "error": str(e)}), 503
+
+@app.route('/api/settings/llm', methods=['POST'])
+def post_llm_settings():
+    # Enforce Pro gate
+    data = request.json or {}
+    provider = data.get("provider", "ollama")
+    if provider != "ollama" and not pro.is_pro():
+        return jsonify({"status": "error", "message": "Cloud LLMs require Synthesus Pro."}), 403
+        
+    try:
+        r = requests.post(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/settings/llm",
+            json=data,
+            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            timeout=5,
+        )
+        return (r.text, r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"runtime unavailable: {e}"}), 503
+
+@app.route('/api/conversations/<sid>/export', methods=['GET'])
+def export_conversation(sid):
+    fmt = request.args.get("format", "md")
+    try:
+        r = requests.get(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/conversations/{sid}/export?format={fmt}",
+            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            timeout=5,
+        )
+        return (r.text, r.status_code, {"Content-Type": r.headers.get("Content-Type", "text/markdown")})
+    except Exception as e:
+        return f"export unavailable: {e}", 503
+
+@app.route('/api/pro/packs', methods=['GET'])
+def pro_packs():
+    try:
+        r = requests.get(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/pro/packs",
+            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            timeout=5,
+        )
+        return (r.text, r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        return jsonify({"available": [], "installed": [], "error": str(e)}), 503
+
+@app.route('/api/pro/packs/install', methods=['POST'])
+def install_pro_pack():
+    if not pro.is_pro():
+        return jsonify({"status": "error", "message": "Requires Synthesus Pro."}), 403
+    data = request.json or {}
+    try:
+        r = requests.post(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/pro/packs/install",
+            json=data,
+            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            timeout=60,
+        )
+        return (r.text, r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 503
+
 @app.route('/api/ide/files', methods=['GET'])
 def list_files():
     # Bind the file explorer to the user's actual home directory on the Host OS

@@ -134,6 +134,74 @@ def status() -> dict:
         "configured": bool((os.environ.get("PRO_PRODUCT_ID") or DEFAULT_PRODUCT_ID).strip()),
     }
 
+def is_pro() -> bool:
+    return status().get("pro", False)
+
+def refresh() -> dict:
+    st = _load_state()
+    key = st.get("key", "")
+    if not key:
+        return status()
+    v = verify_license(key)
+    if not v.get("ok"):
+        return status()
+    
+    # A cancelled subscription means active becomes false for NEW entitlements
+    active = v.get("active", False)
+    st["subscription"] = v.get("subscription", False)
+    st["pro"] = active
+    _save_state(st)
+    return status()
+
+def list_member_packs() -> list[dict]:
+    manifest_url = os.environ.get("SYNTHESUS_PACK_MANIFEST_URL", "").strip()
+    if not manifest_url:
+        return []
+    try:
+        if requests is None:
+            return []
+        r = requests.get(manifest_url, timeout=5)
+        if r.status_code == 200:
+            return r.json().get("packs", [])
+    except Exception:
+        pass
+    return []
+
+def install_member_pack(pack_id: str) -> list[str]:
+    packs = list_member_packs()
+    pack = next((p for p in packs if p.get("id") == pack_id), None)
+    if not pack or not pack.get("url"):
+        raise ValueError(f"Pack {pack_id} not found or missing URL.")
+    
+    import tempfile
+    if requests is None:
+        raise RuntimeError("HTTP client unavailable.")
+    
+    # download to temp file and install
+    r = requests.get(pack["url"], stream=True, timeout=30)
+    r.raise_for_status()
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
+        for chunk in r.iter_content(chunk_size=8192):
+            tmp.write(chunk)
+        tmp_path = tmp.name
+        
+    try:
+        installed_names = install_pack(tmp_path)
+        # add to installed list
+        st = _load_state()
+        installed = st.get("installed", [])
+        for name in installed_names:
+            if name not in installed:
+                installed.append(name)
+        st["installed"] = installed
+        _save_state(st)
+        return installed_names
+    finally:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+
 def _find_pack() -> str:
     """Locate the Pro pack zip: an explicit env path, the Gumroad download in the
     usual spots, or the local build location. Returns '' if not found."""
