@@ -88,12 +88,15 @@ class LLMGenerationDevice(SllmCoordinator):
                 response.raise_for_status()
                 output = response.json()["content"][0]["text"]
             elif provider == "gemini":
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+                # Key goes in a header, NOT the URL query string — a key in the URL
+                # leaks into request/exception messages ("...for url: ...?key=...").
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
+                headers = {"x-goog-api-key": api_key, "content-type": "application/json"}
                 payload = {
                     "systemInstruction": {"parts": [{"text": sys_prompt}]},
                     "contents": [{"parts": [{"text": prompt}]}]
                 }
-                response = requests.post(url, json=payload, timeout=timeout_s)
+                response = requests.post(url, headers=headers, json=payload, timeout=timeout_s)
                 response.raise_for_status()
                 output = response.json()["candidates"][0]["content"]["parts"][0]["text"]
             else: # ollama
@@ -135,9 +138,14 @@ class LLMGenerationDevice(SllmCoordinator):
             
         except Exception as e:
             latency_ms = (time.time() - start_time) * 1000.0
+            # Belt-and-suspenders: never let a provider key leak into an error
+            # message that might be logged or surfaced.
+            _msg = str(e)
+            if 'api_key' in locals() and api_key:
+                _msg = _msg.replace(api_key, "***REDACTED***")
             error_frame = {
                 "error": type(e).__name__,
-                "message": str(e)
+                "message": _msg
             }
             telemetry = TelemetryRecord(
                 trace_id=task.trace_id,
