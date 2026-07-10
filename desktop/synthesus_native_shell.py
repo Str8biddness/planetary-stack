@@ -402,6 +402,44 @@ def install_pro_pack():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 503
 
+@app.route('/api/foreman/queue', methods=['GET'])
+def get_foreman_queue():
+    try:
+        r = requests.get(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/foreman/queue",
+            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            timeout=5,
+        )
+        return (r.text, r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        return jsonify({"queue": [], "error": str(e)}), 503
+
+@app.route('/api/foreman/approve', methods=['POST'])
+def approve_foreman_step():
+    try:
+        r = requests.post(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/foreman/approve",
+            json=request.json or {},
+            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            timeout=5,
+        )
+        return (r.text, r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 503
+
+@app.route('/api/foreman/deny', methods=['POST'])
+def deny_foreman_step():
+    try:
+        r = requests.post(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/foreman/deny",
+            json=request.json or {},
+            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            timeout=5,
+        )
+        return (r.text, r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 503
+
 @app.route('/api/ide/files', methods=['GET'])
 def list_files():
     # Bind the file explorer to the user's actual home directory on the Host OS

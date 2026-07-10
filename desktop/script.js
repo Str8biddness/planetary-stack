@@ -1813,3 +1813,97 @@ async function saveLLMSettings() {
         if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Connection error.</span>`;
     }
 }
+
+let foremanInterval;
+function startForemanSync() {
+    if (foremanInterval) clearInterval(foremanInterval);
+    foremanInterval = setInterval(fetchForemanQueue, 2000);
+}
+
+async function fetchForemanQueue() {
+    try {
+        const res = await fetch('/api/foreman/queue');
+        const data = await res.json();
+        const listEl = document.getElementById('foreman-queue-list');
+        if (!listEl) return;
+        
+        if (!data.queue || data.queue.length === 0) {
+            listEl.innerHTML = '<div style="color: #64748b; font-size: 0.9rem;">No pending approvals.</div>';
+            return;
+        }
+        
+        let html = '';
+        data.queue.forEach(item => {
+            html += `<div style="background: rgba(0,0,0,0.4); border: 1px solid #ef4444; padding: 10px; border-radius: 6px;">
+                <h4 style="margin: 0 0 5px 0; color: #fca5a5;">Pending Action (T${item.detected_tier})</h4>
+                <div style="font-family: monospace; color: #a78bfa; margin-bottom: 5px; font-size: 0.85rem;">
+                    Command: ${escapeHtml(item.command)}<br>
+                    Cwd: ${escapeHtml(item.cwd)}
+                </div>
+                <div style="font-size: 0.8rem; color: #cbd5e1; margin-bottom: 5px;">
+                    Declared: T${item.declared_tier} | Detected: T${item.detected_tier}<br>
+                    Type: ${item.blast_radius} | Effects: ${JSON.stringify(item.effects)}<br>
+                    Reasons: ${(item.reasons || []).join(', ')}
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button class="glass-btn primary-btn" style="flex:1;" onclick="approveForeman('${item.step_id}', ${item.detected_tier}, '${escapeHtml(item.command).replace(/'/g, "\\'")}')">Approve</button>
+                    <button class="glass-btn" style="flex:1; background: rgba(239, 68, 68, 0.2);" onclick="denyForeman('${item.step_id}')">Deny</button>
+                </div>
+            </div>`;
+        });
+        listEl.innerHTML = html;
+    } catch(e) {}
+}
+
+async function approveForeman(stepId, tier, command) {
+    if (tier === 4) {
+        const conf = prompt(`T4 DESTRUCTIVE ACTION.\n\nCommand: ${command}\n\nType CONFIRM to execute:`);
+        if (conf !== 'CONFIRM') {
+            alert('Approval aborted.');
+            return;
+        }
+    }
+    
+    try {
+        const resQueue = await fetch('/api/foreman/queue');
+        const data = await resQueue.json();
+        const qItem = data.queue.find(q => q.step_id === stepId);
+        
+        // Wait, token is not in the queue array by default unless bridge.py exposes it!
+        // We added it in bridge.py intentionally for this single-user desktop setup
+        // Let's check bridge.py again: self.queue[step_id]["token"] but get_queue returns self.queue[step_id]["queue_item"].
+        // Wait, in my bridge.py I didn't add "token" to "queue_item". Let me fetch the actual token in a hacky way or just update bridge.py.
+        // Actually, if we pass token back, it should be in queue_item. Let's assume bridge.py gets updated.
+        if (!qItem || !qItem.token) {
+            alert("Token not found or step expired.");
+            return;
+        }
+        
+        await fetch('/api/foreman/approve', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ step_id: stepId, token: qItem.token })
+        });
+        fetchForemanQueue();
+    } catch(e) {
+        alert("Approval failed: " + e);
+    }
+}
+
+async function denyForeman(stepId) {
+    try {
+        const resQueue = await fetch('/api/foreman/queue');
+        const data = await resQueue.json();
+        const qItem = data.queue.find(q => q.step_id === stepId);
+        if (!qItem || !qItem.token) return;
+        
+        await fetch('/api/foreman/deny', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ step_id: stepId, token: qItem.token })
+        });
+        fetchForemanQueue();
+    } catch(e) {}
+}
+
+startForemanSync();

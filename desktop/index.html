@@ -310,6 +310,24 @@
         </div>
 
 
+        <!-- Foreman Bridge / Confirmation Queue Window -->
+        <div class="window glass-panel" id="win-foreman" style="top: 150px; left: 600px; width: 600px; height: 500px; display: none;">
+            <div class="window-header" onmousedown="dragWindow(event, 'win-foreman')">
+                <span class="window-title">🛡️ Foreman Bridge Queue</span>
+                <div class="window-controls">
+                    <button class="win-btn minimize" onclick="minimizeWindow('win-foreman')" style="background: #facc15;"></button>
+                    <button class="win-btn maximize" onclick="maximizeWindow('win-foreman')" style="background: #22c55e;"></button>
+                    <button class="win-btn close" onclick="toggleWindow('win-foreman')"></button>
+                </div>
+            </div>
+            <div class="window-content" style="overflow: auto;">
+                <p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 15px;">Pending elevated actions require explicit human approval.</p>
+                <div id="foreman-queue-list" style="display: flex; flex-direction: column; gap: 15px;">
+                    <!-- Queue items will be injected here -->
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <!-- OS Taskbar (Dock) -->
@@ -318,11 +336,12 @@
         <button onclick="toggleWindow('win-chat')" class="dock-btn" title="Quadbrain SI">🧠</button>
         <button onclick="toggleWindow('win-drive')" class="dock-btn" title="Expansion Drive — ground on your sources">💽</button>
         <button onclick="toggleWindow('win-explorer')" class="dock-btn" title="File Explorer">📁</button>
+        <button onclick="toggleWindow('win-foreman')" class="dock-btn" title="Foreman Bridge">🛡️</button>
         <button onclick="spawnTerminalWindow()" class="dock-btn" title="Ring-0 Command Interface">_</button>
         <button onclick="showTiers()" class="dock-btn" title="Unlock Pro — premium personas">⭐</button>
     </nav>
 
-    <script src="script.js?v=10020"></script>
+    <script src="script.js?v=10021"></script>
     <script src="hyperspace.js?v=4"></script>
 
     <!-- OTA Update Screen -->

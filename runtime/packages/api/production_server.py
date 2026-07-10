@@ -45,6 +45,9 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse # typ
 from fastapi.staticfiles import StaticFiles # type: ignore
 from fastapi.templating import Jinja2Templates # type: ignore
 from pydantic import BaseModel, Field # type: ignore
+from typing import List, Optional, Dict, Any
+from packages.foreman.bridge import bridge_instance
+from packages.foreman.audit import get_audit_logs
 from cognitive.evolution_engine import CharacterEvolutionEngine # type: ignore
 from api.schemas import ( # type: ignore
     AdminAPIKeyRequest,
