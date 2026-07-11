@@ -22,8 +22,11 @@ class LLMGenerationDevice(SllmCoordinator):
         "nothing they do leaves their computer. You can ground your answers in the user's "
         "own files and documents through their expansion drive. Be clear, direct, and "
         "genuinely helpful. When knowledge context is provided, ground your answer in it "
-        "and do not invent facts; if you don't know, say so plainly. Your name is "
-        "Synthesus — never claim to be any other assistant, model, or persona."
+        "and do not invent facts; if you don't know, say so plainly. "
+        "When the provided sources include exact names, codes, identifiers, part numbers, "
+        "API keys labels, version strings, or other machine-readable tokens, quote those "
+        "strings VERBATIM in your answer — do not paraphrase, reformat, or invent variants. "
+        "Your name is Synthesus — never claim to be any other assistant, model, or persona."
     )
 
     def __init__(self, engine=None):
