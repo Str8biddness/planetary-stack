@@ -1,5 +1,32 @@
 # AGENT_LOG.md — session continuity for memory-provenance build
 
+## 2026-07-11 — SW-1..SW-5 Persona-Clone Expert Swarm
+
+### What
+New package `runtime/packages/swarm/` (disjoint from `foreman/`):
+- **SW-1** `registry.py` — Expert registry (persona + system_prompt + namespace + optional adapter_ref). Deltas only.
+- **SW-2** `scheduler.py` + `model_client.py` — ONE shared Ollama base model; fan-out expert system prompts; missing expert/adapter → degraded, no fabricated text.
+- **SW-3** `arbiter.py` — merge via `QuadBrainOrchestrator`; SwarmAnswer.sources carry C-001 verification tiers.
+- **SW-4** `adapters/` — LoRA/persona-delta DATA validation; refuse executables; base-compat check.
+- **SW-5** `envelope_firecracker.py` — loud BLOCKED/NotImplementedError on single-GPU local host.
+
+### Why
+GPU-bound inference: never N model copies. Isolation between cooperating experts is forbidden on one GPU.
+
+### Proof
+`pytest runtime/tests/test_persona_clone_swarm.py` → 11 passed (real Ollama llama3.2:3b).
+
+### Pre-review hardening (same branch)
+- Honest v1 boundary: `adapter_applied=False`, `adapter_status=persona_prompt_delta_only|validated_not_applied`.
+- Arbiter prefers expert seed prose over template CGPU surfaces (`swarm: [expert:…]`).
+- Export `SwarmRuntime` + `README.md` quick start.
+- Stricter persona-marker tests; all `model_id`s must be the single base.
+
+### Branch
+`feat/persona-clone-swarm` — commit per section; do not merge without review.
+
+---
+
 ## 2026-07-11 — REQUEST CHANGES fix (reviewer anti-collapse hole)
 
 ### Coordination note — C-001 unfreeze (Law #4 security exception)
