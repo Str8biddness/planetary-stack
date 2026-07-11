@@ -610,11 +610,13 @@ def get_llm_settings():
 
 @app.route('/api/settings/llm', methods=['POST'])
 def post_llm_settings():
-    # Enforce Pro gate
+    # Pro gate applies ONLY to cloud backends. Local backends (Ollama, LM Studio) are
+    # free — nothing leaves the machine, so there's nothing to gate.
     data = request.json or {}
     provider = data.get("provider", "ollama")
-    if provider != "ollama" and not pro.is_pro():
-        return jsonify({"status": "error", "message": "Cloud LLMs require Synthesus Pro."}), 403
+    LOCAL_BACKENDS = ("ollama", "lmstudio")
+    if provider not in LOCAL_BACKENDS and not pro.is_pro():
+        return jsonify({"status": "error", "message": "Cloud LLM backends require Synthesus Pro. Local backends (Ollama, LM Studio) are free."}), 403
         
     try:
         r = requests.post(
