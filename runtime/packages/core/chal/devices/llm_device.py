@@ -55,7 +55,7 @@ class LLMGenerationDevice(SllmCoordinator):
             sys_prompt = system_prompt or self.system_prompt
             prompt = task.query
 
-            if provider != "ollama" and not api_key:
+            if provider not in ("ollama", "lmstudio") and not api_key:
                 raise ValueError(f"API key missing for provider: {provider}")
 
             if provider == "openai":
@@ -99,6 +99,22 @@ class LLMGenerationDevice(SllmCoordinator):
                 response = requests.post(url, headers=headers, json=payload, timeout=timeout_s)
                 response.raise_for_status()
                 output = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+            elif provider == "lmstudio":
+                base_url = settings.get("lmstudio_base_url", "http://localhost:1234").rstrip("/")
+                url = f"{base_url}/v1/chat/completions"
+                headers = {"Content-Type": "application/json"}
+                payload = {
+                    "model": model_name,
+                    "messages": [
+                        {"role": "system", "content": sys_prompt},
+                        {"role": "user", "content": prompt}
+                    ]
+                }
+                response = requests.post(url, headers=headers, json=payload, timeout=timeout_s)
+                response.raise_for_status()
+                output = response.json()["choices"][0]["message"]["content"]
+            elif provider == "ollama_cloud":
+                raise NotImplementedError("BLOCKED: Law #1 - Ollama does not have a documented real cloud API endpoint.")
             else: # ollama
                 payload = {
                     "model": model_name,
@@ -156,3 +172,79 @@ class LLMGenerationDevice(SllmCoordinator):
                 metadata={"model": model_name if 'model_name' in locals() else self.model_name, "status": "error"}
             )
             return error_frame, telemetry
+
+if __name__ == "__main__":
+    import unittest
+    from unittest.mock import patch, MagicMock
+
+    class TestLLMDevice(unittest.TestCase):
+        def setUp(self):
+            self.task = CognitiveTask(task_id="task123", query="hello", trace_id="trace123", budgets={"latency_ms": 1000})
+            self.device = LLMGenerationDevice()
+
+        @patch("requests.post")
+        @patch("os.path.exists", return_value=True)
+        @patch("builtins.open", new_callable=unittest.mock.mock_open, read_data='{"llm_provider": "ollama", "model": "test-model"}')
+        def test_ollama_default_unchanged(self, mock_open, mock_exists, mock_post):
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"response": "Hi there"}
+            mock_post.return_value = mock_response
+
+            output, tel = self.device.generate(self.task)
+            self.assertEqual(output, "Hi there")
+            mock_post.assert_called_once()
+            args, kwargs = mock_post.call_args
+            self.assertEqual(args[0], "http://localhost:11434/api/generate")
+            self.assertEqual(kwargs["json"]["model"], "test-model")
+            self.assertEqual(kwargs["json"]["prompt"], "hello")
+
+        @patch("requests.post")
+        @patch("os.path.exists", return_value=True)
+        @patch("builtins.open", new_callable=unittest.mock.mock_open, read_data='{"llm_provider": "lmstudio", "lmstudio_base_url": "http://my-studio", "model": "local-model"}')
+        def test_lmstudio(self, mock_open, mock_exists, mock_post):
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"choices": [{"message": {"content": "LM Studio output"}}]}
+            mock_post.return_value = mock_response
+
+            output, tel = self.device.generate(self.task)
+            self.assertEqual(output, "LM Studio output")
+            mock_post.assert_called_once()
+            args, kwargs = mock_post.call_args
+            self.assertEqual(args[0], "http://my-studio/v1/chat/completions")
+            self.assertEqual(kwargs["headers"], {"Content-Type": "application/json"})
+            self.assertEqual(kwargs["json"]["model"], "local-model")
+            self.assertEqual(kwargs["json"]["messages"][1]["content"], "hello")
+
+        @patch("requests.post")
+        @patch("os.path.exists", return_value=True)
+        @patch("builtins.open", new_callable=unittest.mock.mock_open, read_data='{"llm_provider": "ollama_cloud", "api_key": "somekey"}')
+        def test_ollama_cloud_blocked(self, mock_open, mock_exists, mock_post):
+            output, tel = self.device.generate(self.task)
+            self.assertIsInstance(output, dict)
+            self.assertEqual(output["error"], "NotImplementedError")
+            self.assertIn("BLOCKED", output["message"])
+
+        @patch("requests.post")
+        @patch("os.path.exists", return_value=True)
+        @patch("builtins.open", new_callable=unittest.mock.mock_open, read_data='{"llm_provider": "openai", "api_key": "supersecretkey"}')
+        def test_token_redaction_on_error(self, mock_open, mock_exists, mock_post):
+            mock_post.side_effect = Exception("Failed to connect with key supersecretkey")
+            output, tel = self.device.generate(self.task)
+            self.assertIsInstance(output, dict)
+            self.assertNotIn("supersecretkey", output["message"])
+            self.assertIn("***REDACTED***", output["message"])
+
+        @patch("requests.post")
+        @patch("os.path.exists", return_value=True)
+        @patch("builtins.open", new_callable=unittest.mock.mock_open, read_data='{"llm_provider": "lmstudio"}')
+        def test_http_error_dict(self, mock_open, mock_exists, mock_post):
+            mock_response = MagicMock()
+            mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Not Found")
+            mock_post.return_value = mock_response
+
+            output, tel = self.device.generate(self.task)
+            self.assertIsInstance(output, dict)
+            self.assertEqual(output["error"], "HTTPError")
+            self.assertEqual(output["message"], "404 Not Found")
+
+    unittest.main(verbosity=2)
