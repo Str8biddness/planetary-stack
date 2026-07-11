@@ -182,6 +182,37 @@ Categories=Utility;
 DESK
 ok "installed"
 
+# ---- 7. self-check: does the REAL path work, or will it degrade to fallbacks? ----
+# Fallbacks (canned replies, seed text) exist ONLY to prevent a crash — they are not the
+# product. This check tells you BEFORE you launch whether you'll get the real thing.
+c "Self-check — verifying the real (non-fallback) path"
+SELFTEST_FAIL=0
+"$SYNTHESUS_HOME/.venv/bin/python" - <<'PYCHECK' || SELFTEST_FAIL=1
+import importlib.util, sys
+critical = ["fastapi","flask","flask_cors","jwt","requests","numpy","pydantic",
+            "sqlalchemy","httpx","faiss","fastembed","onnxruntime"]
+missing = [m for m in critical if importlib.util.find_spec(m) is None]
+if missing:
+    print("  MISSING deps (chat/grounding WILL degrade): " + ", ".join(missing))
+    print("  fix: ~/.local/share/synthesus/.venv/bin/pip install " + " ".join(missing))
+    sys.exit(1)
+print("  all critical Python deps import cleanly")
+PYCHECK
+[ "$SELFTEST_FAIL" = 1 ] && warn "critical deps missing (see above) — the app would fall back instead of working properly"
+
+if curl -s http://localhost:11434/api/tags 2>/dev/null | grep -q "$SYNTHESUS_MODEL"; then
+  ok "Ollama reachable + $SYNTHESUS_MODEL present — real LLM path ready"
+else
+  warn "Ollama/model not ready — chat will use the canned fallback until 'ollama pull $SYNTHESUS_MODEL' succeeds"
+  SELFTEST_FAIL=1
+fi
+
+if [ "$SELFTEST_FAIL" = 0 ]; then
+  ok "SELF-CHECK PASSED — you'll get the real product, not fallbacks"
+else
+  warn "SELF-CHECK found gaps above — resolve them, then re-run, so you're not stuck on fallbacks"
+fi
+
 echo
 c "Done."
 echo "  Launch:   $BIN_DIR/synthesus   (or find 'Synthesus' in your app menu)"
