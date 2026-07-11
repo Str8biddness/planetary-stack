@@ -130,3 +130,22 @@ via `upgrade_from_feedback`, which sets `USER_CONFIRMED`.
 python -m pytest tests/test_memory_provenance.py tests/test_chal_memory_policy.py tests/test_chal_api_memory_writeback.py -q
 ```
 All green at handoff (35 passed when API deps present; 2 skipped without fastapi).
+
+## 2026-07-11 — Multi-phase autonomous finish (native-kernel / polish / module-audit)
+
+### Phase 1 feat/native-kernel — DONE
+- Compile fixes: resonance_observer includes, geometric_optics pybind, GeometricEngine shared_ptr, voice_vcu memory, test_emul link.
+- IPC: main.cpp JSON query parse + dual keys; bridge.py IPC payload; hemisphere_bridge resolves `kernel/build/zo_kernel`, KernelBridge auto-IPC.
+- Proof: `make` builds `zo_kernel` + `_synthesus_kernel*.so`; stdin IPC JSON response; log `KernelBridge initialized in ipc mode`; left query `source=cpp_kernel`.
+
+### Phase 2 feat/polish — DONE
+- `scikit-learn==1.8.0` pin in runtime/requirements.txt; retrieve without InconsistentVersionWarning.
+- llm_device DEFAULT_SYSTEM_PROMPT VERBATIM codes; live Ollama answered `ZXQ-7741-BETA`.
+- production_server startup RAG embedder warm-up; cold ingest 4.66s vs after-warm ~0s.
+
+### Phase 3 feat/module-audit — DONE
+- CAPABILITY_LEDGER.md: REAL/STUB/BROKEN with import evidence.
+- Fixed: core/memory/__init__.py garbage, unpc_engine/__init__.py syntax, production_server loot/dialogue imports use real core modules not ml stubs.
+- Honest stubs left as STUB (core/ml pass classes).
+
+Do NOT merge — Claude reviews.
