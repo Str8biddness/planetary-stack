@@ -1,5 +1,41 @@
 # AGENT_LOG.md — session continuity for memory-provenance build
 
+## 2026-07-11 — REQUEST CHANGES fix (reviewer anti-collapse hole)
+
+### Coordination note — C-001 unfreeze (Law #4 security exception)
+- **Spec rev:** MEMORY_BLUEPRINT.md r1 → **r2**
+- **Why unfreeze frozen contract:** Reviewer found `gate()` trusted a caller-supplied
+  `verification` tier, so `gate({provenance:grounded_cited, verification:2})` returned
+  VERIFIED. Latent (writeback re-derives) but contract-level hole.
+- **Fix:** `gate()` always re-derives via `classify(provenance)`; caller tier ignored.
+  Same for `resolve_legacy_metadata` / `annotate_metadata` authority.
+
+### Blocker fix — C-004 human proof (invert polarity)
+- **Hole:** `_event_is_external_confirm` only rejected self-declared bots. Omitting
+  markers + `{action:"confirm"}` looked like a human confirm. API-key auth is not
+  human auth → agents with the key could forge VERIFIED (model collapse path).
+- **Fix (Foreman allow-list lesson):** deny-by-default positive human proof:
+  1. `actor_kind == "human"`
+  2. `channel ∈ HUMAN_CHANNELS` allow-list
+  3. `confirmed_by` acceptable human identity (blocks `auth:…`, agents, placeholders)
+  4. **Server-issued single-use `human_attestation`** minted only after
+     `X-Synthesus-Human-Session` matches `SYNTHESUS_HUMAN_SESSION_SECRET`
+- **C-005:** `POST /api/v1/human/attestation` for minting; `/api/v1/feedback` never
+  invents human proof from the API key; passes client fields through only.
+- **Reviewer probe now fails:**
+  `verify_human_confirm_proof({action:"confirm", answer_id:"a1"}) → False
+  (missing_human_actor_kind)`
+
+### Files touched this fix
+- `runtime/packages/knowledge/memory_provenance.py` (C-001 r2)
+- `runtime/packages/knowledge/feedback_verification.py` (C-004)
+- `runtime/packages/api/production_server.py` (C-005)
+- `runtime/tests/test_memory_provenance.py` (C-006)
+- `MEMORY_BLUEPRINT.md` (r2)
+- this log
+
+---
+
 ## 2026-07-11 — feat/memory-provenance (build agent)
 
 ### Mission

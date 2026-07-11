@@ -1,10 +1,14 @@
 """Provenance + verification contract for crystallized memory (Mc).
 
-Frozen contract C-001. Read-only after Phase 0.
+Frozen contract C-001 (rev r2 security hardening — see MEMORY_BLUEPRINT.md).
 
 Anti-collapse law: an LLM_GENERATION may never crystallize to long-term Mc as a
 fact, and may never become VERIFIED without an external event (user confirmation
 or grounding against real user sources).
+
+r2 (2026-07-11): gate() ALWAYS re-derives tier via classify(provenance) and never
+trusts a caller-supplied verification field (grounded_cited caps at GROUNDED).
+Coordination note logged in AGENT_LOG.md — security fix, Law #4 exception.
 """
 
 from __future__ import annotations
@@ -90,17 +94,19 @@ def gate(item: Mapping[str, Any]) -> tuple[bool, Verification]:
 
     GATE LAW: LLM_GENERATION may NEVER be crystallized to long-term Mc as a fact
     (returns False). Only VERIFIED and GROUNDED persist. UNVERIFIED is session-only.
+
+    r2 SECURITY: the tier is ALWAYS re-derived via classify(provenance).
+    Caller-supplied item["verification"] is ignored so grounded_cited can never
+    be laundered to VERIFIED by forging verification:2.
     """
     if not isinstance(item, Mapping):
         return False, Verification.UNVERIFIED
 
     prov = _coerce_provenance(item.get("provenance"))
-    tier = _coerce_verification(item.get("verification"))
-    if tier is None:
-        tier = classify(prov)
+    # Never trust a caller-supplied verification tier — re-derive from provenance.
+    tier = classify(prov)
 
-    # Anti-collapse: raw model output is never long-term Mc, regardless of any
-    # caller-supplied verification tier. Tier is forced to UNVERIFIED.
+    # Anti-collapse: raw model output is never long-term Mc.
     if prov is Provenance.LLM_GENERATION:
         return False, Verification.UNVERIFIED
 
@@ -129,18 +135,10 @@ def annotate_metadata(
     import time as _time
 
     prov = _coerce_provenance(provenance)
-    if prov is Provenance.LLM_GENERATION:
-        tier = Verification.UNVERIFIED
-    elif verification is not None:
-        tier = _coerce_verification(verification) or classify(prov)
-        # Never allow a non-LLM provenance to be labeled with a higher tier than
-        # classify() without an external path; callers that already have
-        # USER_CONFIRMED use classify which yields VERIFIED.
-        if tier is Verification.VERIFIED and prov not in _USER_PROVENANCES:
-            # Grounded items stay grounded unless provenance is a USER_* type.
-            tier = classify(prov)
-    else:
-        tier = classify(prov)
+    # r2: tier is always classify(provenance). The verification= kwarg is accepted
+    # for call-site clarity but cannot raise the tier above classify().
+    tier = classify(prov)
+    _ = verification  # explicit: caller-supplied tier is not authoritative
 
     meta["provenance"] = prov.value
     meta["verification"] = int(tier)
@@ -172,13 +170,10 @@ def resolve_legacy_metadata(meta: Mapping[str, Any]) -> tuple[Provenance, Verifi
     """
     if meta.get("provenance") is not None:
         prov = _coerce_provenance(meta.get("provenance"))
-        tier = _coerce_verification(meta.get("verification"))
-        if tier is None:
-            tier = classify(prov)
-        # Enforce anti-collapse even on legacy/corrupt rows.
+        # r2: always re-derive tier from provenance (ignore forged verification).
         if prov is Provenance.LLM_GENERATION:
             return Provenance.LLM_GENERATION, Verification.UNVERIFIED
-        return prov, tier
+        return prov, classify(prov)
 
     domain = str(meta.get("domain") or "")
     namespace = str(meta.get("namespace") or "")

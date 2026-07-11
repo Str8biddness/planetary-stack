@@ -39,13 +39,58 @@ from memory_provenance import (  # noqa: E402
     resolve_legacy_metadata,
     weight_for,
 )
-from feedback_verification import upgrade_from_feedback, assert_no_self_promotion  # noqa: E402
+from feedback_verification import (  # noqa: E402
+    HumanAttestationStore,
+    assert_no_self_promotion,
+    issue_human_attestation,
+    upgrade_from_feedback,
+    verify_human_confirm_proof,
+)
 from core.chal.memory_policy import MemoryProvenanceRef, MemoryWritebackCandidate  # noqa: E402
 from core.chal.memory_writeback import (  # noqa: E402
     apply_memory_writeback,
     candidate_from_hypervisor_trace,
     classify_writeback_provenance,
 )
+
+
+def _human_event(
+    store: HumanAttestationStore,
+    *,
+    memory_id: str,
+    response: str,
+    human_id: str = "desktop-user-alice",
+    channel: str = "human_desktop_ui",
+    action: str = "confirm",
+    rating: int = 5,
+    corrected_text: str | None = None,
+    secret: str = "test-human-session-secret",
+) -> dict:
+    """Build a feedback event with real server-issued human attestation."""
+    issued = issue_human_attestation(
+        human_id=human_id,
+        channel=channel,
+        subject_key=memory_id,
+        human_session_proof=secret,
+        store=store,
+        expected_secret=secret,
+    )
+    assert issued["issued"] is True, issued
+    event = {
+        "action": action,
+        "rating": rating,
+        "response": response,
+        "memory_id": memory_id,
+        "actor_kind": "human",
+        "channel": channel,
+        "confirmed_by": human_id,
+        "human_attestation": issued["human_attestation"],
+        "source": "user_feedback",
+    }
+    if corrected_text is not None:
+        event["corrected_text"] = corrected_text
+        event["action"] = "correct"
+    return event
 
 
 # ─── C-001 contract ───────────────────────────────────────────────────
@@ -74,6 +119,18 @@ def test_c001_gate_admits_verified_and_grounded() -> None:
     assert gate({"provenance": "user_stated"}) == (True, Verification.VERIFIED)
     assert gate({"provenance": "user_confirmed"}) == (True, Verification.VERIFIED)
     assert gate({"provenance": "grounded_cited"}) == (True, Verification.GROUNDED)
+
+
+def test_c001_gate_r2_rederives_tier_ignores_forged_verification() -> None:
+    """r2 security: grounded_cited + forged verification=2 must stay GROUNDED."""
+    ok, tier = gate({"provenance": "grounded_cited", "verification": 2})
+    assert ok is True
+    assert tier is Verification.GROUNDED
+    assert tier is not Verification.VERIFIED
+
+    ok2, tier2 = gate({"provenance": "user_document", "verification": 0})
+    # classify(user_document) → VERIFIED; caller cannot demote via gate either
+    assert ok2 is True and tier2 is Verification.VERIFIED
 
 
 # ─── (a) No path: LLM_GENERATION → VERIFIED without external event ───
@@ -120,6 +177,71 @@ def test_a_feedback_model_origin_refused() -> None:
     )
     assert result["upgraded"] is False
     assert assert_no_self_promotion(item)
+
+
+def test_a_feedback_action_confirm_without_human_proof_refused() -> None:
+    """Reviewer hole: self-marker ABSENT must still refuse (deny-by-default).
+
+    agent → POST {action:confirm, answer_id:X} without human attestation
+    must NOT upgrade X to VERIFIED.
+    """
+    item = {
+        "id": "a1",
+        "content": "LLM draft fact",
+        "response": "LLM draft fact",
+        "provenance": Provenance.LLM_GENERATION.value,
+        "verification": int(Verification.UNVERIFIED),
+    }
+    # Exactly the reviewer's live probe shape:
+    event = {"action": "confirm", "answer_id": "a1"}
+    ok, reason, _ = verify_human_confirm_proof(event)
+    assert ok is False
+    assert reason == "missing_human_actor_kind"
+
+    result = upgrade_from_feedback(event, items=[item])
+    assert result["upgraded"] is False
+    assert item["verification"] == int(Verification.UNVERIFIED)
+    assert item["provenance"] == Provenance.LLM_GENERATION.value
+
+
+def test_a_feedback_self_labels_without_attestation_refused() -> None:
+    """Forging actor_kind/channel labels without server-issued token fails."""
+    item = {
+        "id": "a2",
+        "content": "still a draft",
+        "provenance": Provenance.LLM_GENERATION.value,
+        "verification": int(Verification.UNVERIFIED),
+    }
+    result = upgrade_from_feedback(
+        {
+            "action": "confirm",
+            "rating": 5,
+            "memory_id": "a2",
+            "response": "still a draft",
+            "actor_kind": "human",
+            "channel": "human_desktop_ui",
+            "confirmed_by": "forged-alice",
+            # no human_attestation
+        },
+        items=[item],
+    )
+    assert result["upgraded"] is False
+    assert result["reason"] == "missing_human_attestation"
+    assert item["verification"] == int(Verification.UNVERIFIED)
+
+
+def test_a_feedback_api_key_identity_rejected_as_confirmed_by() -> None:
+    """auth: prefix (API key subject) is not a human confirmer identity."""
+    store = HumanAttestationStore()
+    # Even if somehow an attestation were issued with bad id, issue() rejects it.
+    issued = issue_human_attestation(
+        human_id="auth:deadbeef",
+        channel="human_desktop_ui",
+        human_session_proof="s",
+        store=store,
+        expected_secret="s",
+    )
+    assert issued["issued"] is False
 
 
 def test_a_no_direct_verification_write_bypasses_gate() -> None:
@@ -326,6 +448,7 @@ def test_c_rag_retrieve_weights_and_returns_tier(tmp_path: Path) -> None:
 # ─── (d) Feedback upgrade ────────────────────────────────────────────
 
 def test_d_feedback_confirm_upgrades_unverified() -> None:
+    store = HumanAttestationStore()
     item = {
         "id": "ans-9",
         "content": "Assistant: The deploy uses systemd.",
@@ -334,26 +457,22 @@ def test_d_feedback_confirm_upgrades_unverified() -> None:
         "verification": int(Verification.UNVERIFIED),
         "provenance_refs": [],
     }
-    result = upgrade_from_feedback(
-        {
-            "action": "confirm",
-            "rating": 5,
-            "response": "The deploy uses systemd.",
-            "memory_id": "ans-9",
-            "source": "user_feedback",
-            "auth": "user@example.com",
-        },
-        items=[item],
-        confirmed_by="user@example.com",
+    event = _human_event(
+        store,
+        memory_id="ans-9",
+        response="The deploy uses systemd.",
+        human_id="desktop-user-alice",
     )
-    assert result["upgraded"] is True
+    result = upgrade_from_feedback(event, items=[item], attestation_store=store)
+    assert result["upgraded"] is True, result
     assert item["provenance"] == Provenance.USER_CONFIRMED.value
     assert item["verification"] == int(Verification.VERIFIED)
-    assert item["confirmed_by"] == "user@example.com"
+    assert item["confirmed_by"] == "desktop-user-alice"
     assert gate(item) == (True, Verification.VERIFIED)
 
 
 def test_d_feedback_correction_stores_corrected_text_as_verified() -> None:
+    store = HumanAttestationStore()
     item = {
         "id": "ans-10",
         "content": "Wrong port is 8080",
@@ -361,17 +480,15 @@ def test_d_feedback_correction_stores_corrected_text_as_verified() -> None:
         "provenance": Provenance.LLM_GENERATION.value,
         "verification": int(Verification.UNVERIFIED),
     }
-    result = upgrade_from_feedback(
-        {
-            "action": "correct",
-            "corrected_text": "Correct port is 8443",
-            "response": "Wrong port is 8080",
-            "memory_id": "ans-10",
-            "source": "user_feedback",
-        },
-        items=[item],
+    event = _human_event(
+        store,
+        memory_id="ans-10",
+        response="Wrong port is 8080",
+        action="correct",
+        corrected_text="Correct port is 8443",
     )
-    assert result["upgraded"] is True
+    result = upgrade_from_feedback(event, items=[item], attestation_store=store)
+    assert result["upgraded"] is True, result
     assert result["corrected"] is True
     assert item["content"] == "Correct port is 8443"
     assert item["verification"] == int(Verification.VERIFIED)
@@ -379,18 +496,63 @@ def test_d_feedback_correction_stores_corrected_text_as_verified() -> None:
 
 
 def test_d_low_rating_does_not_upgrade() -> None:
+    store = HumanAttestationStore()
     item = {
         "id": "ans-11",
         "content": "meh",
         "provenance": Provenance.LLM_GENERATION.value,
         "verification": int(Verification.UNVERIFIED),
     }
+    # Even with a valid human attestation, non-confirm intent must not upgrade.
+    issued = issue_human_attestation(
+        human_id="desktop-user-alice",
+        channel="human_desktop_ui",
+        subject_key="ans-11",
+        human_session_proof="s",
+        store=store,
+        expected_secret="s",
+    )
     result = upgrade_from_feedback(
-        {"rating": 2, "response": "meh", "memory_id": "ans-11", "source": "user_feedback"},
+        {
+            "rating": 2,
+            "action": "rate",
+            "response": "meh",
+            "memory_id": "ans-11",
+            "actor_kind": "human",
+            "channel": "human_desktop_ui",
+            "confirmed_by": "desktop-user-alice",
+            "human_attestation": issued["human_attestation"],
+        },
         items=[item],
+        attestation_store=store,
     )
     assert result["upgraded"] is False
     assert item["verification"] == int(Verification.UNVERIFIED)
+
+
+def test_d_attestation_is_single_use() -> None:
+    store = HumanAttestationStore()
+    item = {
+        "id": "ans-12",
+        "content": "one shot",
+        "response": "one shot",
+        "provenance": Provenance.LLM_GENERATION.value,
+        "verification": int(Verification.UNVERIFIED),
+    }
+    event = _human_event(store, memory_id="ans-12", response="one shot")
+    first = upgrade_from_feedback(event, items=[item], attestation_store=store)
+    assert first["upgraded"] is True
+    # Replay same attestation → refuse
+    item2 = {
+        "id": "ans-12b",
+        "content": "one shot",
+        "response": "one shot",
+        "provenance": Provenance.LLM_GENERATION.value,
+        "verification": int(Verification.UNVERIFIED),
+    }
+    second = upgrade_from_feedback(event, items=[item2], attestation_store=store)
+    assert second["upgraded"] is False
+    assert second["reason"] == "invalid_or_consumed_human_attestation"
 
 
 # ─── (e) Legacy metadata loads ───────────────────────────────────────
@@ -490,6 +652,22 @@ def test_adversarial_attempts_summary() -> None:
         items=[item],
     )
     attempts.append(("model_origin_feedback", r2["upgraded"] is False))
+
+    # 7. Reviewer hole: action=confirm with NO self-marker and NO human proof
+    item3 = {"id": "a1", "content": "draft", "provenance": "llm_generation", "verification": 0}
+    r3 = upgrade_from_feedback({"action": "confirm", "answer_id": "a1"}, items=[item3])
+    attempts.append(
+        (
+            "confirm_without_human_proof",
+            r3["upgraded"] is False and item3["verification"] == 0,
+        )
+    )
+
+    # 8. gate trusts no caller tier: grounded_cited + verification=2 → GROUNDED
+    ok_g, tier_g = gate({"provenance": "grounded_cited", "verification": 2})
+    attempts.append(
+        ("gate_rederive_grounded", ok_g is True and tier_g is Verification.GROUNDED)
+    )
 
     failed_to_break = [name for name, held in attempts if held]
     broke = [name for name, held in attempts if not held]
