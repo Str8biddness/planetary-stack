@@ -225,6 +225,42 @@ except Exception as e:
 if _chal_memory_import_error is not None:
     logger.warning(f"CHAL memory writeback not available: {_chal_memory_import_error}")
 
+# C-004 / C-001 feedback → verification bridge (optional; degrade loudly)
+_feedback_verification_import_error = None
+try:
+    from feedback_verification import (  # type: ignore
+        upgrade_from_feedback,
+        issue_human_attestation,
+        get_default_attestation_store,
+        HUMAN_CHANNELS,
+        HUMAN_ACTOR_KIND,
+    )
+    HAS_FEEDBACK_VERIFICATION = True
+except Exception:
+    try:
+        from knowledge.feedback_verification import (  # type: ignore
+            upgrade_from_feedback,
+            issue_human_attestation,
+            get_default_attestation_store,
+            HUMAN_CHANNELS,
+            HUMAN_ACTOR_KIND,
+        )
+        HAS_FEEDBACK_VERIFICATION = True
+    except Exception as e:
+        upgrade_from_feedback = None  # type: ignore
+        issue_human_attestation = None  # type: ignore
+        get_default_attestation_store = None  # type: ignore
+        HUMAN_CHANNELS = frozenset()  # type: ignore
+        HUMAN_ACTOR_KIND = "human"  # type: ignore
+        HAS_FEEDBACK_VERIFICATION = False
+        _feedback_verification_import_error = e
+
+if _feedback_verification_import_error is not None:
+    logger.warning(
+        "feedback_verification unavailable (DEGRADED): %s",
+        _feedback_verification_import_error,
+    )
+
 # ─── Linter Safe Helpers ─────────────────────────────────────────────
 def _linter_safe_round(val: Any, n: int = 2) -> float:
     """Helper to bypass linter stub issues with the builtin round() function."""
@@ -692,10 +728,13 @@ def _apply_chal_memory_writeback(
         target_memory_type="episodic",
         importance=0.55,
     )
+    # C-003 gate is applied inside apply_memory_writeback; pass the full trace
+    # so grounded+cited classification can see knowledge_provenance mounts.
     applied = apply_memory_writeback(
         candidate,
         memory_store=memory_store,
         character_id=character_id,
+        trace=telemetry,
     )
     payload = applied.to_dict()
     payload["schema"] = "synthesus.chal.memory_writeback_result.v1"
@@ -2569,25 +2608,202 @@ async def get_character(char_id: str):
     }
 
 
+class HumanAttestationRequest(BaseModel):
+    """Mint a single-use human attestation for Mc upgrades (desktop UI only)."""
+    human_id: str = Field(..., min_length=1, max_length=256)
+    channel: str = Field(..., min_length=1, max_length=64)
+    subject_key: Optional[str] = Field(
+        default=None,
+        description="Optional memory_id / answer_id binding for the attestation",
+    )
+
+
+class FeedbackUpgradeRequest(FeedbackRequest):
+    """Feedback payload with optional human-proof fields for Mc upgrade.
+
+    API-key auth alone NEVER upgrades. The desktop UI must supply:
+      actor_kind=human, channel ∈ HUMAN_CHANNELS, confirmed_by=<human id>,
+      human_attestation=<server-issued single-use token>.
+    """
+    actor_kind: Optional[str] = None
+    channel: Optional[str] = None
+    confirmed_by: Optional[str] = None
+    human_attestation: Optional[str] = None
+    memory_id: Optional[str] = None
+    answer_id: Optional[str] = None
+    action: Optional[str] = None
+
+
+@app.post("/api/v1/human/attestation")
+async def mint_human_attestation(
+    req: HumanAttestationRequest,
+    request: Request,
+    auth=Depends(get_auth),
+    x_synthesus_human_session: Optional[str] = Header(None, alias="X-Synthesus-Human-Session"),
+):
+    """Issue a single-use human attestation token for feedback→VERIFIED upgrades.
+
+    Requires BOTH:
+      - API auth (rate-limit / access control), AND
+      - X-Synthesus-Human-Session header matching SYNTHESUS_HUMAN_SESSION_SECRET
+
+    Agents that hold only the API key cannot mint attestations. The secret is
+    known only to the human desktop UI + server (Foreman-style allow-list gate).
+    """
+    if not HAS_FEEDBACK_VERIFICATION or issue_human_attestation is None:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "issued": False,
+                "reason": "feedback_verification_unavailable",
+                "status": "DEGRADED",
+            },
+        )
+    result = issue_human_attestation(
+        human_id=req.human_id,
+        channel=req.channel,
+        subject_key=req.subject_key,
+        human_session_proof=x_synthesus_human_session,
+    )
+    if not result.get("issued"):
+        # Do not leak whether the secret is configured vs wrong.
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "issued": False,
+                "reason": result.get("reason") or "human_session_proof_rejected",
+                "message": (
+                    "Human attestation requires a valid X-Synthesus-Human-Session "
+                    "header (desktop human session). API key alone is not enough."
+                ),
+            },
+        )
+    return result
+
+
 @app.post("/api/v1/feedback")
-async def store_feedback(req: FeedbackRequest, auth=Depends(get_auth)):
-    """Store user feedback for quality monitoring."""
+async def store_feedback(req: FeedbackUpgradeRequest, auth=Depends(get_auth)):
+    """Store user feedback for quality monitoring.
+
+    C-004/C-005: Mc upgrade to VERIFIED requires **positive human proof**
+    (server-issued human_attestation + allow-listed human channel). API-key
+    auth alone does NOT upgrade — self-labeling is not authentication.
+    Feedback JSON is always recorded; upgrade is separate and deny-by-default.
+    """
     feedback_dir = PROJ_ROOT / "data" / "feedback"
     feedback_dir.mkdir(parents=True, exist_ok=True)
-    
+
+    # Intent only — NOT human proof. Server must never invent actor_kind/channel
+    # /attestation from the API key (that was the anti-collapse hole).
+    action = (req.action or "").strip().lower()
+    if not action:
+        if req.rating >= 4:
+            action = "confirm"
+        elif req.comments:
+            action = "correct" if str(req.comments).upper().startswith("CORRECT:") else "rate"
+        else:
+            action = "rate"
+
+    feedback_event: dict[str, Any] = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "session_id": req.session_id,
+        "query": req.query,
+        "response": req.response,
+        "rating": req.rating,
+        "comments": req.comments,
+        "auth": auth[1],  # audit only — never used as confirmed_by for upgrade
+        "action": action,
+        "source": "user_feedback",
+        # Human-proof fields: pass through ONLY if the client supplied them.
+        # Desktop UI sets these after minting via /api/v1/human/attestation.
+        "actor_kind": req.actor_kind,
+        "channel": req.channel,
+        "confirmed_by": req.confirmed_by,
+        "human_attestation": req.human_attestation,
+        "memory_id": req.memory_id,
+        "answer_id": req.answer_id,
+    }
+    if req.comments and str(req.comments).upper().startswith("CORRECT:"):
+        feedback_event["action"] = "correct"
+        feedback_event["corrected_text"] = str(req.comments).split(":", 1)[1].strip()
+
     filename = f"feedback_{int(time.time())}_{str(uuid.uuid4().hex)[:8]}.json" # type: ignore
     with open(feedback_dir / filename, "w") as f:
-        json.dump({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "session_id": req.session_id,
-            "query": req.query,
-            "response": req.response,
-            "rating": req.rating,
-            "comments": req.comments,
-            "auth": auth[1]
-        }, f, indent=2)
-    
-    return {"status": "success", "message": "Feedback recorded"}
+        json.dump(feedback_event, f, indent=2)
+
+    upgrade_result: dict[str, Any] = {
+        "upgraded": False,
+        "reason": "feedback_verification_unavailable",
+    }
+    if HAS_FEEDBACK_VERIFICATION and upgrade_from_feedback is not None:
+        try:
+            items: list = []
+            rag = _rag if _rag is not None else _ensure_rag()
+            if rag is not None and getattr(rag, "_metadata", None):
+                items.extend(rag._metadata)
+
+            memory_store = _get_chal_memory_store()
+            if memory_store is not None:
+                try:
+                    listed = []
+                    if hasattr(memory_store, "list"):
+                        for cid in ("synth", "default", "global"):
+                            try:
+                                listed.extend(memory_store.list(cid, limit=200) or [])
+                            except Exception:
+                                pass
+                    for mem in listed:
+                        if hasattr(mem, "to_dict"):
+                            d = mem.to_dict() if callable(mem.to_dict) else dict(mem.__dict__)
+                            if isinstance(d.get("tags"), str):
+                                try:
+                                    d["tags"] = json.loads(d["tags"])
+                                except Exception:
+                                    pass
+                            if isinstance(d.get("metadata"), str):
+                                try:
+                                    d["metadata"] = json.loads(d["metadata"])
+                                except Exception:
+                                    pass
+                            items.append(d)
+                        elif isinstance(mem, dict):
+                            items.append(mem)
+                except Exception as exc:
+                    logger.warning("feedback memory store scan failed: %s", exc)
+
+            # Do NOT pass confirmed_by=auth[1] — API key subject is not a human.
+            # Upgrade path reads confirmed_by + human_attestation from the event.
+            upgrade_result = upgrade_from_feedback(
+                feedback_event,
+                items=items,
+                attestation_store=(
+                    get_default_attestation_store()
+                    if get_default_attestation_store is not None
+                    else None
+                ),
+            )
+            if upgrade_result.get("upgraded") and rag is not None and hasattr(rag, "save_index"):
+                try:
+                    rag.save_index()
+                except Exception as exc:
+                    logger.warning("RAG save after feedback upgrade failed: %s", exc)
+        except Exception as exc:
+            logger.warning("feedback verification DEGRADED: %s", exc)
+            upgrade_result = {
+                "upgraded": False,
+                "reason": "upgrade_exception",
+                "error": str(exc),
+            }
+    else:
+        logger.warning(
+            "feedback_verification DEGRADED: module unavailable; feedback stored without Mc upgrade"
+        )
+
+    return {
+        "status": "success",
+        "message": "Feedback recorded",
+        "verification_upgrade": upgrade_result,
+    }
 
 @app.get("/api/v1/kernel/status")
 async def get_kernel_status(auth=Depends(get_auth)):

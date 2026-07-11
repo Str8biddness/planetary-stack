@@ -5,8 +5,8 @@
 | **Project** | Synthesus — anti-collapse crystallized memory (Mc) |
 | **Repo / address** | `/home/dakin/synthesus-public` → `runtime/packages/knowledge/`, `runtime/packages/core/chal/`, `runtime/packages/api/` |
 | **Scale** | 1 frozen contract + 5 consuming sections |
-| **Rev** | r1 (2026-07-10) — initial |
-| **Status** | DESIGNED — to build |
+| **Rev** | r2 (2026-07-11) — security: gate re-derives tier; feedback requires human attestation |
+| **Status** | BUILDING — review fixes in progress |
 
 ## Purpose (the axis / center line)
 Synthesus grows its own crystallized intelligence (Mc) **only from verified, external
@@ -67,11 +67,24 @@ def classify(provenance: Provenance) -> Verification: ...
 def gate(item: dict) -> tuple[bool, Verification]:
     """The crystallization gate. Returns (may_crystallize_to_longterm, tier).
     GATE LAW: LLM_GENERATION may NEVER be crystallized to long-term Mc as a fact
-    (returns False). Only VERIFIED and GROUNDED persist. UNVERIFIED is session-only."""
+    (returns False). Only VERIFIED and GROUNDED persist. UNVERIFIED is session-only.
+    r2: tier is ALWAYS re-derived via classify(provenance); caller-supplied
+    verification is ignored (grounded_cited cannot be forged to VERIFIED)."""
 ```
 **Tolerance C-001 [GATE]:** `gate()` returns `False` for any `LLM_GENERATION` item;
-`classify()` maps USER_* → VERIFIED, GROUNDED_CITED → GROUNDED, LLM_GENERATION → UNVERIFIED.
-Unit test with pasted output.
+`classify()` maps USER_* → VERIFIED, GROUNDED_CITED → GROUNDED, LLM_GENERATION → UNVERIFIED;
+`gate()` re-derives tier (ignores forged `verification`). Unit test with pasted output.
+
+### r2 security addendum — feedback human proof (C-004)
+Self-labeling ≠ authentication (Foreman lesson). Upgrade to VERIFIED requires
+**positive human proof**, deny-by-default:
+1. `actor_kind == "human"` (allow-list)
+2. `channel ∈ {human_desktop_ui, desktop_ui, webos_user}` (allow-list)
+3. `confirmed_by` is a real human identity (not `auth:…` API-key subjects)
+4. `human_attestation` is a **server-issued single-use token**, minted only after
+   `X-Synthesus-Human-Session` matches `SYNTHESUS_HUMAN_SESSION_SECRET`
+
+Mere `{action:"confirm"}` without the above → **no upgrade**.
 
 ---
 

@@ -31,11 +31,78 @@ try:
 except Exception:
     bootstrap_knowledge_cache = None
 
+try:
+    from memory_provenance import (
+        Provenance,
+        Verification,
+        annotate_metadata,
+        resolve_legacy_metadata,
+        weight_for,
+    )
+except ImportError:
+    from knowledge.memory_provenance import (  # type: ignore
+        Provenance,
+        Verification,
+        annotate_metadata,
+        resolve_legacy_metadata,
+        weight_for,
+    )
+
 
 def _should_bootstrap_knowledge_cache(local_root: Path) -> bool:
     return local_root.name == "data"
 
 logger = logging.getLogger(__name__)
+
+
+def _enrich_pattern_metadata(meta: Dict[str, Any], *, default_provenance: Optional[str] = None) -> Dict[str, Any]:
+    """Ensure provenance + verification fields exist on a pattern metadata dict.
+
+    Explicit fields are preserved (subject to anti-collapse rules in annotate).
+    Legacy items without fields receive backward-compatible defaults.
+    """
+    out = dict(meta)
+    if out.get("provenance") is not None:
+        prov = out.get("provenance")
+        refs = out.get("provenance_refs") or []
+        if out.get("source") and out["source"] not in refs:
+            refs = list(refs) + [str(out["source"])]
+        annotate_metadata(
+            out,
+            provenance=prov,
+            provenance_refs=refs,
+            origin_voice=out.get("origin_voice"),
+            created_ts=out.get("created_ts"),
+            confirmed_ts=out.get("confirmed_ts"),
+            confirmed_by=out.get("confirmed_by"),
+            verification=out.get("verification"),
+        )
+        return out
+
+    if default_provenance is not None:
+        refs = list(out.get("provenance_refs") or [])
+        if out.get("source") and str(out["source"]) not in refs:
+            refs.append(str(out["source"]))
+        annotate_metadata(
+            out,
+            provenance=default_provenance,
+            provenance_refs=refs,
+            origin_voice=out.get("origin_voice"),
+        )
+        return out
+
+    prov, tier = resolve_legacy_metadata(out)
+    refs = list(out.get("provenance_refs") or [])
+    if out.get("source") and str(out["source"]) not in refs:
+        refs.append(str(out["source"]))
+    annotate_metadata(
+        out,
+        provenance=prov,
+        provenance_refs=refs,
+        origin_voice=out.get("origin_voice"),
+        verification=tier,
+    )
+    return out
 
 
 class RAGPipeline:
@@ -168,6 +235,7 @@ class RAGPipeline:
             # Provenance ref (e.g. "myrepo/auth.py") written by the expansion-drive
             # connectors; fall back to namespace so every hit carries a source.
             source = meta.get("source") or ns
+            prov, tier = resolve_legacy_metadata(meta)
 
             context_parts.append(f"Q: {pattern}\nA: {response}")
             sources.append({
@@ -176,7 +244,11 @@ class RAGPipeline:
                 "character": char,
                 "namespace": ns,
                 "domain": domain,
-                "source": source
+                "source": source,
+                "provenance": prov.value if hasattr(prov, "value") else str(prov),
+                "verification": int(tier),
+                "verification_name": tier.name if hasattr(tier, "name") else str(tier),
+                "provenance_refs": list(meta.get("provenance_refs") or ([source] if source else [])),
             })
 
         context = "\n\n".join(context_parts)
@@ -197,28 +269,32 @@ class RAGPipeline:
             search_depth = min(k * 100, self.total_vectors)
             scores, indices = self._index.search(query_emb, search_depth)  
 
-            results = []
+            # Collect candidates above the raw-similarity threshold (calibration
+            # stays on unweighted FAISS scores), then re-rank by
+            # similarity × VERIFICATION_WEIGHT so verified out-ranks guesses.
+            candidates = []
             for score, idx in zip(scores[0], indices[0]):
                 if idx < 0 or idx >= len(self._metadata):
                     continue
-                if score < threshold:
+                raw = float(score)
+                if raw < threshold:
                     continue
-                
+
                 meta = self._metadata[idx]
-                
+
                 # Filter by character if specified
                 if character_id and meta.get("character_id") not in (character_id, "global", None):
                     continue
-                
+
                 # Filter by namespace if specified
                 if namespaces and meta.get("namespace") not in namespaces:
                     continue
-                    
-                results.append((float(score), meta))
-                if len(results) >= k:
-                    break
 
-            return results
+                weighted = raw * weight_for(meta)
+                candidates.append((weighted, meta, raw))
+
+            candidates.sort(key=lambda item: item[0], reverse=True)
+            return [(weighted, meta) for weighted, meta, _raw in candidates[:k]]
         except Exception as e:
             logger.error(f"FAISS search error: {e}")
             return []
@@ -264,7 +340,7 @@ class RAGPipeline:
 
             self._index.add(embeddings)
             for p in batch:
-                meta = dict(p)
+                meta = _enrich_pattern_metadata(dict(p))
                 if character_id:
                     meta["character_id"] = character_id
                 self._metadata.append(meta)
@@ -308,7 +384,7 @@ class RAGPipeline:
                 )
             self._index.add(embeddings)
             for p in batch:
-                meta = dict(p)
+                meta = _enrich_pattern_metadata(dict(p))
                 if character_id:
                     meta["character_id"] = character_id
                 self._metadata.append(meta)
@@ -320,7 +396,10 @@ class RAGPipeline:
                          chunk_size: int = 400, save: bool = True) -> int:
         """Read local text/markdown files, chunk them, and APPEND to the index so
         Synthesus can ground answers on YOUR documents (local, private). Returns
-        the number of chunks added."""
+        the number of chunks added.
+
+        Ingested user files are tagged USER_DOCUMENT / VERIFIED (external signal).
+        """
         exts = {".txt", ".md", ".markdown", ".rst"}
         files: List[Path] = []
         for p in ([paths] if isinstance(paths, (str, Path)) else paths):
@@ -342,6 +421,7 @@ class RAGPipeline:
             return chunks
 
         patterns: List[Dict] = []
+        now = time.time()
         for f in files:
             try:
                 text = f.read_text(encoding="utf-8", errors="replace")
@@ -352,6 +432,13 @@ class RAGPipeline:
                     patterns.append({
                         "pattern": chunk, "response": chunk,
                         "namespace": namespace, "domain": "user_docs", "source": f.name,
+                        "provenance": Provenance.USER_DOCUMENT.value,
+                        "verification": int(Verification.VERIFIED),
+                        "provenance_refs": [f.name],
+                        "origin_voice": None,
+                        "created_ts": now,
+                        "confirmed_ts": now,
+                        "confirmed_by": "user_document_ingest",
                     })
         added = self.append_patterns(patterns)
         if save and added:
