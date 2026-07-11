@@ -72,6 +72,60 @@ else
   ok "model pulled"
 fi
 
+# ---- 3b. GPU autodetection (NVIDIA) ------------------------------------
+# Principle: if a GPU + driver is present, Ollama/llama.cpp uses it on its own.
+# We DETECT + point at driver setup — we do NOT write load-balancing code.
+c "3b/6  GPU detection (Ollama acceleration)"
+_gpu_detect_ollama() {
+  # PCI NVIDIA display/3D devices (same idea as: lspci | grep -Ei 'vga|3d' | grep -i nvidia)
+  local pci_nvidia=""
+  if command -v lspci >/dev/null 2>&1; then
+    pci_nvidia="$(lspci 2>/dev/null | grep -Ei 'vga|3d|display' | grep -i nvidia || true)"
+  fi
+
+  local smi_ok=0
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    if nvidia-smi -L >/dev/null 2>&1; then
+      smi_ok=1
+    fi
+  fi
+
+  if [ -n "$pci_nvidia" ] && [ "$smi_ok" -eq 1 ]; then
+    ok "GPU detected and usable — Ollama will use it."
+    echo "  nvidia-smi:"
+    nvidia-smi -L 2>/dev/null | sed 's/^/    /' || true
+    echo "  (llama.cpp offloads layers automatically — no extra config required)"
+    return 0
+  fi
+
+  if [ -n "$pci_nvidia" ] && [ "$smi_ok" -eq 0 ]; then
+    warn "NVIDIA GPU present but drivers are not usable (nvidia-smi failed)."
+    echo "$pci_nvidia" | sed 's/^/    PCI: /'
+    if command -v nvidia-smi >/dev/null 2>&1; then
+      echo "    nvidia-smi: installed but cannot talk to the driver"
+    else
+      echo "    nvidia-smi: not installed"
+    fi
+    echo
+    echo "  → Chat will run on CPU until GPU drivers are installed."
+    echo "  → Enable GPU acceleration (recommended):"
+    if [ -x "$SRC_DIR/tools/enable_gpu.sh" ]; then
+      echo "      $SRC_DIR/tools/enable_gpu.sh"
+    else
+      echo "      ./tools/enable_gpu.sh   # from the Synthesus release directory"
+    fi
+    echo "    That script detects your exact GPU + distro and prints the precise"
+    echo "    nvidia-driver / CUDA install steps, then verifies Ollama sees the GPU."
+    return 0
+  fi
+
+  # No NVIDIA device matching the detect path (other GPUs are not claimed as usable here).
+  echo "  No NVIDIA GPU detected — Ollama will run in CPU mode (expected on many machines)."
+  echo "  Tip: if you later add an NVIDIA GPU, re-run: ./tools/enable_gpu.sh"
+  return 0
+}
+_gpu_detect_ollama
+
 # ---- 4. copy code + create venv -----------------------------------------
 c "4/6  Installing app + Python environment"
 mkdir -p "$SYNTHESUS_HOME"
