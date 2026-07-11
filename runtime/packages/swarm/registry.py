@@ -79,6 +79,10 @@ class ExpertResult:
     latency_ms: float = 0.0
     model_id: str | None = None  # always the shared base when healthy
     sources: list[dict[str, Any]] = field(default_factory=list)
+    # v1 honesty: LoRA/weight adapters are validated as DATA only — never hot-swapped.
+    # Behavioral delta today = system_prompt + namespace (see adapters/loader.py).
+    adapter_applied: bool = False
+    adapter_status: str | None = None  # none | validated_not_applied | missing | …
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

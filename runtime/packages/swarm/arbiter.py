@@ -225,13 +225,13 @@ class SwarmArbiter:
             max_tokens=256,
         )
 
-        selected = (arbitration.selected_response or seed.text or "").strip()
-        # If CGPU/critic produced empty, fall back to best healthy expert (real text).
-        if not selected:
-            selected = seed.text
-            selected_source = f"expert_seed:{seed.expert_id}"
-        else:
-            selected_source = arbitration.selected_source
+        cgpu_text = (arbitration.selected_response or "").strip()
+        selected, selected_source = _pick_user_facing_response(
+            cgpu_text=cgpu_text,
+            seed=seed,
+            healthy=healthy,
+            cgpu_source=arbitration.selected_source,
+        )
 
         contrib = [r.expert_id for r in healthy]
         arb_meta = {
@@ -239,11 +239,13 @@ class SwarmArbiter:
             "selected_source": selected_source,
             "quad_brain": arbitration.to_dict()
             if hasattr(arbitration, "to_dict")
-            else {"selected_response_chars": len(selected)},
+            else {"selected_response_chars": len(cgpu_text)},
+            "cgpu_selected_response": cgpu_text,  # keep full critic path for traces
             "serial_order": list(getattr(arbitration, "serial_order", [])),
             "contributing_experts": contrib,
             "degraded_experts": degraded,
             "shared_model_id": model_id,
+            "response_policy": "prefer_expert_seed_over_template_cgpu",
         }
 
         return SwarmAnswer(
@@ -257,6 +259,62 @@ class SwarmArbiter:
             latency_ms=(time.time() - t0) * 1000.0
             + float(getattr(arbitration, "latency_ms", 0.0)),
         )
+
+
+def _looks_like_template_surface(text: str) -> bool:
+    """CGPU/template leakage patterns that must not be the user-facing answer."""
+    t = (text or "").strip()
+    if not t:
+        return True
+    low = t.lower()
+    needles = (
+        "swarm: [expert:",
+        "[expert:",
+        "response_template",
+        "handled:",
+        "no route matched",
+        "[module]",
+        "[fallback]",
+        "template_surface",
+    )
+    if any(n in low for n in needles):
+        return True
+    # Bare structured dump of expert blocks without natural language
+    if low.startswith("swarm:") and "persona=" in low:
+        return True
+    return False
+
+
+def _pick_user_facing_response(
+    *,
+    cgpu_text: str,
+    seed: ExpertResult,
+    healthy: Sequence[ExpertResult],
+    cgpu_source: str,
+) -> tuple[str, str]:
+    """Prefer real expert prose over template-y CGPU/critic frames.
+
+    Quad-brain trace stays in arbitration; user-facing response must not look
+    fabricated or templated.
+    """
+    if cgpu_text and not _looks_like_template_surface(cgpu_text):
+        return cgpu_text, cgpu_source
+
+    # Prefer highest-confidence healthy expert with non-empty real text
+    best = seed
+    for r in healthy:
+        if r.confidence > best.confidence and str(r.text).strip():
+            best = r
+    if str(best.text).strip():
+        if cgpu_text and _looks_like_template_surface(cgpu_text):
+            logger.info(
+                "arbiter: preferring expert_seed=%s over template CGPU surface",
+                best.expert_id,
+            )
+        return best.text.strip(), f"expert_seed:{best.expert_id}"
+
+    # Last resort: whatever CGPU had (may be empty)
+    return cgpu_text, cgpu_source or "empty"
 
 
 def os_budget_ms() -> float:

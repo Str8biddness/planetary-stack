@@ -2,6 +2,13 @@
 
 Shares ONE SharedOllamaClient / base model. Missing experts degrade loudly —
 never fabricate persona output.
+
+v1 delta semantics (honest boundary):
+  - Behavioral delta = system_prompt + retrieval namespace (cheap, always applied).
+  - LoRA / weight adapter_ref is validated as DATA only (base-compat, no exec).
+  - Adapters are NOT hot-swapped into Ollama in this revision; ExpertResult
+    records adapter_applied=False and adapter_status=validated_not_applied
+    when the manifest exists. Missing adapters degrade that expert only.
 """
 
 from __future__ import annotations
@@ -87,6 +94,9 @@ class SwarmScheduler:
                 continue
 
             # Adapter is DATA — missing/invalid → that expert degrades, swarm continues.
+            # v1: successful validation does NOT hot-swap weights (prompt delta only).
+            adapter_status = "none"
+            adapter_applied = False
             if expert.adapter_ref:
                 validation = self.adapters.validate(expert.adapter_ref)
                 if not validation.ok:
@@ -108,9 +118,15 @@ class SwarmScheduler:
                             namespace=expert.namespace,
                             latency_ms=(time.time() - t0) * 1000.0,
                             model_id=self.model.base_model,
+                            adapter_applied=False,
+                            adapter_status=validation.reason,
                         )
                     )
                     continue
+                adapter_status = "validated_not_applied"
+                adapter_applied = False  # explicit: no LoRA hot-swap in v1
+            else:
+                adapter_status = "persona_prompt_delta_only"
 
             sources: list[dict[str, Any]] = []
             if self.retrieval_fn is not None:
@@ -140,7 +156,9 @@ class SwarmScheduler:
                 f"{expert.system_prompt.strip()}\n"
                 f"You are the '{expert.persona}' expert (id={expert.expert_id}, "
                 f"domain={expert.domain}, namespace={expert.namespace}). "
-                f"Stay in character. Do not claim to be other experts."
+                f"Stay in character. Do not claim to be other experts. "
+                f"You MUST begin your reply with the exact token "
+                f"{expert.expert_id.upper()}:"
             )
             user_prompt = f"{request.query.strip()}{ground_block}"
 
@@ -171,13 +189,16 @@ class SwarmScheduler:
                         latency_ms=gen.latency_ms,
                         model_id=gen.model_id,
                         sources=sources,
+                        adapter_applied=adapter_applied,
+                        adapter_status=adapter_status,
                     )
                 )
                 continue
 
             prov_refs = [f"namespace:{expert.namespace}", f"model:{gen.model_id}"]
             if expert.adapter_ref:
-                prov_refs.append(f"adapter:{expert.adapter_ref}")
+                prov_refs.append(f"adapter_ref:{expert.adapter_ref}")
+                prov_refs.append(f"adapter_status:{adapter_status}")
             for src in sources:
                 if isinstance(src, dict) and src.get("source"):
                     prov_refs.append(str(src["source"]))
@@ -197,6 +218,8 @@ class SwarmScheduler:
                     latency_ms=gen.latency_ms,
                     model_id=gen.model_id,
                     sources=sources,
+                    adapter_applied=adapter_applied,
+                    adapter_status=adapter_status,
                 )
             )
 

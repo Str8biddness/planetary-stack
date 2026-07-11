@@ -16,6 +16,12 @@ GPU-bound inference: never N model copies. Isolation between cooperating experts
 ### Proof
 `pytest runtime/tests/test_persona_clone_swarm.py` → 11 passed (real Ollama llama3.2:3b).
 
+### Pre-review hardening (same branch)
+- Honest v1 boundary: `adapter_applied=False`, `adapter_status=persona_prompt_delta_only|validated_not_applied`.
+- Arbiter prefers expert seed prose over template CGPU surfaces (`swarm: [expert:…]`).
+- Export `SwarmRuntime` + `README.md` quick start.
+- Stricter persona-marker tests; all `model_id`s must be the single base.
+
 ### Branch
 `feat/persona-clone-swarm` — commit per section; do not merge without review.
 

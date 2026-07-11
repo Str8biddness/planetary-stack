@@ -2,6 +2,9 @@
 
 Adapters are DATA (manifest JSON / weight files), never executable code.
 A missing or incompatible adapter must fail loud — no silent fake persona.
+
+v1: validation only. The scheduler does not hot-swap LoRA weights into Ollama;
+behavioral deltas are system_prompt + namespace until a real apply path lands.
 """
 
 from __future__ import annotations

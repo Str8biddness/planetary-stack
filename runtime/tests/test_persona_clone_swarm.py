@@ -208,21 +208,22 @@ def test_sw2_three_experts_one_resident_model():
     healthy = [r for r in results if not r.degraded]
     assert len(healthy) >= 2, f"too many degraded: {[r.to_dict() for r in results]}"
 
-    # All healthy generations used the same base model id
+    # All generations (including degraded) report at most the single base model id
+    all_models = {r.model_id for r in results if r.model_id}
+    assert all_models == {client.base_model}, all_models
     models = {r.model_id for r in healthy}
     assert models == {client.base_model}, models
     assert client.models_requested == {client.base_model}
+    assert len(client.models_requested) == 1
     assert client.call_count == 3
+    for r in healthy:
+        assert r.adapter_applied is False
+        assert r.adapter_status == "persona_prompt_delta_only"
 
     ps = _ollama_ps()
     print("\n=== ollama ps after 3-expert fan-out ===\n", ps)
-    # At most one distinct model name should be active / requested
-    # (ps may list one line for the base model)
-    lines = [ln for ln in ps.splitlines() if ln.strip() and not ln.startswith("NAME")]
-    # If any lines, each should reference the same family or be empty runner
     print("models_requested", client.models_requested)
     print("healthy texts:", [(r.expert_id, r.text[:80]) for r in healthy])
-
 
 @requires_ollama
 def test_sw2_persona_distinct_namespace_scoped():
@@ -233,7 +234,10 @@ def test_sw2_persona_distinct_namespace_scoped():
         Expert(
             expert_id="poet",
             persona="Poet",
-            system_prompt="You are a poet. Always begin with POET: and use a metaphor.",
+            system_prompt=(
+                "You are a poet. Use a metaphor. "
+                "Your first characters MUST be exactly: POET:"
+            ),
             namespace="ns_poetry",
             domain="arts",
         )
@@ -242,7 +246,10 @@ def test_sw2_persona_distinct_namespace_scoped():
         Expert(
             expert_id="auditor",
             persona="Auditor",
-            system_prompt="You are an auditor. Always begin with AUDIT: and mention risk.",
+            system_prompt=(
+                "You are an auditor. Mention risk. "
+                "Your first characters MUST be exactly: AUDITOR:"
+            ),
             namespace="ns_audit",
             domain="finance",
         )
@@ -259,18 +266,24 @@ def test_sw2_persona_distinct_namespace_scoped():
     by_id = {r.expert_id: r for r in results}
     assert not by_id["poet"].degraded, by_id["poet"].degrade_reason
     assert not by_id["auditor"].degraded, by_id["auditor"].degrade_reason
-    poet_t = by_id["poet"].text.upper()
-    audit_t = by_id["auditor"].text.upper()
-    # Distinct persona markers (model asked to start with POET:/AUDIT:)
-    assert "POET" in poet_t or by_id["poet"].persona == "Poet"
-    assert "AUDIT" in audit_t or "RISK" in audit_t
+    poet_t = by_id["poet"].text.strip().upper()
+    audit_t = by_id["auditor"].text.strip().upper()
+    # Strict: scheduler requires EXPERT_ID: prefix; also accept POET:/AUDITOR: from prompt
+    assert poet_t.startswith("POET:") or poet_t.startswith("POET"), (
+        f"poet missing persona marker: {by_id['poet'].text!r}"
+    )
+    assert audit_t.startswith("AUDITOR:") or audit_t.startswith("AUDITOR") or "RISK" in audit_t, (
+        f"auditor missing persona marker: {by_id['auditor'].text!r}"
+    )
     assert by_id["poet"].text != by_id["auditor"].text
     assert by_id["poet"].namespace == "ns_poetry"
     assert by_id["auditor"].namespace == "ns_audit"
+    assert {r.model_id for r in results if not r.degraded} == {client.base_model}
     assert client.models_requested == {client.base_model}
+    assert by_id["poet"].adapter_applied is False
+    assert by_id["poet"].adapter_status == "persona_prompt_delta_only"
     print("poet:", by_id["poet"].text[:120])
     print("auditor:", by_id["auditor"].text[:120])
-
 
 @requires_ollama
 def test_sw2_missing_adapter_degrades_swarm_still_answers(tmp_path):
@@ -320,8 +333,14 @@ def test_sw2_missing_adapter_degrades_swarm_still_answers(tmp_path):
     assert ans.response.strip()  # swarm still answered
     assert "broken_adapter_expert" in ans.degraded_experts
     assert "ok_expert" in ans.contributing_experts
+    # No template-surface / fabricated dump as user-facing response
+    low = ans.response.lower()
+    assert "swarm: [expert:" not in low
+    assert "response_template" not in low
+    assert by["ok_expert"].get("adapter_applied") is False
     print("swarm response:", ans.response[:200])
     print("degraded:", ans.degraded_experts)
+    print("selected_source:", ans.arbitration.get("selected_source"))
 
 
 @requires_ollama
