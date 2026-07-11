@@ -42,6 +42,7 @@ import numpy as np # type: ignore
 from fastapi import FastAPI, HTTPException, Request, Depends, Header, BackgroundTasks, WebSocket, WebSocketDisconnect # type: ignore
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse # type: ignore
+from starlette.concurrency import run_in_threadpool # type: ignore
 from fastapi.staticfiles import StaticFiles # type: ignore
 from fastapi.templating import Jinja2Templates # type: ignore
 from pydantic import BaseModel, Field # type: ignore
@@ -1516,6 +1517,81 @@ async def drive_preview(req: Request, auth=Depends(get_auth)):
         })
         
     return {"chunks": chunks[:5]}
+
+
+@app.post("/api/v1/image")
+async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
+    """Synthetic-intelligence image generation (SI, not AI).
+
+    Reasons the prompt into a resolution-free scene graph and renders an HD
+    raster locally — deterministic, CPU-only, no diffusion. Renders concepts in
+    the visual vocabulary; unknown words map to the nearest renderable concept.
+    Returns the PNG as base64 plus the real scene entities. Degrades LOUDLY
+    (503 with the reason) if the engine/deps are unavailable — never a fake image.
+    """
+    global _request_count
+    _request_count = _request_count + 1
+
+    is_auth, rate_key = auth
+    if not await _check_rate_limit(rate_key, AUTH_RATE_LIMIT if is_auth else DEMO_RATE_LIMIT):
+        raise HTTPException(429, "Rate limit exceeded. Add X-API-Key header for higher limits.")
+
+    try:
+        body = await req.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    prompt = (body.get("prompt") or "").strip()
+    if not prompt:
+        raise HTTPException(400, "prompt is required")
+    try:
+        res = int(body.get("resolution", 1024))
+    except (TypeError, ValueError):
+        res = 1024
+    res = max(128, min(2048, res))  # bound render size
+
+    try:
+        from image_service import generate_image, renderable_vocabulary
+    except Exception as e:
+        # Engine or an image dep (numpy/PIL) is missing — degrade loudly, don't fake.
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "image_engine_unavailable", "message": str(e)},
+        )
+
+    import base64
+    import os
+    import tempfile
+
+    out_path = os.path.join(tempfile.gettempdir(), f"synth_img_{uuid.uuid4().hex[:12]}.png")
+    t0 = time.time()
+    try:
+        meta = await run_in_threadpool(generate_image, prompt, out_path, res)
+        with open(out_path, "rb") as f:
+            png_b64 = base64.b64encode(f.read()).decode("ascii")
+    except Exception as e:
+        logger.warning("image generation failed: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "image_generation_failed", "message": str(e)},
+        )
+    finally:
+        try:
+            os.remove(out_path)
+        except OSError:
+            pass
+
+    return JSONResponse(content={
+        "ok": True,
+        "engine": "synthesus_vsa_geometric",
+        "prompt": prompt,
+        "resolution": res,
+        "entities": meta.get("entities", []),
+        "entity_count": meta.get("entity_count", 0),
+        "renderable_vocabulary": renderable_vocabulary(),
+        "latency_ms": round((time.time() - t0) * 1000.0, 1),
+        "image_base64": png_b64,
+        "mime_type": "image/png",
+    })
 
 
 @app.post("/api/v1/drive/ingest")
