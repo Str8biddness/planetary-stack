@@ -149,3 +149,18 @@ All green at handoff (35 passed when API deps present; 2 skipped without fastapi
 - Honest stubs left as STUB (core/ml pass classes).
 
 Do NOT merge — Claude reviews.
+
+## 2026-07-11 — feat/launch-smoke (final pre-QC pass)
+
+Merged into this branch: native-kernel, polish, module-audit.
+
+Additional launch polish:
+- production_server: HemisphereBridge() uses package kernel path resolver (not PROJ_ROOT/zo_kernel)
+- install.sh: SYNTHESUS_HUMAN_SESSION_SECRET + scikit-learn==1.8.0 pin in pip critical list
+- core/ml/*: re-export real reasoning/core modules (no pass stubs)
+- tools/redeploy_install.sh: safe rsync preserve env/venv/data
+- tools/launch_smoke.sh: real HTTP/kernel/sklearn checks
+- LAUNCH_CHECKLIST.md + kernel/README.md (IPC vs pybind honesty)
+
+Proof: ml re-exports → reasoning/core real files; zo_kernel IPC ok;
+redeploy generates human secret; smoke pass=4 offline (health fail until runtime up).

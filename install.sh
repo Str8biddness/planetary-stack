@@ -155,21 +155,37 @@ fi
 # flask-cors (shell CORS) and PyJWT (accounts.py) are HARD boot requirements — a fresh
 # install without them dies with ModuleNotFoundError before the app can start.
 "$VPIP" install --quiet faiss-cpu fastembed fastapi "uvicorn[standard]" flask flask-cors PyJWT requests \
-        websockets pywebview "pygobject<3.52" numpy pydantic sqlalchemy httpx onnxruntime
-ok "environment ready"
+        websockets pywebview "pygobject<3.52" numpy pydantic sqlalchemy httpx onnxruntime \
+        "scikit-learn==1.8.0"
+ok "environment ready (scikit-learn pinned 1.8.0 for SwarmEmbedder pickle compat)"
 
-# ---- 5. per-install key --------------------------------------------------
-c "5/6  Generating a private per-install key"
+# ---- 5. per-install key + human-session secret ---------------------------
+c "5/6  Generating private per-install secrets"
 KEY="$(python3 -c 'import secrets; print("syn_"+secrets.token_urlsafe(32))')"
+# Human attestation boundary: desktop shell injects this as X-Synthesus-Human-Session.
+# NEVER expose to frontend JS. Same value must be visible to runtime + shell.
+HUMAN_SESSION_SECRET="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 mkdir -p "$SYNTHESUS_HOME"
+# Preserve existing secrets if re-running install over an existing tree.
+if [ -f "$SYNTHESUS_HOME/synthesus.env" ]; then
+  # shellcheck disable=SC1090
+  set -a; . "$SYNTHESUS_HOME/synthesus.env"; set +a
+  KEY="${SYNTHESUS_API_KEY:-$KEY}"
+  HUMAN_SESSION_SECRET="${SYNTHESUS_HUMAN_SESSION_SECRET:-$HUMAN_SESSION_SECRET}"
+  warn "preserving existing synthesus.env secrets (API key / human session)"
+fi
 cat > "$SYNTHESUS_HOME/synthesus.env" <<ENV
-# Auto-generated at install. Do not share.
+# Auto-generated at install. Do not share. Never ship to the browser.
 SYNTHESUS_API_KEY=$KEY
 SYNTHESUS_MODEL=$SYNTHESUS_MODEL
 SYNTHESUS_HOST=127.0.0.1
+# Memory-verification human proof (desktop shell → runtime mint). Local only.
+SYNTHESUS_HUMAN_SESSION_SECRET=$HUMAN_SESSION_SECRET
+# Optional: absolute path to C++ kernel IPC binary (zo_kernel)
+# SYNTHESUS_KERNEL_BIN=$SYNTHESUS_HOME/runtime/packages/kernel/build/zo_kernel
 ENV
 chmod 600 "$SYNTHESUS_HOME/synthesus.env"
-ok "unique key written to synthesus.env (localhost only)"
+ok "unique secrets written to synthesus.env (API key + human session; localhost only)"
 
 # ---- 6. launcher + menu entry -------------------------------------------
 c "6/6  Launcher"

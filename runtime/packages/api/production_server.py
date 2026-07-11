@@ -673,7 +673,9 @@ def _get_cognitive_hypervisor() -> Optional[Any]:
                 return _hemisphere_bridge
             if HemisphereBridge is None:
                 raise RuntimeError("HemisphereBridge is unavailable for hypervisor dispatch")
-            return cast(Any, HemisphereBridge)(kernel_bin=str(PROJ_ROOT / "zo_kernel"))
+            # Prefer built IPC binary; HemisphereBridge resolves package build path
+            # and degrades to Python if absent (never force a missing PROJ_ROOT/zo_kernel).
+            return cast(Any, HemisphereBridge)()
 
         _cognitive_hypervisor = cast(Any, CognitiveHypervisor)(bridge_factory=_bridge_factory)
     return _cognitive_hypervisor
@@ -961,8 +963,14 @@ async def startup():
     if HAS_HEMISPHERE_BRIDGE:
         logger.info("Initializing Hemisphere Bridge (C++ Kernel)...")
         try:
-            _hemisphere_bridge = cast(Any, HemisphereBridge)(kernel_bin=str(PROJ_ROOT / "zo_kernel"))
-            logger.info("Hemisphere Bridge ready.")
+            _hemisphere_bridge = cast(Any, HemisphereBridge)()
+            _kb = getattr(_hemisphere_bridge, "_python_bridge", None)
+            _mode = getattr(getattr(_kb, "mode", None), "value", "n/a")
+            logger.info(
+                "Hemisphere Bridge ready (kernel_bin=%s, KernelBridge mode=%s).",
+                getattr(_hemisphere_bridge, "kernel_bin", "?"),
+                _mode,
+            )
         except Exception as e:
             logger.warning(f"HemisphereBridge failed to initialize: {e}")
             _hemisphere_bridge = None
