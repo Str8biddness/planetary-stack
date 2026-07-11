@@ -193,17 +193,21 @@
                 <input type="file" id="wallpaper-upload" accept="image/*" style="display: none;" onchange="changeWallpaper(event)">
                 <button class="glass-btn" onclick="document.getElementById('wallpaper-upload').click()">Upload your own…</button>
 
-                <h4 style="margin-top: 25px; margin-bottom: 5px; color: #38bdf8;">LLM Backend</h4>
+                <h4 style="margin-top: 25px; margin-bottom: 5px; color: #38bdf8;">AI Backend</h4>
+                <p style="color:#94a3b8; font-size:0.8rem; margin:0 0 8px;">Local models only — no cloud API keys. Open source / on-device.</p>
                 <div style="display:flex; flex-direction:column; gap:8px;">
-                    <select id="llm-provider" class="glass-input">
-                        <option value="ollama">Ollama (Local)</option>
-                        <option value="openai">OpenAI</option>
-                        <option value="anthropic">Anthropic</option>
-                        <option value="gemini">Google Gemini</option>
+                    <label for="llm-provider" style="color:#94a3b8; font-size:0.8rem;">Provider</label>
+                    <select id="llm-provider" class="glass-input" onchange="onLLMProviderChange()">
+                        <option value="ollama" selected>Local Ollama (default)</option>
+                        <option value="lmstudio">LM Studio</option>
                     </select>
-                    <input type="text" id="llm-model" class="glass-input" placeholder="Model (e.g. gpt-4o, claude-3-5-sonnet-20240620)">
-                    <input type="password" id="llm-key" class="glass-input" placeholder="API Key (Leave blank to keep current)">
-                    <button class="glass-btn primary-btn" onclick="saveLLMSettings()">Save LLM Settings</button>
+                    <label for="llm-model" style="color:#94a3b8; font-size:0.8rem;">Model (optional)</label>
+                    <input type="text" id="llm-model" class="glass-input" placeholder="e.g. llama3.2:3b or local-model">
+                    <div id="lmstudio-url-row" style="display:none; flex-direction:column; gap:8px;">
+                        <label for="llm-lmstudio-url" style="color:#94a3b8; font-size:0.8rem;">LM Studio base URL</label>
+                        <input type="text" id="llm-lmstudio-url" class="glass-input" placeholder="http://localhost:1234">
+                    </div>
+                    <button class="glass-btn primary-btn" onclick="saveLLMSettings()">Save AI Backend</button>
                     <div id="llm-settings-status" style="font-size:0.85rem; color:#94a3b8; min-height:1.2em;"></div>
                 </div>
             </div>
@@ -341,7 +345,7 @@
         <button onclick="showTiers()" class="dock-btn" title="Unlock Pro — premium personas">⭐</button>
     </nav>
 
-    <script src="script.js?v=10022"></script>
+    <script src="script.js?v=10023"></script>
     <script src="hyperspace.js?v=4"></script>
 
     <!-- OTA Update Screen -->

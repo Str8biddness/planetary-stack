@@ -22,6 +22,7 @@ function toggleWindow(id) {
         if (id === 'win-term') initTerminal();
         if (id === 'win-chat') maybeStreamWelcome();
         if (id === 'win-drive') loadDriveSources();
+        if (id === 'win-core') loadLLMSettings();
     } else {
         win.style.display = 'none';
         if (id === 'win-twin' && twinInterval) clearInterval(twinInterval);
@@ -615,21 +616,27 @@ async function sendChatMessage() {
             chatHistory.innerHTML += planHtml;
         }
 
-        // IMPROVEMENT 4: show RAG sources under grounded answers.
-        // Only render when the response carries a non-empty `sources` list.
+        // Sources under grounded answers — each shows verification tier badge
+        // (anti-collapse Mc: verified > grounded > unverified).
         if (Array.isArray(data.sources) && data.sources.length) {
             const items = data.sources.map(s => {
-                const label = (typeof s === 'string')
-                    ? s
-                    : (s && (s.file || s.name || s.path || s.source || s.title)) || JSON.stringify(s);
-                return '<li style="margin:2px 0;">' + escapeHtml(String(label)) + '</li>';
+                if (typeof s === 'string') {
+                    return '<li style="margin:4px 0; list-style:none;">' +
+                        verificationTierBadge(null) + ' ' + escapeHtml(s) + '</li>';
+                }
+                const label = (s && (s.file || s.name || s.path || s.source || s.title || s.pattern)) || JSON.stringify(s);
+                const badge = verificationTierBadge(s);
+                const score = (s && s.score != null) ? ' <span style="opacity:0.6;">(' + Number(s.score).toFixed(2) + ')</span>' : '';
+                return '<li style="margin:4px 0; list-style:none; display:flex; align-items:flex-start; gap:6px;">' +
+                    badge +
+                    '<span style="flex:1; word-break:break-word;">' + escapeHtml(String(label)) + score + '</span></li>';
             }).join('');
             const sourcesHtml =
                 '<details class="rag-sources" style="margin-top:8px; background:rgba(20,25,40,0.6); ' +
                 'border:1px solid rgba(56,189,248,.3); border-radius:8px; padding:6px 10px;">' +
                 '<summary style="cursor:pointer; color:#38bdf8; font-size:0.8rem;">' +
                 '&#128206; Sources (' + data.sources.length + ')</summary>' +
-                '<ul style="margin:6px 0 2px 18px; padding:0; color:#94a3b8; font-size:0.8rem; list-style:disc;">' +
+                '<ul style="margin:6px 0 2px 0; padding:0; color:#94a3b8; font-size:0.8rem;">' +
                 items + '</ul></details>';
             // insertAdjacentHTML keeps the streaming bubble node intact (unlike innerHTML +=).
             chatHistory.insertAdjacentHTML('beforeend', sourcesHtml);
@@ -1966,46 +1973,160 @@ window.onload = function() {
     loadLLMSettings();
 };
 
+// ---------------------------------------------------------------------------
+// Verification tier badges — make anti-collapse Mc trust levels visible.
+// Source objects from retrieve() carry verification: 0|1|2 (or verification_name).
+// ---------------------------------------------------------------------------
+function verificationTierBadge(source) {
+    let tier = null;
+    if (source && typeof source === 'object') {
+        if (source.verification != null && source.verification !== '') {
+            tier = Number(source.verification);
+        } else if (source.verification_name) {
+            const n = String(source.verification_name).toUpperCase();
+            if (n === 'VERIFIED') tier = 2;
+            else if (n === 'GROUNDED') tier = 1;
+            else if (n === 'UNVERIFIED') tier = 0;
+        } else if (source.provenance) {
+            const p = String(source.provenance).toLowerCase();
+            if (p === 'user_document' || p === 'user_stated' || p === 'user_confirmed') tier = 2;
+            else if (p === 'grounded_cited') tier = 1;
+            else if (p === 'llm_generation') tier = 0;
+        }
+    }
+    // Default unknown → Unverified (do not claim trust)
+    if (tier !== 0 && tier !== 1 && tier !== 2) tier = 0;
+
+    const styles = {
+        2: { label: '✓ Verified', color: '#4ade80', border: 'rgba(74,222,128,0.45)', bg: 'rgba(74,222,128,0.12)' },
+        1: { label: '~ Grounded', color: '#38bdf8', border: 'rgba(56,189,248,0.45)', bg: 'rgba(56,189,248,0.12)' },
+        0: { label: '• Unverified', color: '#94a3b8', border: 'rgba(148,163,184,0.35)', bg: 'rgba(148,163,184,0.08)' },
+    };
+    const s = styles[tier];
+    return '<span class="verification-badge" data-tier="' + tier + '" title="Trust tier from provenance" ' +
+        'style="display:inline-block; flex-shrink:0; font-size:0.72rem; font-weight:600; ' +
+        'padding:1px 7px; border-radius:999px; border:1px solid ' + s.border + '; ' +
+        'color:' + s.color + '; background:' + s.bg + '; white-space:nowrap;">' +
+        s.label + '</span>';
+}
+
+// ---------------------------------------------------------------------------
+// AI backend selector (Local Ollama / LM Studio) — no API keys for local backends.
+// POST /api/settings/llm { provider, model, lmstudio_base_url? }
+// ---------------------------------------------------------------------------
+const LMSTUDIO_URL_STORAGE_KEY = 'synthesus_lmstudio_base_url';
+
+function onLLMProviderChange() {
+    const providerSel = document.getElementById('llm-provider');
+    const row = document.getElementById('lmstudio-url-row');
+    if (!providerSel || !row) return;
+    const isLm = providerSel.value === 'lmstudio';
+    row.style.display = isLm ? 'flex' : 'none';
+}
+
 async function loadLLMSettings() {
+    const statusEl = document.getElementById('llm-settings-status');
     try {
         const res = await fetch('/api/settings/llm');
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         const providerSel = document.getElementById('llm-provider');
         const modelInput = document.getElementById('llm-model');
-        const keyInput = document.getElementById('llm-key');
-        
-        if (providerSel && data.provider) providerSel.value = data.provider;
-        if (modelInput) modelInput.value = data.model || '';
-        if (keyInput) keyInput.placeholder = data.key_set ? 'API Key (Saved. Leave blank to keep)' : 'API Key (Required for cloud)';
-    } catch(e) {
-        console.error("Failed to load LLM settings:", e);
+        const urlInput = document.getElementById('llm-lmstudio-url');
+
+        // Only local backends in the selector — map unknown/cloud values to ollama default.
+        let provider = (data && data.provider) || 'ollama';
+        if (provider !== 'ollama' && provider !== 'lmstudio') {
+            provider = 'ollama';
+        }
+        if (providerSel) providerSel.value = provider;
+        if (modelInput) modelInput.value = (data && data.model) || '';
+
+        // Base URL: prefer server field if present; else localStorage (GET contract may omit it).
+        let baseUrl = (data && (data.lmstudio_base_url || data.lmstudioBaseUrl)) || '';
+        if (!baseUrl) {
+            try { baseUrl = localStorage.getItem(LMSTUDIO_URL_STORAGE_KEY) || ''; } catch (e) { baseUrl = ''; }
+        }
+        if (urlInput) urlInput.value = baseUrl || 'http://localhost:1234';
+
+        onLLMProviderChange();
+        if (statusEl && data && data.error) {
+            statusEl.innerHTML = '<span style="color:#fbbf24;">Loaded defaults (runtime: ' +
+                escapeHtml(String(data.error)) + ')</span>';
+        }
+    } catch (e) {
+        console.error('Failed to load LLM settings:', e);
+        onLLMProviderChange();
+        if (statusEl) {
+            statusEl.innerHTML = '<span style="color:#f87171;">Could not load settings — using defaults.</span>';
+        }
     }
 }
 
 async function saveLLMSettings() {
-    const provider = document.getElementById('llm-provider').value;
-    const model = document.getElementById('llm-model').value;
-    const key = document.getElementById('llm-key').value;
+    const providerSel = document.getElementById('llm-provider');
+    const modelInput = document.getElementById('llm-model');
+    const urlInput = document.getElementById('llm-lmstudio-url');
     const statusEl = document.getElementById('llm-settings-status');
-    
-    if (statusEl) statusEl.innerText = 'Saving...';
-    
+
+    const provider = (providerSel && providerSel.value) || 'ollama';
+    const model = (modelInput && modelInput.value) ? modelInput.value.trim() : '';
+    let lmstudioBaseUrl = (urlInput && urlInput.value) ? urlInput.value.trim() : '';
+
+    if (provider !== 'ollama' && provider !== 'lmstudio') {
+        if (statusEl) {
+            statusEl.innerHTML = '<span style="color:#f87171;">Only Local Ollama and LM Studio are supported here.</span>';
+        }
+        return;
+    }
+
+    if (provider === 'lmstudio' && !lmstudioBaseUrl) {
+        lmstudioBaseUrl = 'http://localhost:1234';
+        if (urlInput) urlInput.value = lmstudioBaseUrl;
+    }
+
+    // Remember base URL for UI reload (GET may not echo lmstudio_base_url).
+    try {
+        if (provider === 'lmstudio' && lmstudioBaseUrl) {
+            localStorage.setItem(LMSTUDIO_URL_STORAGE_KEY, lmstudioBaseUrl);
+        }
+    } catch (e) { /* storage unavailable */ }
+
+    const payload = { provider: provider, model: model };
+    // Include optional base URL for LM Studio (runtime/device reads settings.json).
+    if (provider === 'lmstudio') {
+        payload.lmstudio_base_url = lmstudioBaseUrl;
+    }
+
+    if (statusEl) statusEl.innerText = 'Saving…';
+
     try {
         const res = await fetch('/api/settings/llm', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ provider, model, api_key: key })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (res.ok) {
-            if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80;">Saved successfully.</span>`;
-            document.getElementById('llm-key').value = '';
-            document.getElementById('llm-key').placeholder = data.key_set ? 'API Key (Saved. Leave blank to keep)' : 'API Key (Required for cloud)';
+            const savedProvider = data.provider || provider;
+            const savedModel = data.model != null ? data.model : model;
+            if (statusEl) {
+                statusEl.innerHTML =
+                    '<span style="color:#4ade80;">Saved: ' +
+                    escapeHtml(String(savedProvider)) +
+                    (savedModel ? ' / ' + escapeHtml(String(savedModel)) : '') +
+                    (provider === 'lmstudio' ? ' @ ' + escapeHtml(lmstudioBaseUrl) : '') +
+                    '</span>';
+            }
         } else {
-            if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Error: ${data.message || data.error}</span>`;
+            const msg = data.message || data.error || data.detail || ('HTTP ' + res.status);
+            if (statusEl) {
+                statusEl.innerHTML = '<span style="color:#f87171;">Error: ' + escapeHtml(String(msg)) + '</span>';
+            }
         }
     } catch (e) {
-        if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Connection error.</span>`;
+        if (statusEl) {
+            statusEl.innerHTML = '<span style="color:#f87171;">Connection error — is the desktop shell running?</span>';
+        }
     }
 }
 
