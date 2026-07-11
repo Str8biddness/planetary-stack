@@ -356,6 +356,7 @@ function renderMarkdown(md) {
 }
 
 // Reveal text with a typewriter stream; the lightbulb stays lit while it types.
+// onDone(bubble) receives the bubble element so callers can attach 👍 confirm.
 function streamInto(bubble, text, onDone) {
     if (!bubble) return;
     const chatHistory = document.getElementById('chat-history');
@@ -371,9 +372,191 @@ function streamInto(bubble, text, onDone) {
             clearInterval(timer);
             target.innerHTML = renderMarkdown(clean);  // final render: markdown formatting
             if (chatHistory) chatHistory.scrollTop = chatHistory.scrollHeight;
-            if (onDone) onDone();
+            if (onDone) onDone(bubble);
         }
     }, 14);
+}
+
+// Auth header for shell routes that resolve accounts.py identity (JWT).
+// Human-session proof is injected only by the desktop shell server — never by this JS.
+function authHeaders(extra) {
+    const headers = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
+    try {
+        const token = localStorage.getItem('synthesus_token');
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+    } catch (e) { /* storage unavailable */ }
+    return headers;
+}
+
+function currentUserIdentity() {
+    try {
+        if (window.currentUser && window.currentUser.email) return window.currentUser.email;
+        const u = JSON.parse(localStorage.getItem('synthesus_user') || '{}');
+        return (u && u.email) || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+// Attach a 👍 confirm control to an assistant message bubble.
+// Two-step human-proof flow (session proof stays server-side in the shell only):
+//   1) POST /api/human/attestation  { subject_key: answer_id }
+//   2) POST /api/feedback           { actor_kind, channel, confirmed_by, human_attestation, answer_id, action }
+function attachConfirmControl(bubble, meta) {
+    if (!bubble || !meta || !meta.answer_id) return;
+    // Avoid duplicate buttons on re-stream
+    if (bubble.querySelector('.confirm-fact-btn')) return;
+
+    const bar = document.createElement('div');
+    bar.className = 'confirm-fact-bar';
+    bar.style.cssText = 'margin-top:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'confirm-fact-btn glass-btn';
+    btn.title = 'Confirm this answer as a verified fact (human only)';
+    btn.setAttribute('data-answer-id', meta.answer_id);
+    btn.style.cssText = 'background:rgba(34,197,94,0.15); border:1px solid #22c55e; color:#86efac; padding:4px 10px; font-size:0.85rem; cursor:pointer;';
+    btn.innerHTML = '&#128077; Confirm as fact';
+
+    const status = document.createElement('span');
+    status.className = 'confirm-fact-status';
+    status.style.cssText = 'font-size:0.75rem; color:#94a3b8;';
+
+    btn.addEventListener('click', function () {
+        confirmAssistantFact(meta, btn, status);
+    });
+
+    bar.appendChild(btn);
+    bar.appendChild(status);
+    bubble.appendChild(bar);
+}
+
+async function confirmAssistantFact(meta, btn, statusEl) {
+    const answerId = meta.answer_id;
+    const query = meta.query || '';
+    const responseText = meta.response || '';
+    if (!answerId) {
+        if (statusEl) statusEl.textContent = 'DEGRADED: missing answer_id';
+        return;
+    }
+    if (!currentUserIdentity()) {
+        if (statusEl) {
+            statusEl.style.color = '#f87171';
+            statusEl.textContent = 'Log in first — confirm needs your accounts identity.';
+        }
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Confirming…';
+    }
+    if (statusEl) {
+        statusEl.style.color = '#94a3b8';
+        statusEl.textContent = 'Minting human attestation…';
+    }
+
+    const base = 'http://' + window.location.host;
+
+    // Step 1 — mint via shell proxy (shell injects human-session proof; browser never holds it)
+    let mintBody;
+    try {
+        const mintResp = await fetch(base + '/api/human/attestation', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({
+                channel: 'human_desktop_ui',
+                subject_key: answerId,
+                answer_id: answerId,
+            }),
+        });
+        mintBody = await mintResp.json().catch(function () { return {}; });
+        if (!mintResp.ok || !mintBody.issued || !mintBody.human_attestation) {
+            if (statusEl) {
+                statusEl.style.color = '#f87171';
+                statusEl.textContent = 'Attestation refused: ' +
+                    (mintBody.reason || mintBody.message || ('HTTP ' + mintResp.status));
+            }
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '&#128077; Confirm as fact';
+            }
+            return;
+        }
+    } catch (e) {
+        console.log('attestation mint failed:', e);
+        if (statusEl) {
+            statusEl.style.color = '#f87171';
+            statusEl.textContent = 'DEGRADED: cannot reach shell attestation proxy.';
+        }
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '&#128077; Confirm as fact';
+        }
+        return;
+    }
+
+    if (statusEl) statusEl.textContent = 'Sending human-proven feedback…';
+
+    // Step 2 — feedback with full human-proof fields (confirmed_by forced server-side from JWT)
+    try {
+        const fbResp = await fetch(base + '/api/feedback', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({
+                session_id: (window.sessionId || currentUserIdentity() || 'desktop'),
+                query: query,
+                response: responseText,
+                rating: 5,
+                action: 'confirm',
+                actor_kind: 'human',
+                channel: 'human_desktop_ui',
+                // Hint only — shell overwrites confirmed_by from accounts.py JWT
+                confirmed_by: currentUserIdentity(),
+                human_attestation: mintBody.human_attestation,
+                answer_id: answerId,
+                memory_id: answerId,
+            }),
+        });
+        const fbBody = await fbResp.json().catch(function () { return {}; });
+        const upgrade = fbBody.verification_upgrade || {};
+        if (fbResp.ok && upgrade.upgraded) {
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '&#10003; Verified fact';
+                btn.style.borderColor = '#4ade80';
+                btn.style.color = '#4ade80';
+            }
+            if (statusEl) {
+                statusEl.style.color = '#4ade80';
+                statusEl.textContent = 'Mc upgrade: ' +
+                    (upgrade.provenance || 'user_confirmed') +
+                    ' / tier ' + String(upgrade.verification) +
+                    (upgrade.confirmed_by ? ' by ' + upgrade.confirmed_by : '');
+            }
+        } else {
+            if (statusEl) {
+                statusEl.style.color = '#f87171';
+                statusEl.textContent = 'Not upgraded: ' +
+                    (upgrade.reason || fbBody.message || ('HTTP ' + fbResp.status));
+            }
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '&#128077; Confirm as fact';
+            }
+        }
+    } catch (e) {
+        console.log('feedback failed:', e);
+        if (statusEl) {
+            statusEl.style.color = '#f87171';
+            statusEl.textContent = 'DEGRADED: feedback proxy unreachable.';
+        }
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '&#128077; Confirm as fact';
+        }
+    }
 }
 
 async function sendChatMessage() {
@@ -382,7 +565,7 @@ async function sendChatMessage() {
     if(!message) return;
 
     const chatHistory = document.getElementById('chat-history');
-    chatHistory.innerHTML += `<div class="message" style="border-left: 3px solid #facc15;"><strong>User:</strong> ${message}</div>`;
+    chatHistory.innerHTML += `<div class="message" style="border-left: 3px solid #facc15;"><strong>User:</strong> ${escapeHtml(message)}</div>`;
     input.value = '';
     chatHistory.scrollTop = chatHistory.scrollHeight;
 
@@ -393,12 +576,24 @@ async function sendChatMessage() {
 
     try {
         const response = await fetch('http://' + window.location.host + '/api/chat', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST',
+            headers: authHeaders(),
             body: JSON.stringify({ message: message })
         });
         const data = await response.json();
+        const answerText = data.response || '';
+        const answerId = data.answer_id || null;
         // Idea arrives: bulb lights up solid, then the answer streams out.
-        streamInto(document.getElementById(thinkId), data.response || '');
+        // After stream, attach 👍 confirm bound to this answer_id.
+        streamInto(document.getElementById(thinkId), answerText, function (bubble) {
+            if (answerId) {
+                attachConfirmControl(bubble, {
+                    answer_id: answerId,
+                    query: message,
+                    response: answerText,
+                });
+            }
+        });
 
         if (data.os_plan) {
             const plan = data.os_plan;
