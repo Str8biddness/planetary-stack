@@ -134,7 +134,7 @@ private:
     std::shared_ptr<synthesus::kernel::vmm::VirtualVpuDevice> vpu_device_;
     std::shared_ptr<synthesus::kernel::vmm::VirtualSllmDevice> sllm_device_;
     std::shared_ptr<synthesus::kernel::vmm::VirtualAcceleratorDevice> accelerator_device_;
-    std::unique_ptr<zo::GeometricEngine> geometric_engine_;
+    std::shared_ptr<zo::GeometricEngine> geometric_engine_;
     std::unique_ptr<zo::ShardManager> shard_manager_;
     std::unique_ptr<zo::ResonanceObserver> resonance_observer_;
 

@@ -467,15 +467,21 @@ class KernelBridge:
             return self._query_fallback(q)
 
         try:
-            self._kernel_proc.stdin.write(q.text + "\n")
+            # Prefer HemisphereBridge-compatible JSON; plain text also accepted by kernel.
+            payload = json.dumps({"query": q.text, "rag_context": q.context or ""}) + "\n"
+            self._kernel_proc.stdin.write(payload)
             self._kernel_proc.stdin.flush()
             line = self._kernel_proc.stdout.readline().strip()
             if line:
                 data = json.loads(line)
+                # Accept both short keys (legacy) and full keys (main.cpp protocol).
+                response = data.get("r") if data.get("r") is not None else data.get("response", "")
+                confidence = data.get("c") if data.get("c") is not None else data.get("confidence", 0.0)
+                module_used = data.get("m") if data.get("m") is not None else data.get("module_used", "unknown")
                 return KernelResult(
-                    response=data.get("r", ""),
-                    confidence=data.get("c", 0.0),
-                    module_used=data.get("m", "unknown"),
+                    response=str(response or ""),
+                    confidence=float(confidence or 0.0),
+                    module_used=str(module_used or "unknown"),
                 )
         except (BrokenPipeError, json.JSONDecodeError, IOError) as e:
             logger.warning(f"IPC query failed: {e}")

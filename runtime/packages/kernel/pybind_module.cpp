@@ -19,6 +19,7 @@
 #include "../reasoning/ppbrs.hpp"
 #include "../core/memory/working_memory.hpp"
 #include "watchdog.hpp"
+#include "geometric_optics.hpp"
 #include "emul_engineering/emul_engine.hpp"
 #include "vmm/virtual_parameter_device.hpp"
 #include "vmm/virtual_quantum_device.hpp"

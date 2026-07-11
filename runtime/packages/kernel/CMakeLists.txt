@@ -154,8 +154,12 @@ if(BUILD_KERNEL)
         emul_engineering/test_emul.cpp
         ${EMUL_SOURCES}
         ${VMM_SOURCES}
+        geometric_engine.cpp
+        shard_manager.cpp
+        resonance_observer.cpp
     )
     target_include_directories(test_emul PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/vmm
         ${CMAKE_CURRENT_SOURCE_DIR}/emul_engineering
     )
