@@ -4,6 +4,7 @@ import threading
 import time
 import json
 import subprocess
+import uuid
 # pywebview is only needed for the GRAPHICAL desktop window. A headless server
 # (SYNTHESUS_HEADLESS=1) may not have a GTK/WebKit backend at all, so import it
 # lazily/optionally — the module must still load and serve the UI in headless mode.
@@ -100,6 +101,49 @@ def serve_static(path):
 
 SYNTHESUS_RUNTIME_URL = os.environ.get("SYNTHESUS_RUNTIME_URL", "http://127.0.0.1:5010")
 
+# Pending chat answers keyed by answer_id — used so 👍 confirm can stage + upgrade
+# a specific assistant message. Server-side only; not exposed as a dump endpoint.
+_pending_chat_answers: dict = {}
+
+
+def _runtime_api_headers(*, include_human_session: bool = False) -> dict:
+    """Headers for runtime calls. Human session secret is NEVER sent to the browser."""
+    headers = {
+        "X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me"),
+        "Content-Type": "application/json",
+    }
+    if include_human_session:
+        secret = os.environ.get("SYNTHESUS_HUMAN_SESSION_SECRET", "").strip()
+        if secret:
+            # Injected only on the shell→runtime hop. Frontend never sees this value.
+            headers["X-Synthesus-Human-Session"] = secret
+    return headers
+
+
+def _human_identity_from_request():
+    """Resolve the logged-in user's real identity via accounts.py (JWT).
+
+    Prefer Authorization: Bearer <token>; fall back to X-Synthesus-Token.
+    Returns email string or None. Never invents a human from API-key alone.
+    """
+    token = None
+    auth = request.headers.get("Authorization") or ""
+    if auth.lower().startswith("bearer "):
+        token = auth.split(" ", 1)[1].strip()
+    if not token:
+        token = (request.headers.get("X-Synthesus-Token") or "").strip() or None
+    if not token:
+        body = request.get_json(silent=True) or {}
+        token = (body.get("token") or "").strip() or None
+    if not token:
+        return None
+    payload = accounts.verify_token(token)
+    if not payload:
+        return None
+    email = (payload.get("email") or "").strip()
+    return email or None
+
+
 @app.route('/api/system/status', methods=['GET'])
 def get_status():
     status_data = {
@@ -145,28 +189,250 @@ def health_proxy():
 
 @app.route('/api/chat', methods=['POST'])
 def chat_with_llm():
-    data = request.json
+    data = request.json or {}
     user_message = data.get('message', '')
+
+    # Every assistant reply gets a stable answer_id so 👍 can bind human
+    # attestation + feedback to that exact message (subject_key / answer_id).
+    answer_id = "ans-" + uuid.uuid4().hex[:16]
 
     # 1) Preferred path: the full CHAL runtime.
     try:
         r = requests.post(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/query",
             json={"query": user_message, "mode": "chal", "character": "synthesus"},
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers=_runtime_api_headers(),
             timeout=90,
         )
         r.raise_for_status()
         payload = r.json()
         text = (payload.get("response") or payload.get("text") or "").strip()
         if text:
-            return jsonify({"response": text, "source": "chal_runtime"})
+            _pending_chat_answers[answer_id] = {
+                "query": user_message,
+                "response": text,
+                "source": "chal_runtime",
+                "created_ts": time.time(),
+            }
+            return jsonify({
+                "response": text,
+                "source": "chal_runtime",
+                "answer_id": answer_id,
+                "sources": payload.get("sources"),
+            })
         raise ValueError("empty runtime response")
     except Exception as e:
         # 2) Loud DEGRADED fallback — direct kernel (Ollama) path. Logged, not faked.
         print(f"[chat] CHAL runtime unavailable ({e}); DEGRADED -> direct kernel path")
         response = kernel_ipc.send_intent_to_kernel(user_message)
-        return jsonify({"response": response, "source": "degraded_direct"})
+        _pending_chat_answers[answer_id] = {
+            "query": user_message,
+            "response": response,
+            "source": "degraded_direct",
+            "created_ts": time.time(),
+        }
+        return jsonify({
+            "response": response,
+            "source": "degraded_direct",
+            "answer_id": answer_id,
+            "degraded": True,
+            "reason": f"chal_runtime_unavailable: {e}",
+        })
+
+
+# ===================================================================
+# HUMAN ATTESTATION + FEEDBACK (Mc upgrade — anti-collapse boundary)
+# ===================================================================
+# The browser NEVER holds SYNTHESUS_HUMAN_SESSION_SECRET. The shell injects
+# X-Synthesus-Human-Session from its own environment when minting tokens.
+# confirmed_by is the logged-in account email from accounts.py (JWT), not a
+# client-supplied self-label.
+# ===================================================================
+
+@app.route('/api/human/attestation', methods=['POST'])
+def human_attestation_proxy():
+    """Mint a single-use human attestation for feedback→VERIFIED upgrades.
+
+    Frontend calls this shell route only. The shell injects the human-session
+    secret server-side and forwards to runtime POST /api/v1/human/attestation.
+    """
+    data = request.get_json(silent=True) or {}
+    human_id = _human_identity_from_request()
+    if not human_id:
+        # Allow explicit human_id only when it matches a verified session; otherwise
+        # require login. Client-supplied identity without JWT is refused.
+        return jsonify({
+            "issued": False,
+            "reason": "login_required",
+            "message": "Log in so confirmed_by is a real accounts.py identity.",
+            "status": "DEGRADED",
+        }), 401
+
+    secret = os.environ.get("SYNTHESUS_HUMAN_SESSION_SECRET", "").strip()
+    if not secret:
+        print("[attestation] DEGRADED: SYNTHESUS_HUMAN_SESSION_SECRET not set in shell env")
+        return jsonify({
+            "issued": False,
+            "reason": "human_session_secret_unconfigured",
+            "message": "Shell is missing SYNTHESUS_HUMAN_SESSION_SECRET (server-side only).",
+            "status": "DEGRADED",
+        }), 503
+
+    channel = (data.get("channel") or "human_desktop_ui").strip() or "human_desktop_ui"
+    subject_key = data.get("subject_key") or data.get("answer_id") or data.get("memory_id")
+    body = {
+        "human_id": human_id,
+        "channel": channel,
+        "subject_key": subject_key,
+    }
+    try:
+        r = requests.post(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/human/attestation",
+            json=body,
+            headers=_runtime_api_headers(include_human_session=True),
+            timeout=15,
+        )
+        # Pass runtime status/body through — never fake a successful mint.
+        return (r.text, r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        print(f"[attestation] runtime unavailable ({e})")
+        return jsonify({
+            "issued": False,
+            "reason": "runtime_unavailable",
+            "message": f"runtime unavailable: {e}",
+            "status": "DEGRADED",
+        }), 503
+
+
+def _stage_chat_draft_as_llm_generation(answer_id: str, query: str, response: str) -> dict:
+    """Stage the assistant answer into the runtime RAG so feedback can upgrade it.
+
+    The frozen runtime admin/patterns normalizer does not pass provenance through,
+    so we stage with a distinctive source/id in the pattern text and then rely on
+    feedback matching by answer_id/response. We also best-effort POST a pattern
+    whose response text matches for upgrade_from_feedback's content match.
+
+    Returns a small status dict (never silently fakes success).
+    """
+    pattern_text = f"[chat_draft:{answer_id}] {query or response[:120]}"
+    payload = {
+        "patterns": [
+            {
+                "pattern": pattern_text,
+                "response": response,
+                "source": f"chat_draft:{answer_id}",
+                "domain": "chat_draft",
+                # id is used when the runtime preserves extra fields; response match is backup
+                "id": answer_id,
+                "answer_id": answer_id,
+                "provenance": "llm_generation",
+                "verification": 0,
+            }
+        ]
+    }
+    try:
+        r = requests.post(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/admin/patterns",
+            json=payload,
+            headers=_runtime_api_headers(),
+            timeout=60,
+        )
+        return {
+            "staged": r.status_code < 400,
+            "status_code": r.status_code,
+            "body": r.json() if r.headers.get("content-type", "").startswith("application/json") else r.text[:300],
+        }
+    except Exception as e:
+        print(f"[feedback] stage draft failed ({e})")
+        return {"staged": False, "error": str(e)}
+
+
+@app.route('/api/feedback', methods=['POST'])
+def feedback_proxy():
+    """Human confirm/correction feedback → runtime Mc upgrade path.
+
+    Requires a prior mint via /api/human/attestation. The shell:
+      1) resolves confirmed_by from the logged-in accounts.py identity
+      2) stages the chat draft into the runtime index (so upgrade can find it)
+      3) forwards feedback with actor_kind/channel/human_attestation to runtime
+    """
+    data = request.get_json(silent=True) or {}
+    human_id = _human_identity_from_request()
+    if not human_id:
+        return jsonify({
+            "status": "error",
+            "message": "Login required — confirmed_by must be a real accounts.py identity.",
+            "verification_upgrade": {"upgraded": False, "reason": "login_required"},
+        }), 401
+
+    answer_id = data.get("answer_id") or data.get("memory_id") or data.get("subject_key")
+    pending = _pending_chat_answers.get(answer_id) if answer_id else None
+    query = data.get("query") or (pending or {}).get("query") or ""
+    response_text = data.get("response") or (pending or {}).get("response") or ""
+    human_attestation = data.get("human_attestation") or data.get("attestation")
+    action = (data.get("action") or "confirm").strip().lower() or "confirm"
+    channel = (data.get("channel") or "human_desktop_ui").strip() or "human_desktop_ui"
+    rating = data.get("rating")
+    if rating is None:
+        rating = 5 if action in {"confirm", "confirmed", "thumbs_up", "accept"} else 3
+
+    if not human_attestation:
+        return jsonify({
+            "status": "error",
+            "message": "human_attestation required — mint via POST /api/human/attestation first.",
+            "verification_upgrade": {"upgraded": False, "reason": "missing_human_attestation"},
+        }), 400
+
+    # Stage draft so runtime feedback has an item to upgrade (match by response / id).
+    stage_info = None
+    if answer_id and response_text:
+        stage_info = _stage_chat_draft_as_llm_generation(answer_id, query, response_text)
+
+    # Force human proof fields from server-side identity — client cannot spoof
+    # confirmed_by to someone else's account when a valid session is present.
+    body = {
+        "session_id": data.get("session_id") or human_id,
+        "query": query or "(chat confirm)",
+        "response": response_text or "(empty)",
+        "rating": int(rating),
+        "comments": data.get("comments"),
+        "action": action,
+        "actor_kind": "human",
+        "channel": channel,
+        "confirmed_by": human_id,
+        "human_attestation": human_attestation,
+        "memory_id": answer_id,
+        "answer_id": answer_id,
+    }
+    if data.get("corrected_text"):
+        body["action"] = "correct"
+        # Runtime reads CORRECT: prefix on comments for correction text
+        body["comments"] = f"CORRECT: {data.get('corrected_text')}"
+
+    try:
+        r = requests.post(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/feedback",
+            json=body,
+            headers=_runtime_api_headers(),
+            timeout=30,
+        )
+        try:
+            payload = r.json()
+        except Exception:
+            payload = {"status": "error", "message": r.text[:500]}
+        if isinstance(payload, dict) and stage_info is not None:
+            payload["draft_stage"] = stage_info
+        return (json.dumps(payload), r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        print(f"[feedback] runtime unavailable ({e})")
+        return jsonify({
+            "status": "error",
+            "message": f"runtime unavailable: {e}",
+            "verification_upgrade": {"upgraded": False, "reason": "runtime_unavailable"},
+            "draft_stage": stage_info,
+            "status_flag": "DEGRADED",
+        }), 503
+
 
 # ===================================================================
 # AGNOSTIC EXPANSION DRIVE — ground Synthesus on the user's own sources
