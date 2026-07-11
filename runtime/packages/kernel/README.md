@@ -1,25 +1,37 @@
-# vendor/
+# Synthesus C++ Kernel
 
-This directory holds the SQLite3 amalgamation needed to compile the ZO C++ kernel.
+## Two artifacts, two roles (do not confuse them)
 
-## Required files
+| Artifact | How built | Used by runtime? | Role |
+|----------|-----------|------------------|------|
+| **`build/zo_kernel`** (cmake target `synthesus_kernel`, OUTPUT_NAME `zo_kernel`) | `cmake` + `make` | **YES — primary** | stdin/stdout **IPC** process for left-hemisphere routing |
+| **`build/_synthesus_kernel*.so`** | same cmake with `-DBUILD_PYBIND=ON` | Optional / experimental | pybind exports `EmulEngine`, `GeometricEngine`, `GeometricOptics`, … |
 
-- `sqlite3.c` — SQLite3 amalgamation source
-- `sqlite3.h` — SQLite3 header
+### IPC is the production path
 
-## Download (handled automatically by build.sh)
+`HemisphereBridge` + `kernel/bridge.py` launch the **executable** and exchange JSON lines:
+
+- Request (plain text) or `{"query":"...","rag_context":"..."}`
+- Response: `{"response":"...","confidence":0.7,"module_used":"ppbrs","found":true,...}`
+
+If the binary is missing, the bridge **degrades to pure Python** (loud log, no crash).
+
+### Why not “native” pybind for the left hemisphere?
+
+`bridge.py` `_init_native` expects `ThreadPool` / `MessageBus` / `ContextMemory` / `PPBRSRouter` / `Watchdog`.  
+The current pybind module exports **EmulEngine / geometric** types instead — an API mismatch.  
+Do **not** force NATIVE mode until those symbols match. Prefer **IPC**.
+
+### Build
 
 ```bash
-wget https://www.sqlite.org/2024/sqlite-amalgamation-3450300.zip
-unzip sqlite-amalgamation-3450300.zip
-cp sqlite-amalgamation-3450300/sqlite3.c vendor/
-cp sqlite-amalgamation-3450300/sqlite3.h vendor/
+cd runtime/packages/kernel
+mkdir -p build && cd build
+CXXFLAGS="-march=native" cmake .. \
+  -DPython3_EXECUTABLE=$HOME/synthesus/.venv/bin/python \
+  -DBUILD_PYBIND=ON
+make -j4
+# artifacts: ./zo_kernel  and  ./_synthesus_kernel*.so
 ```
 
-Or simply run:
-
-```bash
-bash build.sh --rebuild
-```
-
-The build script auto-downloads sqlite3 if missing.
+Optional env: `SYNTHESUS_KERNEL_BIN=/absolute/path/to/zo_kernel`

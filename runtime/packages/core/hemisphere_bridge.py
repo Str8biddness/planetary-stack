@@ -7,12 +7,14 @@ import asyncio
 import inspect
 import json
 import logging
+import os
 import re
 import select
 import subprocess
 import time
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 from bridge import BridgeMode as KernelBridgeMode
@@ -25,6 +27,29 @@ except ModuleNotFoundError:  # pragma: no cover - repo-root compatibility path
     from packages.reasoning.chal import build_ppbrs_firmware_signal
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_default_kernel_bin() -> str:
+    """Locate built IPC binary (cmake OUTPUT_NAME zo_kernel). Fallbacks if absent."""
+    env = os.environ.get("SYNTHESUS_KERNEL_BIN", "").strip()
+    if env and Path(env).is_file() and os.access(env, os.X_OK):
+        return env
+    here = Path(__file__).resolve().parent
+    candidates = [
+        here.parent / "kernel" / "build" / "zo_kernel",
+        here.parent / "kernel" / "build" / "synthesus_kernel",
+        Path("build/zo_kernel"),
+        Path("./build/zo_kernel"),
+        Path("./build/synthesus_kernel"),
+    ]
+    for p in candidates:
+        try:
+            if p.is_file() and os.access(str(p), os.X_OK):
+                return str(p.resolve())
+        except OSError:
+            continue
+    # Default path for error messages; _start_kernel degrades loudly if missing.
+    return str((here.parent / "kernel" / "build" / "zo_kernel"))
 
 
 class HemisphereMode(Enum):
@@ -82,7 +107,7 @@ class HemisphereBridge:
 
     def __init__(
         self,
-        kernel_bin: str = "./build/zo_kernel",
+        kernel_bin: Optional[str] = None,
         kernel_timeout: float = 2.0,
         agreement_threshold: float = 0.65,
         left_config: Optional[Dict[str, Any]] = None,
@@ -93,7 +118,9 @@ class HemisphereBridge:
         """Initializes the HemisphereBridge.
 
         Args:
-            kernel_bin: Path to the C++ kernel binary. Defaults to "./build/zo_kernel".
+            kernel_bin: Path to the C++ kernel binary (IPC). Defaults to built
+                runtime/packages/kernel/build/zo_kernel when present; otherwise
+                degrades to Python fallback.
             kernel_timeout: Timeout for kernel queries in seconds. Defaults to 2.0.
             agreement_threshold: Threshold for hemisphere agreement. Defaults to 0.65.
             left_config: Configuration for the left hemisphere. Defaults to None.
@@ -101,7 +128,7 @@ class HemisphereBridge:
             right_handler: Optional handler instance for the right hemisphere. Defaults to None.
             shared_state: Optional shared state dictionary. Defaults to None.
         """
-        self.kernel_bin = kernel_bin
+        self.kernel_bin = kernel_bin or _resolve_default_kernel_bin()
         self.kernel_timeout = kernel_timeout
         self.agreement_threshold = agreement_threshold
         self.left_config = left_config or {}
@@ -119,13 +146,14 @@ class HemisphereBridge:
         self._social_fabric = SocialFabric() # Singleton access
         
         self._kernel_proc: Optional[subprocess.Popen] = None
-        self._python_bridge = KernelBridge(force_mode=KernelBridgeMode.FALLBACK)
+        # Prefer IPC when binary exists; KernelBridge degrades to FALLBACK loudly if not.
+        # (Does not force NATIVE pybind — EmulEngine export mismatches ThreadPool API.)
+        self._python_bridge = KernelBridge(kernel_path=self.kernel_bin)
         self._generation_spine = GenerationSpine(
             models_dir=str(self.right_config.get("models_dir", "data/models"))
         )
         self._apply_left_routes()
         self._start_kernel()
-
     def _ensure_left_firmware_signal(
         self,
         result: Dict[str, Any],

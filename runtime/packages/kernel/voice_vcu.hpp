@@ -4,6 +4,7 @@
 #include "geometric_engine.hpp"
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace zo {
 

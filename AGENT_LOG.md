@@ -130,3 +130,85 @@ via `upgrade_from_feedback`, which sets `USER_CONFIRMED`.
 python -m pytest tests/test_memory_provenance.py tests/test_chal_memory_policy.py tests/test_chal_api_memory_writeback.py -q
 ```
 All green at handoff (35 passed when API deps present; 2 skipped without fastapi).
+
+## 2026-07-11 — Multi-phase autonomous finish (native-kernel / polish / module-audit)
+
+### Phase 1 feat/native-kernel — DONE
+- Compile fixes: resonance_observer includes, geometric_optics pybind, GeometricEngine shared_ptr, voice_vcu memory, test_emul link.
+- IPC: main.cpp JSON query parse + dual keys; bridge.py IPC payload; hemisphere_bridge resolves `kernel/build/zo_kernel`, KernelBridge auto-IPC.
+- Proof: `make` builds `zo_kernel` + `_synthesus_kernel*.so`; stdin IPC JSON response; log `KernelBridge initialized in ipc mode`; left query `source=cpp_kernel`.
+
+### Phase 2 feat/polish — DONE
+- `scikit-learn==1.8.0` pin in runtime/requirements.txt; retrieve without InconsistentVersionWarning.
+- llm_device DEFAULT_SYSTEM_PROMPT VERBATIM codes; live Ollama answered `ZXQ-7741-BETA`.
+- production_server startup RAG embedder warm-up; cold ingest 4.66s vs after-warm ~0s.
+
+### Phase 3 feat/module-audit — DONE
+- CAPABILITY_LEDGER.md: REAL/STUB/BROKEN with import evidence.
+- Fixed: core/memory/__init__.py garbage, unpc_engine/__init__.py syntax, production_server loot/dialogue imports use real core modules not ml stubs.
+- Honest stubs left as STUB (core/ml pass classes).
+
+Do NOT merge — Claude reviews.
+
+## 2026-07-11 — feat/launch-smoke (final pre-QC pass)
+
+Merged into this branch: native-kernel, polish, module-audit.
+
+Additional launch polish:
+- production_server: HemisphereBridge() uses package kernel path resolver (not PROJ_ROOT/zo_kernel)
+- install.sh: SYNTHESUS_HUMAN_SESSION_SECRET + scikit-learn==1.8.0 pin in pip critical list
+- core/ml/*: re-export real reasoning/core modules (no pass stubs)
+- tools/redeploy_install.sh: safe rsync preserve env/venv/data
+- tools/launch_smoke.sh: real HTTP/kernel/sklearn checks
+- LAUNCH_CHECKLIST.md + kernel/README.md (IPC vs pybind honesty)
+
+Proof: ml re-exports → reasoning/core real files; zo_kernel IPC ok;
+redeploy generates human secret; smoke pass=4 offline (health fail until runtime up).
+
+## 2026-07-11 — feat/launch-smoke (finish-rest pass, no CNC/swarm)
+
+### Mission
+Knock out remaining pre-QC launch gaps. Explicitly **did not** start CNC/G-code or new swarm product features.
+
+### What changed
+- Fixed `core/ml/dialogue_ranker.py` + `core/ml/loot_balancer.py` re-exports (were `from dialogue_ranker` without package path → ModuleNotFoundError outside install PYTHONPATH). Now try `core.*` then relative `..*`.
+- `production_server.py` prefers `from core.loot_balancer` / `core.dialogue_ranker` first.
+- `CAPABILITY_LEDGER.md` updated: `core/ml/*` documented as RE-EXPORT of real targets, not pass stubs.
+- Live runtime proof + full `tools/launch_smoke.sh`.
+
+### Verified (pasted real)
+```
+pytest tests/test_memory_provenance.py tests/test_chal_memory_policy.py -q
+→ 38 passed
+
+./tools/launch_smoke.sh  (runtime up, API_KEY=dev-key-change-me)
+  PASS  health HTTP 200 (ml_models_loaded loot=true dialogue=true)
+  PASS  query HTTP 200 body=... source=cognitive_hypervisor ...
+  PASS  feedback without human proof did not crystallize (HTTP 200)
+  PASS  image HTTP 200 (bytes=7527)
+  PASS  sklearn embedder (1.8.0 ok)
+  PASS  zo_kernel IPC
+  PASS  VERBATIM in llm_device
+  PASS  install.sh human session secret
+=== summary: pass=8 fail=0 skip=0 ===
+
+Server log: KernelBridge initialized in ipc mode
+  Hemisphere Bridge ready (kernel_bin=.../kernel/build/zo_kernel, KernelBridge mode=ipc)
+```
+
+### Already complete on branch (no further code)
+- LM Studio local free / Pro gate cloud-only (`LOCAL_BACKENDS = ("ollama", "lmstudio")`)
+- GPU autodetect in install.sh + tools/enable_gpu.sh (on main lineage)
+- SYNTHESUS_FAST_MODE already in hypervisor on this branch
+- Attestation UI, settings/tiers, voice backends already ancestors of launch-smoke
+
+### Left off / do NOT
+- Do **not** merge to main — Claude reviews `feat/launch-smoke`
+- CNC/G-code: not started (user forbid)
+- New swarm features: not started
+- Remote Mint redeploy: still needs working SSH when user wants it
+
+### Recommended next
+1. Claude review + merge `feat/launch-smoke`
+2. Redeploy install dir with `tools/redeploy_install.sh` on the box that ships
+3. Optional: re-run smoke after redeploy with production API key

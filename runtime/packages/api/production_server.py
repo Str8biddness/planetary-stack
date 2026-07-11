@@ -320,8 +320,21 @@ try:
     from reasoning.sentiment_analyzer import SentimentAnalyzer # type: ignore
     from reasoning.emotion_detector import EmotionDetector # type: ignore
     from reasoning.behavior_predictor import BehaviorPredictor # type: ignore
-    from ml.loot_balancer import LootBalancer # type: ignore
-    from ml.dialogue_ranker import DialogueRanker # type: ignore
+    # Prefer real core/* implementations; core/ml/* re-exports those same classes.
+    try:
+        from core.loot_balancer import LootBalancer  # type: ignore
+    except ImportError:
+        try:
+            from loot_balancer import LootBalancer  # type: ignore
+        except ImportError:
+            from ml.loot_balancer import LootBalancer  # type: ignore
+    try:
+        from core.dialogue_ranker import DialogueRanker  # type: ignore
+    except ImportError:
+        try:
+            from dialogue_ranker import DialogueRanker  # type: ignore
+        except ImportError:
+            from ml.dialogue_ranker import DialogueRanker  # type: ignore
     HAS_ML_SWARM = True
 except (ImportError, Exception) as e:
     logger.warning(f"ML Swarm not available: {e}")
@@ -666,7 +679,9 @@ def _get_cognitive_hypervisor() -> Optional[Any]:
                 return _hemisphere_bridge
             if HemisphereBridge is None:
                 raise RuntimeError("HemisphereBridge is unavailable for hypervisor dispatch")
-            return cast(Any, HemisphereBridge)(kernel_bin=str(PROJ_ROOT / "zo_kernel"))
+            # Prefer built IPC binary; HemisphereBridge resolves package build path
+            # and degrades to Python if absent (never force a missing PROJ_ROOT/zo_kernel).
+            return cast(Any, HemisphereBridge)()
 
         _cognitive_hypervisor = cast(Any, CognitiveHypervisor)(bridge_factory=_bridge_factory)
     return _cognitive_hypervisor
@@ -900,10 +915,51 @@ async def startup():
                 score_threshold=float(os.environ.get("SYNTHESUS_RAG_THRESHOLD", "0.32")),
             )
             logger.info(f"RAG loaded: {_rag.total_vectors} vectors")
+            # Pre-warm embedder so the first /drive/ingest does not pay ~100s cold load.
+            try:
+                t0_warm = time.time()
+                logger.info("Warming RAG embedder (one-time cold load)...")
+                if getattr(_rag, "_embedder", None) is not None:
+                    _ = _rag._embed(["synthesus embedder warm-up probe"])
+                    logger.info(
+                        "RAG embedder warm-up complete in %.1fs (first ingest will not re-pay cold load)",
+                        time.time() - t0_warm,
+                    )
+                else:
+                    logger.warning("RAG embedder missing after load — warm-up skipped (DEGRADED)")
+            except Exception as warm_exc:
+                logger.warning("RAG embedder warm-up failed (DEGRADED): %s", warm_exc)
         except Exception as e:
             logger.warning(f"RAG failed to load: {e}")
     else:
-        logger.warning("No FAISS index found — RAG disabled")
+        logger.warning("No FAISS index found — RAG disabled (will init on first ingest if needed)")
+        # Still attempt a lightweight embedder warm-up path when pipeline can construct empty.
+        if RAGPipeline and os.environ.get("SYNTHESUS_RAG_WARM_EMPTY", "1") not in {"0", "false", "off"}:
+            try:
+                t0_warm = time.time()
+                logger.info("No user index yet — pre-warming embedder via empty RAGPipeline...")
+                rag_class = cast(Any, RAGPipeline)
+                warm_rag = cast(Any, rag_class)(
+                    index_path=str(index_path),
+                    metadata_path=str(meta_path),
+                    top_k=5,
+                    score_threshold=float(os.environ.get("SYNTHESUS_RAG_THRESHOLD", "0.32")),
+                    batch_sleep_s=0.0,
+                )
+                # Fit-or-load then probe so subsequent ingest skips cold model load.
+                if getattr(warm_rag, "_embedder", None) is not None:
+                    if not getattr(warm_rag._embedder, "is_fitted", False):
+                        warm_rag._embedder.fit(
+                            ["synthesus warm-up corpus alpha", "synthesus warm-up corpus beta"]
+                        )
+                    _ = warm_rag._embed(["synthesus embedder warm-up probe"])
+                    _rag = warm_rag
+                    logger.info(
+                        "Empty-index embedder warm-up complete in %.1fs",
+                        time.time() - t0_warm,
+                    )
+            except Exception as warm_exc:
+                logger.warning("Empty-index RAG warm-up failed (DEGRADED): %s", warm_exc)
 
     # ── Initialize Default Synthesus Master ──
     if HAS_SYNTHESUS_MASTER and SynthesusMaster:
@@ -913,8 +969,14 @@ async def startup():
     if HAS_HEMISPHERE_BRIDGE:
         logger.info("Initializing Hemisphere Bridge (C++ Kernel)...")
         try:
-            _hemisphere_bridge = cast(Any, HemisphereBridge)(kernel_bin=str(PROJ_ROOT / "zo_kernel"))
-            logger.info("Hemisphere Bridge ready.")
+            _hemisphere_bridge = cast(Any, HemisphereBridge)()
+            _kb = getattr(_hemisphere_bridge, "_python_bridge", None)
+            _mode = getattr(getattr(_kb, "mode", None), "value", "n/a")
+            logger.info(
+                "Hemisphere Bridge ready (kernel_bin=%s, KernelBridge mode=%s).",
+                getattr(_hemisphere_bridge, "kernel_bin", "?"),
+                _mode,
+            )
         except Exception as e:
             logger.warning(f"HemisphereBridge failed to initialize: {e}")
             _hemisphere_bridge = None
