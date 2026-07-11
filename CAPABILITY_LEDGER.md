@@ -22,7 +22,7 @@
 
 | Package | Verdict | Notes |
 |---------|---------|-------|
-| `core/` | **REAL** (with STUB islands) | CHAL hypervisor, hemisphere bridge, conscious state real; `core/ml/*` stubs |
+| `core/` | **REAL** | CHAL hypervisor, hemisphere bridge, conscious state real; `core/ml/*` are re-exports of reasoning/core implementations |
 | `reasoning/` | **REAL** | Intent/sentiment/emotion/behavior, image_service, chal firmware |
 | `knowledge/` | **REAL** | RAG, provenance, feedback verification, cloud_sync, drive |
 | `api/` | **REAL** | production_server, security_router (Dict/Any fixed on main) |
@@ -45,8 +45,12 @@ OK  core.chal.hypervisor                          REAL
 OK  core.chal.quad_brain                          REAL
 OK  core.chal.memory_writeback                    REAL
 OK  core.chal.devices.llm_device                  REAL
-OK  core.ml.intent_classifier                     import OK but SOURCE STUB (class pass)
-OK  core.ml.sentiment_analyzer                    import OK but SOURCE STUB (class pass)
+OK  core.ml.intent_classifier                     RE-EXPORT → reasoning.intent_classifier
+OK  core.ml.sentiment_analyzer                    RE-EXPORT → reasoning.sentiment_analyzer
+OK  core.ml.emotion_detector                      RE-EXPORT → reasoning.emotion_detector
+OK  core.ml.behavior_predictor                    RE-EXPORT → reasoning.behavior_predictor
+OK  core.ml.dialogue_ranker                       RE-EXPORT → core.dialogue_ranker
+OK  core.ml.loot_balancer                         RE-EXPORT → core.loot_balancer
 OK  reasoning.intent_classifier                   REAL  (production path)
 OK  reasoning.sentiment_analyzer                  REAL  (production path)
 OK  reasoning.emotion_detector                    REAL
@@ -67,29 +71,24 @@ OK  swarm.envelope_firecracker                    REAL (raises BLOCKED on local)
 OK  aivm                                          REAL (package init)
 ```
 
-**Source scan (class `pass` stubs):**
+**Source scan (remaining true stubs):**
 
 ```
-STUB class_pass_only  runtime/packages/core/ml/intent_classifier.py
-STUB class_pass_only  runtime/packages/core/ml/sentiment_analyzer.py
-STUB class_pass_only  runtime/packages/core/ml/emotion_detector.py
-STUB class_pass_only  runtime/packages/core/ml/behavior_predictor.py
-STUB class_pass_only  runtime/packages/core/ml/dialogue_ranker.py
-STUB class_pass_only  runtime/packages/core/ml/loot_balancer.py
-STUB class_pass_only  runtime/packages/core/ml/pattern_lm.py
 STUB class_pass_only  runtime/packages/aivm/devices/base.py
+# core/ml/* are no longer pass stubs — they re-export real implementations
+# (feat/launch-smoke). Import of DialogueRanker/LootBalancer via core.ml works.
 ```
 
-**Known shadowing (documented):**
+**Known re-export map (documented):**
 
-| Shadow path | Real path | Used by production_server? |
-|-------------|-----------|----------------------------|
-| `core/ml/intent_classifier.py` (`class IntentClassifier: pass`) | `reasoning/intent_classifier.py` | **reasoning** ✓ |
-| `core/ml/sentiment_analyzer.py` (pass) | `reasoning/sentiment_analyzer.py` | **reasoning** ✓ |
-| `core/ml/emotion_detector.py` (pass) | `reasoning/emotion_detector.py` | **reasoning** ✓ |
-| `core/ml/behavior_predictor.py` (pass) | `reasoning/behavior_predictor.py` | **reasoning** ✓ |
-| `core/ml/loot_balancer.py` (pass) | `core/loot_balancer.py` (REAL, 150 lines) | was wrongly importing `ml.*` — **fixed on this branch** |
-| `core/ml/dialogue_ranker.py` (pass) | `core/dialogue_ranker.py` (REAL, 209 lines) | was wrongly importing `ml.*` — **fixed on this branch** |
+| Re-export path | Real path | Used by production_server? |
+|----------------|-----------|----------------------------|
+| `core/ml/intent_classifier.py` | `reasoning/intent_classifier.py` | **reasoning** ✓ (direct) |
+| `core/ml/sentiment_analyzer.py` | `reasoning/sentiment_analyzer.py` | **reasoning** ✓ |
+| `core/ml/emotion_detector.py` | `reasoning/emotion_detector.py` | **reasoning** ✓ |
+| `core/ml/behavior_predictor.py` | `reasoning/behavior_predictor.py` | **reasoning** ✓ |
+| `core/ml/loot_balancer.py` | `core/loot_balancer.py` (REAL) | **core.** first, then re-export |
+| `core/ml/dialogue_ranker.py` | `core/dialogue_ranker.py` (REAL) | **core.** first, then re-export |
 
 ---
 
@@ -116,7 +115,7 @@ assert not (inspect.getsource(LootBalancer).strip().endswith('pass'))
 
 | Item | Status | Reason |
 |------|--------|--------|
-| `core/ml/*` pass stubs | **STUB** | Intentionally empty stand-ins; real logic lives under `reasoning/` or `core/*.py`. Do not fill with fake bodies. |
+| `core/ml/*` | **RE-EXPORT (REAL targets)** | Thin re-exports to `reasoning/*` or `core/*.py`. Not pass stubs anymore on `feat/launch-smoke`. |
 | `aivm/devices/*` skeleton | **STUB/partial** | `devices/base.py` is pass-only; full device isolation not production-wired here. |
 | `swarm` Firecracker local | **BLOCKED by design** | `FirecrackerLocalBlockedError` on single-GPU local (HOSTED-only). |
 | Kernel pybind vs IPC API | **Documented mismatch** | pybind exports EmulEngine/Geometric*; IPC `zo_kernel` is the runtime path. Fixed/wired on `feat/native-kernel`. |

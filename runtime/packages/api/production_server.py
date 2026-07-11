@@ -320,15 +320,21 @@ try:
     from reasoning.sentiment_analyzer import SentimentAnalyzer # type: ignore
     from reasoning.emotion_detector import EmotionDetector # type: ignore
     from reasoning.behavior_predictor import BehaviorPredictor # type: ignore
-    # Prefer real core/* implementations; core/ml/* are pass-only stubs (shadowed).
+    # Prefer real core/* implementations; core/ml/* re-exports those same classes.
     try:
-        from loot_balancer import LootBalancer  # type: ignore
+        from core.loot_balancer import LootBalancer  # type: ignore
     except ImportError:
-        from ml.loot_balancer import LootBalancer  # type: ignore
+        try:
+            from loot_balancer import LootBalancer  # type: ignore
+        except ImportError:
+            from ml.loot_balancer import LootBalancer  # type: ignore
     try:
-        from dialogue_ranker import DialogueRanker  # type: ignore
+        from core.dialogue_ranker import DialogueRanker  # type: ignore
     except ImportError:
-        from ml.dialogue_ranker import DialogueRanker  # type: ignore
+        try:
+            from dialogue_ranker import DialogueRanker  # type: ignore
+        except ImportError:
+            from ml.dialogue_ranker import DialogueRanker  # type: ignore
     HAS_ML_SWARM = True
 except (ImportError, Exception) as e:
     logger.warning(f"ML Swarm not available: {e}")

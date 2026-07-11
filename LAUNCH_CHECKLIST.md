@@ -18,12 +18,15 @@ export SYNTHESUS_API_KEY=…   # from synthesus.env
 ./tools/launch_smoke.sh
 ```
 
-- [ ] health 200  
-- [ ] query returns real text  
-- [ ] feedback without human proof does **not** upgrade  
-- [ ] image endpoint (if enabled) returns image/JSON  
-- [ ] sklearn embedder clean  
-- [ ] `zo_kernel` IPC if binary present  
+**2026-07-11 live proof (dev box, runtime up):** `pass=8 fail=0 skip=0`
+
+- [x] health 200  
+- [x] query returns real text (`source=cognitive_hypervisor`)  
+- [x] feedback without human proof does **not** upgrade  
+- [x] image endpoint returns image (`bytes=7527`)  
+- [x] sklearn embedder clean (`1.8.0 ok`)  
+- [x] `zo_kernel` IPC if binary present  
+- [x] VERBATIM + install human session secret checks
 
 ## C. Manual product checks
 
