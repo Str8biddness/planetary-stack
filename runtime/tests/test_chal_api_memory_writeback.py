@@ -65,7 +65,11 @@ def test_chal_api_writeback_accepts_final_hypervisor_trace(monkeypatch):
     assert payload["stored_memory_id"] == "mem-1"
     assert store.records[0]["content"].startswith("User: Explain CHAL cache tiers")
     assert store.records[0]["metadata"]["trace_id"] == "api-hv-1"
-    assert store.records[0]["metadata"]["provenance"][0]["ref"] == "/mnt/rom/world_lore"
+    # C-001: provenance is the enum string; source path is in provenance_refs
+    assert store.records[0]["metadata"]["provenance"] == "grounded_cited"
+    assert store.records[0]["metadata"]["verification"] == 1
+    assert "/mnt/rom/world_lore" in store.records[0]["metadata"]["provenance_refs"]
+    assert store.records[0]["metadata"]["chal_provenance"][0]["ref"] == "/mnt/rom/world_lore"
 
 
 def test_chal_api_writeback_rejects_degraded_template_rewritten_trace(monkeypatch):

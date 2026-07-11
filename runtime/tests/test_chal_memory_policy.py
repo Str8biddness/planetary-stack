@@ -151,6 +151,7 @@ def test_writeback_candidate_validates_target_type() -> None:
 
 
 def test_apply_memory_writeback_persists_accepted_episodic_candidate() -> None:
+    """Grounded+cited candidates crystallize as GROUNDED with provenance_refs (C-003)."""
     store = FakeMemoryStore()
     candidate = MemoryWritebackCandidate(
         trace_id="trace-6",
@@ -158,20 +159,66 @@ def test_apply_memory_writeback_persists_accepted_episodic_candidate() -> None:
         content="User confirmed CHAL writeback should preserve provenance.",
         critic_accepted=True,
         provenance=(
-            MemoryProvenanceRef(ref="trace://critic/6", source="critic", trace_id="trace-6", confidence=0.9),
+            MemoryProvenanceRef(
+                ref="/mnt/rom/world_lore",
+                source="rom_mount:world_lore",
+                trace_id="trace-6",
+                confidence=0.9,
+            ),
         ),
         importance=0.65,
     )
+    trace = {
+        "trace_id": "trace-6",
+        "knowledge_provenance": {
+            "context_used": True,
+            "source": "rom_mount:world_lore",
+            "confidence": 0.9,
+            "mounts": [{"mount_path": "/mnt/rom/world_lore"}],
+        },
+    }
 
-    applied = apply_memory_writeback(candidate, memory_store=store, character_id="synth")
+    applied = apply_memory_writeback(
+        candidate, memory_store=store, character_id="synth", trace=trace
+    )
 
     assert applied.decision.accepted is True
     assert applied.stored_memory_id == "mem-1"
     assert store.records[0]["memory_type"] == "episodic"
     assert store.records[0]["metadata"]["schema"] == "synthesus.chal.memory_writeback.v1"
     assert store.records[0]["metadata"]["trace_id"] == "trace-6"
-    assert store.records[0]["metadata"]["provenance"][0]["ref"] == "trace://critic/6"
+    # C-001 fields: provenance is the enum string; CHAL refs live in provenance_refs
+    assert store.records[0]["metadata"]["provenance"] == "grounded_cited"
+    assert store.records[0]["metadata"]["verification"] == 1
+    assert "/mnt/rom/world_lore" in store.records[0]["metadata"]["provenance_refs"]
+    assert store.records[0]["metadata"]["chal_provenance"][0]["ref"] == "/mnt/rom/world_lore"
     assert "chal_writeback" in store.records[0]["tags"]
+
+
+def test_apply_memory_writeback_rejects_ungrounded_llm_generation() -> None:
+    """Anti-collapse: critic-only / trace-self refs must NOT crystallize as facts."""
+    store = FakeMemoryStore()
+    candidate = MemoryWritebackCandidate(
+        trace_id="trace-6b",
+        target_memory_type="episodic",
+        content="Raw model guess without external grounding.",
+        critic_accepted=True,
+        provenance=(
+            MemoryProvenanceRef(
+                ref="trace://critic/6b",
+                source="cognitive_hypervisor_trace",
+                trace_id="trace-6b",
+                confidence=0.9,
+            ),
+        ),
+        importance=0.65,
+    )
+
+    applied = apply_memory_writeback(candidate, memory_store=store, character_id="synth")
+
+    assert applied.decision.accepted is False
+    assert applied.decision.reason == "gate_rejected_llm_generation_or_unverified"
+    assert store.records == []
 
 
 def test_apply_memory_writeback_stages_crystallized_candidate_and_updates_state() -> None:
