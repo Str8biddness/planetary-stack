@@ -7,9 +7,10 @@ slice changes orchestration without rewriting the runtime.
 
 from __future__ import annotations
 
+import os
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from enum import Enum
 from typing import Any, Callable, Mapping
 
@@ -73,6 +74,15 @@ class HypervisorResult:
             "bridge_result": self.bridge_result,
             "telemetry": self.telemetry,
         }
+
+
+def _fast_mode_enabled() -> bool:
+    """SYNTHESUS_FAST_MODE — collapse the candidate/critic fan-out to a single
+    grounded pass. Default ON: a plain query must not trigger the deep multi-brain
+    tree (that is the ~60x LLM-call, ~250s regression). Set SYNTHESUS_FAST_MODE=0
+    to restore full deep reasoning. Routing (grounding, safety) is preserved; only
+    the per-route fan-out knobs are clamped."""
+    return os.getenv("SYNTHESUS_FAST_MODE", "1").strip().lower() not in ("0", "false", "no", "off")
 
 
 BridgeFactory = Callable[[], Any]
@@ -193,6 +203,25 @@ class CognitiveHypervisor:
 
         if max_tokens <= 256:
             active_constraints.append("compact_surface_response")
+
+        # FAST MODE (default) — the launch-critical fix. The deep routes fan a
+        # single query into candidate_count>1 candidates + critic/revision passes
+        # across both hemispheres and the quad-brain, which is the ~60x LLM-call,
+        # ~250s regression. Fast mode clamps that fan-out to one grounded pass:
+        # candidate_count=1, critic_passes=0 (skips the revision render), and a
+        # single hemisphere. Route selection (grounding, safety) is untouched, so
+        # answers stay grounded — they are just realized once instead of 60 times.
+        # Safety path keeps its critic (never trade safety for latency).
+        if _fast_mode_enabled():
+            is_safety = route == HypervisorRoute.SAFETY_PATH
+            budget = replace(
+                budget,
+                candidate_count=1,
+                critic_passes=budget.critic_passes if is_safety else 0,
+            )
+            if not is_safety:
+                hemisphere_mode = "auto"
+            reasons.append("fast_mode")
 
         return HypervisorDecision(
             trace_id=f"hv-{uuid.uuid4().hex[:12]}",
