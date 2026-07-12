@@ -216,7 +216,26 @@ def image_proxy():
         "return_level": data.get("return_level", False),
         "orbit_day": data.get("orbit_day", False),
         "orbit_frames": data.get("orbit_frames", 6),
+        "async_mode": data.get("async_mode", False),
     }
+
+
+@app.route('/api/v1/image/jobs/<job_id>', methods=['GET'])
+def image_job_proxy(job_id):
+    """Poll async SI image job."""
+    try:
+        r = requests.get(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/image/jobs/{job_id}",
+            headers=_runtime_api_headers(),
+            timeout=30,
+        )
+        try:
+            payload = r.json()
+        except Exception:
+            payload = {"ok": False, "error": "bad_runtime_body", "message": (r.text or "")[:400]}
+        return (json.dumps(payload), r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": "runtime_unavailable", "message": str(e)}), 503
 
 
 @app.route('/api/v1/image/level', methods=['POST'])

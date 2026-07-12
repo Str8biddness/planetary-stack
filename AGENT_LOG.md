@@ -517,3 +517,25 @@ Tests: **20 passed in 2.99s** (was ~20s suite time).
 - Further vectorize materials if needed
 
 ### Do NOT merge without Claude re-verify.
+
+## 2026-07-12 — feat/image-async-jobs
+
+### Mission
+Continue after Claude perf fix: merge main, async jobs for HD/multi-frame
+(soft-DoS guard), job poll API, Studio polling.
+
+### What changed
+- Merged `origin/main` (ac98b91) into image tip
+- NEW `image_jobs.py` — 2-worker queue, TTL, status/progress
+- `execute_image_request` — single sync entry for API + workers
+- POST /api/v1/image → 202 + job_id when async_mode or res≥1024 or multi-frame
+- GET /api/v1/image/jobs/{id}
+- Studio polls job_id with progress %
+- Tests: **21 passed**
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 21 passed (~4.5s)
+```
+
+### Do NOT merge without Claude re-review of async + prior perf fix.

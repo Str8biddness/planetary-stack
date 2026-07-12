@@ -2456,6 +2456,28 @@ async function runImageOrbitDay(n) {
     return runImageStudio(1, { orbit_day: true, orbit_frames: n || 6, as_gif: true, yaw_span: 40 });
 }
 
+async function pollImageJob(jobId, statusEl) {
+    const maxTries = 120;
+    for (let i = 0; i < maxTries; i++) {
+        await new Promise(r => setTimeout(r, 500));
+        try {
+            const r = await fetch('/api/v1/image/jobs/' + encodeURIComponent(jobId));
+            const j = await r.json().catch(() => null);
+            if (!j) continue;
+            if (statusEl) {
+                const pct = j.progress != null ? Math.round(Number(j.progress) * 100) : 0;
+                statusEl.innerHTML = '<span style="color:#38bdf8;">Job '
+                    + escapeHtmlStudio(jobId) + ' · ' + escapeHtmlStudio(j.status || '?')
+                    + ' · ' + pct + '% · ' + escapeHtmlStudio(j.message || '') + '</span>';
+            }
+            if (j.status === 'done' && j.result) return j.result;
+            if (j.status === 'failed') return j;
+        } catch (_) { /* retry */ }
+    }
+    if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">Job timed out</span>';
+    return null;
+}
+
 // ── SI Level viewer (top-down X × Z map) ─────────────────────────────
 let _lastLevelJson = null;
 const LEVEL_ROLE_COLORS = {
@@ -2658,6 +2680,10 @@ async function runImageStudio(variations, extra) {
     if (entEl) entEl.innerHTML = '';
 
     try {
+        // HD / multi-frame auto-async on server — poll job_id
+        if (resolution >= 1024 || body.orbit_day || body.frames > 1 || body.views > 1 || variations > 1) {
+            body.async_mode = true;
+        }
         const res = await fetch('/api/v1/image', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2665,9 +2691,27 @@ async function runImageStudio(variations, extra) {
         });
         let data = null;
         try { data = await res.json(); } catch (_) { data = null; }
-        if (!res.ok || !data || (!data.image_base64 && !(data.variations && data.variations.length))) {
-            const msg = (data && (data.message || data.error || data.detail)) || (`HTTP ${res.status}`);
-            if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Failed: ${escapeHtmlStudio(typeof msg === 'string' ? msg : JSON.stringify(msg))}</span>`;
+
+        // 202 Accepted — async job
+        if (res.status === 202 && data && data.job_id) {
+            if (statusEl) {
+                statusEl.innerHTML = '<span style="color:#38bdf8;">Job ' + escapeHtmlStudio(data.job_id)
+                    + ' · ' + escapeHtmlStudio(data.status || 'queued') + '…</span>';
+            }
+            data = await pollImageJob(data.job_id, statusEl);
+            if (!data) {
+                if (previewEl) previewEl.innerHTML = '<span style="color:#f87171;">Job failed</span>';
+                return;
+            }
+        }
+
+        if (!res.ok && res.status !== 202 || !data || (!data.image_base64 && !(data.variations && data.variations.length) && !(data.frames && data.frames.length) && !(data.views && data.views.length) && !data.animation)) {
+            if (data && data.status === 'failed') {
+                if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">Failed: ' + escapeHtmlStudio(data.error || 'job failed') + '</span>';
+            } else {
+                const msg = (data && (data.message || data.error || data.detail)) || (`HTTP ${res.status}`);
+                if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Failed: ${escapeHtmlStudio(typeof msg === 'string' ? msg : JSON.stringify(msg))}</span>`;
+            }
             if (previewEl) previewEl.innerHTML = '<span style="color:#f87171;">No image</span>';
             return;
         }

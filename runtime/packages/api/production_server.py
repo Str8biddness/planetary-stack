@@ -1678,296 +1678,106 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     orbit_day = bool(getattr(image_req, "orbit_day", False))
     orbit_frames = int(getattr(image_req, "orbit_frames", 6) or 6)
     orbit_frames = max(2, min(12, orbit_frames))
+    async_mode = bool(getattr(image_req, "async_mode", False))
+
+    # Soft-DoS guard: high-res / multi-frame auto-async unless client forces sync
+    multi = bool(orbit_day or n_frames > 1 or n_views > 1 or n_var > 1)
+    try:
+        import image_jobs as _ijobs
+        force_async = _ijobs.should_force_async(res, multi=multi)
+    except Exception:
+        _ijobs = None  # type: ignore
+        force_async = False
+    use_async = async_mode or force_async
+
+    params = {
+        "prompt": prompt,
+        "resolution": res,
+        "style": style,
+        "look": look,
+        "seed": seed,
+        "aspect": aspect,
+        "use_cache": use_cache,
+        "detail": detail,
+        "path_mode": path_mode,
+        "preset": preset,
+        "yaw_deg": yaw_deg,
+        "pitch_deg": pitch_deg,
+        "time_of_day": time_of_day,
+        "variations": n_var,
+        "views": n_views,
+        "yaw_span": yaw_span,
+        "frames": n_frames,
+        "as_gif": as_gif,
+        "gif_format": gif_format,
+        "gif_duration_ms": gif_duration_ms,
+        "return_level": return_level,
+        "orbit_day": orbit_day,
+        "orbit_frames": orbit_frames,
+    }
 
     try:
-        from image_service import (
-            generate_image,
-            generate_variations,
-            generate_multiview,
-            generate_time_sequence,
-            generate_orbit_day,
-            export_level,
-            renderable_vocabulary,
-        )
+        from image_service import execute_image_request
     except Exception as e:
-        # Engine or an image dep (numpy/PIL) is missing — degrade loudly, don't fake.
         raise HTTPException(
             status_code=503,
             detail={"error": "image_engine_unavailable", "message": str(e)},
         )
 
-    import base64
-    import os
-    import tempfile
+    if use_async and _ijobs is not None:
+        def _runner(p, progress):
+            return execute_image_request(p, progress=progress)
 
-    t0 = time.time()
-
-    def _grid_payload(items, kind: str):
-        primary = items[0]
-        key = "variations" if kind == "seed" else ("views" if kind == "yaw" else "frames")
-        grid = []
-        for v in items:
-            entry = {
-                "image_base64": v.get("image_base64"),
-                "entities": v.get("entities", []),
-                "latency_ms": v.get("latency_ms"),
-                "cache_hit": v.get("cache_hit"),
-                "width": v.get("width"),
-                "height": v.get("height"),
-                "seed": v.get("seed"),
-                "yaw_deg": v.get("yaw_deg"),
-                "time_of_day": v.get("time_of_day"),
-            }
-            grid.append(entry)
-        return {
-            "ok": True,
-            "engine": primary.get("engine", "synthesus_vsa_geometric"),
-            "prompt": prompt,
-            "resolution": res,
-            "width": primary.get("width"),
-            "height": primary.get("height"),
-            "style": style,
-            "detail": detail,
-            "look": look,
-            "seed": primary.get("seed"),
-            "aspect": aspect,
-            "entities": primary.get("entities", []),
-            "entity_count": primary.get("entity_count", 0),
-            "roles": primary.get("roles", []),
-            "renderable_vocabulary": renderable_vocabulary(),
-            "cache_hit": bool(primary.get("cache_hit")),
-            "cache_source": primary.get("cache_source"),
-            "latency_ms": round((time.time() - t0) * 1000.0, 1),
-            "image_base64": primary.get("image_base64", ""),
-            "mime_type": "image/png",
-            "vocab_version": primary.get("vocab_version"),
-            "isp": primary.get("isp"),
-            "depth": primary.get("depth"),
-            "camera": primary.get("camera"),
-            "path_mode": path_mode,
-            "path_entities": primary.get("path_entities"),
-            "path_ops_sample": primary.get("path_ops_sample"),
-            "preset": primary.get("preset") or preset,
-            "yaw_deg": primary.get("yaw_deg", yaw_deg),
-            "time_of_day": primary.get("time_of_day", time_of_day),
-            "grid_kind": kind,
-            key: grid,
-            "variations": grid if kind == "seed" else None,
-        }
-
-    # Priority: orbit_day > time sequence > multiview > seed variations > single
-    if orbit_day:
         try:
-            items = await run_in_threadpool(
-                generate_orbit_day,
-                prompt,
-                orbit_frames,
-                yaw_span if yaw_span else 40.0,
-                0.12,
-                0.95,
-                min(res, 512),  # keep orbit GIFs snappy
-                style,
-                seed,
-                aspect,
-                detail,
-                use_cache,
-                look,
-                path_mode,
-                preset,
-                pitch_deg,
-                as_gif if as_gif or True else True,
-                gif_duration_ms,
-                gif_format,
+            job_id = _ijobs.submit_job(
+                "orbit_day" if orbit_day else (
+                    "time" if n_frames > 1 else (
+                        "multiview" if n_views > 1 else (
+                            "variations" if n_var > 1 else "image"
+                        )
+                    )
+                ),
+                params,
+                _runner,
             )
         except Exception as e:
-            logger.warning("orbit_day failed: %s", e)
+            logger.warning("image job submit failed: %s", e)
             raise HTTPException(
-                status_code=500,
-                detail={"error": "image_generation_failed", "message": str(e)},
+                status_code=503,
+                detail={"error": "image_queue_full", "message": str(e)},
             )
-        payload = _grid_payload(items, "orbit_day")
-        payload["frames"] = [
-            {
-                "image_base64": v.get("image_base64"),
-                "yaw_deg": v.get("yaw_deg"),
-                "time_of_day": v.get("time_of_day"),
-                "width": v.get("width"),
-                "height": v.get("height"),
-            }
-            for v in items
-        ]
-        if items and items[0].get("animation"):
-            payload["animation"] = items[0]["animation"]
-        return JSONResponse(content=payload)
-
-    if n_frames > 1:
-        try:
-            items = await run_in_threadpool(
-                generate_time_sequence,
-                prompt,
-                n_frames,
-                0.1,
-                0.95,
-                res,
-                style,
-                seed,
-                aspect,
-                detail,
-                use_cache,
-                look,
-                path_mode,
-                preset,
-                yaw_deg,
-                pitch_deg,
-                as_gif,
-                gif_duration_ms,
-                gif_format,
-            )
-        except Exception as e:
-            logger.warning("image time sequence failed: %s", e)
-            raise HTTPException(
-                status_code=500,
-                detail={"error": "image_generation_failed", "message": str(e)},
-            )
-        payload = _grid_payload(items, "time")
-        if items and items[0].get("animation"):
-            payload["animation"] = items[0]["animation"]
-        return JSONResponse(content=payload)
-
-    if n_views > 1:
-        try:
-            items = await run_in_threadpool(
-                generate_multiview,
-                prompt,
-                n_views,
-                yaw_span,
-                res,
-                style,
-                seed,
-                aspect,
-                detail,
-                use_cache,
-                look,
-                path_mode,
-                preset,
-                time_of_day,
-                pitch_deg,
-            )
-        except Exception as e:
-            logger.warning("image multiview failed: %s", e)
-            raise HTTPException(
-                status_code=500,
-                detail={"error": "image_generation_failed", "message": str(e)},
-            )
-        payload = _grid_payload(items, "yaw")
-        if as_gif and items:
-            try:
-                from image_service import sequence_to_animation
-                payload["animation"] = sequence_to_animation(
-                    items, fmt=gif_format, duration_ms=gif_duration_ms
-                )
-            except Exception as ge:
-                payload["animation_error"] = str(ge)
-        return JSONResponse(content=payload)
-
-    # Multi-variation path
-    if n_var > 1:
-        try:
-            vars_meta = await run_in_threadpool(
-                generate_variations,
-                prompt,
-                n_var,
-                res,
-                style,
-                seed,
-                aspect,
-                detail,
-                use_cache,
-                look,
-                path_mode,
-                preset,
-            )
-        except Exception as e:
-            logger.warning("image variations failed: %s", e)
-            raise HTTPException(
-                status_code=500,
-                detail={"error": "image_generation_failed", "message": str(e)},
-            )
-        return JSONResponse(content=_grid_payload(vars_meta, "seed"))
-
-    out_path = os.path.join(tempfile.gettempdir(), f"synth_img_{uuid.uuid4().hex[:12]}.png")
-    try:
-        meta = await run_in_threadpool(
-            generate_image,
-            prompt,
-            out_path,
-            res,
-            style,
-            seed,
-            aspect,
-            use_cache,
-            detail,
-            look,
-            path_mode,
-            preset,
-            yaw_deg,
-            time_of_day,
-            pitch_deg,
-            return_level,
+        job = _ijobs.get_job(job_id)
+        return JSONResponse(
+            status_code=202,
+            content=_ijobs.job_public_view(job or {"job_id": job_id, "status": "queued", "progress": 0}),
         )
-        with open(out_path, "rb") as f:
-            png_b64 = base64.b64encode(f.read()).decode("ascii")
+
+    try:
+        payload = await run_in_threadpool(execute_image_request, params, None)
     except Exception as e:
         logger.warning("image generation failed: %s", e)
         raise HTTPException(
             status_code=500,
             detail={"error": "image_generation_failed", "message": str(e)},
         )
-    finally:
-        try:
-            os.remove(out_path)
-        except OSError:
-            pass
-
-    payload = {
-        "ok": True,
-        "engine": meta.get("engine", "synthesus_vsa_geometric"),
-        "prompt": prompt,
-        "resolution": res,
-        "width": meta.get("width"),
-        "height": meta.get("height"),
-        "style": style,
-        "detail": detail,
-        "look": look,
-        "seed": meta.get("seed", seed),
-        "aspect": aspect,
-        "entities": meta.get("entities", []),
-        "entity_count": meta.get("entity_count", 0),
-        "roles": meta.get("roles", []),
-        "renderable_vocabulary": renderable_vocabulary(),
-        "cache_hit": bool(meta.get("cache_hit")),
-        "cache_source": meta.get("cache_source"),
-        "latency_ms": round((time.time() - t0) * 1000.0, 1),
-        "image_base64": png_b64,
-        "mime_type": "image/png",
-        "vocab_version": meta.get("vocab_version"),
-        "isp": meta.get("isp"),
-        "depth": meta.get("depth"),
-        "preset": meta.get("preset") or preset,
-        "path_mode": path_mode,
-        "path_entities": meta.get("path_entities"),
-        "path_ops_sample": meta.get("path_ops_sample"),
-        "yaw_deg": meta.get("yaw_deg", yaw_deg),
-        "pitch_deg": meta.get("pitch_deg", pitch_deg),
-        "time_of_day": meta.get("time_of_day", time_of_day),
-        "camera": meta.get("camera"),
-        "level": meta.get("level"),
-    }
     try:
-        ImageResponse(**payload)
+        ImageResponse(**{k: v for k, v in payload.items() if k in ImageResponse.model_fields})
     except Exception as ve:
         logger.warning("ImageResponse validation soft-fail: %s", ve)
     return JSONResponse(content=payload)
+
+
+@app.get("/api/v1/image/jobs/{job_id}")
+async def get_image_job(job_id: str, auth=Depends(get_auth)):
+    """Poll async SI image job status / result."""
+    try:
+        import image_jobs as _ijobs
+    except Exception as e:
+        raise HTTPException(503, detail={"error": "image_jobs_unavailable", "message": str(e)})
+    job = _ijobs.get_job(job_id)
+    if not job:
+        raise HTTPException(404, detail={"error": "job_not_found", "job_id": job_id})
+    return JSONResponse(content=_ijobs.job_public_view(job, include_result=True))
 
 
 @app.post("/api/v1/image/level")

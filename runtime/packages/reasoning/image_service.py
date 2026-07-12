@@ -17,6 +17,7 @@ import os
 import tempfile
 import threading
 import time
+import uuid
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Optional
@@ -731,6 +732,225 @@ def export_level(
     """Build SI level JSON for a prompt (no PNG required)."""
     import level_export as le
     return le.build_level_from_prompt(prompt, **kwargs)
+
+
+def execute_image_request(
+    params: dict[str, Any],
+    progress: Optional[Any] = None,
+) -> dict[str, Any]:
+    """Full SI image request (sync). Used by API and async job workers.
+
+    params keys mirror ImageRequest + normalized fields.
+    progress: optional callable(message, fraction 0..1)
+    """
+    import base64
+    import time as _time
+
+    def _p(msg: str, frac: float = 0.0) -> None:
+        if callable(progress):
+            try:
+                progress(msg, frac)
+            except Exception:
+                pass
+
+    prompt = (params.get("prompt") or "").strip()
+    if not prompt:
+        raise ValueError("prompt is required")
+    res = max(128, min(2048, int(params.get("resolution") or 512)))
+    style = (params.get("style") or "soft").lower().strip()
+    look = (params.get("look") or "photo").lower().strip()
+    seed = params.get("seed")
+    aspect = float(params.get("aspect") or 1.0)
+    use_cache = bool(params.get("use_cache", True))
+    detail = (params.get("detail") or "high").lower().strip()
+    path_mode = bool(params.get("path_mode", True))
+    preset = params.get("preset")
+    yaw_deg = float(params.get("yaw_deg") or 0.0)
+    pitch_deg = float(params.get("pitch_deg") or 0.0)
+    time_of_day = params.get("time_of_day")
+    n_var = max(1, min(8, int(params.get("variations") or 1)))
+    n_views = max(1, min(8, int(params.get("views") or 1)))
+    yaw_span = float(params.get("yaw_span") or 30.0)
+    n_frames = max(1, min(8, int(params.get("frames") or 1)))
+    as_gif = bool(params.get("as_gif", False))
+    gif_format = (params.get("gif_format") or "gif").lower().strip()
+    if gif_format not in ("gif", "webp"):
+        gif_format = "gif"
+    gif_duration_ms = int(params.get("gif_duration_ms") or 400)
+    return_level = bool(params.get("return_level", False))
+    orbit_day = bool(params.get("orbit_day", False))
+    orbit_frames = max(2, min(12, int(params.get("orbit_frames") or 6)))
+
+    t0 = _time.time()
+    _p("starting", 0.05)
+
+    def _grid(items, kind: str) -> dict[str, Any]:
+        primary = items[0]
+        key = "variations" if kind == "seed" else (
+            "views" if kind == "yaw" else ("frames" if kind in ("time", "orbit_day") else "items")
+        )
+        grid = []
+        for v in items:
+            grid.append({
+                "image_base64": v.get("image_base64"),
+                "entities": v.get("entities", []),
+                "latency_ms": v.get("latency_ms"),
+                "cache_hit": v.get("cache_hit"),
+                "width": v.get("width"),
+                "height": v.get("height"),
+                "seed": v.get("seed"),
+                "yaw_deg": v.get("yaw_deg"),
+                "time_of_day": v.get("time_of_day"),
+            })
+        out = {
+            "ok": True,
+            "engine": primary.get("engine", "synthesus_vsa_geometric"),
+            "prompt": prompt,
+            "resolution": res,
+            "width": primary.get("width"),
+            "height": primary.get("height"),
+            "style": style,
+            "detail": detail,
+            "look": look,
+            "seed": primary.get("seed"),
+            "aspect": aspect,
+            "entities": primary.get("entities", []),
+            "entity_count": primary.get("entity_count", 0),
+            "roles": primary.get("roles", []),
+            "renderable_vocabulary": renderable_vocabulary(),
+            "cache_hit": bool(primary.get("cache_hit")),
+            "cache_source": primary.get("cache_source"),
+            "latency_ms": round((_time.time() - t0) * 1000.0, 1),
+            "image_base64": primary.get("image_base64", ""),
+            "mime_type": "image/png",
+            "vocab_version": primary.get("vocab_version"),
+            "isp": primary.get("isp"),
+            "depth": primary.get("depth"),
+            "camera": primary.get("camera"),
+            "path_mode": path_mode,
+            "path_entities": primary.get("path_entities"),
+            "path_ops_sample": primary.get("path_ops_sample"),
+            "preset": primary.get("preset") or preset,
+            "yaw_deg": primary.get("yaw_deg", yaw_deg),
+            "pitch_deg": primary.get("pitch_deg", pitch_deg),
+            "time_of_day": primary.get("time_of_day", time_of_day),
+            "grid_kind": kind,
+            key: grid,
+            "variations": grid if kind == "seed" else None,
+        }
+        if primary.get("animation"):
+            out["animation"] = primary["animation"]
+        return out
+
+    if orbit_day:
+        _p("orbit_day", 0.2)
+        items = generate_orbit_day(
+            prompt, orbit_frames, yaw_span if yaw_span else 40.0,
+            0.12, 0.95, min(res, 512), style, seed, aspect, detail,
+            use_cache, look, path_mode, preset, pitch_deg,
+            True if as_gif or True else True, gif_duration_ms, gif_format,
+        )
+        payload = _grid(items, "orbit_day")
+        payload["frames"] = [
+            {
+                "image_base64": v.get("image_base64"),
+                "yaw_deg": v.get("yaw_deg"),
+                "time_of_day": v.get("time_of_day"),
+                "width": v.get("width"),
+                "height": v.get("height"),
+            }
+            for v in items
+        ]
+        _p("done", 1.0)
+        return payload
+
+    if n_frames > 1:
+        _p("time_sequence", 0.2)
+        items = generate_time_sequence(
+            prompt, n_frames, 0.1, 0.95, res, style, seed, aspect,
+            detail, use_cache, look, path_mode, preset, yaw_deg, pitch_deg,
+            as_gif, gif_duration_ms, gif_format,
+        )
+        _p("done", 1.0)
+        return _grid(items, "time")
+
+    if n_views > 1:
+        _p("multiview", 0.2)
+        items = generate_multiview(
+            prompt, n_views, yaw_span, res, style, seed, aspect,
+            detail, use_cache, look, path_mode, preset, time_of_day, pitch_deg,
+        )
+        payload = _grid(items, "yaw")
+        if as_gif and items:
+            try:
+                payload["animation"] = sequence_to_animation(
+                    items, fmt=gif_format, duration_ms=gif_duration_ms
+                )
+            except Exception as ge:
+                payload["animation_error"] = str(ge)
+        _p("done", 1.0)
+        return payload
+
+    if n_var > 1:
+        _p("variations", 0.2)
+        items = generate_variations(
+            prompt, n_var, res, style, seed, aspect, detail,
+            use_cache, look, path_mode, preset,
+        )
+        _p("done", 1.0)
+        return _grid(items, "seed")
+
+    _p("render", 0.3)
+    out_path = os.path.join(tempfile.gettempdir(), f"synth_img_{uuid.uuid4().hex[:12]}.png")
+    try:
+        meta = generate_image(
+            prompt, out_path, res, style, seed, aspect, use_cache, detail,
+            look, path_mode, preset, yaw_deg, time_of_day, pitch_deg, return_level,
+        )
+        with open(out_path, "rb") as f:
+            png_b64 = base64.b64encode(f.read()).decode("ascii")
+    finally:
+        try:
+            os.remove(out_path)
+        except OSError:
+            pass
+
+    payload = {
+        "ok": True,
+        "engine": meta.get("engine", "synthesus_vsa_geometric"),
+        "prompt": prompt,
+        "resolution": res,
+        "width": meta.get("width"),
+        "height": meta.get("height"),
+        "style": style,
+        "detail": detail,
+        "look": look,
+        "seed": meta.get("seed", seed),
+        "aspect": aspect,
+        "entities": meta.get("entities", []),
+        "entity_count": meta.get("entity_count", 0),
+        "roles": meta.get("roles", []),
+        "renderable_vocabulary": renderable_vocabulary(),
+        "cache_hit": bool(meta.get("cache_hit")),
+        "cache_source": meta.get("cache_source"),
+        "latency_ms": round((_time.time() - t0) * 1000.0, 1),
+        "image_base64": png_b64,
+        "mime_type": "image/png",
+        "vocab_version": meta.get("vocab_version"),
+        "isp": meta.get("isp"),
+        "depth": meta.get("depth"),
+        "preset": meta.get("preset") or preset,
+        "path_mode": path_mode,
+        "path_entities": meta.get("path_entities"),
+        "path_ops_sample": meta.get("path_ops_sample"),
+        "yaw_deg": meta.get("yaw_deg", yaw_deg),
+        "pitch_deg": meta.get("pitch_deg", pitch_deg),
+        "time_of_day": meta.get("time_of_day", time_of_day),
+        "camera": meta.get("camera"),
+        "level": meta.get("level"),
+    }
+    _p("done", 1.0)
+    return payload
 
 
 if __name__ == "__main__":

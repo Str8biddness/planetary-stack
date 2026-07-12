@@ -352,6 +352,13 @@ class ImageRequest(BaseModel):
         le=12,
         description="Frame count when orbit_day=true",
     )
+    async_mode: bool = Field(
+        False,
+        description=(
+            "If true, return 202 + job_id immediately; poll GET /api/v1/image/jobs/{id}. "
+            "Auto-forced when resolution>=1024 or multi-frame (views/frames/orbit_day)."
+        ),
+    )
 
 
 class ImageResponse(BaseModel):

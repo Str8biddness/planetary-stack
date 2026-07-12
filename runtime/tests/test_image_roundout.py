@@ -275,6 +275,59 @@ def test_detail_high_and_variations():
     assert all(v.get("image_base64") for v in vars_)
 
 
+def test_async_image_jobs_and_execute():
+    import image_jobs as jobs
+    from image_service import execute_image_request
+
+    # Sync execute path (small)
+    payload = execute_image_request({
+        "prompt": "a house on grass under a sky",
+        "resolution": 128,
+        "style": "soft",
+        "look": "raw",
+        "detail": "standard",
+        "path_mode": False,
+        "use_cache": False,
+        "seed": 1,
+    })
+    assert payload.get("ok") is True
+    assert payload.get("image_base64")
+    assert payload.get("entity_count", 0) >= 1
+
+    # Job queue
+    assert jobs.should_force_async(1024) is True
+    assert jobs.should_force_async(512) is False
+    assert jobs.should_force_async(512, multi=True) is True
+
+    def runner(params, progress):
+        progress("go", 0.5)
+        return execute_image_request(params, progress=progress)
+
+    jid = jobs.submit_job("test", {
+        "prompt": "a tree on grass under a sky",
+        "resolution": 128,
+        "style": "soft",
+        "look": "raw",
+        "detail": "standard",
+        "path_mode": False,
+        "use_cache": False,
+        "seed": 2,
+    }, runner)
+    import time
+    done = None
+    for _ in range(40):
+        j = jobs.get_job(jid)
+        if j and j["status"] in ("done", "failed"):
+            done = j
+            break
+        time.sleep(0.05)
+    assert done is not None
+    assert done["status"] == "done"
+    view = jobs.job_public_view(done)
+    assert view["status"] == "done"
+    assert view["result"]["image_base64"]
+
+
 def test_orbit_day_sequence():
     from image_service import generate_orbit_day, clear_image_cache
 
