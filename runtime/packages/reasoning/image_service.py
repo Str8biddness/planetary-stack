@@ -5,9 +5,10 @@ raster. Deterministic, CPU-only, no diffusion.
 
 Wow layer:
   - process LRU + optional disk cache (survives restarts)
-  - detail: standard | high (richer trees/atmosphere)
+  - detail: draft | standard | high (draft = fast preview, no pocket)
   - variations: N seeds in one call
   - style / seed / aspect knobs
+  - shared scene graph + parallel multi-frame (multiview / orbit / time)
 """
 from __future__ import annotations
 
@@ -47,9 +48,9 @@ _DISK_ENABLED = os.environ.get("SYNTHESUS_IMAGE_DISK_CACHE_OFF", "").strip() not
 )
 
 STYLES = sorted(vpi.STYLES)
-DETAILS = ("standard", "high")
+DETAILS = ("draft", "standard", "high")
 # Bump when SHAPES, path raster, ISP, or materials change — invalidates disk/memory cache.
-ENGINE_VERSION = "si-image-v3-bbox-fill"
+ENGINE_VERSION = "si-image-v4-isp-parallel"
 VOCAB_VERSION = ENGINE_VERSION  # alias for API meta field
 LOOKS = ("raw", "photo", "cinema", "vivid", "tv")
 
@@ -188,6 +189,8 @@ def generate_image(
     time_of_day: Optional[float] = None,
     pitch_deg: float = 0.0,
     return_level: bool = False,
+    scene_doc: Optional[list] = None,
+    scene_horizon: Optional[float] = None,
 ) -> dict[str, Any]:
     """Reason ``prompt`` into a scene graph and render it to ``out_path`` (PNG).
 
@@ -197,6 +200,7 @@ def generate_image(
     preset: optional cinematic pack id (scene_presets) fills blanks.
     yaw_deg/pitch_deg: camera orbit/tilt (parallax by Z). time_of_day: 0..1 sun path.
     return_level: attach serializable SI level JSON object for world export.
+    scene_doc/scene_horizon: optional prebuilt graph (shared across multiview/orbit frames).
     """
     # Apply cinematic preset pack (fills missing knobs only)
     if preset:
@@ -245,6 +249,9 @@ def generate_image(
         detail = "standard"
     if look not in LOOKS:
         look = "raw"
+    # Draft: standard paint + CNC contours without multi-pass pocket (fast preview)
+    draft = detail == "draft"
+    render_detail = "standard" if draft else detail
     aspect = float(np.clip(float(aspect) if aspect else 1.0, 0.5, 2.0))
     if seed is not None:
         seed = int(seed)
@@ -259,7 +266,7 @@ def generate_image(
     )
     t0 = time.time()
 
-    if use_cache:
+    if use_cache and scene_doc is None:
         hit = _cache_get(key)
         if hit is not None:
             with open(out_path, "wb") as f:
@@ -275,15 +282,20 @@ def generate_image(
     paint_style = "soft" if style == "photo" else style
     if paint_style not in ("flat", "soft", "night"):
         paint_style = "soft" if look != "raw" else "flat"
-    doc, horizon = vpi.pattern_document(
-        prompt,
-        s["imag"],
-        s["vidx"],
-        s["E"],
-        seed=seed,
-        style=paint_style,
-        path_mode=path_mode,
-    )
+    if scene_doc is not None and scene_horizon is not None:
+        import copy
+        doc = copy.deepcopy(scene_doc)
+        horizon = float(scene_horizon)
+    else:
+        doc, horizon = vpi.pattern_document(
+            prompt,
+            s["imag"],
+            s["vidx"],
+            s["E"],
+            seed=seed,
+            style=paint_style,
+            path_mode=path_mode,
+        )
     camera_meta = None
     if abs(yaw_deg) > 1e-6 or abs(pitch_deg) > 1e-6 or time_of_day is not None:
         try:
@@ -305,7 +317,7 @@ def generate_image(
                     look = _wc.look_for_time(time_of_day, default_look=look)
         except Exception:
             camera_meta = {"error": "world_camera_unavailable"}
-    # Re-attach paths after view projection if path_mode
+    # Re-attach paths after view projection if path_mode (draft keeps contours, skips pocket)
     if path_mode:
         try:
             import cnc_paths as _cnc
@@ -317,11 +329,18 @@ def generate_image(
                 ):
                     ps = _cnc.paths_for_primitive(prim, seed=int(seed or 0) + i * 17)
                     if ps:
+                        if draft:
+                            for pth in ps:
+                                pth.meta["no_pocket"] = True
                         prim["paths"] = ps
                         prim["path_ops"] = _cnc.path_provenance(ps)
                         prim["construction"] = "cnc_paths"
         except Exception:
             pass
+    if draft and path_mode:
+        for prim in doc:
+            for pth in prim.get("paths") or []:
+                pth.meta["no_pocket"] = True
     vpi.render_doc(
         doc,
         horizon,
@@ -330,7 +349,7 @@ def generate_image(
         style=paint_style,
         aspect=aspect,
         seed=seed,
-        detail=detail,
+        detail=render_detail,
         look=look,
         path_mode=path_mode,
     )
@@ -368,6 +387,7 @@ def generate_image(
         "roles": roles,
         "vocabulary_size": len(s["vidx"]),
         "vocab_version": VOCAB_VERSION,
+        "engine_version": ENGINE_VERSION,
         "style": style,
         "detail": detail,
         "look": look,
@@ -487,6 +507,29 @@ def generate_variations(
     return results
 
 
+def _build_base_scene(prompt, seed, style, path_mode, detail):
+    """Shared scene graph for multi-frame sequences (built once).
+
+    ``detail`` is accepted for call-site symmetry; pocket skipping is applied
+    per-frame inside generate_image when detail==draft.
+    """
+    _ = detail
+    s = _imagination()
+    paint_style = "soft" if style == "photo" else style
+    if paint_style not in ("flat", "soft", "night"):
+        paint_style = "soft"
+    doc, horizon = vpi.pattern_document(
+        prompt,
+        s["imag"],
+        s["vidx"],
+        s["E"],
+        seed=seed,
+        style=paint_style,
+        path_mode=path_mode,
+    )
+    return doc, horizon
+
+
 def generate_multiview(
     prompt: str,
     n: int = 3,
@@ -503,40 +546,61 @@ def generate_multiview(
     time_of_day: Optional[float] = None,
     pitch_deg: float = 0.0,
 ) -> list[dict[str, Any]]:
-    """Same scene graph, multiple camera yaws (orbit). SI multi-view, not diffusion."""
+    """Same scene graph, multiple camera yaws (orbit). Parallel frames when n>1."""
     import base64
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     import world_camera as wc
 
     yaws = wc.yaw_schedule(n=n, span_deg=yaw_span)
-    results = []
+    # Apply preset once to knobs
+    if preset:
+        try:
+            import scene_presets as _sp
+            merged = _sp.apply_preset_to_request({
+                "preset": preset, "prompt": prompt, "style": style, "look": look,
+                "detail": detail, "path_mode": path_mode, "aspect": aspect, "seed": seed,
+                "resolution": res,
+            })
+            prompt = merged.get("prompt") or prompt
+            style = merged.get("style") or style
+            look = merged.get("look") or look
+            detail = merged.get("detail") or detail
+            path_mode = bool(merged.get("path_mode", path_mode))
+            aspect = float(merged.get("aspect", aspect))
+            if seed is None and merged.get("seed") is not None:
+                seed = merged.get("seed")
+        except Exception:
+            pass
+
+    base_doc, base_h = _build_base_scene(prompt, seed, style, path_mode, detail)
     tmpdir = tempfile.mkdtemp(prefix="synth_img_mv_")
+    results: list[Optional[dict]] = [None] * len(yaws)
+
+    def _one(i_yaw):
+        i, yaw = i_yaw
+        out = os.path.join(tmpdir, f"mv{i}.png")
+        meta = generate_image(
+            prompt, out, res=res, style=style, seed=seed, aspect=aspect,
+            use_cache=use_cache, detail=detail, look=look, path_mode=path_mode,
+            yaw_deg=yaw, time_of_day=time_of_day, pitch_deg=pitch_deg,
+            scene_doc=base_doc, scene_horizon=base_h,
+        )
+        with open(out, "rb") as f:
+            png = f.read()
+        m = dict(meta)
+        m["image_base64"] = base64.b64encode(png).decode("ascii")
+        m["mime_type"] = "image/png"
+        m["view_index"] = i
+        m["yaw_deg"] = yaw
+        return i, m
+
     try:
-        for i, yaw in enumerate(yaws):
-            out = os.path.join(tmpdir, f"mv{i}.png")
-            meta = generate_image(
-                prompt,
-                out,
-                res=res,
-                style=style,
-                seed=seed,
-                aspect=aspect,
-                use_cache=use_cache,
-                detail=detail,
-                look=look,
-                path_mode=path_mode,
-                preset=preset if i == 0 else None,
-                yaw_deg=yaw,
-                time_of_day=time_of_day,
-                pitch_deg=pitch_deg,
-            )
-            with open(out, "rb") as f:
-                png = f.read()
-            m = dict(meta)
-            m["image_base64"] = base64.b64encode(png).decode("ascii")
-            m["mime_type"] = "image/png"
-            m["view_index"] = i
-            m["yaw_deg"] = yaw
-            results.append(m)
+        workers = min(4, max(1, len(yaws)))
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futs = [ex.submit(_one, (i, y)) for i, y in enumerate(yaws)]
+            for fut in as_completed(futs):
+                i, m = fut.result()
+                results[i] = m
     finally:
         for name in os.listdir(tmpdir):
             try:
@@ -547,7 +611,7 @@ def generate_multiview(
             os.rmdir(tmpdir)
         except OSError:
             pass
-    return results
+    return [r for r in results if r is not None]
 
 
 def generate_time_sequence(
@@ -579,35 +643,36 @@ def generate_time_sequence(
     import world_camera as wc
 
     times = wc.time_schedule(n=n, t0=t0, t1=t1)
-    results = []
+    base_doc, base_h = _build_base_scene(prompt, seed, style, path_mode, detail)
+    results: list = [None] * len(times)
     tmpdir = tempfile.mkdtemp(prefix="synth_img_ts_")
+
+    def _one(i_t):
+        i, t = i_t
+        out = os.path.join(tmpdir, f"t{i}.png")
+        meta = generate_image(
+            prompt, out, res=res, style=style, seed=seed, aspect=aspect,
+            use_cache=use_cache, detail=detail, look=look, path_mode=path_mode,
+            yaw_deg=yaw_deg, time_of_day=t, pitch_deg=pitch_deg,
+            scene_doc=base_doc, scene_horizon=base_h,
+        )
+        with open(out, "rb") as f:
+            png = f.read()
+        m = dict(meta)
+        m["image_base64"] = base64.b64encode(png).decode("ascii")
+        m["mime_type"] = "image/png"
+        m["frame_index"] = i
+        m["time_of_day"] = t
+        return i, m
+
     try:
-        for i, t in enumerate(times):
-            out = os.path.join(tmpdir, f"t{i}.png")
-            meta = generate_image(
-                prompt,
-                out,
-                res=res,
-                style=style,
-                seed=seed,
-                aspect=aspect,
-                use_cache=use_cache,
-                detail=detail,
-                look=look,
-                path_mode=path_mode,
-                preset=preset if i == 0 else None,
-                yaw_deg=yaw_deg,
-                time_of_day=t,
-                pitch_deg=pitch_deg,
-            )
-            with open(out, "rb") as f:
-                png = f.read()
-            m = dict(meta)
-            m["image_base64"] = base64.b64encode(png).decode("ascii")
-            m["mime_type"] = "image/png"
-            m["frame_index"] = i
-            m["time_of_day"] = t
-            results.append(m)
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        with ThreadPoolExecutor(max_workers=min(4, max(1, len(times)))) as ex:
+            futs = [ex.submit(_one, (i, t)) for i, t in enumerate(times)]
+            for fut in as_completed(futs):
+                i, m = fut.result()
+                results[i] = m
+        results = [r for r in results if r is not None]
         if as_gif and results:
             try:
                 import gif_export as _ge
@@ -671,37 +736,37 @@ def generate_orbit_day(
     n = max(2, min(12, int(n)))
     yaws = wc.yaw_schedule(n=n, span_deg=yaw_span)
     times = wc.time_schedule(n=n, t0=t0, t1=t1)
-    results: list[dict[str, Any]] = []
+    base_doc, base_h = _build_base_scene(prompt, seed, style, path_mode, detail)
+    results: list = [None] * n
     tmpdir = tempfile.mkdtemp(prefix="synth_img_od_")
+
+    def _one(i: int):
+        out = os.path.join(tmpdir, f"od{i}.png")
+        meta = generate_image(
+            prompt, out, res=res, style=style, seed=seed, aspect=aspect,
+            use_cache=use_cache, detail=detail, look=look, path_mode=path_mode,
+            yaw_deg=yaws[i], time_of_day=times[i], pitch_deg=pitch_deg,
+            scene_doc=base_doc, scene_horizon=base_h,
+        )
+        with open(out, "rb") as f:
+            png = f.read()
+        m = dict(meta)
+        m["image_base64"] = base64.b64encode(png).decode("ascii")
+        m["mime_type"] = "image/png"
+        m["frame_index"] = i
+        m["yaw_deg"] = yaws[i]
+        m["time_of_day"] = times[i]
+        m["orbit_day"] = True
+        return i, m
+
     try:
-        for i in range(n):
-            out = os.path.join(tmpdir, f"od{i}.png")
-            meta = generate_image(
-                prompt,
-                out,
-                res=res,
-                style=style,
-                seed=seed,  # same seed = same world layout
-                aspect=aspect,
-                use_cache=use_cache,
-                detail=detail,
-                look=look,
-                path_mode=path_mode,
-                preset=preset if i == 0 else None,
-                yaw_deg=yaws[i],
-                time_of_day=times[i],
-                pitch_deg=pitch_deg,
-            )
-            with open(out, "rb") as f:
-                png = f.read()
-            m = dict(meta)
-            m["image_base64"] = base64.b64encode(png).decode("ascii")
-            m["mime_type"] = "image/png"
-            m["frame_index"] = i
-            m["yaw_deg"] = yaws[i]
-            m["time_of_day"] = times[i]
-            m["orbit_day"] = True
-            results.append(m)
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        with ThreadPoolExecutor(max_workers=min(4, max(1, n))) as ex:
+            futs = [ex.submit(_one, i) for i in range(n)]
+            for fut in as_completed(futs):
+                i, m = fut.result()
+                results[i] = m
+        results = [r for r in results if r is not None]
         if as_gif and results:
             try:
                 import gif_export as _ge

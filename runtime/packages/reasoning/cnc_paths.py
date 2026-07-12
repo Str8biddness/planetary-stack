@@ -621,7 +621,11 @@ def paint_path(
         crop, box = raster_stroke_bbox(path, h, w, width=width, aa=aa)
         _blend_crop(crop, box, mat=False)
     else:
-        if pocket and path.meta.get("layer") not in ("door", "window"):
+        if (
+            pocket
+            and not path.meta.get("no_pocket")
+            and path.meta.get("layer") not in ("door", "window")
+        ):
             for pth, scale in pocket_passes(path, tool_r=max(width, 0.01), passes=2):
                 crop, box = raster_fill_bbox(pth, h, w, aa=aa)
                 _blend_crop(crop, box, scale=scale, mat=True)

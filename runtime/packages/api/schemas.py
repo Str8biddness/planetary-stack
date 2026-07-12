@@ -269,7 +269,7 @@ class ImageRequest(BaseModel):
     )
     detail: str = Field(
         "standard",
-        description="Render detail: standard | high (richer trees + atmosphere)",
+        description="Render detail: draft (fast preview) | standard | high (richer trees + atmosphere)",
     )
     variations: int = Field(
         1,

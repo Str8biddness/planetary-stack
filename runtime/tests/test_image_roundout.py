@@ -275,6 +275,52 @@ def test_detail_high_and_variations():
     assert all(v.get("image_base64") for v in vars_)
 
 
+def test_draft_detail_and_engine_v4():
+    """Draft is a real detail mode; engine cache key is v4 isp-parallel."""
+    from image_service import (
+        ENGINE_VERSION,
+        DETAILS,
+        generate_image,
+        clear_image_cache,
+    )
+
+    assert "draft" in DETAILS
+    assert ENGINE_VERSION == "si-image-v4-isp-parallel"
+
+    clear_image_cache(disk=True)
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "draft.png")
+        m = generate_image(
+            "a house and a tree on grass under a sky with a sun",
+            out,
+            res=256,
+            style="soft",
+            look="raw",
+            detail="draft",
+            seed=7,
+            path_mode=True,
+            use_cache=True,
+        )
+        assert m["detail"] == "draft"
+        assert m.get("engine_version") == "si-image-v4-isp-parallel"
+        assert m.get("path_mode") is True
+        assert (m.get("path_entities") or 0) >= 1
+        assert os.path.getsize(out) > 500
+        m2 = generate_image(
+            "a house and a tree on grass under a sky with a sun",
+            os.path.join(td, "draft2.png"),
+            res=256,
+            style="soft",
+            look="raw",
+            detail="draft",
+            seed=7,
+            path_mode=True,
+            use_cache=True,
+        )
+        assert m["cache_hit"] is False
+        assert m2["cache_hit"] is True
+
+
 def test_bbox_fill_matches_full_frame_semantics():
     """BBox fill is output-preserving: same coverage support as full raster."""
     import cnc_paths as cnc

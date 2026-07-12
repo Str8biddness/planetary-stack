@@ -31,42 +31,31 @@ import numpy as np
 LOOKS = frozenset({"raw", "photo", "cinema", "vivid", "tv"})
 
 
-def _box_blur_1d(ch: np.ndarray, radius: int, axis: int) -> np.ndarray:
-    """Constant-time box filter via cumsum along one axis."""
-    r = int(max(0, radius))
-    if r == 0:
-        return ch.astype(np.float32)
-    pad_width = [(0, 0), (0, 0)]
-    pad_width[axis] = (r, r)
-    pad = np.pad(ch.astype(np.float64), pad_width, mode="edge")
-    csum = np.cumsum(pad, axis=axis)
-    # sum of window size w=2r+1 ending at i+2r relative to unpadded...
-    # For output index i, sum pad[i : i+2r+1] = csum[i+2r] - csum[i-1]
-    w = 2 * r + 1
-    if axis == 1:
-        # csum shape (h, w+2r)
-        left = np.zeros_like(csum)
-        left[:, 1:] = csum[:, :-1]
-        # window from j to j+w-1 in padded coords, j = 0..orig_w-1 maps to pad index j
-        # sum = csum[:, j+w-1] - left[:, j]
-        out = (csum[:, w - 1 : w - 1 + ch.shape[1]] - left[:, : ch.shape[1]]) / w
-    else:
-        left = np.zeros_like(csum)
-        left[1:, :] = csum[:-1, :]
-        out = (csum[w - 1 : w - 1 + ch.shape[0], :] - left[: ch.shape[0], :]) / w
-    return out.astype(np.float32)
-
-
 def box_blur(ch: np.ndarray, radius: int) -> np.ndarray:
-    """Separable multi-pass box ≈ gaussian (TV/camera soft)."""
+    """Fast blur via PIL Gaussian (C) — replaces multi-pass numpy box.
+
+    Accepts HxW or HxWxC float arrays. Radius is approximate pixel sigma.
+    """
     r = int(max(0, radius))
     if r <= 0:
-        return ch.astype(np.float32)
-    out = ch.astype(np.float32)
-    for _ in range(3):
-        out = _box_blur_1d(out, r, axis=1)
-        out = _box_blur_1d(out, r, axis=0)
-    return out
+        return np.asarray(ch, dtype=np.float32)
+    from PIL import Image, ImageFilter
+
+    arr = np.asarray(ch, dtype=np.float32)
+    # PIL works in 0–255; preserve scale by normalizing with a safe max
+    scale = float(max(float(arr.max()), 1e-6))
+    sigma = max(0.5, r * 0.65)
+    if arr.ndim == 2:
+        u8 = np.clip(arr / scale * 255.0, 0, 255).astype(np.uint8)
+        im = Image.fromarray(u8, mode="L")
+        im = im.filter(ImageFilter.GaussianBlur(radius=sigma))
+        return (np.asarray(im, dtype=np.float32) / 255.0) * scale
+    if arr.ndim == 3 and arr.shape[2] >= 3:
+        u8 = np.clip(arr[..., :3] / scale * 255.0, 0, 255).astype(np.uint8)
+        im = Image.fromarray(u8, mode="RGB")
+        im = im.filter(ImageFilter.GaussianBlur(radius=sigma))
+        return (np.asarray(im, dtype=np.float32) / 255.0) * scale
+    return arr
 
 
 def _luma(img: np.ndarray) -> np.ndarray:
@@ -99,7 +88,8 @@ def bloom(img: np.ndarray, threshold: float = 0.75, amount: float = 0.35, radius
     y = _luma(img)
     mask = np.clip((y - threshold) / max(1.0 - threshold, 1e-3), 0, 1)
     bright = img * mask[..., None]
-    blur = np.stack([box_blur(bright[..., k], radius) for k in range(3)], -1)
+    # Single RGB blur (faster than 3× mono)
+    blur = box_blur(bright, radius)
     return np.clip(img + blur * amount, 0, 8.0).astype(np.float32)
 
 
@@ -125,8 +115,9 @@ def depth_of_field(
         depth = np.clip(yy, 0, 1)
         focus = float(np.clip(focus, 0.15, 0.95))
         coc = np.clip(np.abs(depth - focus) * 1.4 + np.clip(horizon - yy, 0, 1) * 0.15, 0, 1)
-    soft = np.stack([box_blur(img[..., k], max(1, max_radius)) for k in range(3)], -1)
-    softer = np.stack([box_blur(img[..., k], max(2, max_radius + 2)) for k in range(3)], -1)
+    # Two RGB blurs (not 6 mono channel blurs)
+    soft = box_blur(img, max(1, max_radius))
+    softer = box_blur(img, max(2, max_radius + 2))
     a = (coc * amount).astype(np.float32)[..., None]
     mid = img * (1 - np.clip(a * 1.2, 0, 1)) + soft * np.clip(a * 1.2, 0, 1)
     a2 = np.clip((coc - 0.4) * 2.0 * amount, 0, 1)[..., None]
@@ -160,7 +151,7 @@ def filmic_tonemap(img: np.ndarray) -> np.ndarray:
 
 def local_contrast(img: np.ndarray, amount: float = 0.22, radius: int = 4) -> np.ndarray:
     y = _luma(img)
-    blur = box_blur(y, radius)
+    blur = box_blur(y, max(1, radius))
     detail = y - blur
     y2 = np.clip(y + detail * amount, 0, 1)
     scale = (y2 / (y + 1e-5))[..., None]
@@ -210,18 +201,23 @@ def apply_camera_look(
     pipeline: list[str] = []
     x = np.clip(img.astype(np.float32), 0, 4.0)
 
+    # Smaller blur radii — PIL gaussian is strong; less radius, same look, less cost
     if look == "cinema":
         temp, iso, bloom_amt, dof_amt, contrast = 4800.0, 400.0, 0.28, 0.65, 0.18
         target = 0.16
+        bloom_r, dof_r = 4, 3
     elif look == "vivid":
         temp, iso, bloom_amt, dof_amt, contrast = 6000.0, 100.0, 0.40, 0.35, 0.32
         target = 0.20
+        bloom_r, dof_r = 4, 2
     elif look == "tv":
         temp, iso, bloom_amt, dof_amt, contrast = 6500.0, 100.0, 0.22, 0.20, 0.38
         target = 0.22
+        bloom_r, dof_r = 3, 2
     else:
         temp, iso, bloom_amt, dof_amt, contrast = 5600.0, 200.0, 0.32, 0.50, 0.24
         target = 0.18
+        bloom_r, dof_r = 4, 3
 
     x, gain = auto_exposure(x, target=target)
     pipeline.append(f"ae_gain={gain:.3f}")
@@ -241,14 +237,14 @@ def apply_camera_look(
         )
         pipeline.append("sun_flare")
 
-    x = bloom(x, threshold=0.72, amount=bloom_amt, radius=6 if look != "tv" else 3)
+    x = bloom(x, threshold=0.72, amount=bloom_amt, radius=bloom_r)
     pipeline.append("bloom")
     # True DOF when per-object depth map present; else y-proxy
     fd = 0.35 if focus_depth is None else float(focus_depth)
     if depth_map is None:
         fd = 0.62  # legacy y-focus
     x = depth_of_field(
-        x, yy, horizon, focus=fd, amount=dof_amt, max_radius=4, depth_map=depth_map
+        x, yy, horizon, focus=fd, amount=dof_amt, max_radius=dof_r, depth_map=depth_map
     )
     pipeline.append("dof_z" if depth_map is not None else "dof_y")
     if look in ("photo", "cinema"):
@@ -257,7 +253,7 @@ def apply_camera_look(
 
     x = filmic_tonemap(x)
     pipeline.append("filmic")
-    x = local_contrast(x, amount=contrast, radius=3 if look == "tv" else 4)
+    x = local_contrast(x, amount=contrast, radius=2 if look == "tv" else 3)
     pipeline.append("clarity")
     x = sensor_noise(x, iso=iso, seed=seed)
     pipeline.append(f"iso={iso:.0f}")
