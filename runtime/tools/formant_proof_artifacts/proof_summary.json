@@ -1,0 +1,54 @@
+{
+  "result": "BLOCKED-partial-intelligibility",
+  "tone_peak_mean": 121.48,
+  "phrases": [
+    {
+      "text": "hello world",
+      "path": "/tmp/formant_proof/hello_world.wav",
+      "peak_mean_ratio": 26.3,
+      "speech_like": true,
+      "band_energy": {
+        "F1_200_900": 0.02348,
+        "F2_900_2500": 0.00469,
+        "F3_2500_4000": 0.00148,
+        "hi_4000_plus": 0.00026
+      },
+      "phonemes": "hello:HH EH L OW | world:W ER L D",
+      "asr": "hello world",
+      "keyword_hits": [
+        "hello",
+        "world"
+      ],
+      "must": [
+        "hello",
+        "world"
+      ]
+    },
+    {
+      "text": "the quick brown fox",
+      "path": "/tmp/formant_proof/fox.wav",
+      "peak_mean_ratio": 15.62,
+      "speech_like": true,
+      "band_energy": {
+        "F1_200_900": 0.0149,
+        "F2_900_2500": 0.00576,
+        "F3_2500_4000": 0.00194,
+        "hi_4000_plus": 0.00135
+      },
+      "phonemes": "the:DH AH | quick:K W IH K | brown:B R AW N | fox:F AA K S",
+      "asr": "",
+      "keyword_hits": [],
+      "must": [
+        "the",
+        "quick",
+        "brown",
+        "fox"
+      ]
+    }
+  ],
+  "spectral_ok": true,
+  "intelligibility_ok": false,
+  "hello_world_ok": true,
+  "fox_hits": 0,
+  "exit_code": 1
+}
