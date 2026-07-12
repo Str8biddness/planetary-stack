@@ -67,7 +67,9 @@ from api.schemas import ( # type: ignore
     ProcessResponse,
     ErrorResponse,
     CharacterEvolutionResponse,
-    SpawnCharacterRequest
+    SpawnCharacterRequest,
+    ImageRequest,
+    ImageResponse,
 )
 from api.database import init_db, SessionLocal, APIKey, UsageMetric # type: ignore
 
@@ -1588,7 +1590,8 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     Reasons the prompt into a resolution-free scene graph and renders an HD
     raster locally — deterministic, CPU-only, no diffusion. Renders concepts in
     the visual vocabulary; unknown words map to the nearest renderable concept.
-    Returns the PNG as base64 plus the real scene entities. Degrades LOUDLY
+    Supports style (flat|soft|night), seed, aspect, and process-local LRU cache.
+    Returns the PNG as base64 plus real scene entities. Degrades LOUDLY
     (503 with the reason) if the engine/deps are unavailable — never a fake image.
     """
     global _request_count
@@ -1602,14 +1605,22 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         body = await req.json()
     except Exception:
         raise HTTPException(400, "Invalid JSON")
-    prompt = (body.get("prompt") or "").strip()
+
+    try:
+        image_req = ImageRequest(**body)
+    except Exception as e:
+        raise HTTPException(400, f"Invalid image request: {e}")
+
+    prompt = image_req.prompt.strip()
     if not prompt:
         raise HTTPException(400, "prompt is required")
-    try:
-        res = int(body.get("resolution", 1024))
-    except (TypeError, ValueError):
-        res = 1024
-    res = max(128, min(2048, res))  # bound render size
+    res = image_req.resolution
+    style = (image_req.style or "flat").lower().strip()
+    if style not in ("flat", "soft", "night"):
+        style = "flat"
+    seed = image_req.seed
+    aspect = image_req.aspect
+    use_cache = bool(image_req.use_cache)
 
     try:
         from image_service import generate_image, renderable_vocabulary
@@ -1627,7 +1638,16 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     out_path = os.path.join(tempfile.gettempdir(), f"synth_img_{uuid.uuid4().hex[:12]}.png")
     t0 = time.time()
     try:
-        meta = await run_in_threadpool(generate_image, prompt, out_path, res)
+        meta = await run_in_threadpool(
+            generate_image,
+            prompt,
+            out_path,
+            res,
+            style,
+            seed,
+            aspect,
+            use_cache,
+        )
         with open(out_path, "rb") as f:
             png_b64 = base64.b64encode(f.read()).decode("ascii")
     except Exception as e:
@@ -1642,18 +1662,32 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         except OSError:
             pass
 
-    return JSONResponse(content={
+    payload = {
         "ok": True,
-        "engine": "synthesus_vsa_geometric",
+        "engine": meta.get("engine", "synthesus_vsa_geometric"),
         "prompt": prompt,
         "resolution": res,
+        "width": meta.get("width"),
+        "height": meta.get("height"),
+        "style": style,
+        "seed": seed,
+        "aspect": aspect,
         "entities": meta.get("entities", []),
         "entity_count": meta.get("entity_count", 0),
+        "roles": meta.get("roles", []),
         "renderable_vocabulary": renderable_vocabulary(),
+        "cache_hit": bool(meta.get("cache_hit")),
         "latency_ms": round((time.time() - t0) * 1000.0, 1),
         "image_base64": png_b64,
         "mime_type": "image/png",
-    })
+        "vocab_version": meta.get("vocab_version"),
+    }
+    # Validate envelope against schema (keeps contract honest)
+    try:
+        ImageResponse(**payload)
+    except Exception as ve:
+        logger.warning("ImageResponse validation soft-fail: %s", ve)
+    return JSONResponse(content=payload)
 
 
 @app.post("/api/v1/drive/ingest")

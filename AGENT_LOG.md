@@ -212,3 +212,44 @@ Server log: KernelBridge initialized in ipc mode
 1. Claude review + merge `feat/launch-smoke`
 2. Redeploy install dir with `tools/redeploy_install.sh` on the box that ships
 3. Optional: re-run smoke after redeploy with production API key
+
+## 2026-07-12 — feat/image-roundout
+
+### Mission
+Optimize + scale SI image generation into a well-rounded illustration product
+(not diffusion). No CNC/G-code, no new swarm features.
+
+### What changed
+- `runtime/packages/reasoning/vsa_pipeline_image.py`
+  - Full SHAPES ↔ renderer parity (`house`, `star_top`, fire inner flame)
+  - Multi-object layout packing (ground + sky slots, seed jitter)
+  - Styles: `flat` | `soft` | `night`
+  - Aspect ratio + float32 raster
+  - Richer tree canopy (layered discs) + multi-blob clouds
+- `runtime/packages/reasoning/image_service.py`
+  - LRU PNG cache (prompt+res+style+seed+aspect), env `SYNTHESUS_IMAGE_CACHE_SIZE`
+  - Forwards style/seed/aspect; reports `cache_hit`, dims, roles
+- `runtime/packages/api/schemas.py` — `ImageRequest` / `ImageResponse`
+- `runtime/packages/api/production_server.py` — validates request, returns full envelope
+- `runtime/tests/test_image_roundout.py` — 9 golden/parity tests
+
+### Verified (pasted)
+```
+pytest tests/test_image_roundout.py -v
+→ 9 passed
+
+python packages/reasoning/image_service.py
+→ entities: house, tree, grass, sky, sun, star
+→ PNG 43966 bytes; cache_hit second call: True
+```
+
+### Honest ceiling
+Still SI procedural illustration (~26 vocab concepts), not photoreal.
+Photoreal / local SD remains optional future tier with explicit labeling.
+
+### Left off
+- Desktop Image Studio UI (next if product wants it)
+- Optional raw PNG URL response (base64 still default)
+- C++ optics paint acceleration (measure first)
+
+### Do NOT merge without Claude review.

@@ -226,3 +226,56 @@ class PatternIngest(BaseModel):
     domain: Optional[str] = "general"
     character_id: Optional[str] = None
     create_character: bool = False
+
+
+# --- SI Image Generation (procedural VSA/geometric — not diffusion) ---
+
+class ImageRequest(BaseModel):
+    """Request for POST /api/v1/image (SI illustration engine)."""
+    prompt: str = Field(..., min_length=1, max_length=2000, description="Scene description")
+    resolution: int = Field(
+        1024,
+        ge=128,
+        le=2048,
+        description="Long-edge resolution in pixels (128–2048)",
+    )
+    style: str = Field(
+        "flat",
+        description="Render style: flat | soft | night",
+    )
+    seed: Optional[int] = Field(
+        None,
+        description="Optional deterministic layout seed; omit for prompt-stable default",
+    )
+    aspect: float = Field(
+        1.0,
+        ge=0.5,
+        le=2.0,
+        description="Width/height aspect ratio (0.5–2.0). 1.0 = square.",
+    )
+    use_cache: bool = Field(
+        True,
+        description="Serve from process LRU cache when prompt+params match",
+    )
+
+
+class ImageResponse(BaseModel):
+    """Response envelope for SI image generation."""
+    ok: bool = True
+    engine: str = "synthesus_vsa_geometric"
+    prompt: str
+    resolution: int
+    width: Optional[int] = None
+    height: Optional[int] = None
+    style: str = "flat"
+    seed: Optional[int] = None
+    aspect: float = 1.0
+    entities: List[str] = Field(default_factory=list)
+    entity_count: int = 0
+    roles: List[str] = Field(default_factory=list)
+    renderable_vocabulary: List[str] = Field(default_factory=list)
+    cache_hit: bool = False
+    latency_ms: float = 0.0
+    image_base64: str
+    mime_type: str = "image/png"
+    vocab_version: Optional[str] = None
