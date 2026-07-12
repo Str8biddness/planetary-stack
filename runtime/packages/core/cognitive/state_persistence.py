@@ -18,6 +18,7 @@ Cost: ~1-5ms save, ~2-8ms load for 100 NPCs. Zero GPU.
 
 from __future__ import annotations
 
+import re
 import json
 import os
 import shutil
@@ -665,7 +666,10 @@ class SaveManager:
         if engines:
             for char_id, engine in engines.items():
                 npc_state = CognitiveStateSerializer.extract_state(engine)
-                npc_path = self._npc_dir / f"{char_id}.json"
+                # char_id derives from the user-supplied `character` field; keep it
+                # filename-safe so it can't escape _npc_dir (path traversal).
+                _safe_char = re.sub(r"[^A-Za-z0-9_-]", "", str(char_id))[:64] or "invalid"
+                npc_path = self._npc_dir / f"{_safe_char}.json"
                 npc_path.write_text(json.dumps(npc_state, indent=2, default=str))
                 saved_npcs.append(char_id)
                 saved_files.append(str(npc_path))

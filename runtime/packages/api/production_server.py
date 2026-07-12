@@ -24,6 +24,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sys
 import time
 import uuid
@@ -516,7 +517,11 @@ MAX_ENGINES = 50
 class _PersistentList(list):
     def __init__(self, data_dir, sid):
         super().__init__()
-        self.path = os.path.join(data_dir, f"{sid}.json")
+        # sid is a user-supplied session_id that becomes a filename; keep only
+        # filename-safe chars so a crafted session_id like '../../x' cannot escape
+        # data_dir and write JSON to an arbitrary path (path traversal).
+        safe = re.sub(r"[^A-Za-z0-9_-]", "", str(sid))[:64] or "invalid"
+        self.path = os.path.join(data_dir, f"{safe}.json")
     def append(self, item):
         super().append(item)
         self._save()
