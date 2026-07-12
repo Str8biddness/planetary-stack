@@ -239,7 +239,8 @@ class ImageRequest(BaseModel):
         le=2048,
         description=(
             "Long-edge resolution in pixels (128–2048). Default 512 for interactive SI "
-            "renders; 1024+ is slower (CPU geometric pipeline, not diffusion)."
+            "renders (CPU geometric pipeline, not diffusion); 1024+ is slower — the "
+            "per-object SDF fill is ~O(res^2) until the bbox-restricted fill lands."
         ),
     )
     style: str = Field(
