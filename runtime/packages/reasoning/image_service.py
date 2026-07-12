@@ -9,6 +9,7 @@ Wow layer:
   - variations: N seeds in one call
   - style / seed / aspect knobs
   - shared scene graph + parallel multi-frame (multiview / orbit / time)
+  - scene_plan: rules (+ optional LLM) compile synonyms/composites → SI graph
 """
 from __future__ import annotations
 
@@ -50,7 +51,7 @@ _DISK_ENABLED = os.environ.get("SYNTHESUS_IMAGE_DISK_CACHE_OFF", "").strip() not
 STYLES = sorted(vpi.STYLES)
 DETAILS = ("draft", "standard", "high")
 # Bump when SHAPES, path raster, ISP, or materials change — invalidates disk/memory cache.
-ENGINE_VERSION = "si-image-v4.1-draft-isp"
+ENGINE_VERSION = "si-image-v5-scene-plan"
 VOCAB_VERSION = ENGINE_VERSION  # alias for API meta field
 LOOKS = ("raw", "photo", "cinema", "vivid", "tv")
 
@@ -117,12 +118,14 @@ def _cache_key(
     yaw_deg: float = 0.0,
     pitch_deg: float = 0.0,
     time_of_day: Optional[float] = None,
+    plan_fp: str = "",
 ) -> str:
     tod = "none" if time_of_day is None else f"{float(time_of_day):.4f}"
     raw = (
         f"engine={ENGINE_VERSION}|{prompt.strip()}|{res}|{style}|{seed}|"
         f"{aspect:.4f}|{detail}|{look}|path={int(bool(path_mode))}|"
-        f"yaw={float(yaw_deg):.3f}|pitch={float(pitch_deg):.3f}|t={tod}"
+        f"yaw={float(yaw_deg):.3f}|pitch={float(pitch_deg):.3f}|t={tod}|"
+        f"plan={plan_fp or 'none'}"
     )
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -191,6 +194,10 @@ def generate_image(
     return_level: bool = False,
     scene_doc: Optional[list] = None,
     scene_horizon: Optional[float] = None,
+    compile_plan: bool = True,
+    use_llm_plan: Optional[bool] = None,
+    scene_plan: Optional[dict] = None,
+    return_plan: bool = True,
 ) -> dict[str, Any]:
     """Reason ``prompt`` into a scene graph and render it to ``out_path`` (PNG).
 
@@ -201,6 +208,9 @@ def generate_image(
     yaw_deg/pitch_deg: camera orbit/tilt (parallax by Z). time_of_day: 0..1 sun path.
     return_level: attach serializable SI level JSON object for world export.
     scene_doc/scene_horizon: optional prebuilt graph (shared across multiview/orbit frames).
+    compile_plan: run scene_plan compiler (synonyms + composite puzzle pieces).
+    use_llm_plan: optional LLM enrich (None = env SYNTHESUS_IMAGE_LLM_PLAN).
+    scene_plan: precomputed plan dict (skips compile when provided).
     """
     # Apply cinematic preset pack (fills missing knobs only)
     if preset:
@@ -260,9 +270,56 @@ def generate_image(
     if time_of_day is not None:
         time_of_day = float(np.clip(float(time_of_day), 0.0, 1.0))
 
+    # ── Scene plan: outer/inner compile → SI shapes (not diffusion) ──
+    plan: Optional[dict[str, Any]] = scene_plan
+    plan_fp = ""
+    user_prompt = prompt
+    si_prompt = prompt
+    if plan is None and compile_plan and scene_doc is None:
+        try:
+            import scene_plan as _sp
+            plan = _sp.compile_scene_plan(prompt, use_llm=use_llm_plan)
+            si_prompt = (plan.get("si_prompt") or prompt).strip() or prompt
+            plan_fp = _sp.plan_fingerprint(plan)
+            cam = plan.get("camera") or {}
+            if time_of_day is None and cam.get("time_of_day") is not None:
+                time_of_day = float(np.clip(float(cam["time_of_day"]), 0.0, 1.0))
+            # Mood from plan only fills soft defaults (never override explicit raw/cinema/tv)
+            if look == "photo" and cam.get("look") in LOOKS:
+                look = cam["look"]
+            if cam.get("style") == "night" and style in ("soft", "flat", "photo"):
+                style = "night"
+        except Exception as pe:
+            plan = {
+                "version": "error",
+                "source_prompt": prompt,
+                "si_prompt": prompt,
+                "construction": "native",
+                "monologue": f"plan compile failed: {pe}",
+                "outer_voice": "SI illustration (plan compiler unavailable).",
+                "compile_steps": [f"plan_error:{type(pe).__name__}"],
+                "source": "fallback",
+                "llm_status": "error",
+                "entities": [],
+                "composites": [],
+                "camera": {},
+                "missing": [],
+                "honesty": "si_construct",
+                "not_diffusion": True,
+            }
+            si_prompt = prompt
+    elif plan is not None:
+        try:
+            import scene_plan as _sp
+            si_prompt = (plan.get("si_prompt") or prompt).strip() or prompt
+            plan_fp = _sp.plan_fingerprint(plan)
+        except Exception:
+            si_prompt = plan.get("si_prompt") or prompt
+            plan_fp = "given"
+
     key = _cache_key(
-        prompt, res, style, seed, aspect, detail, look, path_mode,
-        yaw_deg, pitch_deg, time_of_day,
+        user_prompt, res, style, seed, aspect, detail, look, path_mode,
+        yaw_deg, pitch_deg, time_of_day, plan_fp=plan_fp,
     )
     t0 = time.time()
 
@@ -288,7 +345,7 @@ def generate_image(
         horizon = float(scene_horizon)
     else:
         doc, horizon = vpi.pattern_document(
-            prompt,
+            si_prompt,
             s["imag"],
             s["vidx"],
             s["E"],
@@ -296,6 +353,15 @@ def generate_image(
             style=paint_style,
             path_mode=path_mode,
         )
+        # Inject composite puzzle pieces from plan
+        if plan and plan.get("composites"):
+            try:
+                import scene_plan as _sp
+                doc = _sp.inject_composites(
+                    doc, plan, horizon, seed=seed, path_mode=path_mode,
+                )
+            except Exception:
+                pass
     camera_meta = None
     if abs(yaw_deg) > 1e-6 or abs(pitch_deg) > 1e-6 or time_of_day is not None:
         try:
@@ -407,7 +473,28 @@ def generate_image(
         "bytes": len(png_bytes),
         "isp": getattr(vpi.render_doc, "last_isp_meta", None),
         "depth": getattr(vpi.render_doc, "last_depth_stats", None),
+        "user_prompt": user_prompt,
+        "si_prompt": si_prompt,
+        "construction": (plan or {}).get("construction"),
+        "outer_voice": (plan or {}).get("outer_voice"),
+        "monologue": (plan or {}).get("monologue"),
+        "not_diffusion": True,
     }
+    if plan and return_plan:
+        try:
+            import scene_plan as _sp
+            meta["scene_plan"] = _sp.public_plan_view(plan, full=False)
+        except Exception:
+            meta["scene_plan"] = {
+                "construction": plan.get("construction"),
+                "si_prompt": plan.get("si_prompt"),
+                "outer_voice": plan.get("outer_voice"),
+            }
+    composite_n = sum(1 for p in doc if p.get("construction") == "plan_composite")
+    if composite_n:
+        meta["composite_parts"] = composite_n
+        if "plan_composite" not in (meta.get("engine") or ""):
+            meta["engine"] = (meta.get("engine") or "") + "+plan_composite"
     try:
         from PIL import Image as _Im
         with _Im.open(out_path) as im:
@@ -507,19 +594,26 @@ def generate_variations(
     return results
 
 
-def _build_base_scene(prompt, seed, style, path_mode, detail):
+def _build_base_scene(prompt, seed, style, path_mode, detail, plan=None, use_llm_plan=None):
     """Shared scene graph for multi-frame sequences (built once).
 
-    ``detail`` is accepted for call-site symmetry; pocket skipping is applied
-    per-frame inside generate_image when detail==draft.
+    Compiles scene_plan (synonyms + composites) then builds the document.
+    ``detail`` reserved for per-frame draft pocket skipping in generate_image.
     """
     _ = detail
+    if plan is None:
+        try:
+            import scene_plan as _sp
+            plan = _sp.compile_scene_plan(prompt, use_llm=use_llm_plan)
+        except Exception:
+            plan = None
+    si_prompt = (plan or {}).get("si_prompt") or prompt
     s = _imagination()
     paint_style = "soft" if style == "photo" else style
     if paint_style not in ("flat", "soft", "night"):
         paint_style = "soft"
     doc, horizon = vpi.pattern_document(
-        prompt,
+        si_prompt,
         s["imag"],
         s["vidx"],
         s["E"],
@@ -527,7 +621,13 @@ def _build_base_scene(prompt, seed, style, path_mode, detail):
         style=paint_style,
         path_mode=path_mode,
     )
-    return doc, horizon
+    if plan and plan.get("composites"):
+        try:
+            import scene_plan as _sp
+            doc = _sp.inject_composites(doc, plan, horizon, seed=seed, path_mode=path_mode)
+        except Exception:
+            pass
+    return doc, horizon, plan
 
 
 def generate_multiview(
@@ -572,7 +672,7 @@ def generate_multiview(
         except Exception:
             pass
 
-    base_doc, base_h = _build_base_scene(prompt, seed, style, path_mode, detail)
+    base_doc, base_h, base_plan = _build_base_scene(prompt, seed, style, path_mode, detail)
     tmpdir = tempfile.mkdtemp(prefix="synth_img_mv_")
     results: list[Optional[dict]] = [None] * len(yaws)
 
@@ -583,7 +683,8 @@ def generate_multiview(
             prompt, out, res=res, style=style, seed=seed, aspect=aspect,
             use_cache=use_cache, detail=detail, look=look, path_mode=path_mode,
             yaw_deg=yaw, time_of_day=time_of_day, pitch_deg=pitch_deg,
-            scene_doc=base_doc, scene_horizon=base_h,
+            scene_doc=base_doc, scene_horizon=base_h, scene_plan=base_plan,
+            compile_plan=False,
         )
         with open(out, "rb") as f:
             png = f.read()
@@ -643,7 +744,7 @@ def generate_time_sequence(
     import world_camera as wc
 
     times = wc.time_schedule(n=n, t0=t0, t1=t1)
-    base_doc, base_h = _build_base_scene(prompt, seed, style, path_mode, detail)
+    base_doc, base_h, base_plan = _build_base_scene(prompt, seed, style, path_mode, detail)
     results: list = [None] * len(times)
     tmpdir = tempfile.mkdtemp(prefix="synth_img_ts_")
 
@@ -654,7 +755,8 @@ def generate_time_sequence(
             prompt, out, res=res, style=style, seed=seed, aspect=aspect,
             use_cache=use_cache, detail=detail, look=look, path_mode=path_mode,
             yaw_deg=yaw_deg, time_of_day=t, pitch_deg=pitch_deg,
-            scene_doc=base_doc, scene_horizon=base_h,
+            scene_doc=base_doc, scene_horizon=base_h, scene_plan=base_plan,
+            compile_plan=False,
         )
         with open(out, "rb") as f:
             png = f.read()
@@ -736,7 +838,7 @@ def generate_orbit_day(
     n = max(2, min(12, int(n)))
     yaws = wc.yaw_schedule(n=n, span_deg=yaw_span)
     times = wc.time_schedule(n=n, t0=t0, t1=t1)
-    base_doc, base_h = _build_base_scene(prompt, seed, style, path_mode, detail)
+    base_doc, base_h, base_plan = _build_base_scene(prompt, seed, style, path_mode, detail)
     results: list = [None] * n
     tmpdir = tempfile.mkdtemp(prefix="synth_img_od_")
 
@@ -746,7 +848,8 @@ def generate_orbit_day(
             prompt, out, res=res, style=style, seed=seed, aspect=aspect,
             use_cache=use_cache, detail=detail, look=look, path_mode=path_mode,
             yaw_deg=yaws[i], time_of_day=times[i], pitch_deg=pitch_deg,
-            scene_doc=base_doc, scene_horizon=base_h,
+            scene_doc=base_doc, scene_horizon=base_h, scene_plan=base_plan,
+            compile_plan=False,
         )
         with open(out, "rb") as f:
             png = f.read()
@@ -845,6 +948,11 @@ def execute_image_request(
     return_level = bool(params.get("return_level", False))
     orbit_day = bool(params.get("orbit_day", False))
     orbit_frames = max(2, min(12, int(params.get("orbit_frames") or 6)))
+    compile_plan = bool(params.get("compile_plan", True))
+    use_llm_plan = params.get("use_llm_plan")  # None | bool
+    if isinstance(use_llm_plan, str):
+        use_llm_plan = use_llm_plan.strip().lower() in ("1", "true", "yes", "on")
+    return_plan = bool(params.get("return_plan", True))
 
     t0 = _time.time()
     _p("starting", 0.05)
@@ -905,6 +1013,12 @@ def execute_image_request(
         }
         if primary.get("animation"):
             out["animation"] = primary["animation"]
+        for k in (
+            "scene_plan", "outer_voice", "monologue", "construction",
+            "si_prompt", "user_prompt", "composite_parts", "not_diffusion",
+        ):
+            if primary.get(k) is not None:
+                out[k] = primary.get(k)
         return out
 
     if orbit_day:
@@ -971,6 +1085,9 @@ def execute_image_request(
         meta = generate_image(
             prompt, out_path, res, style, seed, aspect, use_cache, detail,
             look, path_mode, preset, yaw_deg, time_of_day, pitch_deg, return_level,
+            compile_plan=compile_plan,
+            use_llm_plan=use_llm_plan,
+            return_plan=return_plan,
         )
         with open(out_path, "rb") as f:
             png_b64 = base64.b64encode(f.read()).decode("ascii")
@@ -1013,6 +1130,15 @@ def execute_image_request(
         "time_of_day": meta.get("time_of_day", time_of_day),
         "camera": meta.get("camera"),
         "level": meta.get("level"),
+        "scene_plan": meta.get("scene_plan"),
+        "outer_voice": meta.get("outer_voice"),
+        "monologue": meta.get("monologue"),
+        "construction": meta.get("construction"),
+        "si_prompt": meta.get("si_prompt"),
+        "user_prompt": meta.get("user_prompt", prompt),
+        "composite_parts": meta.get("composite_parts"),
+        "not_diffusion": True,
+        "engine_version": meta.get("engine_version"),
     }
     _p("done", 1.0)
     return payload

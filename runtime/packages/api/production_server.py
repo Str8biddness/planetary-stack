@@ -1625,7 +1625,7 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     aspect = image_req.aspect
     use_cache = bool(image_req.use_cache)
     detail = (getattr(image_req, "detail", None) or "high").lower().strip()
-    if detail not in ("standard", "high"):
+    if detail not in ("draft", "standard", "high"):
         detail = "high"
     n_var = int(getattr(image_req, "variations", 1) or 1)
     n_var = max(1, min(8, n_var))
@@ -1679,6 +1679,9 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     orbit_frames = int(getattr(image_req, "orbit_frames", 6) or 6)
     orbit_frames = max(2, min(12, orbit_frames))
     async_mode = bool(getattr(image_req, "async_mode", False))
+    compile_plan = bool(getattr(image_req, "compile_plan", True))
+    use_llm_plan = getattr(image_req, "use_llm_plan", None)
+    return_plan = bool(getattr(image_req, "return_plan", True))
 
     # Soft-DoS guard: high-res / multi-frame auto-async unless client forces sync
     multi = bool(orbit_day or n_frames > 1 or n_views > 1 or n_var > 1)
@@ -1714,6 +1717,9 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         "return_level": return_level,
         "orbit_day": orbit_day,
         "orbit_frames": orbit_frames,
+        "compile_plan": compile_plan,
+        "use_llm_plan": use_llm_plan,
+        "return_plan": return_plan,
     }
 
     try:

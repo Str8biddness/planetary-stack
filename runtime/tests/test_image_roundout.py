@@ -276,7 +276,7 @@ def test_detail_high_and_variations():
 
 
 def test_draft_detail_and_engine_v4():
-    """Draft is a real detail mode; engine cache key is v4 isp-parallel."""
+    """Draft is a real detail mode; engine cache key is v5+."""
     from image_service import (
         ENGINE_VERSION,
         DETAILS,
@@ -285,7 +285,7 @@ def test_draft_detail_and_engine_v4():
     )
 
     assert "draft" in DETAILS
-    assert ENGINE_VERSION.startswith("si-image-v4")
+    assert ENGINE_VERSION.startswith("si-image-v")
 
     clear_image_cache(disk=True)
     with tempfile.TemporaryDirectory() as td:
@@ -302,7 +302,7 @@ def test_draft_detail_and_engine_v4():
             use_cache=True,
         )
         assert m["detail"] == "draft"
-        assert str(m.get("engine_version", "")).startswith("si-image-v4")
+        assert str(m.get("engine_version", "")).startswith("si-image-v")
         assert m.get("path_mode") is True
         assert (m.get("path_entities") or 0) >= 1
         assert os.path.getsize(out) > 500
@@ -338,6 +338,84 @@ def test_draft_detail_and_engine_v4():
         isp = mp.get("isp") or {}
         if isp:
             assert isp.get("quality") == "draft"
+
+
+def test_scene_plan_compile_and_composite_render():
+    """Rules compiler maps synonyms + assembles puzzle-piece composites."""
+    import scene_plan as sp
+    from image_service import generate_image, clear_image_cache, execute_image_request
+
+    plan = sp.compile_scene_plan(
+        "a lonely cabin by a creek at golden hour",
+        use_llm=False,
+    )
+    assert plan["not_diffusion"] is True
+    roles = {e["role"] for e in plan["entities"]}
+    maps_to = [e["maps_to"] for e in plan["entities"]]
+    # cabin is a SHAPES key (role house); creek/river water present
+    assert "house" in roles
+    assert "river" in roles or any(m in ("river", "stream", "creek", "lake") for m in maps_to)
+    assert plan.get("camera", {}).get("time_of_day") is not None
+    assert "si_prompt" in plan and plan["si_prompt"]
+    assert plan.get("outer_voice")
+    assert plan.get("monologue")
+    # "hour" from golden hour must not become a composite object
+    assert "hour" not in [c["name"] for c in plan["composites"]]
+
+    plan2 = sp.compile_scene_plan("espresso machine on a table under a sky", use_llm=False)
+    names = [c["name"] for c in plan2["composites"]]
+    assert "espresso_machine" in names
+    assert "table" in names
+    roles = []
+    for c in plan2["composites"]:
+        roles.extend(p["role"] for p in c["parts"])
+    assert "building" in roles
+    assert all(r in sp.VALID_ROLES for r in roles)
+
+    clear_image_cache(disk=True)
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "espresso.png")
+        m = generate_image(
+            "espresso machine on grass under a sky",
+            out,
+            res=192,
+            style="soft",
+            look="raw",
+            detail="standard",
+            seed=3,
+            path_mode=True,
+            use_cache=False,
+            compile_plan=True,
+            use_llm_plan=False,
+        )
+        assert os.path.getsize(out) > 500
+        assert m.get("construction") in ("composite", "mixed", "mapped", "native")
+        assert m.get("scene_plan")
+        assert m.get("not_diffusion") is True
+        # composite parts should appear in entity list
+        ents = " ".join(str(e) for e in (m.get("entities") or []))
+        assert "espresso" in ents or (m.get("composite_parts") or 0) >= 1
+
+    payload = execute_image_request({
+        "prompt": "a robot near a house on grass under a sky",
+        "resolution": 160,
+        "style": "soft",
+        "look": "raw",
+        "detail": "standard",
+        "path_mode": True,
+        "use_cache": False,
+        "seed": 4,
+        "compile_plan": True,
+        "use_llm_plan": False,
+        "return_plan": True,
+    })
+    assert payload.get("ok") is True
+    assert payload.get("image_base64")
+    assert payload.get("scene_plan")
+    assert payload.get("outer_voice")
+    assert "robot" in str(payload.get("scene_plan")).lower() or (
+        payload.get("composite_parts") or 0
+    ) >= 1 or "robot" in " ".join(str(e) for e in payload.get("entities") or [])
 
 
 def test_bbox_fill_matches_full_frame_semantics():

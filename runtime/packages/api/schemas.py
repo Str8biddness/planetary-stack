@@ -359,6 +359,24 @@ class ImageRequest(BaseModel):
             "Auto-forced when resolution>=1024 or multi-frame (views/frames/orbit_day)."
         ),
     )
+    compile_plan: bool = Field(
+        True,
+        description=(
+            "Compile language → SI scene plan (synonyms + composite puzzle pieces). "
+            "Inner monologue + outer_voice honesty labels. Not diffusion."
+        ),
+    )
+    use_llm_plan: Optional[bool] = Field(
+        None,
+        description=(
+            "Optional LLM enrich of the scene plan (Ollama). "
+            "None = env SYNTHESUS_IMAGE_LLM_PLAN; False = rules only."
+        ),
+    )
+    return_plan: bool = Field(
+        True,
+        description="Include scene_plan / monologue / outer_voice in the response",
+    )
 
 
 class ImageResponse(BaseModel):
@@ -389,3 +407,12 @@ class ImageResponse(BaseModel):
     path_mode: bool = True
     path_entities: Optional[int] = None
     path_ops_sample: Optional[List[str]] = None
+    scene_plan: Optional[Dict[str, Any]] = None
+    outer_voice: Optional[str] = None
+    monologue: Optional[str] = None
+    construction: Optional[str] = None
+    si_prompt: Optional[str] = None
+    user_prompt: Optional[str] = None
+    composite_parts: Optional[int] = None
+    not_diffusion: bool = True
+    engine_version: Optional[str] = None

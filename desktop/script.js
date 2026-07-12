@@ -600,6 +600,8 @@ async function sendChatMessage() {
                     path_mode: true,
                     aspect: 1.0,
                     use_cache: true,
+                    compile_plan: true,
+                    return_plan: true,
                 }),
             });
             const data = await res.json().catch(() => ({}));
@@ -616,15 +618,18 @@ async function sendChatMessage() {
             const mime = data.mime_type || 'image/png';
             const src = 'data:' + mime + ';base64,' + data.image_base64;
             const ents = (data.entities || []).map(e => escapeHtml(String(e))).join(', ');
+            const voice = data.outer_voice || (data.scene_plan && data.scene_plan.outer_voice) || '';
+            const construction = data.construction || (data.scene_plan && data.scene_plan.construction) || '';
             if (bubble) {
                 bubble.innerHTML =
-                    '<strong>Synthesus:</strong> SI illustration of <em>' + escapeHtml(drawPrompt) + '</em>'
+                    '<strong>Synthesus:</strong> ' + (voice ? escapeHtml(voice) : ('SI illustration of <em>' + escapeHtml(drawPrompt) + '</em>'))
                     + '<div style="margin-top:8px;"><img src="' + src + '" alt="SI render" style="max-width:100%; border-radius:8px; border:1px solid rgba(56,189,248,.3);"></div>'
                     + '<div style="font-size:0.75rem; color:#64748b; margin-top:6px; font-family:monospace;">'
                     + (data.engine || 'synthesus_vsa_geometric') + ' · ' + (data.style || 'soft')
+                    + (construction ? ' · ' + escapeHtml(String(construction)) : '')
                     + ' · ' + (data.latency_ms != null ? data.latency_ms + 'ms' : '')
                     + (ents ? ' · ' + ents : '')
-                    + ' · local SI (not cloud AI)</div>';
+                    + ' · local SI (not diffusion)</div>';
             }
             pushImageGallery(src, drawPrompt);
             chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -2644,7 +2649,10 @@ async function runImageStudio(variations, extra) {
     const pathModeEl = document.getElementById('image-path-mode');
     const path_mode = !pathModeEl || pathModeEl.value !== '0';
     const seedRaw = (document.getElementById('image-seed') || {}).value;
-    const body = { prompt, style, look, resolution, aspect, detail, path_mode, use_cache: true, variations };
+    const body = {
+        prompt, style, look, resolution, aspect, detail, path_mode,
+        use_cache: true, variations, compile_plan: true, return_plan: true,
+    };
     if (_activeImagePreset) body.preset = _activeImagePreset;
     if (extra.views) { body.views = extra.views; body.yaw_span = extra.yaw_span || 30; body.variations = 1; }
     if (extra.frames) { body.frames = extra.frames; body.variations = 1; body.views = 1; }
@@ -2751,14 +2759,21 @@ async function runImageStudio(variations, extra) {
                 `style=${data.style || style}`,
                 `look=${data.look || look}`,
                 `detail=${data.detail || detail}`,
+                data.construction ? ('build=' + data.construction) : '',
+                data.composite_parts != null ? ('composites=' + data.composite_parts) : '',
                 path_mode ? 'cnc_paths' : 'legacy',
                 data.path_entities != null ? ('paths=' + data.path_entities) : '',
                 `${data.width || '?'}x${data.height || '?'}`,
                 `${data.latency_ms != null ? data.latency_ms + 'ms' : ''}`,
                 cacheTag,
-                data.engine || '',
                 data.vocab_version || '',
             ].filter(Boolean).join(' · ');
+            if (data.outer_voice) {
+                metaEl.textContent += '\n' + data.outer_voice;
+            }
+            if (data.si_prompt && data.si_prompt !== prompt) {
+                metaEl.textContent += '\nsi_prompt: ' + data.si_prompt;
+            }
         }
         if (entEl) {
             const ents = data.entities || [];
@@ -2767,7 +2782,8 @@ async function runImageStudio(variations, extra) {
             ).join('');
         }
         if (statusEl) {
-            statusEl.innerHTML = `<span style="color:#4ade80;">OK — ${entsSafe(data.entity_count)} entities · SI illustration (local)</span>`;
+            const build = data.construction ? (' · ' + data.construction) : '';
+            statusEl.innerHTML = `<span style="color:#4ade80;">OK — ${entsSafe(data.entity_count)} entities · SI illustration (not diffusion)${build}</span>`;
         }
     } catch (e) {
         if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Error: ${escapeHtmlStudio(e.message || e)}</span>`;

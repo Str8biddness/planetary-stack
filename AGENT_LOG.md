@@ -604,3 +604,37 @@ tests: 23 passed in 1.46s
 
 ### Branch
 `feat/image-opt-enhance` (from `feat/image-bbox-perf`) — commit `61f79cd`
+
+---
+
+## 2026-07-12 — feat/image-opt-enhance (scene plan compiler)
+
+### Mission
+Fully build LLM/rules scene compile: outer voice + inner monologue + puzzle-piece
+composites so free language maps into SI constructible shapes (not diffusion).
+
+### What changed
+- **New** `runtime/packages/reasoning/scene_plan.py`
+  - Rule compiler always on: synonyms, multi-word phrases, mood→camera,
+    composite recipes (espresso, robot, cart, windmill, table, …) + heuristic
+    assemblies from allowed roles only
+  - Optional Ollama enrich via `use_llm_plan` / `SYNTHESUS_IMAGE_LLM_PLAN`
+  - `inject_composites` appends paintable prims + optional CNC paths
+  - Honesty: `construction` native|mapped|composite|mixed, outer_voice, monologue
+- `image_service.generate_image` / `execute_image_request` default `compile_plan=True`
+- Multiview/orbit/time share planned base graph
+- API schema + production_server knobs; desktop chat draw + Studio show voice/plan
+- ENGINE_VERSION → `si-image-v5-scene-plan`
+- Tests: `test_scene_plan_compile_and_composite_render` (24 image tests green)
+
+### Usage
+```python
+# rules only (default offline)
+generate_image("espresso machine on grass under a sky", out, use_llm_plan=False)
+# optional LLM enrich
+# SYNTHESUS_IMAGE_LLM_PLAN=1  or  use_llm_plan=True
+```
+
+### Honest ceiling
+LLM/rules supply recipes and routing; SI still only paints known roles.
+Composites are procedural stand-ins, not photoreal invention.
