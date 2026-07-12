@@ -564,7 +564,7 @@ def _dims(res: int, aspect: float) -> tuple[int, int]:
 def render_doc(
     doc: list[dict[str, Any]],
     horizon: float,
-    res: int = 1024,
+    res: int = 512,
     out: str = "pipeline.png",
     style: str = "flat",
     aspect: float = 1.0,

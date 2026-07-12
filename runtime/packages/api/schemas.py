@@ -234,10 +234,13 @@ class ImageRequest(BaseModel):
     """Request for POST /api/v1/image (SI illustration engine)."""
     prompt: str = Field(..., min_length=1, max_length=2000, description="Scene description")
     resolution: int = Field(
-        1024,
+        512,
         ge=128,
         le=2048,
-        description="Long-edge resolution in pixels (128–2048)",
+        description=(
+            "Long-edge resolution in pixels (128–2048). Default 512 for interactive SI "
+            "renders; 1024+ is slower (CPU geometric pipeline, not diffusion)."
+        ),
     )
     style: str = Field(
         "soft",

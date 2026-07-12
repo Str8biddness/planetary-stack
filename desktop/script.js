@@ -297,7 +297,7 @@ async function fetchOSStatus() {
                 document.getElementById('pool-worker').innerHTML = `
                     <div style="display:flex; justify-content:space-between;"><span>CPU Usage:</span> <span style="color:#34d399;">${workerData.cpu_percent || '8'}%</span></div>
                     <div style="display:flex; justify-content:space-between;"><span>RAM Usage:</span> <span style="color:#818cf8;">${workerData.ram_percent || '22'}%</span></div>
-                    <div style="display:flex; justify-content:space-between;"><span>Neural Load:</span> <span style="color:#facc15;">Synced via WebSocket</span></div>
+                    <div style="display:flex; justify-content:space-between;"><span>SI Grid Load:</span> <span style="color:#facc15;">Synced via WebSocket</span></div>
                 `;
             } catch(e) {
                 document.getElementById('pool-worker').innerText = 'Node Offline or Refused Connection';

@@ -47,7 +47,9 @@ _DISK_ENABLED = os.environ.get("SYNTHESUS_IMAGE_DISK_CACHE_OFF", "").strip() not
 
 STYLES = sorted(vpi.STYLES)
 DETAILS = ("standard", "high")
-VOCAB_VERSION = "image-orbit-day-v1"
+# Bump when SHAPES, path raster, ISP, or materials change — invalidates disk/memory cache.
+ENGINE_VERSION = "si-image-v2-pil-fill"
+VOCAB_VERSION = ENGINE_VERSION  # alias for API meta field
 LOOKS = ("raw", "photo", "cinema", "vivid", "tv")
 
 
@@ -116,7 +118,7 @@ def _cache_key(
 ) -> str:
     tod = "none" if time_of_day is None else f"{float(time_of_day):.4f}"
     raw = (
-        f"{VOCAB_VERSION}|{prompt.strip()}|{res}|{style}|{seed}|"
+        f"engine={ENGINE_VERSION}|{prompt.strip()}|{res}|{style}|{seed}|"
         f"{aspect:.4f}|{detail}|{look}|path={int(bool(path_mode))}|"
         f"yaw={float(yaw_deg):.3f}|pitch={float(pitch_deg):.3f}|t={tod}"
     )
@@ -172,7 +174,7 @@ def _cache_put(key: str, item: dict[str, Any], write_disk: bool = True) -> None:
 def generate_image(
     prompt: str,
     out_path: str,
-    res: int = 1024,
+    res: int = 512,
     style: str = "flat",
     seed: Optional[int] = None,
     aspect: float = 1.0,

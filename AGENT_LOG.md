@@ -494,3 +494,26 @@ pytest tests/test_image_roundout.py → 20 passed
 ```
 
 ### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-perf-review-fix (Claude review blockers)
+
+### Claude findings addressed
+1. **PERF blocker** — replaced O(edges×pixels) PIP fill/stroke with PIL scanline
+   polygon/line + Gaussian soft AA. Pocket passes 3→2.
+2. **Default res** — API/schema default 1024→512.
+3. **Cache key** — explicit `ENGINE_VERSION=si-image-v2-pil-fill` in key.
+4. **Honesty** — "Neural Load/link" → "SI Grid Load" / "SI link".
+
+### Benchmark (pasted, look=raw, path_mode=True, seed=7)
+```
+res= 256     0.53s   (was ~2.7s in review env)
+res= 512     1.44s
+res=1024     7.48s   (was 79.11s — ~10× faster)
+```
+Tests: **20 passed in 2.99s** (was ~20s suite time).
+
+### Remaining non-blocking
+- 2048 still heavy; async job later
+- Further vectorize materials if needed
+
+### Do NOT merge without Claude re-verify.

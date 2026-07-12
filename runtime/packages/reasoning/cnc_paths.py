@@ -377,117 +377,73 @@ def smoothstep(a, b, x):
     return t * t * (3.0 - 2.0 * t)
 
 
-def _dist_to_segments(xx, yy, poly: np.ndarray) -> np.ndarray:
-    """Min distance from each pixel to polyline segments."""
-    h, w = xx.shape
-    best = np.full((h, w), 1e9, dtype=np.float64)
-    if len(poly) < 2:
-        return best
-    for i in range(len(poly) - 1):
-        x0, y0 = poly[i]
-        x1, y1 = poly[i + 1]
-        dx, dy = x1 - x0, y1 - y0
-        L2 = dx * dx + dy * dy
-        if L2 < 1e-14:
-            d = np.hypot(xx - x0, yy - y0)
-        else:
-            t = np.clip(((xx - x0) * dx + (yy - y0) * dy) / L2, 0, 1)
-            px = x0 + t * dx
-            py = y0 + t * dy
-            d = np.hypot(xx - px, yy - py)
-        best = np.minimum(best, d)
-    return best
+def _world_to_px(poly: np.ndarray, h: int, w: int) -> list:
+    """Normalized [0,1] world poly → pixel coordinates for PIL."""
+    scale_x = max(w - 1, 1)
+    scale_y = max(h - 1, 1)
+    return [(float(p[0]) * scale_x, float(p[1]) * scale_y) for p in poly]
+
+
+def _soft_mask(binary_u8: "Image.Image", aa_px: float) -> np.ndarray:
+    """Binary L-mode image → soft float mask via small Gaussian (cheap AA)."""
+    from PIL import ImageFilter
+
+    if aa_px <= 0.25:
+        return np.asarray(binary_u8, dtype=np.float32) / 255.0
+    r = max(0.4, min(4.0, float(aa_px) * 0.65))
+    soft = binary_u8.filter(ImageFilter.GaussianBlur(radius=r))
+    return np.asarray(soft, dtype=np.float32) / 255.0
 
 
 def raster_stroke(
     xx, yy, path: Path, width: float = 0.01, aa: float = 0.002
 ) -> np.ndarray:
-    """Coverage mask [0,1] for stroked path."""
+    """Coverage mask [0,1] for stroked path — PIL scanline (O(pixels), not O(edges×pixels))."""
+    from PIL import Image, ImageDraw
+
+    h, w = xx.shape
     poly = discretize(path, tol=max(aa * 2, 0.004))
     if len(poly) < 2:
-        return np.zeros(xx.shape, dtype=np.float32)
-    d = _dist_to_segments(xx, yy, poly)
-    half = width * 0.5
-    return (1.0 - smoothstep(half - aa, half + aa, d)).astype(np.float32)
+        return np.zeros((h, w), dtype=np.float32)
+    pts = _world_to_px(poly, h, w)
+    # width in world units → pixels
+    width_px = max(1.0, float(width) * max(h, w))
+    img = Image.new("L", (w, h), 0)
+    draw = ImageDraw.Draw(img)
+    draw.line(pts, fill=255, width=int(round(width_px)), joint="curve")
+    aa_px = max(0.0, float(aa) * max(h, w))
+    return _soft_mask(img, aa_px)
 
 
 def raster_fill(xx, yy, path: Path, aa: float = 0.002) -> np.ndarray:
-    """Even-odd style fill via matplotlib-free winding using scan approx.
-
-    Uses point-in-polygon on closed discretized contour + edge AA.
-    """
-    poly = discretize(path, tol=max(aa * 2, 0.005))
-    if len(poly) < 3:
-        return np.zeros(xx.shape, dtype=np.float32)
-    if not np.allclose(poly[0], poly[-1]):
-        poly = np.vstack([poly, poly[0]])
-    # Ray cast PIP vectorized (horizontal ray)
-    x = xx
-    y = yy
-    inside = np.zeros(xx.shape, dtype=bool)
-    for i in range(len(poly) - 1):
-        x0, y0 = poly[i]
-        x1, y1 = poly[i + 1]
-        # edge crosses horizontal ray
-        cond = ((y0 > y) != (y1 > y)) & (
-            x < (x1 - x0) * (y - y0) / (y1 - y0 + 1e-15) + x0
-        )
-        inside ^= cond
-    cov = inside.astype(np.float32)
-    # edge AA via distance
-    d = _dist_to_segments(xx, yy, poly)
-    edge = 1.0 - smoothstep(0, aa * 2, d)
-    # soft boundary
-    cov = np.maximum(cov * (1.0 - 0.0), np.minimum(1.0, cov + edge * 0.5))
-    # cleaner: inside full, edge blend
-    cov = np.where(inside, np.maximum(cov, 1.0 - smoothstep(0, aa * 2.5, d)), edge * 0.0)
-    cov = inside.astype(np.float32)
-    # soft exterior falloff into edge
-    cov = np.clip(cov + (1.0 - smoothstep(0, aa * 2, d)) * (1 - cov) * 0.0, 0, 1)
-    # distance field soft fill edge
-    cov = np.clip(
-        inside.astype(np.float32) * 1.0
-        + (~inside).astype(np.float32) * (1.0 - smoothstep(0, aa * 2.5, d)) * 0,
-        0,
-        1,
-    )
-    # final: soft edge on boundary
-    soft = 1.0 - smoothstep(-aa * 2, aa * 2, 
-                            np.where(inside, -d, d))  # signed-ish
-    # simpler reliable approach:
-    d_signed = np.where(inside, -d, d)
-    soft = 1.0 - smoothstep(0, aa * 2.5, d_signed)  # wrong for inside
-    # USE: inside=1, boundary blend
-    fill = inside.astype(np.float32)
-    border = (1.0 - smoothstep(0, aa * 2.5, d)).astype(np.float32)
-    return np.clip(np.maximum(fill, border * fill), 0, 1).astype(np.float32)
+    """Closed-path fill via PIL polygon scanline (replaces per-pixel PIP)."""
+    return raster_fill_fast(xx, yy, path, aa=aa)
 
 
 def raster_fill_fast(xx, yy, path: Path, aa: float = 0.0025) -> np.ndarray:
-    """Reliable closed-path fill with edge anti-alias."""
+    """Fast closed-path fill with soft edge AA.
+
+    Uses PIL ImageDraw.polygon (scanline) instead of O(edges × pixels) point-in-polygon.
+    This is the hot-path fix for 512–1024 SI renders.
+    """
+    from PIL import Image, ImageDraw
+
+    h, w = xx.shape
     poly = discretize(path, tol=max(aa * 2, 0.005))
     if len(poly) < 3:
-        return np.zeros(xx.shape, dtype=np.float32)
+        return np.zeros((h, w), dtype=np.float32)
     if not np.allclose(poly[0], poly[-1]):
         poly = np.vstack([poly, poly[0]])
-    x, y = xx, yy
-    inside = np.zeros(xx.shape, dtype=bool)
-    for i in range(len(poly) - 1):
-        x0, y0 = float(poly[i, 0]), float(poly[i, 1])
-        x1, y1 = float(poly[i + 1, 0]), float(poly[i + 1, 1])
-        cond = ((y0 > y) != (y1 > y)) & (
-            x < (x1 - x0) * (y - y0) / ((y1 - y0) + 1e-15) + x0
-        )
-        np.logical_xor(inside, cond, out=inside)
-    d = _dist_to_segments(xx, yy, poly)
-    # smooth: 1 inside, 0 outside, blend near edge
-    # coverage ≈ 1 - smoothstep(0, aa, signed_distance) with sd = -d inside
-    sd = np.where(inside, -d, d)
-    return (1.0 - smoothstep(0.0, aa * 2.5, sd)).astype(np.float32)
+    pts = _world_to_px(poly, h, w)
+    img = Image.new("L", (w, h), 0)
+    draw = ImageDraw.Draw(img)
+    draw.polygon(pts, fill=255)
+    aa_px = max(0.0, float(aa) * max(h, w))
+    return _soft_mask(img, aa_px)
 
 
 def pocket_passes(
-    path: Path, tool_r: float = 0.012, passes: int = 3
+    path: Path, tool_r: float = 0.012, passes: int = 2
 ) -> List[Tuple[Path, float]]:
     """Roughing → finish offset contours for closed paths (CAM multi-pass).
 
@@ -586,7 +542,8 @@ def paint_path(
         _blend_flat(raster_stroke(xx, yy, path, width=width, aa=aa))
     else:
         if pocket and path.meta.get("layer") not in ("door", "window"):
-            for pth, scale in pocket_passes(path, tool_r=max(width, 0.01), passes=3):
+            # 2 passes is enough for illustration depth; was 3× full-res PIP (perf killer)
+            for pth, scale in pocket_passes(path, tool_r=max(width, 0.01), passes=2):
                 fill = raster_fill_fast(xx, yy, pth, aa=aa)
                 _blend_mat(fill, scale=scale)
         else:
