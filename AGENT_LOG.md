@@ -475,3 +475,22 @@ pytest tests/test_image_roundout.py → 19 passed
 ```
 
 ### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-orbit-day
+
+### Mission
+Orbiting-day cinematic (yaw×time GIF) + tiny SI level viewer (X×Z map).
+
+### What changed
+- `generate_orbit_day` — same seed world, yaw+time schedules, GIF attach
+- API: `orbit_day`, `orbit_frames`
+- Studio: 🌐 Orbit day button; canvas level viewer + file open
+- Level export also paints into viewer
+- Tests: **20 passed**
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 20 passed
+```
+
+### Do NOT merge without Claude review.

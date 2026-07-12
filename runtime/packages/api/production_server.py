@@ -1675,6 +1675,9 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         gif_format = "gif"
     gif_duration_ms = int(getattr(image_req, "gif_duration_ms", 400) or 400)
     return_level = bool(getattr(image_req, "return_level", False))
+    orbit_day = bool(getattr(image_req, "orbit_day", False))
+    orbit_frames = int(getattr(image_req, "orbit_frames", 6) or 6)
+    orbit_frames = max(2, min(12, orbit_frames))
 
     try:
         from image_service import (
@@ -1682,6 +1685,7 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
             generate_variations,
             generate_multiview,
             generate_time_sequence,
+            generate_orbit_day,
             export_level,
             renderable_vocabulary,
         )
@@ -1751,7 +1755,51 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
             "variations": grid if kind == "seed" else None,
         }
 
-    # Priority: time sequence > multiview > seed variations > single
+    # Priority: orbit_day > time sequence > multiview > seed variations > single
+    if orbit_day:
+        try:
+            items = await run_in_threadpool(
+                generate_orbit_day,
+                prompt,
+                orbit_frames,
+                yaw_span if yaw_span else 40.0,
+                0.12,
+                0.95,
+                min(res, 512),  # keep orbit GIFs snappy
+                style,
+                seed,
+                aspect,
+                detail,
+                use_cache,
+                look,
+                path_mode,
+                preset,
+                pitch_deg,
+                as_gif if as_gif or True else True,
+                gif_duration_ms,
+                gif_format,
+            )
+        except Exception as e:
+            logger.warning("orbit_day failed: %s", e)
+            raise HTTPException(
+                status_code=500,
+                detail={"error": "image_generation_failed", "message": str(e)},
+            )
+        payload = _grid_payload(items, "orbit_day")
+        payload["frames"] = [
+            {
+                "image_base64": v.get("image_base64"),
+                "yaw_deg": v.get("yaw_deg"),
+                "time_of_day": v.get("time_of_day"),
+                "width": v.get("width"),
+                "height": v.get("height"),
+            }
+            for v in items
+        ]
+        if items and items[0].get("animation"):
+            payload["animation"] = items[0]["animation"]
+        return JSONResponse(content=payload)
+
     if n_frames > 1:
         try:
             items = await run_in_threadpool(

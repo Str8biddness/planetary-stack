@@ -47,7 +47,7 @@ _DISK_ENABLED = os.environ.get("SYNTHESUS_IMAGE_DISK_CACHE_OFF", "").strip() not
 
 STYLES = sorted(vpi.STYLES)
 DETAILS = ("standard", "high")
-VOCAB_VERSION = "image-world-export-v1"
+VOCAB_VERSION = "image-orbit-day-v1"
 LOOKS = ("raw", "photo", "cinema", "vivid", "tv")
 
 
@@ -636,6 +636,90 @@ def sequence_to_animation(
     """Turn frame metas (with image_base64) into GIF/WebP data URL payload."""
     import gif_export as ge
     return ge.frames_to_data_url(frames, fmt=fmt, duration_ms=duration_ms)
+
+
+def generate_orbit_day(
+    prompt: str,
+    n: int = 6,
+    yaw_span: float = 40.0,
+    t0: float = 0.12,
+    t1: float = 0.95,
+    res: int = 384,
+    style: str = "photo",
+    seed: Optional[int] = None,
+    aspect: float = 1.5,
+    detail: str = "high",
+    use_cache: bool = True,
+    look: str = "photo",
+    path_mode: bool = True,
+    preset: Optional[str] = None,
+    pitch_deg: float = 0.0,
+    as_gif: bool = True,
+    gif_duration_ms: int = 280,
+    gif_format: str = "gif",
+) -> list[dict[str, Any]]:
+    """Orbiting day: same SI world, yaw + time advance together → short cinematic GIF.
+
+    Frame i uses yaw from schedule and time_of_day from schedule (locked world seed).
+    """
+    import base64
+    import world_camera as wc
+
+    n = max(2, min(12, int(n)))
+    yaws = wc.yaw_schedule(n=n, span_deg=yaw_span)
+    times = wc.time_schedule(n=n, t0=t0, t1=t1)
+    results: list[dict[str, Any]] = []
+    tmpdir = tempfile.mkdtemp(prefix="synth_img_od_")
+    try:
+        for i in range(n):
+            out = os.path.join(tmpdir, f"od{i}.png")
+            meta = generate_image(
+                prompt,
+                out,
+                res=res,
+                style=style,
+                seed=seed,  # same seed = same world layout
+                aspect=aspect,
+                use_cache=use_cache,
+                detail=detail,
+                look=look,
+                path_mode=path_mode,
+                preset=preset if i == 0 else None,
+                yaw_deg=yaws[i],
+                time_of_day=times[i],
+                pitch_deg=pitch_deg,
+            )
+            with open(out, "rb") as f:
+                png = f.read()
+            m = dict(meta)
+            m["image_base64"] = base64.b64encode(png).decode("ascii")
+            m["mime_type"] = "image/png"
+            m["frame_index"] = i
+            m["yaw_deg"] = yaws[i]
+            m["time_of_day"] = times[i]
+            m["orbit_day"] = True
+            results.append(m)
+        if as_gif and results:
+            try:
+                import gif_export as _ge
+                anim = _ge.frames_to_data_url(
+                    results, fmt=gif_format, duration_ms=gif_duration_ms
+                )
+                anim["kind"] = "orbit_day"
+                results[0]["animation"] = anim
+            except Exception as ge:
+                results[0]["animation_error"] = str(ge)
+    finally:
+        for name in os.listdir(tmpdir):
+            try:
+                os.remove(os.path.join(tmpdir, name))
+            except OSError:
+                pass
+        try:
+            os.rmdir(tmpdir)
+        except OSError:
+            pass
+    return results
 
 
 def export_level(

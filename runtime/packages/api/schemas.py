@@ -339,6 +339,16 @@ class ImageRequest(BaseModel):
         False,
         description="Attach SI level JSON (scene graph world dump) for virtual-world use",
     )
+    orbit_day: bool = Field(
+        False,
+        description="If true, render orbiting-day sequence (yaw+time together) and optional GIF",
+    )
+    orbit_frames: int = Field(
+        6,
+        ge=2,
+        le=12,
+        description="Frame count when orbit_day=true",
+    )
 
 
 class ImageResponse(BaseModel):

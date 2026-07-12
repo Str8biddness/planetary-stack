@@ -411,11 +411,26 @@
                     <button class="glass-btn" style="background:rgba(167,139,250,0.2);" onclick="runImageStudio(4)" title="4 seed variations">✦ 4× seeds</button>
                     <button class="glass-btn" style="background:rgba(56,189,248,0.2);" onclick="runImageStudioViews(3)" title="3 camera yaws — same world">⟲ 3 views</button>
                     <button class="glass-btn" style="background:rgba(74,222,128,0.15);" onclick="runImageStudioFrames(4)" title="dawn→night + GIF">⏱ 4 times + GIF</button>
+                    <button class="glass-btn" style="background:rgba(251,191,36,0.18);" onclick="runImageOrbitDay(6)" title="yaw+time cinematic GIF">🌐 Orbit day</button>
                     <button class="glass-btn" onclick="exportImageLevel()" title="Download SI level JSON">⧉ Level</button>
                     <button class="glass-btn" id="image-download-btn" onclick="downloadImageStudio()" disabled>⬇ Save</button>
                     <button class="glass-btn" onclick="imageStudioExample('house')">House</button>
                     <button class="glass-btn" onclick="imageStudioExample('river')">River</button>
                     <button class="glass-btn" onclick="imageStudioExample('city')">City</button>
+                </div>
+                <div style="margin-top:6px;">
+                    <label style="color:#94a3b8; font-size:0.75rem;">Level viewer (top-down X×Z)</label>
+                    <div style="display:flex; gap:8px; align-items:flex-start; margin-top:4px;">
+                        <canvas id="level-viewer-canvas" width="220" height="160"
+                            style="background:rgba(0,0,0,0.45); border-radius:8px; border:1px solid rgba(148,163,184,0.25);"></canvas>
+                        <div style="flex:1; min-width:0;">
+                            <input type="file" id="level-viewer-file" accept="application/json,.json" style="font-size:0.72rem; color:#94a3b8; width:100%;"
+                                onchange="loadLevelViewerFile(event)">
+                            <div id="level-viewer-info" style="font-size:0.72rem; color:#64748b; margin-top:6px; font-family:'Fira Code',monospace;">
+                                Export Level or open a .json to inspect the SI world.
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <label style="color:#94a3b8; font-size:0.75rem;">Cinematic presets (SI packs)</label>
@@ -456,7 +471,7 @@
         <button onclick="showTiers()" class="dock-btn" title="Unlock Pro — premium personas">⭐</button>
     </nav>
 
-    <script src="script.js?v=10030"></script>
+    <script src="script.js?v=10031"></script>
     <script src="hyperspace.js?v=4"></script>
 
     <!-- OTA Update Screen -->

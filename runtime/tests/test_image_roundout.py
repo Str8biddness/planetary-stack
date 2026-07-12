@@ -275,6 +275,34 @@ def test_detail_high_and_variations():
     assert all(v.get("image_base64") for v in vars_)
 
 
+def test_orbit_day_sequence():
+    from image_service import generate_orbit_day, clear_image_cache
+
+    clear_image_cache(disk=True)
+    frames = generate_orbit_day(
+        "a house and a tree on grass under a sky with a sun",
+        n=3,
+        yaw_span=24,
+        t0=0.2,
+        t1=0.9,
+        res=128,
+        style="soft",
+        look="raw",
+        detail="standard",
+        path_mode=False,
+        use_cache=False,
+        seed=5,
+        as_gif=True,
+        gif_duration_ms=200,
+    )
+    assert len(frames) == 3
+    assert frames[0]["yaw_deg"] != frames[-1]["yaw_deg"]
+    assert frames[0]["time_of_day"] < frames[-1]["time_of_day"]
+    assert frames[0].get("orbit_day") is True
+    assert frames[0].get("animation") and frames[0]["animation"]["frame_count"] == 3
+    assert frames[0]["animation"].get("kind") == "orbit_day"
+
+
 def test_pitch_gif_and_level_export():
     import world_camera as wc
     import gif_export as ge

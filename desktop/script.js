@@ -2452,6 +2452,107 @@ async function runImageStudioViews(n) {
 async function runImageStudioFrames(n) {
     return runImageStudio(1, { frames: n || 4, as_gif: true });
 }
+async function runImageOrbitDay(n) {
+    return runImageStudio(1, { orbit_day: true, orbit_frames: n || 6, as_gif: true, yaw_span: 40 });
+}
+
+// ── SI Level viewer (top-down X × Z map) ─────────────────────────────
+let _lastLevelJson = null;
+const LEVEL_ROLE_COLORS = {
+    house: '#c4785a', building: '#7a8499', tree: '#3d8c48', bush: '#4a9e52',
+    person: '#6b6b8a', boat: '#8b5a3c', bridge: '#9a8060', fence: '#8a7048',
+    triangle: '#6e6a66', mountain: '#6e6a66', disc: '#d05050', flower: '#d84a78',
+    ground: '#4a8a50', river: '#2e6ea8', strip: '#555560', bird: '#333',
+    disc_top: '#f0d060', cloud_top: '#e8e8f0', star_top: '#f5e090', bg: '#4a70b0',
+};
+
+function renderLevelViewer(level) {
+    const canvas = document.getElementById('level-viewer-canvas');
+    const info = document.getElementById('level-viewer-info');
+    if (!canvas || !level) return;
+    _lastLevelJson = level;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx.fillStyle = '#0b1220';
+    ctx.fillRect(0, 0, W, H);
+    // grid
+    ctx.strokeStyle = 'rgba(100,116,139,0.25)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+        const x = (W * i) / 4, y = (H * i) / 4;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    // axes labels
+    ctx.fillStyle = '#64748b';
+    ctx.font = '10px monospace';
+    ctx.fillText('X →', W - 28, H - 6);
+    ctx.fillText('Z far', 4, 12);
+    ctx.fillText('near', 4, H - 6);
+
+    const ents = level.entities || [];
+    const pad = 16;
+    const mapX = (x) => pad + (Math.min(1, Math.max(0, x)) * (W - 2 * pad));
+    // z: 0 near at bottom, 1 far at top
+    const mapZ = (z) => pad + ((1 - Math.min(1, Math.max(0, z))) * (H - 2 * pad));
+
+    ents.forEach(function (e) {
+        const role = e.role || 'disc';
+        let x = e.cx != null ? e.cx : (e.x != null ? e.x : 0.5);
+        let z = e.depth_z != null ? e.depth_z : 0.5;
+        if (role === 'bg') return;
+        if (role === 'ground') {
+            ctx.fillStyle = 'rgba(74,138,80,0.15)';
+            ctx.fillRect(pad, H * 0.55, W - 2 * pad, H * 0.4);
+            return;
+        }
+        const px = mapX(Number(x) || 0.5);
+        const py = mapZ(Number(z) || 0.5);
+        const col = LEVEL_ROLE_COLORS[role] || LEVEL_ROLE_COLORS[e.entity] || '#94a3b8';
+        const r = role === 'person' ? 4 : (role === 'tree' || role === 'house' || role === 'building') ? 7 : 5;
+        ctx.beginPath();
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.fillStyle = col;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+        ctx.stroke();
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '9px sans-serif';
+        ctx.fillText(String(e.entity || role).slice(0, 8), px + r + 2, py + 3);
+    });
+
+    // camera marker
+    const cam = level.camera || {};
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '9px monospace';
+    ctx.fillText(
+        'yaw=' + (cam.yaw_deg != null ? Number(cam.yaw_deg).toFixed(0) : '0')
+        + ' pitch=' + (cam.pitch_deg != null ? Number(cam.pitch_deg).toFixed(0) : '0'),
+        pad, H - 4
+    );
+
+    if (info) {
+        info.innerHTML = escapeHtmlStudio(level.schema || 'level')
+            + ' · ' + (level.entity_count != null ? level.entity_count : ents.length) + ' ents'
+            + (level.prompt ? '<br><span style="color:#94a3b8;">' + escapeHtmlStudio(String(level.prompt).slice(0, 80)) + '</span>' : '');
+    }
+}
+
+function loadLevelViewerFile(ev) {
+    const f = ev && ev.target && ev.target.files && ev.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = function () {
+        try {
+            const level = JSON.parse(String(reader.result || '{}'));
+            renderLevelViewer(level.level || level);
+        } catch (e) {
+            const info = document.getElementById('level-viewer-info');
+            if (info) info.innerHTML = '<span style="color:#f87171;">Invalid JSON</span>';
+        }
+    };
+    reader.readAsText(f);
+}
 
 async function exportImageLevel() {
     const promptEl = document.getElementById('image-prompt');
@@ -2487,6 +2588,7 @@ async function exportImageLevel() {
         document.body.appendChild(a);
         a.click();
         a.remove();
+        try { renderLevelViewer(data.level); } catch (_) {}
         if (statusEl) {
             statusEl.innerHTML = '<span style="color:#4ade80;">Level exported — '
                 + (data.level.entity_count || '?') + ' entities · '
@@ -2524,6 +2626,14 @@ async function runImageStudio(variations, extra) {
     if (_activeImagePreset) body.preset = _activeImagePreset;
     if (extra.views) { body.views = extra.views; body.yaw_span = extra.yaw_span || 30; body.variations = 1; }
     if (extra.frames) { body.frames = extra.frames; body.variations = 1; body.views = 1; }
+    if (extra.orbit_day) {
+        body.orbit_day = true;
+        body.orbit_frames = extra.orbit_frames || 6;
+        body.yaw_span = extra.yaw_span || 40;
+        body.variations = 1;
+        body.views = 1;
+        body.frames = 1;
+    }
     if (extra.as_gif) { body.as_gif = true; body.gif_format = extra.gif_format || 'gif'; body.gif_duration_ms = 350; }
     if (seedRaw !== undefined && seedRaw !== null && String(seedRaw).trim() !== '') {
         const n = parseInt(seedRaw, 10);
@@ -2532,7 +2642,8 @@ async function runImageStudio(variations, extra) {
 
     if (statusEl) {
         let msg = 'Rendering SI scene graph…';
-        if (body.frames > 1) msg = 'Rendering ' + body.frames + ' time-of-day frames (same world)…';
+        if (body.orbit_day) msg = 'Rendering orbiting-day cinematic (' + (body.orbit_frames || 6) + ' frames)…';
+        else if (body.frames > 1) msg = 'Rendering ' + body.frames + ' time-of-day frames (same world)…';
         else if (body.views > 1) msg = 'Rendering ' + body.views + ' camera views (orbit)…';
         else if (variations > 1) msg = 'Rendering ' + variations + ' SI seed variations…';
         statusEl.innerHTML = '<span style="color:#38bdf8;">' + msg + '</span>';

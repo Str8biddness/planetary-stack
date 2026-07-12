@@ -214,6 +214,8 @@ def image_proxy():
         "gif_format": data.get("gif_format", "gif"),
         "gif_duration_ms": data.get("gif_duration_ms", 400),
         "return_level": data.get("return_level", False),
+        "orbit_day": data.get("orbit_day", False),
+        "orbit_frames": data.get("orbit_frames", 6),
     }
 
 
