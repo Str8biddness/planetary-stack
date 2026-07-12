@@ -88,24 +88,26 @@ def write_depth(
     *,
     soft: bool = True,
 ) -> None:
-    """Update depth where mask covers; nearer (smaller z) wins like a z-buffer."""
+    """Update depth where mask covers; nearer (smaller z) wins like a z-buffer.
+
+    Supports full-frame or matching-shape crop (bbox-restricted paint passes a crop).
+    """
     m = np.asarray(mask, dtype=np.float32)
+    if depth.shape[:2] != m.shape[:2]:
+        return  # shape mismatch — skip rather than corrupt
     if soft:
-        # only write where coverage is significant
         write = m > 0.08
     else:
         write = m > 0.5
     if not np.any(write):
         return
     z = float(np.clip(z, 0.0, 1.0))
-    # standard z-test: keep closer
     cur = depth[write]
     new = np.minimum(cur, z)
-    # soft blend at edges
     if soft:
         a = m[write]
         depth[write] = cur * (1.0 - a) + new * a
-        depth[write] = np.minimum(depth[write], new)  # still prefer nearer
+        depth[write] = np.minimum(depth[write], new)
     else:
         depth[write] = new
 

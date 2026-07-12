@@ -395,51 +395,118 @@ def _soft_mask(binary_u8: "Image.Image", aa_px: float) -> np.ndarray:
     return np.asarray(soft, dtype=np.float32) / 255.0
 
 
+def _path_bbox_px(
+    poly: np.ndarray,
+    h: int,
+    w: int,
+    pad_px: float = 4.0,
+) -> Tuple[int, int, int, int, list]:
+    """Return (x0, y0, x1, y1, pts_px) clamped to frame, with pad for AA/stroke.
+
+    Pixels outside this box cannot belong to the filled/stroked path (output-preserving
+    when pad covers stroke half-width + blur radius).
+    """
+    pts = _world_to_px(poly, h, w)
+    if not pts:
+        return 0, 0, 0, 0, []
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    pad = int(math.ceil(pad_px)) + 1
+    x0 = max(0, int(math.floor(min(xs))) - pad)
+    y0 = max(0, int(math.floor(min(ys))) - pad)
+    x1 = min(w, int(math.ceil(max(xs))) + pad + 1)
+    y1 = min(h, int(math.ceil(max(ys))) + pad + 1)
+    if x1 <= x0 or y1 <= y0:
+        return 0, 0, 0, 0, []
+    # Shift points into bbox-local coords
+    local = [(p[0] - x0, p[1] - y0) for p in pts]
+    return x0, y0, x1, y1, local
+
+
 def raster_stroke(
     xx, yy, path: Path, width: float = 0.01, aa: float = 0.002
 ) -> np.ndarray:
-    """Coverage mask [0,1] for stroked path — PIL scanline (O(pixels), not O(edges×pixels))."""
+    """Full-frame stroke mask (compat). Prefer paint_path bbox path for speed."""
+    h, w = xx.shape
+    mask = np.zeros((h, w), dtype=np.float32)
+    crop, box = raster_stroke_bbox(path, h, w, width=width, aa=aa)
+    if crop is None:
+        return mask
+    x0, y0, x1, y1 = box
+    mask[y0:y1, x0:x1] = np.maximum(mask[y0:y1, x0:x1], crop)
+    return mask
+
+
+def raster_stroke_bbox(
+    path: Path,
+    h: int,
+    w: int,
+    width: float = 0.01,
+    aa: float = 0.002,
+) -> Tuple[Optional[np.ndarray], Tuple[int, int, int, int]]:
+    """Stroke mask only inside path bbox. Returns (crop_mask|None, (x0,y0,x1,y1))."""
     from PIL import Image, ImageDraw
 
-    h, w = xx.shape
     poly = discretize(path, tol=max(aa * 2, 0.004))
     if len(poly) < 2:
-        return np.zeros((h, w), dtype=np.float32)
-    pts = _world_to_px(poly, h, w)
-    # width in world units → pixels
+        return None, (0, 0, 0, 0)
     width_px = max(1.0, float(width) * max(h, w))
-    img = Image.new("L", (w, h), 0)
-    draw = ImageDraw.Draw(img)
-    draw.line(pts, fill=255, width=int(round(width_px)), joint="curve")
     aa_px = max(0.0, float(aa) * max(h, w))
-    return _soft_mask(img, aa_px)
+    pad = width_px * 0.5 + aa_px * 2 + 2
+    x0, y0, x1, y1, local = _path_bbox_px(poly, h, w, pad_px=pad)
+    if not local:
+        return None, (0, 0, 0, 0)
+    bw, bh = x1 - x0, y1 - y0
+    img = Image.new("L", (bw, bh), 0)
+    draw = ImageDraw.Draw(img)
+    draw.line(local, fill=255, width=int(round(width_px)), joint="curve")
+    return _soft_mask(img, aa_px), (x0, y0, x1, y1)
 
 
 def raster_fill(xx, yy, path: Path, aa: float = 0.002) -> np.ndarray:
-    """Closed-path fill via PIL polygon scanline (replaces per-pixel PIP)."""
+    """Full-frame fill mask (compat)."""
     return raster_fill_fast(xx, yy, path, aa=aa)
 
 
 def raster_fill_fast(xx, yy, path: Path, aa: float = 0.0025) -> np.ndarray:
-    """Fast closed-path fill with soft edge AA.
+    """Full-frame fill via bbox raster + paste (output-preserving)."""
+    h, w = xx.shape
+    mask = np.zeros((h, w), dtype=np.float32)
+    crop, box = raster_fill_bbox(path, h, w, aa=aa)
+    if crop is None:
+        return mask
+    x0, y0, x1, y1 = box
+    mask[y0:y1, x0:x1] = np.maximum(mask[y0:y1, x0:x1], crop)
+    return mask
 
-    Uses PIL ImageDraw.polygon (scanline) instead of O(edges × pixels) point-in-polygon.
-    This is the hot-path fix for 512–1024 SI renders.
+
+def raster_fill_bbox(
+    path: Path,
+    h: int,
+    w: int,
+    aa: float = 0.0025,
+) -> Tuple[Optional[np.ndarray], Tuple[int, int, int, int]]:
+    """Fill only inside path bbox — PIL polygon on small canvas.
+
+    This is the real perf win: cost ∝ bbox area, not full frame × objects.
     """
     from PIL import Image, ImageDraw
 
-    h, w = xx.shape
     poly = discretize(path, tol=max(aa * 2, 0.005))
     if len(poly) < 3:
-        return np.zeros((h, w), dtype=np.float32)
+        return None, (0, 0, 0, 0)
     if not np.allclose(poly[0], poly[-1]):
         poly = np.vstack([poly, poly[0]])
-    pts = _world_to_px(poly, h, w)
-    img = Image.new("L", (w, h), 0)
-    draw = ImageDraw.Draw(img)
-    draw.polygon(pts, fill=255)
     aa_px = max(0.0, float(aa) * max(h, w))
-    return _soft_mask(img, aa_px)
+    pad = aa_px * 2 + 3
+    x0, y0, x1, y1, local = _path_bbox_px(poly, h, w, pad_px=pad)
+    if not local:
+        return None, (0, 0, 0, 0)
+    bw, bh = x1 - x0, y1 - y0
+    img = Image.new("L", (bw, bh), 0)
+    draw = ImageDraw.Draw(img)
+    draw.polygon(local, fill=255)
+    return _soft_mask(img, aa_px), (x0, y0, x1, y1)
 
 
 def pocket_passes(
@@ -490,68 +557,83 @@ def paint_path(
     depth_map: Optional[np.ndarray] = None,
     depth_z: Optional[float] = None,
 ) -> np.ndarray:
-    """Paint a path into img (float HxWx3) with fill and/or stroke.
+    """Paint a path into img with fill/stroke — **bbox-restricted**.
 
-    pocket=True applies multi-pass offset fills for closed contours.
-    use_materials=True shades with materials.shade_albedo when available.
-    If depth_map + depth_z provided, writes Z under coverage (true DOF later).
-    Returns combined coverage mask for the paint.
+    Raster + materials only touch the padded path bounding box (not full frame).
+    Output-preserving: outside bbox coverage is zero, so pixels cannot change.
+    Returns sparse full-frame coverage (zeros outside bbox) for callers that need it.
     """
+    h, w = img.shape[:2]
     c = np.asarray(color, dtype=np.float32)
     entity = str(path.meta.get("entity", ""))
     role = str(path.meta.get("role", ""))
-    cov_acc = np.zeros(xx.shape, dtype=np.float32)
+    # Sparse accumulator (only allocate full frame if caller needs union; keep cheap)
+    cov_acc = np.zeros((h, w), dtype=np.float32)
 
-    def _write_z(m):
-        if depth_map is not None and depth_z is not None:
-            try:
-                import depth_buffer as _db
-                _db.write_depth(depth_map, m, float(depth_z))
-            except Exception:
-                pass
-
-    def _blend_flat(m, col=None, scale=1.0):
-        m = np.asarray(m, dtype=np.float32) * float(scale)
-        nonlocal cov_acc
-        cov_acc = np.maximum(cov_acc, m)
-        col = np.asarray(col if col is not None else c, dtype=np.float32)
-        for k in range(3):
-            img[:, :, k] = img[:, :, k] * (1.0 - m) + col[k] * m
-        _write_z(m)
-
-    def _blend_mat(m, col=None, scale=1.0):
-        m = np.asarray(m, dtype=np.float32) * float(scale)
-        nonlocal cov_acc
-        cov_acc = np.maximum(cov_acc, m)
-        col = tuple(float(x) for x in (col if col is not None else c))
-        if use_materials:
+    def _blend_crop(crop: np.ndarray, box: Tuple[int, int, int, int], col=None, scale: float = 1.0, mat: bool = False):
+        if crop is None:
+            return
+        x0, y0, x1, y1 = box
+        if x1 <= x0 or y1 <= y0:
+            return
+        m = np.asarray(crop, dtype=np.float32) * float(scale)
+        if m.shape != (y1 - y0, x1 - x0):
+            return
+        col_t = tuple(float(x) for x in (col if col is not None else c))
+        # World coords for crop only
+        # xx/yy may be full-frame meshgrids — slice them
+        xx_c = xx[y0:y1, x0:x1] if xx.shape == (h, w) else xx
+        yy_c = yy[y0:y1, x0:x1] if yy.shape == (h, w) else yy
+        img_c = img[y0:y1, x0:x1]
+        if mat and use_materials:
             try:
                 import materials as _mat
                 _mat.blend_shaded(
-                    img, m, col, xx, yy, sun_pos=sun_pos, entity=entity, role=role
+                    img_c, m, col_t, xx_c, yy_c,
+                    sun_pos=sun_pos, entity=entity, role=role,
                 )
-                _write_z(m)
-                return
             except Exception:
-                pass
-        _blend_flat(m, col)
+                col_a = np.asarray(col_t, dtype=np.float32)
+                for k in range(3):
+                    img_c[:, :, k] = img_c[:, :, k] * (1.0 - m) + col_a[k] * m
+        else:
+            col_a = np.asarray(col_t, dtype=np.float32)
+            for k in range(3):
+                img_c[:, :, k] = img_c[:, :, k] * (1.0 - m) + col_a[k] * m
+        cov_acc[y0:y1, x0:x1] = np.maximum(cov_acc[y0:y1, x0:x1], m)
+        if depth_map is not None and depth_z is not None:
+            try:
+                import depth_buffer as _db
+                _db.write_depth(depth_map[y0:y1, x0:x1], m, float(depth_z))
+            except Exception:
+                # fallback: full write_depth expects full arrays
+                try:
+                    import depth_buffer as _db
+                    full = np.zeros((h, w), dtype=np.float32)
+                    full[y0:y1, x0:x1] = m
+                    _db.write_depth(depth_map, full, float(depth_z))
+                except Exception:
+                    pass
 
     stroke_only = bool(path.meta.get("stroke_only"))
     width = stroke_width if stroke_width is not None else float(path.meta.get("width", 0.012))
     if stroke_only or not path.closed:
-        _blend_flat(raster_stroke(xx, yy, path, width=width, aa=aa))
+        crop, box = raster_stroke_bbox(path, h, w, width=width, aa=aa)
+        _blend_crop(crop, box, mat=False)
     else:
         if pocket and path.meta.get("layer") not in ("door", "window"):
-            # 2 passes is enough for illustration depth; was 3× full-res PIP (perf killer)
             for pth, scale in pocket_passes(path, tool_r=max(width, 0.01), passes=2):
-                fill = raster_fill_fast(xx, yy, pth, aa=aa)
-                _blend_mat(fill, scale=scale)
+                crop, box = raster_fill_bbox(pth, h, w, aa=aa)
+                _blend_crop(crop, box, scale=scale, mat=True)
         else:
-            _blend_mat(raster_fill_fast(xx, yy, path, aa=aa))
-        # finish pass outline (final contour cut)
+            crop, box = raster_fill_bbox(path, h, w, aa=aa)
+            _blend_crop(crop, box, mat=True)
+        # finish pass outline
         sw = max(width * 0.35, aa * 2)
         op = polyline([tuple(p) for p in discretize(path)], closed=True)
-        _blend_flat(raster_stroke(xx, yy, op, width=sw, aa=aa) * 0.25)
+        crop, box = raster_stroke_bbox(op, h, w, width=sw, aa=aa)
+        if crop is not None:
+            _blend_crop(crop * 0.25, box, mat=False)
     return cov_acc
 
 

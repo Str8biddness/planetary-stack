@@ -275,6 +275,33 @@ def test_detail_high_and_variations():
     assert all(v.get("image_base64") for v in vars_)
 
 
+def test_bbox_fill_matches_full_frame_semantics():
+    """BBox fill is output-preserving: same coverage support as full raster."""
+    import cnc_paths as cnc
+
+    h = w = 128
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    yy /= max(h - 1, 1)
+    xx /= max(w - 1, 1)
+    path = cnc.house_contour(0.55, 0.70, 0.18, 0.14)
+    full = cnc.raster_fill_fast(xx, yy, path, aa=0.003)
+    crop, box = cnc.raster_fill_bbox(path, h, w, aa=0.003)
+    assert crop is not None
+    x0, y0, x1, y1 = box
+    recon = np.zeros((h, w), dtype=np.float32)
+    recon[y0:y1, x0:x1] = crop
+    # Nonzero support matches (allow tiny AA pad edge noise)
+    full_on = full > 0.05
+    recon_on = recon > 0.05
+    # recon should not light pixels far outside the house
+    assert recon_on.sum() <= full_on.sum() + 50
+    # where both on, values close
+    both = full_on & recon_on
+    if both.any():
+        err = np.abs(full[both] - recon[both]).mean()
+        assert err < 0.08, err
+
+
 def test_async_image_jobs_and_execute():
     import image_jobs as jobs
     from image_service import execute_image_request

@@ -49,7 +49,7 @@ _DISK_ENABLED = os.environ.get("SYNTHESUS_IMAGE_DISK_CACHE_OFF", "").strip() not
 STYLES = sorted(vpi.STYLES)
 DETAILS = ("standard", "high")
 # Bump when SHAPES, path raster, ISP, or materials change — invalidates disk/memory cache.
-ENGINE_VERSION = "si-image-v2-pil-fill"
+ENGINE_VERSION = "si-image-v3-bbox-fill"
 VOCAB_VERSION = ENGINE_VERSION  # alias for API meta field
 LOOKS = ("raw", "photo", "cinema", "vivid", "tv")
 

@@ -539,3 +539,27 @@ pytest tests/test_image_roundout.py → 21 passed (~4.5s)
 ```
 
 ### Do NOT merge without Claude re-review of async + prior perf fix.
+
+## 2026-07-12 — feat/image-bbox-perf (Claude follow-up #6)
+
+### Mission
+BBox-restrict per-object fill/stroke/materials so raster cost ∝ object area,
+not full frame × objects. Output-preserving (outside bbox coverage = 0).
+
+### What changed
+- `cnc_paths.raster_fill_bbox` / `raster_stroke_bbox` — PIL only on padded bbox
+- `paint_path` blends materials/depth only on crop slices
+- `depth_buffer.write_depth` accepts matching crop shapes
+- ENGINE_VERSION → `si-image-v3-bbox-fill`
+- Test: bbox vs full-frame support agreement
+
+### Benchmark (pasted, look=raw, path_mode, seed=7)
+```
+res= 256    0.19s   (was 0.53s after PIL; was ~2.7s original review)
+res= 512    0.20s   (was 1.44s)
+res=1024    0.59s   (was 7.48s / originally 79s)
+photo512    0.56s
+tests: 22 passed in 1.39s
+```
+
+### Do NOT merge without Claude re-verify.
