@@ -286,17 +286,17 @@ async function fetchOSStatus() {
             try {
                 // Master
                 document.getElementById('pool-master').innerHTML = `
-                    <div style="display:flex; justify-content:space-between;"><span>CPU Usage:</span> <span style="color:#34d399;">${data.cpu_percent || '12'}%</span></div>
-                    <div style="display:flex; justify-content:space-between;"><span>RAM Usage:</span> <span style="color:#818cf8;">${data.ram_percent || '45'}%</span></div>
+                    <div style="display:flex; justify-content:space-between;"><span>CPU Usage:</span> <span style="color:#34d399;">${data.cpu_percent != null ? data.cpu_percent + '%' : '—'}</span></div>
+                    <div style="display:flex; justify-content:space-between;"><span>RAM Usage:</span> <span style="color:#818cf8;">${data.ram_percent != null ? data.ram_percent + '%' : '—'}</span></div>
                     <div style="display:flex; justify-content:space-between;"><span>GPU VRAM:</span> <span style="color:#facc15;">Allocated (QuadBrain)</span></div>
                 `;
-                
+
                 // Worker
                 const workerRes = await fetch('http://127.0.0.1:8082/api/system/status');
                 const workerData = await workerRes.json();
                 document.getElementById('pool-worker').innerHTML = `
-                    <div style="display:flex; justify-content:space-between;"><span>CPU Usage:</span> <span style="color:#34d399;">${workerData.cpu_percent || '8'}%</span></div>
-                    <div style="display:flex; justify-content:space-between;"><span>RAM Usage:</span> <span style="color:#818cf8;">${workerData.ram_percent || '22'}%</span></div>
+                    <div style="display:flex; justify-content:space-between;"><span>CPU Usage:</span> <span style="color:#34d399;">${workerData.cpu_percent != null ? workerData.cpu_percent + '%' : '—'}</span></div>
+                    <div style="display:flex; justify-content:space-between;"><span>RAM Usage:</span> <span style="color:#818cf8;">${workerData.ram_percent != null ? workerData.ram_percent + '%' : '—'}</span></div>
                     <div style="display:flex; justify-content:space-between;"><span>SI Grid Load:</span> <span style="color:#facc15;">Synced via WebSocket</span></div>
                 `;
             } catch(e) {
@@ -1146,8 +1146,24 @@ let hopDirection = "right";
 // ==========================================
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Pre-fill the email field if we remember the last account that logged in here.
     const storedUser = localStorage.getItem('synthesus_user');
+
+    // Restore the session on reload/reopen so a logged-in user isn't dumped back to the
+    // login screen on every refresh. If the stored token is stale, subsequent API calls
+    // 401 and the app can re-prompt — but the common case (valid token) skips re-login.
+    try {
+        const token = localStorage.getItem('synthesus_token');
+        if (token && storedUser) {
+            const u = JSON.parse(storedUser);
+            if (u && u.email) {
+                window.sessionId = u.email;
+                window.currentUser = u;
+                enterDesktop();
+            }
+        }
+    } catch (e) { /* fall through to the login screen */ }
+
+    // Pre-fill the email field if we remember the last account that logged in here.
     if (storedUser) {
         try {
             const u = JSON.parse(storedUser);
