@@ -517,10 +517,13 @@ MAX_ENGINES = 50
 class _PersistentList(list):
     def __init__(self, data_dir, sid):
         super().__init__()
-        # sid is a user-supplied session_id that becomes a filename; keep only
-        # filename-safe chars so a crafted session_id like '../../x' cannot escape
-        # data_dir and write JSON to an arbitrary path (path traversal).
-        safe = re.sub(r"[^A-Za-z0-9_-]", "", str(sid))[:64] or "invalid"
+        # sid is a user-supplied session_id that becomes a filename; path traversal
+        # defense is centralized in core.utils.safe_path.safe_id.
+        try:
+            from core.utils.safe_path import safe_id as _safe_id
+        except ImportError:
+            from utils.safe_path import safe_id as _safe_id  # type: ignore
+        safe = _safe_id(str(sid))
         self.path = os.path.join(data_dir, f"{safe}.json")
     def append(self, item):
         super().append(item)

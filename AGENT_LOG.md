@@ -688,3 +688,24 @@ level re-render, Studio inspector/capabilities, bench, Claude review package.
 - ENGINE `si-image-v6.1-workshop` · **26 tests passed**
 
 ### Do NOT merge without Claude review of this package.
+
+---
+
+## 2026-07-12 — feat/path-safety (centralize safe_id)
+
+### What
+- Added `runtime/packages/core/utils/safe_path.py` with `safe_id` / `safe_join`
+  (path-traversal defense for user ids used as filenames).
+- Replaced 4 copy-pasted sanitizers:
+  - `image_session._disk_path`
+  - `formant_session._path`
+  - `production_server._PersistentList`
+  - `state_persistence` NPC char_id
+- Tests: `runtime/tests/test_path_safety.py` (6 passed).
+
+### Proof
+`pytest runtime/tests/test_path_safety.py -v` → 6 passed.
+Crafted ids like `../../../../tmp/evil` resolve inside intended roots only.
+
+### Branch
+`feat/path-safety` — do not merge without Claude review.

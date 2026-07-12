@@ -12,13 +12,17 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import threading
 import time
 import uuid
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Optional
+
+try:
+    from core.utils.safe_path import safe_id
+except ImportError:  # tools/ isolated path
+    from utils.safe_path import safe_id  # type: ignore
 
 _LOCK = threading.Lock()
 _MAX = int(os.environ.get("SYNTHESUS_IMAGE_SESSION_MAX", "64"))
@@ -34,19 +38,12 @@ _DISK_ON = os.environ.get("SYNTHESUS_IMAGE_SESSION_DISK_OFF", "").strip().lower(
 )
 
 
-# scene_id is user-supplied via the API and becomes a filename here, so it must
-# never be able to escape _DISK_ROOT (path traversal). Keep only filename-safe
-# characters and bound the length; both _read_disk and _write_disk route through
-# this, so sanitizing here closes traversal for read AND write.
-_SID_SANITIZE = re.compile(r"[^A-Za-z0-9_-]")
-
-
-def _safe_sid(sid: str) -> str:
-    return _SID_SANITIZE.sub("", str(sid))[:64] or "invalid"
+# scene_id is user-supplied via the API and becomes a filename here.
+# Sanitization is centralized in core.utils.safe_path.safe_id (path traversal).
 
 
 def _disk_path(sid: str) -> Path:
-    return _DISK_ROOT / f"{_safe_sid(sid)}.json"
+    return _DISK_ROOT / f"{safe_id(sid)}.json"
 
 
 def _serialize_doc(doc: Optional[list]) -> list:
