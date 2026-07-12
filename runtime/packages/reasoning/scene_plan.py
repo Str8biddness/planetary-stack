@@ -41,8 +41,21 @@ VALID_ROLES = frozenset(
         "bg", "ground", "disc_top", "cloud_top", "star_top", "disc", "tree",
         "triangle", "house", "strip", "river", "fence", "boat", "person",
         "building", "flower", "bird", "bridge", "bush",
+        "lathe", "extrude",
     ]
 )
+
+# Machine routing: entity token → lathe | extrude (else mill/composite/native)
+LATHE_ENTITIES = frozenset({
+    "cup", "mug", "glass", "vase", "urn", "column", "pillar", "bottle", "flask",
+    "pot", "jar", "fruit", "apple", "orange", "bowl", "goblet",
+})
+EXTRUDE_ENTITIES = frozenset({
+    "crate", "box", "block", "wall", "brick", "slab", "plinth", "pedestal",
+    "container", "dumpster", "cabinet",
+})
+# Prefer lathe over disc for these even if also in SHAPES
+LATHE_OVERRIDE_SHAPES = frozenset({"apple", "orange", "ball"})
 
 # Free-language → SHAPES entity (must be a key of SHAPES)
 SYNONYMS: dict[str, str] = {
@@ -428,16 +441,60 @@ def compile_scene_plan_rules(prompt: str) -> dict[str, Any]:
             else:
                 add_composite(key, _default_composite_parts(key), "heuristic")
 
+    machines: list[dict[str, Any]] = []
+
+    def add_lathe(name: str, entity: str, how: str = "lathe") -> None:
+        key = f"lathe:{entity}"
+        if key in seen:
+            return
+        seen.add(key)
+        machines.append({
+            "machine": "lathe",
+            "name": name,
+            "entity": entity,
+            "how": how,
+            "construction": "lathe",
+        })
+        steps.append(f"lathe {name!r} as solid of revolution ({entity})")
+
+    def add_extrude(name: str, entity: str, how: str = "extrude") -> None:
+        key = f"extrude:{entity}"
+        if key in seen:
+            return
+        seen.add(key)
+        machines.append({
+            "machine": "extrude",
+            "name": name,
+            "entity": entity,
+            "how": how,
+            "construction": "extrude",
+            "layers": 4 if entity in ("wall", "brick", "crate") else 1,
+        })
+        steps.append(f"extrude {name!r} print-lite volume ({entity})")
+
     for t in tokens:
         if t.startswith("__ph_"):
             continue
         if t in STOP or len(t) < 2:
             continue
+        # Machine dialects first (lathe / extrude)
+        if t in LATHE_ENTITIES or t in LATHE_OVERRIDE_SHAPES:
+            add_lathe(t, t if t in LATHE_ENTITIES or t in LATHE_OVERRIDE_SHAPES else t)
+            continue
+        if t in EXTRUDE_ENTITIES:
+            add_extrude(t, t)
+            continue
         if t in scene_composer.SHAPES:
             add_entity(t, t, "native")
             continue
         if t in SYNONYMS:
-            add_entity(t, SYNONYMS[t], "synonym")
+            mapped = SYNONYMS[t]
+            if mapped in LATHE_ENTITIES or mapped in LATHE_OVERRIDE_SHAPES:
+                add_lathe(t, mapped, "synonym_lathe")
+            elif mapped in EXTRUDE_ENTITIES:
+                add_extrude(t, mapped, "synonym_extrude")
+            else:
+                add_entity(t, mapped, "synonym")
             continue
         if t in COMPOSITE_RECIPES:
             add_composite(t, COMPOSITE_RECIPES[t], "recipe")
@@ -445,9 +502,14 @@ def compile_scene_plan_rules(prompt: str) -> dict[str, Any]:
         # skip relation words already handled
         if t in ("left", "right", "of", "near", "beside", "under", "over", "above", "below"):
             continue
-        # unknown content word → composite heuristic
+        # unknown content word → composite heuristic (not lathe unless keyword)
         if t.isalpha() and t not in seen:
-            add_composite(t, _default_composite_parts(t), "heuristic")
+            if any(k in t for k in ("cup", "vase", "pot", "bottle", "column")):
+                add_lathe(t, "vase" if "vase" in t else "cup", "heuristic_lathe")
+            elif any(k in t for k in ("crate", "box", "block", "wall")):
+                add_extrude(t, "crate", "heuristic_extrude")
+            else:
+                add_composite(t, _default_composite_parts(t), "heuristic")
 
     # Ensure minimal landscape if we have ground objects but no ground/sky
     has_ground = any(e["role"] == "ground" for e in entities)
@@ -458,7 +520,7 @@ def compile_scene_plan_rules(prompt: str) -> dict[str, Any]:
             "flower", "bush", "triangle", "disc", "strip", "river",
         )
         for e in entities
-    ) or bool(composites)
+    ) or bool(composites) or bool(machines)
 
     if ground_objects and not has_ground:
         add_entity("grass", "grass", "default_ground")
@@ -519,18 +581,25 @@ def compile_scene_plan_rules(prompt: str) -> dict[str, Any]:
     if mood:
         steps.append(f"mood knobs from language: {mood}")
 
-    construction = "native"
-    if composites and entities:
-        construction = "mixed"
-    elif composites:
-        construction = "composite"
-    elif any(e.get("how") in ("synonym", "phrase_synonym", "phrase", "default_ground", "default_sky") for e in entities):
-        construction = "mapped"
-    if any(e.get("how") == "native" for e in entities) and construction == "mapped":
-        construction = "mapped"
+    try:
+        from image_contract import merge_construction
+        tags = []
+        if any(e.get("how") == "native" for e in entities):
+            tags.append("native")
+        if any(e.get("how") in ("synonym", "phrase_synonym", "phrase", "default_ground", "default_sky") for e in entities):
+            tags.append("mapped")
+        if composites:
+            tags.append("composite")
+        for m in machines:
+            tags.append(m.get("machine") or m.get("construction") or "mill")
+        construction = merge_construction(*tags) if tags else "native"
+    except Exception:
+        construction = "mixed" if (composites or machines) else (
+            "mapped" if entities else "native"
+        )
 
-    monologue = _build_monologue(prompt, entities, composites, mood, construction)
-    outer = _build_outer_voice(construction, entities, composites, missing)
+    monologue = _build_monologue(prompt, entities, composites, mood, construction, machines)
+    outer = _build_outer_voice(construction, entities, composites, missing, machines)
 
     plan = {
         "version": PLAN_VERSION,
@@ -538,6 +607,7 @@ def compile_scene_plan_rules(prompt: str) -> dict[str, Any]:
         "si_prompt": si_prompt,
         "entities": entities,
         "composites": composites,
+        "machines": machines,
         "relations_text": rel_bits,
         "camera": mood,
         "missing": missing,
@@ -548,6 +618,7 @@ def compile_scene_plan_rules(prompt: str) -> dict[str, Any]:
         "source": "rules",
         "honesty": "si_construct",
         "not_diffusion": True,
+        "stock": "scene_graph",
     }
     return plan
 
@@ -558,6 +629,7 @@ def _build_monologue(
     composites: list[dict],
     mood: dict,
     construction: str,
+    machines: Optional[list] = None,
 ) -> str:
     bits = [
         f"Inner: user asked for {prompt!r}.",
@@ -566,13 +638,17 @@ def _build_monologue(
     if entities:
         maps = ", ".join(f"{e['name']}→{e['maps_to']}" for e in entities[:12])
         bits.append(f"Map to known shapes: {maps}.")
+    for m in (machines or [])[:8]:
+        bits.append(
+            f"Machine {m.get('machine')}: {m.get('name')} → {m.get('entity')}."
+        )
     if composites:
         for c in composites[:6]:
             roles = "+".join(p["role"] for p in c["parts"])
             bits.append(f"Assemble {c['name']} from puzzle pieces [{roles}] ({c.get('how')}).")
     if mood:
         bits.append(f"Camera/mood: {mood}.")
-    bits.append("Hand plan to SI raster (CNC paths + materials + optional ISP).")
+    bits.append("Hand plan to SI raster (mill/lathe/extrude + optional ISP).")
     return " ".join(bits)
 
 
@@ -581,11 +657,16 @@ def _build_outer_voice(
     entities: list[dict],
     composites: list[dict],
     missing: list[str],
+    machines: Optional[list] = None,
 ) -> str:
     if construction == "native":
         base = "SI illustration from known shapes in your prompt."
     elif construction == "mapped":
         base = "SI illustration — I mapped your words onto Synthesus shape vocabulary."
+    elif construction == "lathe":
+        base = "SI illustration — lathe (solid of revolution) construction for round forms."
+    elif construction == "extrude":
+        base = "SI illustration — extruded / print-lite volumes."
     elif construction == "composite":
         base = (
             "SI illustration — some objects aren't single primitives, so I assembled "
@@ -593,9 +674,14 @@ def _build_outer_voice(
         )
     else:
         base = (
-            "SI illustration — known shapes plus composite assemblies from puzzle pieces. "
+            "SI illustration — mill paths, lathe/extrude machines, and/or composites. "
             "Not diffusion; not a real photograph."
         )
+    if machines:
+        names = ", ".join(
+            f"{m.get('name')}({m.get('machine')})" for m in machines[:6]
+        )
+        base += f" Machines: {names}."
     if composites:
         names = ", ".join(c["name"].replace("_", " ") for c in composites[:5])
         base += f" Composites: {names}."
@@ -842,6 +928,10 @@ def plan_fingerprint(plan: dict[str, Any]) -> str:
                 (x.get("name"), [(p.get("role"), p.get("dx"), p.get("dy")) for p in x.get("parts") or []])
                 for x in plan.get("composites") or []
             ],
+            "m": [
+                (x.get("machine"), x.get("entity"), x.get("name"))
+                for x in plan.get("machines") or []
+            ],
             "cam": plan.get("camera"),
         },
         sort_keys=True,
@@ -936,19 +1026,21 @@ def inject_composites(
     seed: Optional[int] = None,
     path_mode: bool = True,
 ) -> list[dict[str, Any]]:
-    """Append composite puzzle-piece primitives to a scene document."""
+    """Append composite puzzle-pieces + lathe/extrude machine prims to a scene document."""
     composites = plan.get("composites") or []
-    if not composites:
+    machines = plan.get("machines") or []
+    if not composites and not machines:
         return doc
 
     rng = np.random.default_rng(int(seed) if seed is not None else 0)
-    # place composites in free ground slots
-    n = len(composites)
+    n = len(composites) + len(machines)
     xs = np.linspace(0.28, 0.78, max(n, 1)) if n else []
     out = list(doc)
+    slot = 0
 
     for i, comp in enumerate(composites):
-        ax = float(comp.get("anchor_x") if comp.get("anchor_x") is not None else xs[i % len(xs)])
+        ax = float(comp.get("anchor_x") if comp.get("anchor_x") is not None else xs[slot % len(xs)])
+        slot += 1
         ax = float(np.clip(ax + float(rng.uniform(-0.03, 0.03)), 0.12, 0.88))
         base = float(np.clip(horizon + float(comp.get("anchor_yoff") or 0.0), 0.45, 0.9))
         parts = comp.get("parts") or []
@@ -959,7 +1051,6 @@ def inject_composites(
             entity = str(part.get("entity") or f"{comp.get('name', 'obj')}_{role}")
             cx = ax + float(part.get("dx") or 0.0)
             b = base + float(part.get("dy") or 0.0)
-            # sky-like parts use y from base as height
             if role in ("disc_top", "cloud_top", "star_top", "bird"):
                 b = float(np.clip(0.15 + float(part.get("dy") or 0.0), 0.05, 0.45))
             color = part.get("color")
@@ -979,6 +1070,7 @@ def inject_composites(
             )
             prim["composite_of"] = comp.get("name")
             prim["construction"] = "plan_composite"
+            prim["machine"] = "composite"
             if path_mode:
                 try:
                     import cnc_paths as _cnc
@@ -991,6 +1083,57 @@ def inject_composites(
                 except Exception:
                     pass
             out.append(prim)
+
+    # Lathe / extrude machines
+    for mi, mach in enumerate(machines):
+        ax = float(mach.get("anchor_x") if mach.get("anchor_x") is not None else xs[slot % len(xs)])
+        slot += 1
+        ax = float(np.clip(ax + float(rng.uniform(-0.02, 0.02)), 0.15, 0.85))
+        base = float(np.clip(horizon + float(mach.get("anchor_yoff") or 0.0), 0.5, 0.9))
+        entity = str(mach.get("entity") or mach.get("name") or "object")
+        kind = (mach.get("machine") or "lathe").lower()
+        if kind == "lathe":
+            try:
+                import lathe_paths as _lathe
+                colors = {
+                    "cup": (0.85, 0.85, 0.9),
+                    "vase": (0.7, 0.35, 0.28),
+                    "column": (0.75, 0.72, 0.65),
+                    "bottle": (0.3, 0.55, 0.4),
+                    "apple": (0.75, 0.2, 0.15),
+                    "fruit": (0.85, 0.45, 0.15),
+                    "pot": (0.55, 0.4, 0.3),
+                    "bowl": (0.6, 0.55, 0.5),
+                }
+                col = colors.get(entity, (0.55, 0.45, 0.38))
+                hgt = 0.10 if entity in ("cup", "bowl", "apple", "fruit") else 0.14
+                if entity in ("column", "vase", "bottle"):
+                    hgt = 0.18
+                r = 0.045 if entity in ("cup", "bottle") else 0.055
+                prim = _lathe.lathe_primitive(
+                    entity, cx=ax, base=base, height=hgt, max_radius=r, color=col,
+                )
+            except Exception:
+                prim = {
+                    "entity": entity, "role": "lathe", "cx": ax, "base": base,
+                    "h": 0.12, "r": 0.05, "color": (0.55, 0.45, 0.4),
+                    "construction": "lathe", "machine": "lathe",
+                }
+        else:
+            try:
+                import extrude_paths as _ex
+                layers = int(mach.get("layers") or 1)
+                prim = _ex.extrude_primitive(
+                    entity, cx=ax, base=base, width=0.11, height=0.14,
+                    color=(0.5, 0.48, 0.45), layers=layers,
+                )
+            except Exception:
+                prim = {
+                    "entity": entity, "role": "extrude", "cx": ax, "base": base,
+                    "w": 0.11, "h": 0.14, "color": (0.5, 0.48, 0.45),
+                    "layers": 1, "construction": "extrude", "machine": "extrude",
+                }
+        out.append(prim)
     return out
 
 
@@ -1018,9 +1161,18 @@ def public_plan_view(plan: dict[str, Any], *, full: bool = False) -> dict[str, A
             }
             for c in (plan.get("composites") or [])
         ],
+        "machines": [
+            {
+                "machine": m.get("machine"),
+                "name": m.get("name"),
+                "entity": m.get("entity"),
+            }
+            for m in (plan.get("machines") or [])
+        ],
         "camera": plan.get("camera") or {},
         "missing": plan.get("missing") or [],
         "fingerprint": plan_fingerprint(plan),
+        "stock": "scene_graph",
     }
     if full:
         view["compile_steps"] = plan.get("compile_steps")

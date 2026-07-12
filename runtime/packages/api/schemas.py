@@ -232,7 +232,7 @@ class PatternIngest(BaseModel):
 
 class ImageRequest(BaseModel):
     """Request for POST /api/v1/image (SI illustration engine)."""
-    prompt: str = Field(..., min_length=1, max_length=2000, description="Scene description")
+    prompt: str = Field("", max_length=2000, description="Scene description (optional if scene_id + pass_only)")
     resolution: int = Field(
         512,
         ge=128,
@@ -377,6 +377,36 @@ class ImageRequest(BaseModel):
         True,
         description="Include scene_plan / monologue / outer_voice in the response",
     )
+    keep_session: bool = Field(
+        True,
+        description="Store scene graph for multi-pass re-render (returns scene_id)",
+    )
+    scene_id: Optional[str] = Field(
+        None,
+        description="Existing scene session id for multi-pass (with pass_only/from_scene)",
+    )
+    pass_only: bool = Field(
+        False,
+        description="If true with scene_id, re-render stock graph (no re-prompt compile)",
+    )
+    from_scene: bool = Field(
+        False,
+        description="Alias for pass_only — multi-pass from scene_id",
+    )
+    grade: str = Field(
+        "none",
+        description="Photoshop-lite grade: none|warm|cool|contrast|fade|vivid",
+    )
+    edit_text: Optional[str] = Field(
+        None,
+        description="Optional text overlay (picture_edit, not construction)",
+    )
+    edit_vignette: float = Field(
+        0.0,
+        ge=0.0,
+        le=1.0,
+        description="Extra vignette amount for picture_edit pass",
+    )
 
 
 class ImageResponse(BaseModel):
@@ -416,3 +446,8 @@ class ImageResponse(BaseModel):
     composite_parts: Optional[int] = None
     not_diffusion: bool = True
     engine_version: Optional[str] = None
+    scene_id: Optional[str] = None
+    lathe_parts: Optional[int] = None
+    extrude_parts: Optional[int] = None
+    picture_edit: Optional[Dict[str, Any]] = None
+    stock: Optional[str] = "scene_graph"

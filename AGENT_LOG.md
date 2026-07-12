@@ -638,3 +638,30 @@ generate_image("espresso machine on grass under a sky", out, use_llm_plan=False)
 ### Honest ceiling
 LLM/rules supply recipes and routing; SI still only paints known roles.
 Composites are procedural stand-ins, not photoreal invention.
+
+---
+
+## 2026-07-12 — feat/image-opt-enhance (v6 machine dialects + multi-pass)
+
+### Mission
+Full roadmap: lathe + extrude + plan routing + session multi-pass + picture-edit.
+
+### What shipped
+- `image_contract.py` + `docs/SI_IMAGE_CONTRACT.md` — honesty modes, stock=scene_graph
+- `lathe_paths.py` — solid of revolution paint (cup/vase/column/bottle/fruit…)
+- `extrude_paths.py` — print-lite box volumes + strata lines
+- `image_session.py` — in-memory scene stock for multi-pass
+- `picture_edit.py` — grade / vignette / text overlay (post-raster)
+- `scene_plan` routes LATHE_ENTITIES / EXTRUDE_ENTITIES; inject machines
+- `vsa_pipeline_image` paints `role=lathe|extrude`
+- API: `scene_id`, `pass_only`/`from_scene`, `grade`, `edit_text`, `keep_session`
+- `apply_scene_pass()` re-render without re-prompt
+- ENGINE `si-image-v6-machine-pass`
+- Tests: 25 passed (`test_lathe_extrude_session_and_picture_edit`)
+
+### Multi-pass usage
+```python
+m = generate_image("a vase on grass under a sky", out, keep_session=True)
+apply_scene_pass(m["scene_id"], out2, yaw_deg=20, look="cinema", grade="warm")
+# API: { "scene_id": "...", "pass_only": true, "yaw_deg": 15, "grade": "cool" }
+```

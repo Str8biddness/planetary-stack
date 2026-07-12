@@ -340,6 +340,70 @@ def test_draft_detail_and_engine_v4():
             assert isp.get("quality") == "draft"
 
 
+def test_lathe_extrude_session_and_picture_edit():
+    """Machine dialects + multi-pass session + photoshop-lite."""
+    import scene_plan as sp
+    import lathe_paths as lathe
+    import extrude_paths as ex
+    import picture_edit as pe
+    import image_session as sess
+    from image_service import generate_image, apply_scene_pass, clear_image_cache, ENGINE_VERSION
+
+    assert ENGINE_VERSION.startswith("si-image-v6")
+    plan = sp.compile_scene_plan("a vase and a cup on grass under a sky", use_llm=False)
+    machines = [m["machine"] for m in plan.get("machines") or []]
+    assert "lathe" in machines
+    assert any(m.get("entity") in ("vase", "cup") for m in plan["machines"])
+
+    plan_e = sp.compile_scene_plan("a crate on grass under a sky", use_llm=False)
+    assert any(m.get("machine") == "extrude" for m in plan_e.get("machines") or [])
+
+    # unit paint
+    h = w = 64
+    img = np.ones((h, w, 3), dtype=np.float32) * 0.5
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    yy /= h - 1
+    xx /= w - 1
+    lathe.paint_lathe(img, xx, yy, cx=0.5, base=0.7, height=0.2, max_radius=0.1, color=(0.8, 0.3, 0.2), entity="vase")
+    assert img.std() > 0.01
+    img2 = np.ones((h, w, 3), dtype=np.float32) * 0.5
+    ex.paint_extrude(img2, xx, yy, cx=0.5, base=0.7, width=0.2, height=0.15, color=(0.4, 0.4, 0.45), layers=3)
+    assert img2.std() > 0.01
+
+    graded = pe.edit_image(img, grade="warm", text="SI", vignette=0.2)
+    assert graded["meta"]["construction"] == "picture_edit"
+    assert graded["image"].shape == img.shape
+
+    clear_image_cache(disk=True)
+    sess.clear_sessions()
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "vase.png")
+        m = generate_image(
+            "a vase and a cup on grass under a sky",
+            out,
+            res=192,
+            style="soft",
+            look="raw",
+            detail="standard",
+            seed=2,
+            path_mode=True,
+            use_cache=False,
+            compile_plan=True,
+            use_llm_plan=False,
+            keep_session=True,
+            grade="none",
+        )
+        assert os.path.getsize(out) > 500
+        assert (m.get("lathe_parts") or 0) >= 1
+        sid = m.get("scene_id")
+        assert sid
+        out2 = os.path.join(td, "pass.png")
+        m2 = apply_scene_pass(sid, out2, yaw_deg=15.0, look="photo", grade="warm", edit_text="pass")
+        assert os.path.getsize(out2) > 500
+        assert m2.get("scene_id") == sid
+        assert m2.get("picture_edit") or m2.get("look") == "photo"
+
+
 def test_scene_plan_compile_and_composite_render():
     """Rules compiler maps synonyms + assembles puzzle-piece composites."""
     import scene_plan as sp

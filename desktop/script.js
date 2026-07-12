@@ -2652,7 +2652,11 @@ async function runImageStudio(variations, extra) {
     const body = {
         prompt, style, look, resolution, aspect, detail, path_mode,
         use_cache: true, variations, compile_plan: true, return_plan: true,
+        keep_session: true,
     };
+    // Optional picture-edit grade if control exists
+    const gradeEl = document.getElementById('image-grade');
+    if (gradeEl && gradeEl.value && gradeEl.value !== 'none') body.grade = gradeEl.value;
     if (_activeImagePreset) body.preset = _activeImagePreset;
     if (extra.views) { body.views = extra.views; body.yaw_span = extra.yaw_span || 30; body.variations = 1; }
     if (extra.frames) { body.frames = extra.frames; body.variations = 1; body.views = 1; }

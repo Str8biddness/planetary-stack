@@ -1611,9 +1611,11 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     except Exception as e:
         raise HTTPException(400, f"Invalid image request: {e}")
 
-    prompt = image_req.prompt.strip()
-    if not prompt:
-        raise HTTPException(400, "prompt is required")
+    prompt = (image_req.prompt or "").strip()
+    _pass = bool(getattr(image_req, "pass_only", False) or getattr(image_req, "from_scene", False))
+    _sid = getattr(image_req, "scene_id", None)
+    if not prompt and not (_pass and _sid):
+        raise HTTPException(400, "prompt is required (or scene_id + pass_only for multi-pass)")
     res = image_req.resolution
     style = (image_req.style or "soft").lower().strip()
     if style not in ("flat", "soft", "night", "photo"):
@@ -1682,6 +1684,12 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     compile_plan = bool(getattr(image_req, "compile_plan", True))
     use_llm_plan = getattr(image_req, "use_llm_plan", None)
     return_plan = bool(getattr(image_req, "return_plan", True))
+    keep_session = bool(getattr(image_req, "keep_session", True))
+    scene_id = getattr(image_req, "scene_id", None)
+    pass_only = bool(getattr(image_req, "pass_only", False) or getattr(image_req, "from_scene", False))
+    grade = (getattr(image_req, "grade", None) or "none")
+    edit_text = getattr(image_req, "edit_text", None) or ""
+    edit_vignette = float(getattr(image_req, "edit_vignette", 0.0) or 0.0)
 
     # Soft-DoS guard: high-res / multi-frame auto-async unless client forces sync
     multi = bool(orbit_day or n_frames > 1 or n_views > 1 or n_var > 1)
@@ -1720,6 +1728,13 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         "compile_plan": compile_plan,
         "use_llm_plan": use_llm_plan,
         "return_plan": return_plan,
+        "keep_session": keep_session,
+        "scene_id": scene_id,
+        "pass_only": pass_only,
+        "from_scene": pass_only,
+        "grade": grade,
+        "edit_text": edit_text,
+        "edit_vignette": edit_vignette,
     }
 
     try:

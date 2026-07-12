@@ -966,6 +966,75 @@ def render_doc(
             # no tall trunk for bush — just canopy near ground
             low = canopy * (yy > p["base"] - p["r"] * 2.2).astype(np.float32)
             paint(low, c)
+        elif role == "lathe":
+            try:
+                import lathe_paths as _lathe
+                import depth_buffer as _db
+                z = None
+                if depth_map is not None:
+                    try:
+                        z = _db.depth_for_primitive(p, horizon=horizon)
+                    except Exception:
+                        z = 0.4
+                _lathe.paint_lathe(
+                    img, xx, yy,
+                    cx=float(p.get("cx", p.get("x", 0.5))),
+                    base=float(p.get("base", horizon)),
+                    height=float(p.get("h", 0.12)),
+                    max_radius=float(p.get("r", 0.05)),
+                    color=c,
+                    profile=p.get("profile"),
+                    entity=str(p.get("entity", "lathe")),
+                    aa=aa,
+                    sun_pos=sun_pos if has_glow else None,
+                    depth_map=depth_map,
+                    depth_z=z,
+                )
+            except Exception:
+                # soft fallback: disc stack
+                r = float(p.get("r", 0.05))
+                cx = float(p.get("cx", 0.5))
+                base = float(p.get("base", horizon))
+                hh = float(p.get("h", 0.1))
+                for t in (0.2, 0.5, 0.8):
+                    cy = base - hh * t
+                    rr = r * (0.7 + 0.3 * (1 - abs(t - 0.5)))
+                    rad = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2)
+                    paint(1.0 - smoothstep(rr - aa, rr + aa, rad), c)
+        elif role == "extrude":
+            try:
+                import extrude_paths as _ex
+                import depth_buffer as _db
+                z = None
+                if depth_map is not None:
+                    try:
+                        z = _db.depth_for_primitive(p, horizon=horizon)
+                    except Exception:
+                        z = 0.45
+                _ex.paint_extrude(
+                    img, xx, yy,
+                    cx=float(p.get("cx", p.get("x", 0.5))),
+                    base=float(p.get("base", horizon)),
+                    width=float(p.get("w", 0.12)),
+                    height=float(p.get("h", 0.14)),
+                    color=c,
+                    layers=int(p.get("layers") or 1),
+                    aa=aa,
+                    sun_pos=sun_pos if has_glow else None,
+                    depth_map=depth_map,
+                    depth_z=z,
+                )
+            except Exception:
+                cx = float(p.get("cx", 0.5))
+                base = float(p.get("base", horizon))
+                ww = float(p.get("w", 0.1))
+                hh = float(p.get("h", 0.12))
+                box = (
+                    (np.abs(xx - cx) < ww * 0.5)
+                    & (yy < base)
+                    & (yy > base - hh)
+                ).astype(np.float32)
+                paint(box, c)
 
     # ── atmospheric post (wow polish) ────────────────────────────────
     if high or style in ("soft", "night"):

@@ -46,6 +46,8 @@ ROLE_DEPTH = {
     "disc": 0.32,
     "flower": 0.30,
     "person": 0.28,
+    "lathe": 0.33,
+    "extrude": 0.40,
 }
 
 
@@ -62,7 +64,10 @@ def depth_for_primitive(prim: Dict[str, Any], horizon: float = 0.66) -> float:
     if role in ("ground", "strip", "river"):
         # ground plane: interpolate near at y=1, horizon depth at y0
         z = float(np.clip(0.15 + 0.55 * (1.0 - (y_anchor - 0.2)), 0.2, 0.75))
-    elif role in ("house", "tree", "person", "building", "boat", "fence", "bush", "flower", "disc", "bridge"):
+    elif role in (
+        "house", "tree", "person", "building", "boat", "fence", "bush",
+        "flower", "disc", "bridge", "lathe", "extrude",
+    ):
         # objects on ground: nearer if lower on screen
         z = z * 0.55 + 0.45 * float(np.clip(1.15 - y_anchor, 0.15, 0.9))
     elif role == "triangle":

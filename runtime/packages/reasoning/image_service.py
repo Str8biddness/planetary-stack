@@ -51,9 +51,10 @@ _DISK_ENABLED = os.environ.get("SYNTHESUS_IMAGE_DISK_CACHE_OFF", "").strip() not
 STYLES = sorted(vpi.STYLES)
 DETAILS = ("draft", "standard", "high")
 # Bump when SHAPES, path raster, ISP, or materials change — invalidates disk/memory cache.
-ENGINE_VERSION = "si-image-v5-scene-plan"
+ENGINE_VERSION = "si-image-v6-machine-pass"
 VOCAB_VERSION = ENGINE_VERSION  # alias for API meta field
 LOOKS = ("raw", "photo", "cinema", "vivid", "tv")
+GRADES = ("none", "warm", "cool", "contrast", "fade", "vivid")
 
 
 def renderable_vocabulary() -> list[str]:
@@ -198,6 +199,11 @@ def generate_image(
     use_llm_plan: Optional[bool] = None,
     scene_plan: Optional[dict] = None,
     return_plan: bool = True,
+    keep_session: bool = True,
+    scene_id: Optional[str] = None,
+    grade: str = "none",
+    edit_text: str = "",
+    edit_vignette: float = 0.0,
 ) -> dict[str, Any]:
     """Reason ``prompt`` into a scene graph and render it to ``out_path`` (PNG).
 
@@ -211,6 +217,8 @@ def generate_image(
     compile_plan: run scene_plan compiler (synonyms + composite puzzle pieces).
     use_llm_plan: optional LLM enrich (None = env SYNTHESUS_IMAGE_LLM_PLAN).
     scene_plan: precomputed plan dict (skips compile when provided).
+    keep_session: store graph in image_session for multi-pass re-render.
+    grade/edit_text/edit_vignette: Photoshop-lite post-raster (picture_edit).
     """
     # Apply cinematic preset pack (fills missing knobs only)
     if preset:
@@ -354,7 +362,7 @@ def generate_image(
             path_mode=path_mode,
         )
         # Inject composite puzzle pieces from plan
-        if plan and plan.get("composites"):
+        if plan and (plan.get("composites") or plan.get("machines")):
             try:
                 import scene_plan as _sp
                 doc = _sp.inject_composites(
@@ -419,6 +427,27 @@ def generate_image(
         look=look,
         path_mode=path_mode,
     )
+    # Photoshop-lite post-raster (does not change scene graph)
+    picture_meta = None
+    grade = (grade or "none").lower().strip()
+    if grade not in GRADES:
+        grade = "none"
+    if grade != "none" or (edit_text and str(edit_text).strip()) or float(edit_vignette or 0) > 0:
+        try:
+            import picture_edit as _pe
+            from PIL import Image as _Im
+            arr = np.asarray(_Im.open(out_path).convert("RGB"), dtype=np.float32) / 255.0
+            edited = _pe.edit_image(
+                arr,
+                grade=grade,
+                vignette=float(edit_vignette or 0),
+                text=str(edit_text or ""),
+            )
+            _Im.fromarray((edited["image"] * 255).astype(np.uint8)).save(out_path)
+            picture_meta = edited.get("meta")
+        except Exception as pe:
+            picture_meta = {"error": str(pe), "construction": "picture_edit"}
+
     entities = [
         p.get("entity") for p in doc if isinstance(p, dict) and p.get("entity")
     ]
@@ -479,6 +508,8 @@ def generate_image(
         "outer_voice": (plan or {}).get("outer_voice"),
         "monologue": (plan or {}).get("monologue"),
         "not_diffusion": True,
+        "stock": "scene_graph",
+        "picture_edit": picture_meta,
     }
     if plan and return_plan:
         try:
@@ -495,6 +526,63 @@ def generate_image(
         meta["composite_parts"] = composite_n
         if "plan_composite" not in (meta.get("engine") or ""):
             meta["engine"] = (meta.get("engine") or "") + "+plan_composite"
+    lathe_n = sum(1 for p in doc if p.get("role") == "lathe" or p.get("machine") == "lathe")
+    extrude_n = sum(1 for p in doc if p.get("role") == "extrude" or p.get("machine") == "extrude")
+    if lathe_n:
+        meta["lathe_parts"] = lathe_n
+        meta["engine"] = (meta.get("engine") or "") + "+lathe"
+    if extrude_n:
+        meta["extrude_parts"] = extrude_n
+        meta["engine"] = (meta.get("engine") or "") + "+extrude"
+    if picture_meta and not picture_meta.get("error"):
+        meta["engine"] = (meta.get("engine") or "") + "+picture_edit"
+
+    # Multi-pass session: keep graph stock for later passes
+    if keep_session:
+        try:
+            import image_session as _sess
+            import copy
+            knobs = {
+                "style": style, "look": look, "detail": detail,
+                "path_mode": path_mode, "aspect": aspect, "res": res,
+                "yaw_deg": yaw_deg, "pitch_deg": pitch_deg,
+                "time_of_day": time_of_day, "grade": grade,
+            }
+            prec = {
+                "kind": "pass" if scene_doc is not None else "render",
+                "look": look,
+                "yaw_deg": yaw_deg,
+                "time_of_day": time_of_day,
+                "grade": grade,
+            }
+            if scene_id and _sess.get_session(scene_id):
+                # Update knobs / pass log; keep original scene_doc stock unless first build
+                fields = {"knobs": knobs, "pass_record": prec}
+                if scene_doc is None:
+                    fields.update(
+                        plan=plan,
+                        scene_doc=copy.deepcopy(doc),
+                        horizon=horizon,
+                        prompt=user_prompt,
+                        seed=seed,
+                    )
+                _sess.update_session(scene_id, **fields)
+                meta["scene_id"] = scene_id
+            elif scene_doc is None:
+                sid = _sess.create_session(
+                    plan=plan,
+                    scene_doc=copy.deepcopy(doc),
+                    horizon=horizon,
+                    prompt=user_prompt,
+                    seed=seed,
+                    knobs=knobs,
+                )
+                _sess.update_session(sid, pass_record=prec)
+                meta["scene_id"] = sid
+            elif scene_id:
+                meta["scene_id"] = scene_id
+        except Exception:
+            pass
     try:
         from PIL import Image as _Im
         with _Im.open(out_path) as im:
@@ -621,7 +709,7 @@ def _build_base_scene(prompt, seed, style, path_mode, detail, plan=None, use_llm
         style=paint_style,
         path_mode=path_mode,
     )
-    if plan and plan.get("composites"):
+    if plan and (plan.get("composites") or plan.get("machines")):
         try:
             import scene_plan as _sp
             doc = _sp.inject_composites(doc, plan, horizon, seed=seed, path_mode=path_mode)
@@ -902,6 +990,60 @@ def export_level(
     return le.build_level_from_prompt(prompt, **kwargs)
 
 
+def apply_scene_pass(
+    scene_id: str,
+    out_path: str,
+    *,
+    yaw_deg: Optional[float] = None,
+    pitch_deg: Optional[float] = None,
+    time_of_day: Optional[float] = None,
+    look: Optional[str] = None,
+    detail: Optional[str] = None,
+    res: Optional[int] = None,
+    grade: Optional[str] = None,
+    edit_text: Optional[str] = None,
+    edit_vignette: Optional[float] = None,
+    style: Optional[str] = None,
+) -> dict[str, Any]:
+    """Re-render an existing session graph with new view/ISP/picture-edit knobs.
+
+    Does not re-compile language from zero — multi-pass on scene stock.
+    """
+    import image_session as sess
+
+    s = sess.get_session(scene_id)
+    if not s or not s.get("scene_doc"):
+        raise ValueError(f"unknown or empty scene_id: {scene_id}")
+    kn = dict(s.get("knobs") or {})
+    return generate_image(
+        s.get("prompt") or "scene",
+        out_path,
+        res=int(res if res is not None else kn.get("res") or 512),
+        style=style if style is not None else kn.get("style") or "soft",
+        seed=s.get("seed"),
+        aspect=float(kn.get("aspect") or 1.0),
+        use_cache=False,
+        detail=detail if detail is not None else kn.get("detail") or "standard",
+        look=look if look is not None else kn.get("look") or "photo",
+        path_mode=bool(kn.get("path_mode", True)),
+        yaw_deg=float(yaw_deg if yaw_deg is not None else kn.get("yaw_deg") or 0.0),
+        pitch_deg=float(pitch_deg if pitch_deg is not None else kn.get("pitch_deg") or 0.0),
+        time_of_day=(
+            time_of_day if time_of_day is not None else kn.get("time_of_day")
+        ),
+        scene_doc=s.get("scene_doc"),
+        scene_horizon=float(s.get("horizon") or 0.66),
+        scene_plan=s.get("plan"),
+        compile_plan=False,
+        keep_session=True,
+        scene_id=scene_id,
+        grade=grade if grade is not None else kn.get("grade") or "none",
+        edit_text=edit_text if edit_text is not None else "",
+        edit_vignette=float(edit_vignette if edit_vignette is not None else 0.0),
+        return_plan=True,
+    )
+
+
 def execute_image_request(
     params: dict[str, Any],
     progress: Optional[Any] = None,
@@ -921,9 +1063,70 @@ def execute_image_request(
             except Exception:
                 pass
 
+    # Multi-pass: re-render existing scene stock
+    scene_id_in = params.get("scene_id")
+    pass_only = bool(params.get("pass_only") or params.get("from_scene"))
+    if scene_id_in and pass_only:
+        _p("scene_pass", 0.2)
+        out_path = os.path.join(tempfile.gettempdir(), f"synth_pass_{uuid.uuid4().hex[:12]}.png")
+        try:
+            meta = apply_scene_pass(
+                str(scene_id_in),
+                out_path,
+                yaw_deg=params.get("yaw_deg"),
+                pitch_deg=params.get("pitch_deg"),
+                time_of_day=params.get("time_of_day"),
+                look=params.get("look"),
+                detail=params.get("detail"),
+                res=params.get("resolution"),
+                grade=params.get("grade"),
+                edit_text=params.get("edit_text"),
+                edit_vignette=params.get("edit_vignette"),
+                style=params.get("style"),
+            )
+            with open(out_path, "rb") as f:
+                png_b64 = base64.b64encode(f.read()).decode("ascii")
+        finally:
+            try:
+                os.remove(out_path)
+            except OSError:
+                pass
+        return {
+            "ok": True,
+            "engine": meta.get("engine"),
+            "prompt": meta.get("user_prompt") or meta.get("prompt"),
+            "resolution": meta.get("resolution"),
+            "width": meta.get("width"),
+            "height": meta.get("height"),
+            "style": meta.get("style"),
+            "detail": meta.get("detail"),
+            "look": meta.get("look"),
+            "image_base64": png_b64,
+            "mime_type": "image/png",
+            "scene_id": meta.get("scene_id") or scene_id_in,
+            "scene_plan": meta.get("scene_plan"),
+            "outer_voice": meta.get("outer_voice"),
+            "monologue": meta.get("monologue"),
+            "construction": meta.get("construction"),
+            "si_prompt": meta.get("si_prompt"),
+            "picture_edit": meta.get("picture_edit"),
+            "not_diffusion": True,
+            "stock": "scene_graph",
+            "pass": True,
+            "entities": meta.get("entities", []),
+            "entity_count": meta.get("entity_count", 0),
+            "latency_ms": meta.get("latency_ms"),
+            "engine_version": meta.get("engine_version"),
+        }
+
     prompt = (params.get("prompt") or "").strip()
-    if not prompt:
+    if not prompt and not scene_id_in:
         raise ValueError("prompt is required")
+    if not prompt and scene_id_in:
+        # treat as pass
+        params = dict(params)
+        params["pass_only"] = True
+        return execute_image_request(params, progress=progress)
     res = max(128, min(2048, int(params.get("resolution") or 512)))
     style = (params.get("style") or "soft").lower().strip()
     look = (params.get("look") or "photo").lower().strip()
@@ -953,6 +1156,10 @@ def execute_image_request(
     if isinstance(use_llm_plan, str):
         use_llm_plan = use_llm_plan.strip().lower() in ("1", "true", "yes", "on")
     return_plan = bool(params.get("return_plan", True))
+    keep_session = bool(params.get("keep_session", True))
+    grade = (params.get("grade") or "none")
+    edit_text = params.get("edit_text") or ""
+    edit_vignette = float(params.get("edit_vignette") or 0.0)
 
     t0 = _time.time()
     _p("starting", 0.05)
@@ -1088,6 +1295,10 @@ def execute_image_request(
             compile_plan=compile_plan,
             use_llm_plan=use_llm_plan,
             return_plan=return_plan,
+            keep_session=keep_session,
+            grade=grade,
+            edit_text=edit_text,
+            edit_vignette=edit_vignette,
         )
         with open(out_path, "rb") as f:
             png_b64 = base64.b64encode(f.read()).decode("ascii")
@@ -1137,6 +1348,11 @@ def execute_image_request(
         "si_prompt": meta.get("si_prompt"),
         "user_prompt": meta.get("user_prompt", prompt),
         "composite_parts": meta.get("composite_parts"),
+        "lathe_parts": meta.get("lathe_parts"),
+        "extrude_parts": meta.get("extrude_parts"),
+        "picture_edit": meta.get("picture_edit"),
+        "scene_id": meta.get("scene_id"),
+        "stock": "scene_graph",
         "not_diffusion": True,
         "engine_version": meta.get("engine_version"),
     }
