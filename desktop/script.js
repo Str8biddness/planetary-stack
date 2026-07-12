@@ -2287,6 +2287,12 @@ function startForemanSync() {
 async function fetchForemanQueue() {
     try {
         const res = await fetch('/api/foreman/queue');
+        if (!res.ok) {
+            // Foreman is held/unmounted in this build — stop polling so we don't
+            // spam the browser console with a 404 every 2s. Resumes if the route exists.
+            if (res.status === 404 && foremanInterval) { clearInterval(foremanInterval); foremanInterval = null; }
+            return;
+        }
         const data = await res.json();
         const listEl = document.getElementById('foreman-queue-list');
         if (!listEl) return;
