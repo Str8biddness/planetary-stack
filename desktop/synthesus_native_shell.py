@@ -299,6 +299,59 @@ def image_presets_proxy():
             "message": f"runtime unavailable: {e}",
         }), 503
 
+@app.route('/api/v1/voice', methods=['POST'])
+def voice_proxy():
+    """SI Voice Studio → runtime POST /api/v1/voice (formant larynx, not neural TTS).
+
+    Forwards {text, knobs?, seed?}. Never invents WAV if runtime/engine is down.
+    Propagates 503 loudly when the formant engine is missing.
+    """
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or data.get("prompt") or "").strip()
+    if not text:
+        return jsonify({
+            "ok": False,
+            "error": "text_required",
+            "message": "text is required",
+            "not_neural_tts": True,
+        }), 400
+    body = {
+        "text": text,
+        "knobs": data.get("knobs") if isinstance(data.get("knobs"), dict) else {},
+    }
+    if data.get("seed") is not None and str(data.get("seed")).strip() != "":
+        try:
+            body["seed"] = int(data["seed"])
+        except (TypeError, ValueError):
+            pass
+    try:
+        r = requests.post(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/voice",
+            json=body,
+            headers=_runtime_api_headers(),
+            timeout=60,
+        )
+        try:
+            payload = r.json()
+        except Exception:
+            payload = {
+                "ok": False,
+                "error": "bad_runtime_body",
+                "message": (r.text or "")[:400],
+                "not_neural_tts": True,
+            }
+        return (json.dumps(payload), r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        print(f"[voice] runtime unavailable ({e})")
+        return jsonify({
+            "ok": False,
+            "error": "runtime_unavailable",
+            "message": f"runtime unavailable: {e}",
+            "not_neural_tts": True,
+            "note": "SI formant larynx missing or failed — not falling back to neural TTS",
+        }), 503
+
+
 # Section E (C-401): the desktop chat routes through the CHAL runtime — the full
 # merged Synthesus brain (grounding + quad-brain + LLM + critic). If the runtime
 # is unavailable it DEGRADES LOUDLY to the direct kernel path (still real local AI,

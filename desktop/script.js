@@ -3169,3 +3169,84 @@ const _origToggleWindow = typeof toggleWindow === 'function' ? null : null;
 document.addEventListener('DOMContentLoaded', function () {
     try { renderImageGallery(); } catch (_) {}
 });
+
+// ---------------------------------------------------------------------------
+// SI Voice Studio — formant larynx via POST /api/v1/voice (not neural TTS)
+// ---------------------------------------------------------------------------
+let _lastVoiceObjectUrl = null;
+
+function collectVoiceKnobs() {
+    const knobs = {};
+    if (document.getElementById('voice-knob-slower')?.checked) knobs.slower = true;
+    if (document.getElementById('voice-knob-faster')?.checked) knobs.faster = true;
+    if (document.getElementById('voice-knob-higher')?.checked) knobs.higher = true;
+    if (document.getElementById('voice-knob-lower')?.checked) knobs.lower = true;
+    if (document.getElementById('voice-knob-rising')?.checked) knobs.rising_final = true;
+    return knobs;
+}
+
+async function runVoiceSpeak() {
+    const textEl = document.getElementById('voice-text');
+    const statusEl = document.getElementById('voice-status');
+    const phEl = document.getElementById('voice-phonemes');
+    const uidEl = document.getElementById('voice-uid');
+    const audioEl = document.getElementById('voice-audio');
+    const text = (textEl && textEl.value || '').trim();
+    if (!text) {
+        if (statusEl) statusEl.textContent = 'text required';
+        return;
+    }
+    if (statusEl) statusEl.textContent = 'synthesizing SI formant…';
+    if (phEl) phEl.textContent = '';
+    try {
+        const headers = (typeof authHeaders === 'function') ? authHeaders() : { 'Content-Type': 'application/json' };
+        if (!headers['Content-Type'] && !headers['content-type']) {
+            headers['Content-Type'] = 'application/json';
+        }
+        const res = await fetch('/api/v1/voice', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ text: text, knobs: collectVoiceKnobs(), seed: 25 }),
+        });
+        const data = await res.json().catch(function () { return {}; });
+        if (!res.ok || !data.audio_base64) {
+            const msg = (data && (data.message || data.detail?.message || data.error || data.detail)) || ('HTTP ' + res.status);
+            if (statusEl) {
+                statusEl.style.color = '#fb7185';
+                statusEl.textContent = '503/ERR · ' + (typeof msg === 'string' ? msg : JSON.stringify(msg));
+            }
+            return;
+        }
+        const mime = data.mime_type || 'audio/wav';
+        const bin = atob(data.audio_base64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        // RIFF check in browser
+        const riffOk = bytes.length >= 12 &&
+            String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) === 'RIFF';
+        const blob = new Blob([bytes], { type: mime });
+        if (_lastVoiceObjectUrl) URL.revokeObjectURL(_lastVoiceObjectUrl);
+        _lastVoiceObjectUrl = URL.createObjectURL(blob);
+        if (audioEl) {
+            audioEl.src = _lastVoiceObjectUrl;
+            audioEl.play().catch(function () {});
+        }
+        if (statusEl) {
+            statusEl.style.color = '#8595a9';
+            statusEl.textContent = (data.engine || 'si_formant_klatt') +
+                ' · bytes=' + (data.bytes || bytes.length) +
+                ' · riff=' + (riffOk ? 'ok' : 'BAD') +
+                ' · SI formant · no TTS model';
+        }
+        if (phEl) phEl.textContent = data.phonemes || '';
+        if (uidEl) uidEl.textContent = data.utterance_id
+            ? ('utterance_id ' + data.utterance_id + ' · stock=utterance_plan')
+            : '';
+    } catch (e) {
+        if (statusEl) {
+            statusEl.style.color = '#fb7185';
+            statusEl.textContent = 'DEGRADED: ' + (e.message || e);
+        }
+    }
+}
+
