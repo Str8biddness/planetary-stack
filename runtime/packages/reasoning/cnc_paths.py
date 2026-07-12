@@ -531,24 +531,42 @@ def paint_path(
     sun_pos: Tuple[float, float] = (0.72, 0.20),
     use_materials: bool = True,
     pocket: bool = True,
-) -> None:
+    depth_map: Optional[np.ndarray] = None,
+    depth_z: Optional[float] = None,
+) -> np.ndarray:
     """Paint a path into img (float HxWx3) with fill and/or stroke.
 
     pocket=True applies multi-pass offset fills for closed contours.
     use_materials=True shades with materials.shade_albedo when available.
+    If depth_map + depth_z provided, writes Z under coverage (true DOF later).
+    Returns combined coverage mask for the paint.
     """
     c = np.asarray(color, dtype=np.float32)
     entity = str(path.meta.get("entity", ""))
     role = str(path.meta.get("role", ""))
+    cov_acc = np.zeros(xx.shape, dtype=np.float32)
+
+    def _write_z(m):
+        if depth_map is not None and depth_z is not None:
+            try:
+                import depth_buffer as _db
+                _db.write_depth(depth_map, m, float(depth_z))
+            except Exception:
+                pass
 
     def _blend_flat(m, col=None, scale=1.0):
         m = np.asarray(m, dtype=np.float32) * float(scale)
+        nonlocal cov_acc
+        cov_acc = np.maximum(cov_acc, m)
         col = np.asarray(col if col is not None else c, dtype=np.float32)
         for k in range(3):
             img[:, :, k] = img[:, :, k] * (1.0 - m) + col[k] * m
+        _write_z(m)
 
     def _blend_mat(m, col=None, scale=1.0):
         m = np.asarray(m, dtype=np.float32) * float(scale)
+        nonlocal cov_acc
+        cov_acc = np.maximum(cov_acc, m)
         col = tuple(float(x) for x in (col if col is not None else c))
         if use_materials:
             try:
@@ -556,6 +574,7 @@ def paint_path(
                 _mat.blend_shaded(
                     img, m, col, xx, yy, sun_pos=sun_pos, entity=entity, role=role
                 )
+                _write_z(m)
                 return
             except Exception:
                 pass
@@ -576,6 +595,7 @@ def paint_path(
         sw = max(width * 0.35, aa * 2)
         op = polyline([tuple(p) for p in discretize(path)], closed=True)
         _blend_flat(raster_stroke(xx, yy, op, width=sw, aa=aa) * 0.25)
+    return cov_acc
 
 
 def paths_for_primitive(prim: dict[str, Any], seed: int = 0) -> List[Path]:

@@ -1630,6 +1630,36 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     n_var = int(getattr(image_req, "variations", 1) or 1)
     n_var = max(1, min(8, n_var))
     path_mode = bool(getattr(image_req, "path_mode", True))
+    preset = getattr(image_req, "preset", None)
+
+    # Merge cinematic preset into knobs (fills blanks; explicit body already in image_req)
+    if preset:
+        try:
+            import scene_presets as _sp
+            merged = _sp.apply_preset_to_request({
+                "preset": preset,
+                "prompt": prompt,
+                "style": style,
+                "look": look,
+                "detail": detail,
+                "path_mode": path_mode,
+                "aspect": aspect,
+                "seed": seed,
+                "resolution": res,
+            })
+            prompt = (merged.get("prompt") or prompt).strip()
+            style = merged.get("style") or style
+            look = merged.get("look") or look
+            detail = merged.get("detail") or detail
+            path_mode = bool(merged.get("path_mode", path_mode))
+            aspect = float(merged.get("aspect", aspect))
+            if seed is None and merged.get("seed") is not None:
+                seed = int(merged["seed"])
+            if merged.get("resolution"):
+                res = int(merged["resolution"])
+            preset = merged.get("preset") or preset
+        except Exception as pe:
+            logger.warning("preset merge soft-fail: %s", pe)
 
     try:
         from image_service import generate_image, generate_variations, renderable_vocabulary
@@ -1724,6 +1754,7 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
             detail,
             look,
             path_mode,
+            preset,
         )
         with open(out_path, "rb") as f:
             png_b64 = base64.b64encode(f.read()).decode("ascii")
@@ -1762,7 +1793,8 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         "mime_type": "image/png",
         "vocab_version": meta.get("vocab_version"),
         "isp": meta.get("isp"),
-        "engine": meta.get("engine", "synthesus_vsa_geometric"),
+        "depth": meta.get("depth"),
+        "preset": meta.get("preset") or preset,
         "path_mode": path_mode,
         "path_entities": meta.get("path_entities"),
         "path_ops_sample": meta.get("path_ops_sample"),

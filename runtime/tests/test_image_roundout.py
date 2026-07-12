@@ -275,6 +275,31 @@ def test_detail_high_and_variations():
     assert all(v.get("image_base64") for v in vars_)
 
 
+def test_presets_and_depth_buffer():
+    import scene_presets as sp
+    import depth_buffer as db
+
+    catalog = sp.list_presets()
+    assert len(catalog) >= 6
+    p = sp.get_preset("cottage_dawn")
+    assert p and "cottage" in p["prompt"].lower()
+    body = sp.apply_preset_to_request({"preset": "harbor_day"})
+    assert "boat" in body["prompt"]
+    assert body.get("look")
+
+    h, w = 32, 48
+    depth = db.make_depth_buffer(h, w)
+    mask = np.ones((h, w), dtype=np.float32)
+    mask[:10, :] = 0
+    db.write_depth(depth, mask, 0.3)
+    assert depth.max() <= 1.0
+    assert float(depth[20, 10]) <= 0.35
+    z = db.depth_for_primitive({"role": "person", "base": 0.75})
+    assert 0.0 <= z <= 1.0
+    fd = db.focus_from_doc([{"role": "person", "base": 0.7}, {"role": "tree", "base": 0.66}])
+    assert 0.0 <= fd <= 1.0
+
+
 def test_materials_and_sky_modules():
     import materials as mat
     import sky_model as sky

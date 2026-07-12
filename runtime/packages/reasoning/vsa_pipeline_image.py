@@ -603,6 +603,16 @@ def render_doc(
     aa = 2.5 * px if style == "soft" else 1.0 * px
     img = np.ones((h, w, 3), dtype=np.float32)
 
+    # Per-object depth buffer (0=near, 1=far) for true DOF + future world Z
+    try:
+        import depth_buffer as _db
+        depth_map = _db.make_depth_buffer(h, w, far=1.0)
+        focus_depth = _db.focus_from_doc(doc)
+    except Exception:
+        _db = None  # type: ignore
+        depth_map = None
+        focus_depth = None
+
     has_glow = any(
         p.get("role") == "disc_top" and p.get("entity") in ("sun", "moon")
         for p in doc
@@ -612,11 +622,14 @@ def render_doc(
         (0.72, 0.20),
     )
 
-    def paint(m, c):
+    def paint(m, c, prim=None):
         m = np.asarray(m, dtype=np.float32)
         c = np.asarray(c, dtype=np.float32)
         for k in range(3):
             img[:, :, k] = img[:, :, k] * (1.0 - m) + c[k] * m
+        if depth_map is not None and _db is not None and prim is not None:
+            z = _db.depth_for_primitive(prim, horizon=horizon)
+            _db.write_depth(depth_map, m, z)
 
     # Optional CNC path paint for structured entities
     try:
@@ -634,6 +647,10 @@ def render_doc(
             paths = _cnc.paths_for_primitive(p, seed=int(seed or 0))
         if not paths:
             return False
+        z = None
+        if _db is not None:
+            z = _db.depth_for_primitive(p, horizon=horizon)
+            p["depth_z"] = z
         for pth in paths:
             layer = pth.meta.get("layer")
             if layer == "door":
@@ -647,6 +664,7 @@ def render_doc(
             _cnc.paint_path(
                 img, xx, yy, pth, col, aa=aa,
                 sun_pos=sun_pos, use_materials=True, pocket=True,
+                depth_map=depth_map, depth_z=z,
             )
         return True
 
@@ -694,11 +712,17 @@ def render_doc(
                     img, m, c, xx, yy, sun_pos=sun_pos,
                     entity=p.get("entity", "grass"), role="ground", horizon=horizon,
                 )
+                if depth_map is not None and _db is not None:
+                    # Ground plane: depth from y (near at bottom)
+                    z_plane = np.clip(0.15 + 0.55 * (1.0 - yy), 0.2, 0.75).astype(np.float32)
+                    write = m > 0.1
+                    if np.any(write):
+                        depth_map[write] = np.minimum(depth_map[write], z_plane[write])
             except Exception:
-                paint(m, c)
+                paint(m, c, prim=p)
         elif role == "disc_top":
             r = np.sqrt((xx - p["x"]) ** 2 + (yy - p["y"]) ** 2)
-            paint(1.0 - smoothstep(p["r"] - aa, p["r"] + aa, r), c)
+            paint(1.0 - smoothstep(p["r"] - aa, p["r"] + aa, r), c, prim=p)
         elif role == "cloud_top":
             cov = np.zeros((h, w), dtype=np.float32)
             scale = float(p.get("r", 0.07))
@@ -986,6 +1010,8 @@ def render_doc(
                 look=look if look in _isp.LOOKS else "photo",
                 seed=seed,
                 sun_pos=sun_pos if has_glow else None,
+                depth_map=depth_map,
+                focus_depth=focus_depth,
             )
             img = result["image"]
             isp_meta = result.get("meta")
@@ -995,8 +1021,18 @@ def render_doc(
             logging.getLogger("synthesus.image").warning("camera ISP skipped: %s", exc)
 
     Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8)).save(out)
-    # Stash last ISP meta for callers that re-import (service reads optional side channel)
+    # Stash last ISP meta / depth for callers (service reads optional side channel)
     render_doc.last_isp_meta = isp_meta  # type: ignore[attr-defined]
+    render_doc.last_depth_stats = (  # type: ignore[attr-defined]
+        {
+            "focus_depth": focus_depth,
+            "depth_min": float(depth_map.min()) if depth_map is not None else None,
+            "depth_max": float(depth_map.max()) if depth_map is not None else None,
+            "depth_guided": depth_map is not None,
+        }
+        if depth_map is not None
+        else {"depth_guided": False}
+    )
     return out
 
 

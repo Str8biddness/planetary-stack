@@ -2300,6 +2300,31 @@ const IMAGE_STUDIO_EXAMPLES = {
     river: 'a boat on a river under a sky with a bird and a tree right of a bridge',
     city: 'a person left of a building on a road under a sky with a sun',
 };
+const IMAGE_PRESET_HINTS = {
+    cottage_dawn: { prompt: 'a cottage left of a tree on green grass under a blue sky with a sun and a cloud and a flower', style: 'photo', look: 'cinema', aspect: '1.5' },
+    harbor_day: { prompt: 'a boat on a river under a sky with a sun and a bridge and a bird and a person right of a tree', style: 'photo', look: 'photo', aspect: '1.5' },
+    city_dusk: { prompt: 'a person left of a building on a road under a sky with a sun and a lamp and a car', style: 'photo', look: 'vivid', aspect: '1.5' },
+    mountain_lake: { prompt: 'a mountain and a lake and a tree and a cabin under a sky with a sun and a cloud', style: 'photo', look: 'cinema', aspect: '1.5' },
+    night_village: { prompt: 'a house and a tree and a person and a star under a night sky over grass with a moon and a lamp', style: 'night', look: 'cinema', aspect: '1' },
+    bridge_crossing: { prompt: 'a person on a bridge over a river under a sky with a sun and a tree right of a house', style: 'photo', look: 'photo', aspect: '1.5' },
+};
+let _activeImagePreset = null;
+
+function applyImagePreset(id) {
+    const p = IMAGE_PRESET_HINTS[id];
+    if (!p) return;
+    _activeImagePreset = id;
+    const promptEl = document.getElementById('image-prompt');
+    if (promptEl) promptEl.value = p.prompt;
+    const styleEl = document.getElementById('image-style');
+    if (styleEl && p.style) styleEl.value = p.style;
+    const lookEl = document.getElementById('image-look');
+    if (lookEl && p.look) lookEl.value = p.look;
+    const aspectEl = document.getElementById('image-aspect');
+    if (aspectEl && p.aspect) aspectEl.value = p.aspect;
+    const statusEl = document.getElementById('image-studio-status');
+    if (statusEl) statusEl.innerHTML = '<span style="color:#a78bfa;">Preset: ' + escapeHtmlStudio(id) + ' — hit Generate</span>';
+}
 const IMAGE_GALLERY_KEY = 'synthesus_image_gallery_v1';
 let _lastStudioDataUrl = null;
 
@@ -2444,6 +2469,7 @@ async function runImageStudio(variations) {
     const path_mode = !pathModeEl || pathModeEl.value !== '0';
     const seedRaw = (document.getElementById('image-seed') || {}).value;
     const body = { prompt, style, look, resolution, aspect, detail, path_mode, use_cache: true, variations };
+    if (_activeImagePreset) body.preset = _activeImagePreset;
     if (seedRaw !== undefined && seedRaw !== null && String(seedRaw).trim() !== '') {
         const n = parseInt(seedRaw, 10);
         if (!Number.isNaN(n)) body.seed = n;

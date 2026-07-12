@@ -47,7 +47,7 @@ _DISK_ENABLED = os.environ.get("SYNTHESUS_IMAGE_DISK_CACHE_OFF", "").strip() not
 
 STYLES = sorted(vpi.STYLES)
 DETAILS = ("standard", "high")
-VOCAB_VERSION = "image-materials-v1"
+VOCAB_VERSION = "image-depth-presets-v1"
 LOOKS = ("raw", "photo", "cinema", "vivid", "tv")
 
 
@@ -175,13 +175,44 @@ def generate_image(
     detail: str = "standard",
     look: str = "raw",
     path_mode: bool = True,
+    preset: Optional[str] = None,
 ) -> dict[str, Any]:
     """Reason ``prompt`` into a scene graph and render it to ``out_path`` (PNG).
 
     look: raw | photo | cinema | vivid | tv — camera/TV ISP finish (not diffusion).
     style=photo also enables soft paint + photo look.
     path_mode: CNC path construction (G1/arc/offset math) for form.
+    preset: optional cinematic pack id (scene_presets) fills blanks.
     """
+    # Apply cinematic preset pack (fills missing knobs only)
+    if preset:
+        try:
+            import scene_presets as _sp
+            merged = _sp.apply_preset_to_request({
+                "preset": preset,
+                "prompt": prompt,
+                "style": style,
+                "look": look,
+                "detail": detail,
+                "path_mode": path_mode,
+                "aspect": aspect,
+                "seed": seed,
+                "resolution": res,
+            })
+            prompt = merged.get("prompt") or prompt
+            style = merged.get("style") or style
+            look = merged.get("look") or look
+            detail = merged.get("detail") or detail
+            path_mode = bool(merged.get("path_mode", path_mode))
+            aspect = float(merged.get("aspect", aspect))
+            if merged.get("seed") is not None and seed is None:
+                seed = merged.get("seed")
+            if merged.get("resolution"):
+                res = int(merged.get("resolution"))
+            preset = merged.get("preset") or preset
+        except Exception:
+            pass
+
     if not prompt or not prompt.strip():
         raise ValueError("prompt is required")
 
@@ -284,6 +315,7 @@ def generate_image(
         "path_mode": path_mode,
         "path_entities": path_built,
         "path_ops_sample": path_ops[:16],
+        "preset": preset,
         "seed": seed,
         "aspect": aspect,
         "cache_hit": False,
@@ -291,6 +323,7 @@ def generate_image(
         "engine": "+".join(engine_bits),
         "bytes": len(png_bytes),
         "isp": getattr(vpi.render_doc, "last_isp_meta", None),
+        "depth": getattr(vpi.render_doc, "last_depth_stats", None),
     }
     try:
         from PIL import Image as _Im

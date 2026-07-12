@@ -202,8 +202,27 @@ def image_proxy():
         "detail": data.get("detail", "high"),
         "look": data.get("look", "photo"),
         "path_mode": data.get("path_mode", True),
+        "preset": data.get("preset"),
         "variations": data.get("variations", 1),
     }
+
+
+@app.route('/api/v1/image/presets', methods=['GET'])
+def image_presets_proxy():
+    """List cinematic SI scene presets (local catalog)."""
+    try:
+        import sys
+        from pathlib import Path
+        # Prefer runtime package on PYTHONPATH; fallback load from sibling install
+        try:
+            import scene_presets as sp
+        except ImportError:
+            rt = Path(os.environ.get("SYNTHESUS_HOME", Path.home() / ".local/share/synthesus"))
+            sys.path.insert(0, str(rt / "runtime" / "packages" / "reasoning"))
+            import scene_presets as sp  # type: ignore
+        return jsonify({"ok": True, "presets": sp.list_presets()})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "presets": []}), 503
     if data.get("seed") is not None and str(data.get("seed")).strip() != "":
         try:
             body["seed"] = int(data["seed"])

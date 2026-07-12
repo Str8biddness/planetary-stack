@@ -110,15 +110,26 @@ def depth_of_field(
     focus: float = 0.62,
     amount: float = 0.55,
     max_radius: int = 5,
+    depth_map: Optional[np.ndarray] = None,
 ) -> np.ndarray:
-    depth = np.clip(yy, 0, 1)
-    focus = float(np.clip(focus, 0.15, 0.95))
-    coc = np.clip(np.abs(depth - focus) * 1.4 + np.clip(horizon - yy, 0, 1) * 0.15, 0, 1)
+    """Bokeh-style DOF.
+
+    If depth_map (HxW, 0=near 1=far) is provided, CoC = |z - focus|.
+    Otherwise falls back to y-horizon proxy (legacy).
+    """
+    if depth_map is not None and depth_map.shape[:2] == img.shape[:2]:
+        depth = np.clip(depth_map.astype(np.float32), 0, 1)
+        focus = float(np.clip(focus, 0.0, 1.0))
+        coc = np.clip(np.abs(depth - focus) * 1.85, 0, 1)
+    else:
+        depth = np.clip(yy, 0, 1)
+        focus = float(np.clip(focus, 0.15, 0.95))
+        coc = np.clip(np.abs(depth - focus) * 1.4 + np.clip(horizon - yy, 0, 1) * 0.15, 0, 1)
     soft = np.stack([box_blur(img[..., k], max(1, max_radius)) for k in range(3)], -1)
     softer = np.stack([box_blur(img[..., k], max(2, max_radius + 2)) for k in range(3)], -1)
     a = (coc * amount).astype(np.float32)[..., None]
     mid = img * (1 - np.clip(a * 1.2, 0, 1)) + soft * np.clip(a * 1.2, 0, 1)
-    a2 = np.clip((coc - 0.45) * 2.0 * amount, 0, 1)[..., None]
+    a2 = np.clip((coc - 0.4) * 2.0 * amount, 0, 1)[..., None]
     return (mid * (1 - a2) + softer * a2).astype(np.float32)
 
 
@@ -183,6 +194,8 @@ def apply_camera_look(
     look: str = "photo",
     seed: Optional[int] = None,
     sun_pos: Optional[Tuple[float, float]] = None,
+    depth_map: Optional[np.ndarray] = None,
+    focus_depth: Optional[float] = None,
 ) -> dict[str, Any]:
     look = (look or "photo").lower().strip()
     if look not in LOOKS:
@@ -230,8 +243,14 @@ def apply_camera_look(
 
     x = bloom(x, threshold=0.72, amount=bloom_amt, radius=6 if look != "tv" else 3)
     pipeline.append("bloom")
-    x = depth_of_field(x, yy, horizon, focus=0.62, amount=dof_amt, max_radius=4)
-    pipeline.append("dof")
+    # True DOF when per-object depth map present; else y-proxy
+    fd = 0.35 if focus_depth is None else float(focus_depth)
+    if depth_map is None:
+        fd = 0.62  # legacy y-focus
+    x = depth_of_field(
+        x, yy, horizon, focus=fd, amount=dof_amt, max_radius=4, depth_map=depth_map
+    )
+    pipeline.append("dof_z" if depth_map is not None else "dof_y")
     if look in ("photo", "cinema"):
         x = chromatic_aberration(x, strength=0.0015 if look == "photo" else 0.0022)
         pipeline.append("ca")
@@ -262,6 +281,8 @@ def apply_camera_look(
             "pipeline": pipeline,
             "ae_gain": gain,
             "engine": "synthesus_camera_isp",
+            "focus_depth": fd if depth_map is not None else None,
+            "depth_guided": depth_map is not None,
             "note": "camera/TV ISP math on SI scene — not diffusion",
         },
     }

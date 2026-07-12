@@ -405,3 +405,25 @@ pytest tests/test_image_roundout.py → 16 passed
 ```
 
 ### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-depth-presets
+
+### Mission
+1) Cinematic scene presets  2) Per-object depth map + true DOF bokeh.
+Also documents SI multi-axis opinion: real DOF only when Z is first-class.
+
+### What changed
+- NEW `scene_presets.py` — cottage_dawn, harbor_day, city_dusk, mountain_lake,
+  night_village, orchard, bridge_crossing, tv_vivid_park
+- NEW `depth_buffer.py` — per-object Z, z-test write, focus picker
+- `camera_isp.depth_of_field` uses depth_map when present (`dof_z`)
+- `render_doc` builds depth while painting paths; passes focus to ISP
+- Studio preset buttons; API `preset` field; shell `/api/v1/image/presets`
+- Tests: **17 passed**
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 17 passed
+```
+
+### Do NOT merge without Claude review.

@@ -281,6 +281,10 @@ class ImageRequest(BaseModel):
             "Not raw G-code UI — SI uses the math to build contours."
         ),
     )
+    preset: Optional[str] = Field(
+        None,
+        description="Cinematic scene preset id (cottage_dawn, harbor_day, city_dusk, …)",
+    )
 
 
 class ImageResponse(BaseModel):

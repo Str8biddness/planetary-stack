@@ -414,6 +414,17 @@
                     <button class="glass-btn" onclick="imageStudioExample('river')">River</button>
                     <button class="glass-btn" onclick="imageStudioExample('city')">City</button>
                 </div>
+                <div>
+                    <label style="color:#94a3b8; font-size:0.75rem;">Cinematic presets (SI packs)</label>
+                    <div id="image-preset-row" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;">
+                        <button class="glass-btn" style="font-size:0.75rem;" onclick="applyImagePreset('cottage_dawn')">Cottage dawn</button>
+                        <button class="glass-btn" style="font-size:0.75rem;" onclick="applyImagePreset('harbor_day')">Harbor</button>
+                        <button class="glass-btn" style="font-size:0.75rem;" onclick="applyImagePreset('city_dusk')">City dusk</button>
+                        <button class="glass-btn" style="font-size:0.75rem;" onclick="applyImagePreset('mountain_lake')">Mountain lake</button>
+                        <button class="glass-btn" style="font-size:0.75rem;" onclick="applyImagePreset('night_village')">Night village</button>
+                        <button class="glass-btn" style="font-size:0.75rem;" onclick="applyImagePreset('bridge_crossing')">Bridge</button>
+                    </div>
+                </div>
                 <div id="image-studio-status" style="font-size:0.8rem; color:#94a3b8; min-height:1.2em;"></div>
                 <div id="image-studio-preview" style="flex:1; min-height:180px; background:rgba(0,0,0,0.35); border-radius:8px; border:1px solid rgba(148,163,184,0.2); display:flex; align-items:center; justify-content:center; overflow:hidden;">
                     <span style="color:#64748b; font-size:0.85rem;">Preview appears here</span>
@@ -442,7 +453,7 @@
         <button onclick="showTiers()" class="dock-btn" title="Unlock Pro — premium personas">⭐</button>
     </nav>
 
-    <script src="script.js?v=10027"></script>
+    <script src="script.js?v=10028"></script>
     <script src="hyperspace.js?v=4"></script>
 
     <!-- OTA Update Screen -->
