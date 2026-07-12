@@ -1615,15 +1615,18 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     if not prompt:
         raise HTTPException(400, "prompt is required")
     res = image_req.resolution
-    style = (image_req.style or "flat").lower().strip()
-    if style not in ("flat", "soft", "night"):
-        style = "flat"
+    style = (image_req.style or "soft").lower().strip()
+    if style not in ("flat", "soft", "night", "photo"):
+        style = "soft"
+    look = (getattr(image_req, "look", None) or "photo").lower().strip()
+    if look not in ("raw", "photo", "cinema", "vivid", "tv"):
+        look = "photo"
     seed = image_req.seed
     aspect = image_req.aspect
     use_cache = bool(image_req.use_cache)
-    detail = (getattr(image_req, "detail", None) or "standard").lower().strip()
+    detail = (getattr(image_req, "detail", None) or "high").lower().strip()
     if detail not in ("standard", "high"):
-        detail = "standard"
+        detail = "high"
     n_var = int(getattr(image_req, "variations", 1) or 1)
     n_var = max(1, min(8, n_var))
 
@@ -1655,6 +1658,7 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
                 aspect,
                 detail,
                 use_cache,
+                look,
             )
         except Exception as e:
             logger.warning("image variations failed: %s", e)
@@ -1672,6 +1676,7 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
             "height": primary.get("height"),
             "style": style,
             "detail": detail,
+            "look": look,
             "seed": primary.get("seed"),
             "aspect": aspect,
             "entities": primary.get("entities", []),
@@ -1684,6 +1689,7 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
             "image_base64": primary.get("image_base64", ""),
             "mime_type": "image/png",
             "vocab_version": primary.get("vocab_version"),
+            "isp": primary.get("isp"),
             "variations": [
                 {
                     "seed": v.get("seed"),
@@ -1711,6 +1717,7 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
             aspect,
             use_cache,
             detail,
+            look,
         )
         with open(out_path, "rb") as f:
             png_b64 = base64.b64encode(f.read()).decode("ascii")
@@ -1735,6 +1742,7 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         "height": meta.get("height"),
         "style": style,
         "detail": detail,
+        "look": look,
         "seed": meta.get("seed", seed),
         "aspect": aspect,
         "entities": meta.get("entities", []),
@@ -1747,6 +1755,8 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         "image_base64": png_b64,
         "mime_type": "image/png",
         "vocab_version": meta.get("vocab_version"),
+        "isp": meta.get("isp"),
+        "engine": meta.get("engine", "synthesus_vsa_geometric"),
     }
     try:
         ImageResponse(**payload)

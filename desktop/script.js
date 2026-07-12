@@ -594,7 +594,8 @@ async function sendChatMessage() {
                 body: JSON.stringify({
                     prompt: drawPrompt,
                     resolution: 512,
-                    style: 'soft',
+                    style: 'photo',
+                    look: 'photo',
                     detail: 'high',
                     aspect: 1.0,
                     use_cache: true,
@@ -2433,12 +2434,13 @@ async function runImageStudio(variations) {
         if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">Prompt is required.</span>';
         return;
     }
-    const style = (document.getElementById('image-style') || {}).value || 'soft';
+    const style = (document.getElementById('image-style') || {}).value || 'photo';
+    const look = (document.getElementById('image-look') || {}).value || 'photo';
     const resolution = parseInt((document.getElementById('image-res') || {}).value || '512', 10);
     const aspect = parseFloat((document.getElementById('image-aspect') || {}).value || '1');
     const detail = (document.getElementById('image-detail') || {}).value || 'high';
     const seedRaw = (document.getElementById('image-seed') || {}).value;
-    const body = { prompt, style, resolution, aspect, detail, use_cache: true, variations };
+    const body = { prompt, style, look, resolution, aspect, detail, use_cache: true, variations };
     if (seedRaw !== undefined && seedRaw !== null && String(seedRaw).trim() !== '') {
         const n = parseInt(seedRaw, 10);
         if (!Number.isNaN(n)) body.seed = n;
@@ -2486,10 +2488,12 @@ async function runImageStudio(variations) {
             metaEl.textContent = [
                 `engine=${data.engine || 'synthesus_vsa_geometric'}`,
                 `style=${data.style || style}`,
+                `look=${data.look || look}`,
                 `detail=${data.detail || detail}`,
                 `${data.width || '?'}x${data.height || '?'}`,
                 `${data.latency_ms != null ? data.latency_ms + 'ms' : ''}`,
                 cacheTag,
+                data.engine || '',
                 data.vocab_version || '',
             ].filter(Boolean).join(' · ');
         }

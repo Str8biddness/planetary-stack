@@ -47,7 +47,8 @@ _DISK_ENABLED = os.environ.get("SYNTHESUS_IMAGE_DISK_CACHE_OFF", "").strip() not
 
 STYLES = sorted(vpi.STYLES)
 DETAILS = ("standard", "high")
-VOCAB_VERSION = "image-wow-v1"
+VOCAB_VERSION = "image-camera-v1"
+LOOKS = ("raw", "photo", "cinema", "vivid", "tv")
 
 
 def renderable_vocabulary() -> list[str]:
@@ -107,10 +108,11 @@ def _cache_key(
     seed: Optional[int],
     aspect: float,
     detail: str,
+    look: str = "raw",
 ) -> str:
     raw = (
         f"{VOCAB_VERSION}|{prompt.strip()}|{res}|{style}|{seed}|"
-        f"{aspect:.4f}|{detail}"
+        f"{aspect:.4f}|{detail}|{look}"
     )
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -170,23 +172,37 @@ def generate_image(
     aspect: float = 1.0,
     use_cache: bool = True,
     detail: str = "standard",
+    look: str = "raw",
 ) -> dict[str, Any]:
-    """Reason ``prompt`` into a scene graph and render it to ``out_path`` (PNG)."""
+    """Reason ``prompt`` into a scene graph and render it to ``out_path`` (PNG).
+
+    look: raw | photo | cinema | vivid | tv — camera/TV ISP finish (not diffusion).
+    style=photo also enables soft paint + photo look.
+    """
     if not prompt or not prompt.strip():
         raise ValueError("prompt is required")
 
     res = max(128, min(2048, int(res)))
     style = (style or "flat").lower().strip()
-    if style not in STYLES:
-        style = "flat"
+    look = (look or "raw").lower().strip()
+    if style == "photo":
+        if look in ("raw", "", "none"):
+            look = "photo"
+        style = "soft"
+    if style not in STYLES and style not in ("flat", "soft", "night"):
+        # STYLES may include photo alias
+        if style != "photo":
+            style = "flat"
     detail = (detail or "standard").lower().strip()
     if detail not in DETAILS:
         detail = "standard"
+    if look not in LOOKS:
+        look = "raw"
     aspect = float(np.clip(float(aspect) if aspect else 1.0, 0.5, 2.0))
     if seed is not None:
         seed = int(seed)
 
-    key = _cache_key(prompt, res, style, seed, aspect, detail)
+    key = _cache_key(prompt, res, style, seed, aspect, detail, look)
     t0 = time.time()
 
     if use_cache:
@@ -202,18 +218,22 @@ def generate_image(
             return meta
 
     s = _imagination()
+    paint_style = "soft" if style == "photo" else style
+    if paint_style not in ("flat", "soft", "night"):
+        paint_style = "soft" if look != "raw" else "flat"
     doc, horizon = vpi.pattern_document(
-        prompt, s["imag"], s["vidx"], s["E"], seed=seed, style=style
+        prompt, s["imag"], s["vidx"], s["E"], seed=seed, style=paint_style
     )
     vpi.render_doc(
         doc,
         horizon,
         res=res,
         out=out_path,
-        style=style,
+        style=paint_style,
         aspect=aspect,
         seed=seed,
         detail=detail,
+        look=look,
     )
     entities = [
         p.get("entity") for p in doc if isinstance(p, dict) and p.get("entity")
@@ -236,14 +256,20 @@ def generate_image(
         "roles": roles,
         "vocabulary_size": len(s["vidx"]),
         "vocab_version": VOCAB_VERSION,
-        "style": style,
+        "style": style if style != "soft" or look == "raw" else style,
         "detail": detail,
+        "look": look,
         "seed": seed,
         "aspect": aspect,
         "cache_hit": False,
         "cache_source": None,
-        "engine": "synthesus_vsa_geometric",
+        "engine": (
+            "synthesus_vsa_geometric+camera_isp"
+            if look not in ("raw", "none", "off")
+            else "synthesus_vsa_geometric"
+        ),
         "bytes": len(png_bytes),
+        "isp": getattr(vpi.render_doc, "last_isp_meta", None),
     }
     try:
         from PIL import Image as _Im
@@ -275,6 +301,7 @@ def generate_variations(
     aspect: float = 1.0,
     detail: str = "standard",
     use_cache: bool = True,
+    look: str = "photo",
 ) -> list[dict[str, Any]]:
     """Render N variations with different seeds. Returns list of metas (+ png on path)."""
     n = max(1, min(8, int(n)))
@@ -296,6 +323,7 @@ def generate_variations(
                 aspect=aspect,
                 use_cache=use_cache,
                 detail=detail,
+                look=look,
             )
             with open(out, "rb") as f:
                 png = f.read()

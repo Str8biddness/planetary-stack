@@ -313,3 +313,35 @@ pytest tests/test_image_roundout.py → 13 passed
 ```
 
 ### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-camera (camera/TV ISP, not diffusion)
+
+### Mission
+Keep hammering image quality + scale. Path to *photo-real look* without
+copying diffusion: **digital camera + smart-TV ISP math** on the SI scene graph.
+
+### Thesis (aligned with research)
+Diffusion invents content. Cameras/TVs invent *appearance* of a captured signal:
+AE, white balance, bloom/glare, DOF, chromatic aberration, filmic tonemap,
+local contrast (clarity), sensor noise, sRGB OETF, vignette.
+Apply that stack to SI geometry → photographic finish, still pure SI content.
+
+### What changed
+- NEW `runtime/packages/reasoning/camera_isp.py` — full CPU ISP pipeline
+- `render_doc(..., look=photo|cinema|vivid|tv|raw)`
+- `image_service` / API / Studio / chat draw default toward `look=photo`
+- Vocab: lake/pond/meadow, barn/cabin, forest/pine, lamp, car (primitive reuse)
+- Tests: **14 passed** including `test_camera_isp_photo_look`
+
+### Honest ceiling
+- Photo *look* ≠ Midjourney inventing novel objects/faces
+- Content ceiling still vocabulary; ISP is the finish, not the model
+- Provenance: `engine=synthesus_vsa_geometric+camera_isp`, `isp.pipeline` listed
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 14 passed
+camera_isp demo → /tmp/camera_isp_demo.png with ae/bloom/dof/filmic/...
+```
+
+### Do NOT merge without Claude review.

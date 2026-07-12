@@ -240,8 +240,15 @@ class ImageRequest(BaseModel):
         description="Long-edge resolution in pixels (128–2048)",
     )
     style: str = Field(
-        "flat",
-        description="Render style: flat | soft | night",
+        "soft",
+        description="Paint style: flat | soft | night | photo (photo = soft + camera look)",
+    )
+    look: str = Field(
+        "photo",
+        description=(
+            "Camera/TV ISP finish (not diffusion): raw | photo | cinema | vivid | tv. "
+            "Applies AE, WB, bloom, DOF, filmic tonemap, sensor noise."
+        ),
     )
     seed: Optional[int] = Field(
         None,
@@ -277,8 +284,9 @@ class ImageResponse(BaseModel):
     resolution: int
     width: Optional[int] = None
     height: Optional[int] = None
-    style: str = "flat"
+    style: str = "soft"
     detail: str = "standard"
+    look: str = "photo"
     seed: Optional[int] = None
     aspect: float = 1.0
     entities: List[str] = Field(default_factory=list)
@@ -292,3 +300,4 @@ class ImageResponse(BaseModel):
     mime_type: str = "image/png"
     vocab_version: Optional[str] = None
     variations: Optional[List[Dict[str, Any]]] = None
+    isp: Optional[Dict[str, Any]] = None

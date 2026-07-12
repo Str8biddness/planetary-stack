@@ -248,11 +248,11 @@ def test_detail_high_and_variations():
             style="soft",
             seed=1,
             detail="high",
+            look="raw",
             use_cache=True,
         )
         assert m["detail"] == "high"
         assert os.path.getsize(out) > 500
-        # memory cache hit
         m2 = generate_image(
             "a tree on grass under a sky with a sun",
             os.path.join(td, "high2.png"),
@@ -260,13 +260,52 @@ def test_detail_high_and_variations():
             style="soft",
             seed=1,
             detail="high",
+            look="raw",
         )
         assert m2["cache_hit"] is True
 
     vars_ = generate_variations(
-        "a boat on a river under a sky", n=3, res=192, style="soft", detail="standard"
+        "a boat on a river under a sky",
+        n=3, res=192, style="soft", detail="standard", look="raw",
     )
     assert len(vars_) == 3
     seeds = {v["seed"] for v in vars_}
     assert len(seeds) == 3
     assert all(v.get("image_base64") for v in vars_)
+
+
+def test_camera_isp_photo_look():
+    """Camera/TV ISP produces real PNG + pipeline meta (not diffusion)."""
+    import camera_isp as isp
+    from image_service import generate_image, clear_image_cache
+
+    # Unit: ISP alone
+    h, w = 64, 96
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    yy /= h - 1
+    img = np.stack([0.4 + 0.3 * (1 - yy), 0.45 * np.ones_like(yy), 0.55 - 0.2 * yy], -1)
+    out = isp.apply_camera_look(img, yy, horizon=0.66, look="photo", seed=2)
+    assert out["image"].shape == (h, w, 3)
+    assert out["meta"]["engine"] == "synthesus_camera_isp"
+    assert "filmic" in out["meta"]["pipeline"]
+    assert "ae_gain" in "".join(out["meta"]["pipeline"]) or out["meta"].get("ae_gain")
+
+    clear_image_cache()
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "photo.png")
+        m = generate_image(
+            "a house and a tree on grass under a sky with a sun",
+            path,
+            res=256,
+            style="photo",
+            look="photo",
+            detail="high",
+            seed=9,
+            use_cache=False,
+        )
+        assert os.path.getsize(path) > 800
+        assert m.get("look") == "photo"
+        assert "camera_isp" in (m.get("engine") or "")
+        assert m.get("isp") is not None
+        arr = np.asarray(Image.open(path).convert("RGB"))
+        assert arr.std() > 5.0

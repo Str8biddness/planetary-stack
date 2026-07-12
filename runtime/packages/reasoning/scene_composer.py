@@ -45,6 +45,13 @@ SHAPES = {
     "bird": "bird",
     "bridge": "bridge",
     "bush": "bush", "shrub": "bush",
+    # ── image-camera expansions ──────────────────────────────────────
+    "lake": "ground", "pond": "ground", "meadow": "ground",
+    "barn": "house", "cabin": "house", "cottage": "house",
+    "forest": "tree", "pine": "tree",
+    "lamp": "disc_top", "light": "disc_top",
+    "car": "boat",  # silhouette vehicle on ground (honest primitive reuse)
+    "lakehouse": "house",
 }
 DEFAULT_ROLES_EXTRA = {
     "strip": (90, 90, 95), "river": (40, 100, 170), "fence": (120, 90, 50),

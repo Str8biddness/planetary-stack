@@ -354,9 +354,20 @@
                     <div>
                         <label style="color:#94a3b8; font-size:0.75rem;">Style</label>
                         <select id="image-style" class="glass-input" style="width:100%;">
-                            <option value="flat">flat</option>
-                            <option value="soft" selected>soft</option>
-                            <option value="night">night</option>
+                            <option value="flat">flat paint</option>
+                            <option value="soft">soft paint</option>
+                            <option value="night">night paint</option>
+                            <option value="photo" selected>photo paint</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="color:#94a3b8; font-size:0.75rem;">Camera look (ISP)</label>
+                        <select id="image-look" class="glass-input" style="width:100%;">
+                            <option value="photo" selected>photo (camera)</option>
+                            <option value="cinema">cinema</option>
+                            <option value="vivid">vivid</option>
+                            <option value="tv">smart TV</option>
+                            <option value="raw">raw (no ISP)</option>
                         </select>
                     </div>
                     <div>
@@ -424,7 +435,7 @@
         <button onclick="showTiers()" class="dock-btn" title="Unlock Pro — premium personas">⭐</button>
     </nav>
 
-    <script src="script.js?v=10025"></script>
+    <script src="script.js?v=10026"></script>
     <script src="hyperspace.js?v=4"></script>
 
     <!-- OTA Update Screen -->

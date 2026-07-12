@@ -60,6 +60,11 @@ PAL = {
     "bird": (.18, .18, .22),
     "bridge": (.48, .40, .30),
     "bush": (.22, .48, .24), "shrub": (.24, .46, .22),
+    "lake": (.16, .38, .62), "pond": (.18, .42, .58), "meadow": (.38, .58, .30),
+    "barn": (.65, .28, .22), "cabin": (.55, .35, .22), "cottage": (.72, .48, .35),
+    "forest": (.16, .42, .18), "pine": (.14, .38, .20),
+    "lamp": (1.0, .92, .55), "light": (1.0, .95, .7),
+    "car": (.35, .38, .42),
 }
 ADJ = {
     "red": (.78, .18, .16), "green": (.20, .55, .25), "blue": (.24, .40, .82),
@@ -86,7 +91,8 @@ SKY_ROLES = frozenset({"disc_top", "cloud_top", "star_top", "bird"})
 # Full-width layers (not packed as point objects)
 SPAN_ROLES = frozenset({"strip", "river"})
 
-STYLES = frozenset({"flat", "soft", "night"})
+STYLES = frozenset({"flat", "soft", "night", "photo"})
+# photo style = soft paint + camera/TV ISP finish (see camera_isp.py)
 
 # Relation phrases: (span_tokens, kind) — multi-word first
 _REL_PHRASES: list[tuple[tuple[str, ...], str]] = [
@@ -548,16 +554,24 @@ def render_doc(
     aspect: float = 1.0,
     seed: Optional[int] = None,
     detail: str = "standard",
+    look: str = "raw",
 ) -> str:
     """Rasterize a pattern document to PNG at any resolution/aspect.
 
     detail='high' enables richer tree canopies + atmospheric post (vignette/haze).
+    look: raw | photo | cinema | vivid | tv — camera/TV ISP finish (not diffusion).
+    style='photo' is alias for soft paint + look=photo.
     """
     style = (style or "flat").lower().strip()
-    if style not in STYLES:
+    look = (look or "raw").lower().strip()
+    if style == "photo":
+        style = "soft"
+        if look in ("raw", "", "none"):
+            look = "photo"
+    if style not in STYLES - {"photo"} and style not in ("flat", "soft", "night"):
         style = "flat"
     detail = (detail or "standard").lower().strip()
-    high = detail == "high"
+    high = detail == "high" or look in ("photo", "cinema", "vivid", "tv")
 
     h, w = _dims(res, aspect)
     # World coords: x in [0,1], y in [0,1] (y grows downward in image space)
@@ -888,7 +902,29 @@ def render_doc(
                 sh = np.exp(-(((xx - ox) / 0.08) ** 2 + ((yy - (by + 0.01)) / 0.025) ** 2))
                 img *= (1.0 - 0.18 * sh)[..., None].astype(np.float32)
 
+    # Camera / smart-TV ISP finish — optical + sensor math, not diffusion
+    isp_meta = None
+    if look and look not in ("raw", "none", "off"):
+        try:
+            import camera_isp as _isp
+            result = _isp.apply_camera_look(
+                img,
+                yy,
+                horizon=horizon,
+                look=look if look in _isp.LOOKS else "photo",
+                seed=seed,
+                sun_pos=sun_pos if has_glow else None,
+            )
+            img = result["image"]
+            isp_meta = result.get("meta")
+        except Exception as exc:
+            # Degrade to non-ISP raster; never invent pixels from failure
+            import logging
+            logging.getLogger("synthesus.image").warning("camera ISP skipped: %s", exc)
+
     Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8)).save(out)
+    # Stash last ISP meta for callers that re-import (service reads optional side channel)
+    render_doc.last_isp_meta = isp_meta  # type: ignore[attr-defined]
     return out
 
 
