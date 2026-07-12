@@ -275,6 +275,28 @@ def test_detail_high_and_variations():
     assert all(v.get("image_base64") for v in vars_)
 
 
+def test_materials_and_sky_modules():
+    import materials as mat
+    import sky_model as sky
+
+    m = mat.resolve_material("water", "river")
+    assert m["fresnel"] > 0.1
+    assert m["roughness"] < 0.5
+
+    h, w = 48, 64
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    yy /= max(h - 1, 1)
+    xx /= max(w - 1, 1)
+    sk = sky.render_sky(xx, yy, sun_pos=(0.7, 0.2), style="soft")
+    assert sk.shape == (h, w, 3)
+    assert sk.mean() > 0.05
+
+    img = np.zeros((h, w, 3), dtype=np.float32)
+    mask = (np.sqrt((xx - 0.5) ** 2 + (yy - 0.5) ** 2) < 0.25).astype(np.float32)
+    mat.blend_shaded(img, mask, (0.2, 0.5, 0.3), xx, yy, (0.7, 0.2), entity="grass")
+    assert img.max() > 0.05
+
+
 def test_cnc_path_engine_and_render():
     """CNC path math builds form; path_mode paint produces real PNG + ops sample."""
     import cnc_paths as cnc

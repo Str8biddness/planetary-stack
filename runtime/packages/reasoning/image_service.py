@@ -47,7 +47,7 @@ _DISK_ENABLED = os.environ.get("SYNTHESUS_IMAGE_DISK_CACHE_OFF", "").strip() not
 
 STYLES = sorted(vpi.STYLES)
 DETAILS = ("standard", "high")
-VOCAB_VERSION = "image-cnc-paths-v1"
+VOCAB_VERSION = "image-materials-v1"
 LOOKS = ("raw", "photo", "cinema", "vivid", "tv")
 
 

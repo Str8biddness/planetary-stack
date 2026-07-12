@@ -486,6 +486,40 @@ def raster_fill_fast(xx, yy, path: Path, aa: float = 0.0025) -> np.ndarray:
     return (1.0 - smoothstep(0.0, aa * 2.5, sd)).astype(np.float32)
 
 
+def pocket_passes(
+    path: Path, tool_r: float = 0.012, passes: int = 3
+) -> List[Tuple[Path, float]]:
+    """Roughing → finish offset contours for closed paths (CAM multi-pass).
+
+    Returns list of (path, coverage_scale) from outer rough to inner finish.
+    """
+    if not path.closed or path.empty():
+        return [(path, 1.0)]
+    poly = discretize(path, tol=0.006)
+    if len(poly) < 4:
+        return [(path, 1.0)]
+    passes = max(1, min(6, int(passes)))
+    out: List[Tuple[Path, float]] = []
+    for i in range(passes):
+        # outer first (larger offset), then step inward
+        t = i / max(passes - 1, 1)
+        r = tool_r * (1.0 - t * 0.85)
+        op = offset_polyline(poly, r if i == 0 else -abs(r) * 0.5 * t, closed=True)
+        if len(op) < 3:
+            continue
+        pts = [tuple(p) for p in op]
+        pth = polyline(pts, closed=True)
+        pth.meta = dict(path.meta)
+        pth.meta["pass"] = i
+        pth.meta["pass_of"] = passes
+        # inner passes slightly darker (depth of cut shading)
+        scale = 1.0 - 0.08 * t
+        out.append((pth, scale))
+    if not out:
+        out.append((path, 1.0))
+    return out
+
+
 def paint_path(
     img: np.ndarray,
     xx,
@@ -494,29 +528,54 @@ def paint_path(
     color: Tuple[float, float, float],
     stroke_width: Optional[float] = None,
     aa: float = 0.002,
+    sun_pos: Tuple[float, float] = (0.72, 0.20),
+    use_materials: bool = True,
+    pocket: bool = True,
 ) -> None:
-    """Paint a path into img (float HxWx3) with fill and/or stroke."""
-    c = np.asarray(color, dtype=np.float32)
+    """Paint a path into img (float HxWx3) with fill and/or stroke.
 
-    def _blend(m):
-        m = np.asarray(m, dtype=np.float32)
+    pocket=True applies multi-pass offset fills for closed contours.
+    use_materials=True shades with materials.shade_albedo when available.
+    """
+    c = np.asarray(color, dtype=np.float32)
+    entity = str(path.meta.get("entity", ""))
+    role = str(path.meta.get("role", ""))
+
+    def _blend_flat(m, col=None, scale=1.0):
+        m = np.asarray(m, dtype=np.float32) * float(scale)
+        col = np.asarray(col if col is not None else c, dtype=np.float32)
         for k in range(3):
-            img[:, :, k] = img[:, :, k] * (1.0 - m) + c[k] * m
+            img[:, :, k] = img[:, :, k] * (1.0 - m) + col[k] * m
+
+    def _blend_mat(m, col=None, scale=1.0):
+        m = np.asarray(m, dtype=np.float32) * float(scale)
+        col = tuple(float(x) for x in (col if col is not None else c))
+        if use_materials:
+            try:
+                import materials as _mat
+                _mat.blend_shaded(
+                    img, m, col, xx, yy, sun_pos=sun_pos, entity=entity, role=role
+                )
+                return
+            except Exception:
+                pass
+        _blend_flat(m, col)
 
     stroke_only = bool(path.meta.get("stroke_only"))
     width = stroke_width if stroke_width is not None else float(path.meta.get("width", 0.012))
     if stroke_only or not path.closed:
-        _blend(raster_stroke(xx, yy, path, width=width, aa=aa))
+        _blend_flat(raster_stroke(xx, yy, path, width=width, aa=aa))
     else:
-        _blend(raster_fill_fast(xx, yy, path, aa=aa))
-        # light finish pass outline (finish cut)
-        outline = offset_polyline(discretize(path), 0.0, closed=True)
-        # stroke boundary for crisp CAM finish
+        if pocket and path.meta.get("layer") not in ("door", "window"):
+            for pth, scale in pocket_passes(path, tool_r=max(width, 0.01), passes=3):
+                fill = raster_fill_fast(xx, yy, pth, aa=aa)
+                _blend_mat(fill, scale=scale)
+        else:
+            _blend_mat(raster_fill_fast(xx, yy, path, aa=aa))
+        # finish pass outline (final contour cut)
         sw = max(width * 0.35, aa * 2)
-        # build path from outline for stroke
-        if len(outline) >= 2:
-            op = polyline([tuple(p) for p in outline], closed=True)
-            _blend(raster_stroke(xx, yy, op, width=sw, aa=aa) * 0.35)
+        op = polyline([tuple(p) for p in discretize(path)], closed=True)
+        _blend_flat(raster_stroke(xx, yy, op, width=sw, aa=aa) * 0.25)
 
 
 def paths_for_primitive(prim: dict[str, Any], seed: int = 0) -> List[Path]:

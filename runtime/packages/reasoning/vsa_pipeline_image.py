@@ -644,7 +644,10 @@ def render_doc(
                 col = (.42, .28, .13)
             else:
                 col = default_color
-            _cnc.paint_path(img, xx, yy, pth, col, aa=aa)
+            _cnc.paint_path(
+                img, xx, yy, pth, col, aa=aa,
+                sun_pos=sun_pos, use_materials=True, pocket=True,
+            )
         return True
 
     for p in sorted(doc, key=lambda p: ROLE_ORDER.get(p["role"], 9)):
@@ -666,27 +669,33 @@ def render_doc(
                     paint(smoothstep(-2 * aa, 2 * aa, inside2) * 0.85, (.98, .85, .25))
                 continue
         if role == "bg":
-            shade = 0.78 + 0.22 * (1.0 - yy)
-            if style == "night":
-                shade = 0.55 + 0.45 * (1.0 - yy)
-            img[:] = np.stack([np.clip(c[k] * shade, 0, 1) for k in range(3)], -1)
-            if has_glow and style != "flat":
-                r = np.sqrt((xx - sun_pos[0]) ** 2 + (yy - sun_pos[1]) ** 2)
-                glow_r = 0.50 if style == "soft" else 0.40
-                strength = 0.42 if style == "soft" else 0.28
+            # Atmospheric sky model (Preetham-lite) when available
+            try:
+                import sky_model as _sky
+                img[:] = _sky.render_sky(
+                    xx, yy, sun_pos=sun_pos, style=style, turbidity=2.8 if high else 2.2
+                )
+            except Exception:
+                shade = 0.78 + 0.22 * (1.0 - yy)
                 if style == "night":
-                    strength = 0.18
-                glow = (1.0 + np.cos(PI * np.clip(r / glow_r, 0, 1))) / 2.0 * strength
-                tint = np.array([1.0, 0.95, 0.72], dtype=np.float32)
-                if style == "night":
-                    tint = np.array([0.75, 0.80, 1.0], dtype=np.float32)
-                img[:] = np.clip(img + glow[..., None] * tint, 0, 1)
-            elif has_glow and style == "flat":
-                r = np.sqrt((xx - sun_pos[0]) ** 2 + (yy - sun_pos[1]) ** 2)
-                glow = (1.0 + np.cos(PI * np.clip(r / 0.45, 0, 1))) / 2.0 * 0.30
-                img[:] = np.clip(img + glow[..., None] * np.array([1, .95, .7], dtype=np.float32), 0, 1)
+                    shade = 0.55 + 0.45 * (1.0 - yy)
+                img[:] = np.stack([np.clip(c[k] * shade, 0, 1) for k in range(3)], -1)
+                if has_glow:
+                    r = np.sqrt((xx - sun_pos[0]) ** 2 + (yy - sun_pos[1]) ** 2)
+                    glow = (1.0 + np.cos(PI * np.clip(r / 0.45, 0, 1))) / 2.0 * 0.30
+                    img[:] = np.clip(
+                        img + glow[..., None] * np.array([1, .95, .7], dtype=np.float32), 0, 1
+                    )
         elif role == "ground":
-            paint(smoothstep(p["y0"] - aa, p["y0"] + aa, yy), c)
+            m = smoothstep(p["y0"] - aa, p["y0"] + aa, yy)
+            try:
+                import materials as _mat
+                _mat.blend_shaded(
+                    img, m, c, xx, yy, sun_pos=sun_pos,
+                    entity=p.get("entity", "grass"), role="ground", horizon=horizon,
+                )
+            except Exception:
+                paint(m, c)
         elif role == "disc_top":
             r = np.sqrt((xx - p["x"]) ** 2 + (yy - p["y"]) ** 2)
             paint(1.0 - smoothstep(p["r"] - aa, p["r"] + aa, r), c)

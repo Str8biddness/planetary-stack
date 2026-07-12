@@ -379,3 +379,29 @@ cnc_paths demo → /tmp/cnc_paths_demo.png
 ```
 
 ### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-materials (materials + sky + CNC pocket)
+
+### Mission
+Continue image stack: surface response + atmospheric sky + deeper CNC multi-pass.
+
+### What changed
+- NEW `materials.py` — Lambertian + Schlick fresnel + roughness/metalness shading
+- NEW `sky_model.py` — Preetham-lite analytical sky (zenith/horizon/aureole)
+- `cnc_paths.paint_path` — multi-pass pocket fills + material shading
+- `render_doc` bg uses sky model; ground uses material shade
+- vocab_version `image-materials-v1`
+- Tests: **16 passed**
+
+### Stack
+```
+prompt → scene graph → CNC paths (form + pocket) → materials shade
+       → sky model → camera ISP (look)
+```
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 16 passed
+```
+
+### Do NOT merge without Claude review.
