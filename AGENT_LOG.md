@@ -563,3 +563,44 @@ tests: 22 passed in 1.39s
 ```
 
 ### Do NOT merge without Claude re-verify.
+
+---
+
+## 2026-07-12 — feat/image-opt-enhance (ISP parallel + draft)
+
+### Mission
+Continue SI image optimization after bbox-fill: faster ISP, draft preview
+quality, shared scene graph for multi-frame, parallel frame renders.
+
+### What changed
+- `camera_isp.box_blur` — PIL Gaussian on mono or full RGB (not 3× mono);
+  smaller bloom/DOF radii for camera looks
+- `cnc_paths.paint_path` — honor `path.meta["no_pocket"]` to skip multi-pass pocket
+- `image_service`
+  - `ENGINE_VERSION = si-image-v4-isp-parallel` (cache invalidation)
+  - `DETAILS` includes **draft** (standard paint + CNC contours, no pocket)
+  - `_build_base_scene` shared once for multiview / time / orbit-day
+  - `ThreadPoolExecutor` parallel frames (up to 4 workers)
+  - meta exposes `engine_version`
+- Desktop + schema: draft detail option documented
+- Test: `test_draft_detail_and_engine_v4`
+
+### Benchmark (use_cache=False, seed=3)
+```
+ENGINE si-image-v4-isp-parallel
+draft512     0.182s
+raw512       0.166s
+photo512     0.418s
+photo1024    1.624s
+multiview3   0.328s   (shared scene + parallel)
+orbit3       0.034s
+tests: 23 passed in 1.46s
+```
+
+### Honest notes
+- Draft is preview speed (no pocket), not a fake photoreal shortcut.
+- ISP is camera/TV math on SI geometry — still not diffusion.
+- Do NOT merge to main without Claude re-review.
+
+### Branch
+`feat/image-opt-enhance` (from `feat/image-bbox-perf`) — commit `61f79cd`
