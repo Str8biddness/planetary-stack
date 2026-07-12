@@ -699,7 +699,9 @@ Bare "make coffee" stays talk (not draw).
 Tests: `runtime/tests/test_image_intent_draw.py` 4 passed.
 
 ### b. feat/ui-bugfixes
-Rebased onto latest main (separate commit on that branch) — left for Claude review; not merged.
+Rebased onto latest main (`d96ae83`) → tip `6eeb493`. Conflict in `desktop/index.html`
+cache bust only (kept main v=10031→10032). Foreman 404 poller stop still present.
+Left for Claude review; **not merged**.
 
 ### Branch
 `feat/loose-ends` — do not merge without Claude review.
