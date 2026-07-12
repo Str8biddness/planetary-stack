@@ -3168,4 +3168,70 @@ async function runImageStudio(variations, extra) {
 const _origToggleWindow = typeof toggleWindow === 'function' ? null : null;
 document.addEventListener('DOMContentLoaded', function () {
     try { renderImageGallery(); } catch (_) {}
+    try { startInstrStatusStrip(); } catch (_) {}
 });
+
+// ---------------------------------------------------------------------------
+// Instrument status strip — real /api/v1/health
+// ---------------------------------------------------------------------------
+let _instrHealthTimer = null;
+
+function startInstrStatusStrip() {
+    if (document.getElementById('instr-status-strip')) {
+        pollInstrHealth();
+        if (_instrHealthTimer) clearInterval(_instrHealthTimer);
+        _instrHealthTimer = setInterval(pollInstrHealth, 4000);
+        return;
+    }
+    const strip = document.createElement('div');
+    strip.id = 'instr-status-strip';
+    strip.innerHTML =
+        '<span class="strip-item">KERNEL <span id="strip-kernel">—</span></span>' +
+        '<span class="strip-item">MODEL <span id="strip-model">—</span></span>' +
+        '<span class="strip-item"><span class="strip-dot" id="strip-llm-dot"></span> LLM</span>' +
+        '<span class="strip-item">UP <span id="strip-up">—</span>s</span>' +
+        '<span class="strip-offline" title="Local SI — no cloud egress by design">⦸ OFFLINE — nothing leaves this machine</span>';
+    document.body.insertBefore(strip, document.body.firstChild);
+    document.body.classList.add('has-instr-strip');
+    // offset main content slightly so strip doesn't cover window tops
+    const main = document.querySelector('main') || document.getElementById('desktop');
+    if (main && main.style) {
+        const prev = main.style.paddingTop || '';
+        if (!prev) main.style.paddingTop = '28px';
+    }
+    pollInstrHealth();
+    if (_instrHealthTimer) clearInterval(_instrHealthTimer);
+    _instrHealthTimer = setInterval(pollInstrHealth, 4000);
+}
+
+async function pollInstrHealth() {
+    const kEl = document.getElementById('strip-kernel');
+    const mEl = document.getElementById('strip-model');
+    const dEl = document.getElementById('strip-llm-dot');
+    const uEl = document.getElementById('strip-up');
+    try {
+        const res = await fetch('/api/v1/health');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const llm = data.llm || {};
+        const model = llm.model || '—';
+        const reachable = !!llm.ollama_reachable;
+        const status = data.status || '—';
+        const up = data.uptime_seconds != null ? Math.round(Number(data.uptime_seconds)) : '—';
+        if (kEl) kEl.textContent = String(status).toUpperCase();
+        if (mEl) mEl.textContent = String(model);
+        if (uEl) uEl.textContent = String(up);
+        if (dEl) {
+            dEl.classList.toggle('ok', reachable);
+            dEl.title = reachable ? 'ollama reachable' : 'ollama unreachable';
+        }
+    } catch (e) {
+        if (kEl) kEl.textContent = '—';
+        if (mEl) mEl.textContent = '—';
+        if (uEl) uEl.textContent = '—';
+        if (dEl) {
+            dEl.classList.remove('ok');
+            dEl.title = 'health unreachable';
+        }
+    }
+}
