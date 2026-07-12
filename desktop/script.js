@@ -2304,7 +2304,13 @@ const IMAGE_STUDIO_EXAMPLES = {
     house: 'a house and a tree on green grass under a blue sky with a sun and a cloud',
     river: 'a boat on a river under a sky with a bird and a tree right of a bridge',
     city: 'a person left of a building on a road under a sky with a sun',
+    vase: 'a vase and a cup on grass under a sky with a sun',
+    crate: 'a crate and a house on grass under a sky',
 };
+/** Last SI scene stock id for multi-pass re-render (server session). */
+let _lastStudioSceneId = null;
+let _lastStudioYaw = 0;
+
 const IMAGE_PRESET_HINTS = {
     cottage_dawn: { prompt: 'a cottage left of a tree on green grass under a blue sky with a sun and a cloud and a flower', style: 'photo', look: 'cinema', aspect: '1.5' },
     harbor_day: { prompt: 'a boat on a river under a sky with a sun and a bridge and a bird and a person right of a tree', style: 'photo', look: 'photo', aspect: '1.5' },
@@ -2449,6 +2455,128 @@ function pickStudioVariation(i) {
     const src = _studioVarSrcs[i];
     if (!src) return;
     showStudioImage(src, { prompt: (document.getElementById('image-prompt') || {}).value || '' });
+}
+
+function setStudioSceneId(sid) {
+    _lastStudioSceneId = sid || null;
+    const el = document.getElementById('image-scene-id');
+    if (el) {
+        el.textContent = sid ? sid : '— generate first —';
+        el.title = sid ? ('scene_id ' + sid + ' (stock = scene graph)') : 'Generate once to enable Re-pass';
+    }
+    const rep = document.getElementById('image-repass-btn');
+    const repY = document.getElementById('image-repass-yaw-btn');
+    if (rep) rep.disabled = !sid;
+    if (repY) repY.disabled = !sid;
+}
+
+function studioCollectEditKnobs() {
+    const grade = ((document.getElementById('image-grade') || {}).value) || 'none';
+    const edit_text = ((document.getElementById('image-pass-text') || {}).value || '').trim();
+    const look = ((document.getElementById('image-look') || {}).value) || 'photo';
+    const detail = ((document.getElementById('image-detail') || {}).value) || 'high';
+    const style = ((document.getElementById('image-style') || {}).value) || 'photo';
+    const resolution = parseInt((document.getElementById('image-res') || {}).value || '512', 10);
+    return { grade, edit_text, look, detail, style, resolution };
+}
+
+/**
+ * Multi-pass: re-render the stored scene graph (same world).
+ * opts.yaw_delta adds to last yaw; opts.yaw absolute if set.
+ */
+async function runImageStudioPass(opts) {
+    opts = opts || {};
+    const statusEl = document.getElementById('image-studio-status');
+    const previewEl = document.getElementById('image-studio-preview');
+    const metaEl = document.getElementById('image-studio-meta');
+    if (!_lastStudioSceneId) {
+        if (statusEl) {
+            statusEl.innerHTML = '<span style="color:#f87171;">No scene stock — Generate first.</span>';
+        }
+        return;
+    }
+    const knobs = studioCollectEditKnobs();
+    let yaw = _lastStudioYaw;
+    if (opts.yaw != null && !Number.isNaN(Number(opts.yaw))) {
+        yaw = Number(opts.yaw);
+    } else if (opts.yaw_delta != null) {
+        yaw = Math.max(-60, Math.min(60, yaw + Number(opts.yaw_delta)));
+    } else {
+        const yawEl = document.getElementById('image-pass-yaw');
+        const yv = yawEl ? parseFloat(yawEl.value) : 15;
+        if (!Number.isNaN(yv)) yaw = Math.max(-60, Math.min(60, yv));
+    }
+    const body = {
+        scene_id: _lastStudioSceneId,
+        pass_only: true,
+        from_scene: true,
+        prompt: '',
+        yaw_deg: yaw,
+        look: knobs.look,
+        detail: knobs.detail,
+        style: knobs.style,
+        resolution: knobs.resolution,
+        grade: knobs.grade,
+        edit_text: knobs.edit_text || undefined,
+        keep_session: true,
+        return_plan: true,
+        use_cache: false,
+    };
+    if (statusEl) {
+        statusEl.innerHTML = '<span style="color:#fb923c;">Re-pass on scene stock · yaw='
+            + yaw + '° · grade=' + escapeHtmlStudio(knobs.grade) + '…</span>';
+    }
+    if (previewEl) {
+        previewEl.style.display = 'flex';
+        previewEl.innerHTML = '<span style="color:#64748b;">Multi-pass…</span>';
+    }
+    try {
+        const res = await fetch('/api/v1/image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        let data = null;
+        try { data = await res.json(); } catch (_) { data = null; }
+        if (!res.ok || !data || !data.image_base64) {
+            const msg = (data && (data.message || data.error || data.detail)) || ('HTTP ' + res.status);
+            if (statusEl) {
+                statusEl.innerHTML = '<span style="color:#f87171;">Re-pass failed: '
+                    + escapeHtmlStudio(typeof msg === 'string' ? msg : JSON.stringify(msg)) + '</span>';
+            }
+            return;
+        }
+        _lastStudioYaw = typeof data.yaw_deg === 'number' ? data.yaw_deg : yaw;
+        if (data.scene_id) setStudioSceneId(data.scene_id);
+        const mime = data.mime_type || 'image/png';
+        const src = 'data:' + mime + ';base64,' + data.image_base64;
+        showStudioImage(src, data);
+        if (metaEl) {
+            metaEl.textContent = [
+                'PASS on scene_id=' + (data.scene_id || _lastStudioSceneId),
+                'yaw=' + _lastStudioYaw,
+                'look=' + (data.look || knobs.look),
+                data.construction ? ('build=' + data.construction) : '',
+                data.picture_edit ? 'picture_edit' : '',
+                data.lathe_parts != null ? ('lathe=' + data.lathe_parts) : '',
+                data.extrude_parts != null ? ('extrude=' + data.extrude_parts) : '',
+                (data.latency_ms != null ? data.latency_ms + 'ms' : ''),
+            ].filter(Boolean).join(' · ');
+            if (data.outer_voice) metaEl.textContent += '\n' + data.outer_voice;
+        }
+        if (statusEl) {
+            statusEl.innerHTML = '<span style="color:#4ade80;">Re-pass OK · same world · yaw='
+                + _lastStudioYaw + '° · not diffusion</span>';
+        }
+        // sync yaw field for next pass
+        const yawEl = document.getElementById('image-pass-yaw');
+        if (yawEl) yawEl.value = String(_lastStudioYaw);
+    } catch (e) {
+        if (statusEl) {
+            statusEl.innerHTML = '<span style="color:#f87171;">Re-pass error: '
+                + escapeHtmlStudio(e.message || e) + '</span>';
+        }
+    }
 }
 
 async function runImageStudioViews(n) {
@@ -2654,9 +2782,11 @@ async function runImageStudio(variations, extra) {
         use_cache: true, variations, compile_plan: true, return_plan: true,
         keep_session: true,
     };
-    // Optional picture-edit grade if control exists
     const gradeEl = document.getElementById('image-grade');
-    if (gradeEl && gradeEl.value && gradeEl.value !== 'none') body.grade = gradeEl.value;
+    if (gradeEl && gradeEl.value) body.grade = gradeEl.value;
+    const passText = ((document.getElementById('image-pass-text') || {}).value || '').trim();
+    if (passText) body.edit_text = passText;
+    _lastStudioYaw = 0;
     if (_activeImagePreset) body.preset = _activeImagePreset;
     if (extra.views) { body.views = extra.views; body.yaw_span = extra.yaw_span || 30; body.variations = 1; }
     if (extra.frames) { body.frames = extra.frames; body.variations = 1; body.views = 1; }
@@ -2757,6 +2887,10 @@ async function runImageStudio(variations, extra) {
         const cacheTag = data.cache_hit
             ? ('cache HIT' + (data.cache_source ? ' (' + data.cache_source + ')' : ''))
             : 'cache miss';
+        if (data.scene_id) {
+            setStudioSceneId(data.scene_id);
+            if (typeof data.yaw_deg === 'number') _lastStudioYaw = data.yaw_deg;
+        }
         if (metaEl) {
             metaEl.textContent = [
                 `engine=${data.engine || 'synthesus_vsa_geometric'}`,
@@ -2765,6 +2899,10 @@ async function runImageStudio(variations, extra) {
                 `detail=${data.detail || detail}`,
                 data.construction ? ('build=' + data.construction) : '',
                 data.composite_parts != null ? ('composites=' + data.composite_parts) : '',
+                data.lathe_parts != null ? ('lathe=' + data.lathe_parts) : '',
+                data.extrude_parts != null ? ('extrude=' + data.extrude_parts) : '',
+                data.scene_id ? ('scene=' + data.scene_id.slice(0, 8) + '…') : '',
+                data.picture_edit ? 'picture_edit' : '',
                 path_mode ? 'cnc_paths' : 'legacy',
                 data.path_entities != null ? ('paths=' + data.path_entities) : '',
                 `${data.width || '?'}x${data.height || '?'}`,
@@ -2778,6 +2916,9 @@ async function runImageStudio(variations, extra) {
             if (data.si_prompt && data.si_prompt !== prompt) {
                 metaEl.textContent += '\nsi_prompt: ' + data.si_prompt;
             }
+            if (data.monologue) {
+                metaEl.textContent += '\n' + String(data.monologue).slice(0, 280);
+            }
         }
         if (entEl) {
             const ents = data.entities || [];
@@ -2787,7 +2928,8 @@ async function runImageStudio(variations, extra) {
         }
         if (statusEl) {
             const build = data.construction ? (' · ' + data.construction) : '';
-            statusEl.innerHTML = `<span style="color:#4ade80;">OK — ${entsSafe(data.entity_count)} entities · SI illustration (not diffusion)${build}</span>`;
+            const sid = data.scene_id ? ' · stock ready' : '';
+            statusEl.innerHTML = `<span style="color:#4ade80;">OK — ${entsSafe(data.entity_count)} entities · SI (not diffusion)${build}${sid}</span>`;
         }
     } catch (e) {
         if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Error: ${escapeHtmlStudio(e.message || e)}</span>`;
