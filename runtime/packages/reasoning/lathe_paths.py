@@ -46,6 +46,21 @@ PROFILES: dict[str, List[Point]] = {
     "lamp_body": [
         (0.25, 0.0), (0.35, 0.2), (0.28, 0.5), (0.22, 0.8), (0.18, 1.0),
     ],
+    "urn": [
+        (0.28, 0.0), (0.38, 0.2), (0.42, 0.45), (0.30, 0.7), (0.18, 0.9), (0.22, 1.0),
+    ],
+    "silo": [
+        (0.40, 0.0), (0.42, 0.15), (0.42, 0.75), (0.38, 0.9), (0.28, 1.0),
+    ],
+    "goblet": [
+        (0.18, 0.0), (0.12, 0.25), (0.10, 0.45), (0.28, 0.55), (0.36, 0.8), (0.34, 1.0),
+    ],
+    "barrel": [
+        (0.32, 0.0), (0.40, 0.2), (0.42, 0.5), (0.40, 0.8), (0.32, 1.0),
+    ],
+    "amphora": [
+        (0.20, 0.0), (0.34, 0.2), (0.38, 0.45), (0.28, 0.7), (0.14, 0.9), (0.16, 1.0),
+    ],
     "default": [
         (0.30, 0.0), (0.35, 0.5), (0.28, 1.0),
     ],
@@ -54,13 +69,15 @@ PROFILES: dict[str, List[Point]] = {
 # entity name → profile key
 ENTITY_PROFILE: dict[str, str] = {
     "cup": "cup", "mug": "cup", "glass": "cup",
-    "vase": "vase", "urn": "vase",
+    "vase": "vase", "urn": "urn",
     "column": "column", "pillar": "column", "post": "column",
     "bottle": "bottle", "flask": "bottle",
     "pot": "pot", "jar": "pot",
     "fruit": "fruit", "apple": "apple", "orange": "fruit", "ball": "fruit",
     "bowl": "bowl",
     "lamp": "lamp_body", "lamp_body": "lamp_body",
+    "silo": "silo", "goblet": "goblet", "barrel": "barrel", "keg": "barrel",
+    "amphora": "amphora",
 }
 
 
@@ -117,49 +134,52 @@ def paint_lathe(
     sun_pos: Optional[Tuple[float, float]] = None,
     depth_map: Optional[np.ndarray] = None,
     depth_z: Optional[float] = None,
+    yaw_deg: float = 0.0,
 ) -> np.ndarray:
-    """Raster solid-of-revolution into img; return coverage mask."""
-    prof = list(profile) if profile is not None else profile_for_entity(entity)
-    prof = scale_profile(prof, height=height, max_radius=max_radius)
-    poly = silhouette_polygon(prof, cx=cx, base=base)
+    """Raster solid-of-revolution into img; return coverage mask.
 
-    # Point-in-polygon via matplotlib path or winding — use simple radial test:
-    # for each y, interpolate radius from profile
+    yaw_deg: slight horizontal foreshortening of apparent radius (ellipse cue)
+    so orbit multi-pass still reads as a turned solid, not a flat card.
+    """
+    prof = list(profile) if profile is not None else profile_for_entity(entity)
+    # Yaw: cos foreshorten apparent radius (solid of revolution side view)
+    yaw = math.radians(float(np.clip(yaw_deg, -60, 60)))
+    r_scale = float(max(0.55, abs(math.cos(yaw)) * 0.35 + 0.65))
+    prof = scale_profile(prof, height=height, max_radius=max_radius * r_scale)
+    # slight vertical squash when looking off-axis
+    h_scale = float(0.92 + 0.08 * abs(math.cos(yaw)))
+    height_eff = height * h_scale
+
     h, w = img.shape[:2]
     cov = np.zeros((h, w), dtype=np.float32)
 
-    # Build radius(y) from profile samples
-    # screen y: base at bottom of object, top at base-height
-    y_top = base - height
-    y_bot = base
-    # profile heights from base: 0..height → screen y = base - h_prof
     hs = np.array([p[1] for p in prof], dtype=np.float32)
     rs = np.array([p[0] for p in prof], dtype=np.float32)
-    # sort by height
     order = np.argsort(hs)
     hs, rs = hs[order], rs[order]
 
-    # bbox
+    y_top = base - height_eff
+    y_bot = base
     pad = max(aa * 3, 0.01)
-    x0 = int(max(0, math.floor((cx - max_radius - pad) * (w - 1))))
-    x1 = int(min(w, math.ceil((cx + max_radius + pad) * (w - 1)) + 1))
+    max_r = float(rs.max()) if len(rs) else max_radius
+    x0 = int(max(0, math.floor((cx - max_r - pad) * (w - 1))))
+    x1 = int(min(w, math.ceil((cx + max_r + pad) * (w - 1)) + 1))
     y0 = int(max(0, math.floor((y_top - pad) * (h - 1))))
     y1 = int(min(h, math.ceil((y_bot + pad) * (h - 1)) + 1))
     if x1 <= x0 or y1 <= y0:
         return cov
 
-    # local grids
     ys = np.linspace(0, 1, h, dtype=np.float32)[y0:y1]
     xs = np.linspace(0, 1, w, dtype=np.float32)[x0:x1]
-    # height from base for each row
-    h_from_base = base - ys  # shape (ny,)
-    # interpolate radius
-    r_at = np.interp(h_from_base, hs, rs, left=0.0, right=0.0).astype(np.float32)
-    # only between 0 and height
-    valid_h = (h_from_base >= -aa) & (h_from_base <= height + aa)
-    dx = xs[None, :] - cx  # (1, nx)
-    # soft edge
-    dist = np.abs(dx)  # (1, nx) broadcast with r_at[:, None]
+    h_from_base = base - ys
+    # remap profile heights to height_eff
+    hs_n = hs * (height_eff / max(height, 1e-4))
+    r_at = np.interp(h_from_base, hs_n, rs, left=0.0, right=0.0).astype(np.float32)
+    valid_h = (h_from_base >= -aa) & (h_from_base <= height_eff + aa)
+    dx = xs[None, :] - cx
+    # ellipse: compress x by foreshortening already in r; add mild y-coupled oval
+    oval = 1.0 + 0.12 * abs(math.sin(yaw))
+    dist = np.abs(dx) * oval
     r2d = r_at[:, None]
     inside = (dist <= r2d + aa) & valid_h[:, None]
     edge = np.clip((r2d + aa - dist) / max(aa * 2, 1e-5), 0, 1)
@@ -170,7 +190,7 @@ def paint_lathe(
     # light from upper-left unless sun
     if sun_pos is not None:
         lx = float(sun_pos[0]) - cx
-        ly = float(sun_pos[1]) - (base - height * 0.5)
+        ly = float(sun_pos[1]) - (base - height_eff * 0.5)
         ln = math.hypot(lx, ly) + 1e-5
         lx, ly = lx / ln, ly / ln
     else:

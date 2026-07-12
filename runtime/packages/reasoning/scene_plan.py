@@ -48,11 +48,12 @@ VALID_ROLES = frozenset(
 # Machine routing: entity token → lathe | extrude (else mill/composite/native)
 LATHE_ENTITIES = frozenset({
     "cup", "mug", "glass", "vase", "urn", "column", "pillar", "bottle", "flask",
-    "pot", "jar", "fruit", "apple", "orange", "bowl", "goblet",
+    "pot", "jar", "fruit", "apple", "orange", "bowl", "goblet", "silo", "barrel",
+    "keg", "amphora",
 })
 EXTRUDE_ENTITIES = frozenset({
     "crate", "box", "block", "wall", "brick", "slab", "plinth", "pedestal",
-    "container", "dumpster", "cabinet",
+    "container", "dumpster", "cabinet", "tower_block", "parapet", "step",
 })
 # Prefer lathe over disc for these even if also in SHAPES
 LATHE_OVERRIDE_SHAPES = frozenset({"apple", "orange", "ball"})
@@ -899,22 +900,47 @@ def _call_llm_text(prompt: str, timeout_s: float = 8.0) -> Optional[str]:
         return None
 
 
+def _plan_is_sparse(plan: dict[str, Any]) -> bool:
+    """True when rules found little — candidate for optional LLM enrich."""
+    n_ent = len(plan.get("entities") or [])
+    n_comp = len(plan.get("composites") or [])
+    n_mach = len(plan.get("machines") or [])
+    # grass+sky defaults often add 2; still sparse if no real content
+    content = n_comp + n_mach + max(0, n_ent - 2)
+    return content < 2
+
+
 def compile_scene_plan(
     prompt: str,
     *,
     use_llm: Optional[bool] = None,
     llm_timeout_s: float = 8.0,
 ) -> dict[str, Any]:
-    """Full compile: rules always; optional LLM enrich when enabled."""
+    """Full compile: rules always; optional LLM enrich when enabled or sparse+auto."""
     plan = compile_scene_plan_rules(prompt)
-    if _llm_plan_enabled(use_llm):
+    try:
+        import image_materials_lib as _ml
+        plan = _ml.apply_material_hints(plan, prompt)
+    except Exception:
+        pass
+    # use_llm True → always try; None + env auto → only if sparse; False → never
+    do_llm = False
+    if use_llm is True:
+        do_llm = True
+    elif use_llm is False:
+        do_llm = False
+    elif _llm_plan_enabled(None):
+        # env on: only enrich sparse plans (fast path default)
+        do_llm = _plan_is_sparse(plan)
+        plan["llm_policy"] = "auto_sparse" if do_llm else "auto_skip_rich"
+    if do_llm:
         try:
             plan = llm_enrich_plan(plan, timeout_s=llm_timeout_s)
         except Exception as exc:
             plan = dict(plan)
             plan["llm_status"] = f"error:{type(exc).__name__}"
     else:
-        plan["llm_status"] = "skipped"
+        plan.setdefault("llm_status", "skipped")
     return plan
 
 
@@ -1173,10 +1199,12 @@ def public_plan_view(plan: dict[str, Any], *, full: bool = False) -> dict[str, A
         "missing": plan.get("missing") or [],
         "fingerprint": plan_fingerprint(plan),
         "stock": "scene_graph",
+        "material_lib": plan.get("material_lib"),
     }
     if full:
         view["compile_steps"] = plan.get("compile_steps")
         view["raw_composites"] = plan.get("composites")
+        view["raw_machines"] = plan.get("machines")
     return view
 
 

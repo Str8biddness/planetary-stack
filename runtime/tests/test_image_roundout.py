@@ -340,6 +340,61 @@ def test_draft_detail_and_engine_v4():
             assert isp.get("quality") == "draft"
 
 
+def test_workshop_disk_session_intent_playlist():
+    """Disk session reload, intent router, materials, playlist, level import."""
+    import image_session as sess
+    import image_intent as intent
+    import image_materials_lib as ml
+    from image_service import generate_image, run_pass_playlist, clear_image_cache
+
+    # Intent
+    d = intent.classify_intent("draw a house on grass under a sky")
+    assert d["mode"] == "draw"
+    r = intent.classify_intent("photo of Elon Musk")
+    assert r["mode"] == "refuse"
+    f = intent.classify_intent("find photo of a barn")
+    assert f["mode"] == "find"
+    p = intent.classify_intent("make it warmer", has_scene_id=True)
+    assert p["mode"] == "pass"
+    card = intent.capability_card()
+    assert card["not_diffusion"] is True
+
+    # Materials
+    plan = {"source_prompt": "desert dunes under a sky", "camera": {}, "compile_steps": []}
+    plan = ml.apply_material_hints(plan)
+    assert plan.get("material_lib", {}).get("palette") == "desert"
+
+    clear_image_cache(disk=True)
+    sess.clear_sessions(disk=True)
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "a.png")
+        m = generate_image(
+            "a vase on grass under a sky",
+            out, res=160, look="raw", seed=1, use_cache=False,
+            use_llm_plan=False, keep_session=True,
+        )
+        sid = m.get("scene_id")
+        assert sid
+        # force memory drop then disk reload
+        with sess._LOCK:
+            sess._SESSIONS.clear()
+        s2 = sess.get_session(sid)
+        assert s2 is not None
+        assert s2.get("scene_doc")
+
+        frames = run_pass_playlist(sid, "finish", res=128)
+        assert len(frames) >= 3
+        assert all(f.get("image_base64") for f in frames)
+
+        # level import
+        import level_export as le
+        lvl = le.build_level(
+            "test", s2["scene_doc"], horizon=s2.get("horizon") or 0.66, seed=1,
+        )
+        sid3 = sess.session_from_level(lvl)
+        assert sess.get_session(sid3)
+
+
 def test_lathe_extrude_session_and_picture_edit():
     """Machine dialects + multi-pass session + photoshop-lite."""
     import scene_plan as sp

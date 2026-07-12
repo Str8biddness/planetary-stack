@@ -436,6 +436,8 @@
                     <button class="glass-btn primary-btn" style="flex:1;" onclick="runImageStudio(1)">Generate</button>
                     <button class="glass-btn" id="image-repass-btn" style="background:rgba(251,146,60,0.22); border:1px solid rgba(251,146,60,0.35);" onclick="runImageStudioPass()" title="Re-render same scene graph (multi-pass)" disabled>↻ Re-pass</button>
                     <button class="glass-btn" style="background:rgba(251,146,60,0.12);" onclick="runImageStudioPass({yaw_delta:15})" title="Orbit +15° same world" id="image-repass-yaw-btn" disabled>↻ +yaw</button>
+                    <button class="glass-btn" style="background:rgba(251,191,36,0.2);" onclick="runImagePlaylist('finish')" title="draft→high→cinema→warm on stock" id="image-playlist-btn" disabled>🎞 Finish job</button>
+                    <button class="glass-btn" onclick="loadImageCapabilities()" title="What SI can/can't do">ℹ Can/can't</button>
                     <button class="glass-btn" style="background:rgba(167,139,250,0.2);" onclick="runImageStudio(4)" title="4 seed variations">✦ 4× seeds</button>
                     <button class="glass-btn" style="background:rgba(56,189,248,0.2);" onclick="runImageStudioViews(3)" title="3 camera yaws — same world">⟲ 3 views</button>
                     <button class="glass-btn" style="background:rgba(74,222,128,0.15);" onclick="runImageStudioFrames(4)" title="dawn→night + GIF">⏱ 4 times + GIF</button>
@@ -474,6 +476,8 @@
                     </div>
                 </div>
                 <div id="image-studio-status" style="font-size:0.8rem; color:#94a3b8; min-height:1.2em;"></div>
+                <div id="image-capability-card" style="display:none; font-size:0.72rem; color:#94a3b8; background:rgba(15,23,42,0.6); border:1px solid rgba(56,189,248,0.25); border-radius:8px; padding:8px; margin-bottom:6px;"></div>
+                <div id="image-plan-inspector" style="display:none; font-size:0.72rem; color:#a5b4fc; background:rgba(30,27,75,0.4); border:1px solid rgba(167,139,250,0.3); border-radius:8px; padding:8px; margin-bottom:6px; font-family:'Fira Code',monospace; white-space:pre-wrap; max-height:100px; overflow:auto;"></div>
                 <div id="image-studio-preview" style="flex:1; min-height:180px; background:rgba(0,0,0,0.35); border-radius:8px; border:1px solid rgba(148,163,184,0.2); display:flex; align-items:center; justify-content:center; overflow:hidden;">
                     <span style="color:#64748b; font-size:0.85rem;">Preview appears here</span>
                 </div>

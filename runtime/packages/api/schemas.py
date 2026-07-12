@@ -407,6 +407,14 @@ class ImageRequest(BaseModel):
         le=1.0,
         description="Extra vignette amount for picture_edit pass",
     )
+    playlist: Optional[str] = Field(
+        None,
+        description="Named multi-pass job on scene_id: finish | orbit_sample | day_cycle",
+    )
+    level: Optional[Dict[str, Any]] = Field(
+        None,
+        description="SI level JSON to import as scene stock (re-render path)",
+    )
 
 
 class ImageResponse(BaseModel):

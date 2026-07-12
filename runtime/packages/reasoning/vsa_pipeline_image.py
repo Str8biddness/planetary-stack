@@ -572,6 +572,7 @@ def render_doc(
     detail: str = "standard",
     look: str = "raw",
     path_mode: bool = True,
+    camera_yaw: float = 0.0,
 ) -> str:
     """Rasterize a pattern document to PNG at any resolution/aspect.
 
@@ -579,7 +580,9 @@ def render_doc(
     look: raw | photo | cinema | vivid | tv — camera/TV ISP finish (not diffusion).
     style='photo' is alias for soft paint + look=photo.
     path_mode: prefer CNC path construction for supported roles (house/tree/…).
+    camera_yaw: degrees — lathe foreshortening cue for multi-pass orbit.
     """
+    render_doc.camera_yaw = float(camera_yaw or 0.0)  # type: ignore[attr-defined]
     style = (style or "flat").lower().strip()
     look = (look or "raw").lower().strip()
     if style == "photo":
@@ -989,6 +992,7 @@ def render_doc(
                     sun_pos=sun_pos if has_glow else None,
                     depth_map=depth_map,
                     depth_z=z,
+                    yaw_deg=float(p.get("yaw_deg") or getattr(render_doc, "camera_yaw", 0.0) or 0.0),
                 )
             except Exception:
                 # soft fallback: disc stack

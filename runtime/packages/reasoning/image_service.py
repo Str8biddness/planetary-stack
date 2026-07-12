@@ -51,7 +51,7 @@ _DISK_ENABLED = os.environ.get("SYNTHESUS_IMAGE_DISK_CACHE_OFF", "").strip() not
 STYLES = sorted(vpi.STYLES)
 DETAILS = ("draft", "standard", "high")
 # Bump when SHAPES, path raster, ISP, or materials change — invalidates disk/memory cache.
-ENGINE_VERSION = "si-image-v6-machine-pass"
+ENGINE_VERSION = "si-image-v6.1-workshop"
 VOCAB_VERSION = ENGINE_VERSION  # alias for API meta field
 LOOKS = ("raw", "photo", "cinema", "vivid", "tv")
 GRADES = ("none", "warm", "cool", "contrast", "fade", "vivid")
@@ -415,6 +415,11 @@ def generate_image(
         for prim in doc:
             for pth in prim.get("paths") or []:
                 pth.meta["no_pocket"] = True
+    # Stamp lathe prims with yaw for revolution foreshortening
+    if abs(yaw_deg) > 1e-3:
+        for p in doc:
+            if isinstance(p, dict) and p.get("role") == "lathe":
+                p["yaw_deg"] = yaw_deg
     vpi.render_doc(
         doc,
         horizon,
@@ -426,6 +431,7 @@ def generate_image(
         detail=render_detail,
         look=look,
         path_mode=path_mode,
+        camera_yaw=yaw_deg,
     )
     # Photoshop-lite post-raster (does not change scene graph)
     picture_meta = None
@@ -990,6 +996,49 @@ def export_level(
     return le.build_level_from_prompt(prompt, **kwargs)
 
 
+def run_pass_playlist(
+    scene_id: str,
+    playlist: str = "finish",
+    *,
+    res: Optional[int] = None,
+) -> list[dict[str, Any]]:
+    """Run a named multi-pass finish job on scene stock; returns list of frame metas."""
+    import base64
+    import image_session as sess
+
+    steps = sess.PLAYLISTS.get(playlist) or sess.PLAYLISTS["finish"]
+    results = []
+    for i, step in enumerate(steps):
+        out = os.path.join(
+            tempfile.gettempdir(), f"synth_pl_{scene_id[:8]}_{i}.png"
+        )
+        try:
+            meta = apply_scene_pass(
+                scene_id,
+                out,
+                yaw_deg=step.get("yaw_deg"),
+                time_of_day=step.get("time_of_day"),
+                look=step.get("look"),
+                detail=step.get("detail"),
+                res=res,
+                grade=step.get("grade"),
+                style=step.get("style"),
+            )
+            with open(out, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode("ascii")
+            m = dict(meta)
+            m["playlist_step"] = step.get("label") or f"step{i}"
+            m["image_base64"] = b64
+            m["mime_type"] = "image/png"
+            results.append(m)
+        finally:
+            try:
+                os.remove(out)
+            except OSError:
+                pass
+    return results
+
+
 def apply_scene_pass(
     scene_id: str,
     out_path: str,
@@ -1066,6 +1115,49 @@ def execute_image_request(
     # Multi-pass: re-render existing scene stock
     scene_id_in = params.get("scene_id")
     pass_only = bool(params.get("pass_only") or params.get("from_scene"))
+    playlist = (params.get("playlist") or "").strip().lower()
+    if scene_id_in and playlist:
+        _p("playlist", 0.15)
+        frames = run_pass_playlist(
+            str(scene_id_in),
+            playlist=playlist,
+            res=params.get("resolution"),
+        )
+        primary = frames[0] if frames else {}
+        return {
+            "ok": True,
+            "playlist": playlist,
+            "playlist_frames": frames,
+            "image_base64": primary.get("image_base64", ""),
+            "mime_type": "image/png",
+            "scene_id": scene_id_in,
+            "engine": primary.get("engine"),
+            "not_diffusion": True,
+            "stock": "scene_graph",
+            "frame_count": len(frames),
+        }
+
+    # Level import → session + optional first render
+    if params.get("level") and isinstance(params.get("level"), dict):
+        import image_session as _sess
+        sid = _sess.session_from_level(params["level"], knobs={
+            "res": params.get("resolution") or 512,
+            "look": params.get("look") or "photo",
+            "style": params.get("style") or "soft",
+            "detail": params.get("detail") or "standard",
+        })
+        if params.get("pass_only") or not (params.get("prompt") or "").strip():
+            params = dict(params)
+            params["scene_id"] = sid
+            params["pass_only"] = True
+            params["prompt"] = params.get("prompt") or "level"
+            out = execute_image_request(params, progress=progress)
+            out["scene_id"] = sid
+            out["from_level"] = True
+            return out
+        params = dict(params)
+        params["scene_id"] = sid
+
     if scene_id_in and pass_only:
         _p("scene_pass", 0.2)
         out_path = os.path.join(tempfile.gettempdir(), f"synth_pass_{uuid.uuid4().hex[:12]}.png")

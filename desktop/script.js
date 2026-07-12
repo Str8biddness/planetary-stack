@@ -561,6 +561,21 @@ async function confirmAssistantFact(meta, btn, statusEl) {
     }
 }
 
+/** Chat modes: draw (SI) | find (retrieve label) | pass | refuse | talk */
+async function routeChatImageIntent(message) {
+    try {
+        const res = await fetch('/api/v1/image/intent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: message, scene_id: _lastStudioSceneId || null }),
+        });
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (_) {
+        return null;
+    }
+}
+
 /** Detect "draw …" / "/draw …" / "imagine …" and route to SI image engine. */
 function parseDrawIntent(message) {
     const m = (message || '').trim();
@@ -581,8 +596,65 @@ async function sendChatMessage() {
     input.value = '';
     chatHistory.scrollTop = chatHistory.scrollHeight;
 
+    // Intent router: draw | find | pass | refuse (talk falls through)
+    const intent = await routeChatImageIntent(message);
+    if (intent && intent.mode === 'refuse') {
+        chatHistory.innerHTML += `<div class="message ai-message"><strong>Synthesus:</strong> ${escapeHtml(intent.message || 'Cannot fulfill honestly.')}</div>`;
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+        return;
+    }
+    if (intent && intent.mode === 'find') {
+        chatHistory.innerHTML += `<div class="message ai-message"><strong>Synthesus:</strong> <span style="color:#fbbf24;">[find mode]</span> ${escapeHtml(intent.message || '')}
+            ${intent.alternative ? '<div style="margin-top:6px;font-size:0.85rem;color:#94a3b8;">Alternative: <code>' + escapeHtml(intent.alternative) + '</code></div>' : ''}</div>`;
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+        return;
+    }
+    if (intent && intent.mode === 'pass' && _lastStudioSceneId) {
+        const thinkId = 'think-' + Date.now();
+        chatHistory.innerHTML += `<div class="message ai-message" id="${thinkId}"><strong>Synthesus:</strong> multi-pass on scene stock…</div>`;
+        try {
+            const kn = intent.pass_knobs || {};
+            let yaw = _lastStudioYaw || 0;
+            if (kn.yaw_delta) yaw = Math.max(-60, Math.min(60, yaw + kn.yaw_delta));
+            const res = await fetch('/api/v1/image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    scene_id: _lastStudioSceneId,
+                    pass_only: true,
+                    yaw_deg: yaw,
+                    look: kn.look,
+                    grade: kn.grade,
+                    detail: kn.detail,
+                    time_of_day: kn.time_of_day,
+                    style: kn.style,
+                    resolution: 512,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            const bubble = document.getElementById(thinkId);
+            if (res.ok && data.image_base64) {
+                _lastStudioYaw = data.yaw_deg != null ? data.yaw_deg : yaw;
+                if (data.scene_id) setStudioSceneId(data.scene_id);
+                const src = 'data:' + (data.mime_type || 'image/png') + ';base64,' + data.image_base64;
+                if (bubble) {
+                    bubble.innerHTML = '<strong>Synthesus:</strong> <span style="color:#fb923c;">[pass]</span> same world, new knobs'
+                        + '<div style="margin-top:8px;"><img src="' + src + '" style="max-width:100%;border-radius:8px;"></div>'
+                        + '<div style="font-size:0.75rem;color:#64748b;font-family:monospace;">scene stock · not diffusion</div>';
+                }
+                pushImageGallery(src, 'pass');
+            } else if (bubble) {
+                bubble.innerHTML = '<strong>Synthesus:</strong> pass failed — generate a scene in Studio first.';
+            }
+        } catch (e) {
+            const bubble = document.getElementById(thinkId);
+            if (bubble) bubble.innerHTML = '<strong>Synthesus:</strong> pass error.';
+        }
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+        return;
+    }
     // SI Image shortcut: "draw a house left of a river…"
-    const drawPrompt = parseDrawIntent(message);
+    const drawPrompt = (intent && intent.mode === 'draw' && intent.prompt) ? intent.prompt : parseDrawIntent(message);
     if (drawPrompt) {
         const thinkId = 'think-' + Date.now();
         chatHistory.innerHTML += `<div class="message ai-message" id="${thinkId}"><strong>Synthesus:</strong> <span class="thinking-bulb">&#128161;</span> <span style="color:#94a3b8; font-style:italic;">drawing SI illustration&hellip;</span></div>`;
@@ -602,6 +674,7 @@ async function sendChatMessage() {
                     use_cache: true,
                     compile_plan: true,
                     return_plan: true,
+                    keep_session: true,
                 }),
             });
             const data = await res.json().catch(() => ({}));
@@ -615,6 +688,7 @@ async function sendChatMessage() {
                 }
                 return;
             }
+            if (data.scene_id) setStudioSceneId(data.scene_id);
             const mime = data.mime_type || 'image/png';
             const src = 'data:' + mime + ';base64,' + data.image_base64;
             const ents = (data.entities || []).map(e => escapeHtml(String(e))).join(', ');
@@ -622,14 +696,15 @@ async function sendChatMessage() {
             const construction = data.construction || (data.scene_plan && data.scene_plan.construction) || '';
             if (bubble) {
                 bubble.innerHTML =
-                    '<strong>Synthesus:</strong> ' + (voice ? escapeHtml(voice) : ('SI illustration of <em>' + escapeHtml(drawPrompt) + '</em>'))
+                    '<strong>Synthesus:</strong> <span style="color:#38bdf8;">[draw · SI construct]</span> '
+                    + (voice ? escapeHtml(voice) : ('SI illustration of <em>' + escapeHtml(drawPrompt) + '</em>'))
                     + '<div style="margin-top:8px;"><img src="' + src + '" alt="SI render" style="max-width:100%; border-radius:8px; border:1px solid rgba(56,189,248,.3);"></div>'
                     + '<div style="font-size:0.75rem; color:#64748b; margin-top:6px; font-family:monospace;">'
                     + (data.engine || 'synthesus_vsa_geometric') + ' · ' + (data.style || 'soft')
                     + (construction ? ' · ' + escapeHtml(String(construction)) : '')
                     + ' · ' + (data.latency_ms != null ? data.latency_ms + 'ms' : '')
                     + (ents ? ' · ' + ents : '')
-                    + ' · local SI (not diffusion)</div>';
+                    + ' · local SI (not diffusion · not Ollama pixels)</div>';
             }
             pushImageGallery(src, drawPrompt);
             chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -2466,8 +2541,100 @@ function setStudioSceneId(sid) {
     }
     const rep = document.getElementById('image-repass-btn');
     const repY = document.getElementById('image-repass-yaw-btn');
+    const pl = document.getElementById('image-playlist-btn');
     if (rep) rep.disabled = !sid;
     if (repY) repY.disabled = !sid;
+    if (pl) pl.disabled = !sid;
+}
+
+function showPlanInspector(data) {
+    const el = document.getElementById('image-plan-inspector');
+    if (!el) return;
+    const sp = data && data.scene_plan;
+    if (!sp) {
+        el.style.display = 'none';
+        return;
+    }
+    const lines = [];
+    lines.push('construction: ' + (sp.construction || data.construction || '?'));
+    lines.push('si_prompt: ' + (sp.si_prompt || data.si_prompt || ''));
+    (sp.machines || []).forEach(function (m) {
+        lines.push('machine ' + (m.machine || '?') + ': ' + (m.name || m.entity || ''));
+    });
+    (sp.composites || []).forEach(function (c) {
+        lines.push('composite ' + (c.name || '?') + ' [' + (c.parts || []).join('+') + ']');
+    });
+    (sp.entity_maps || []).slice(0, 12).forEach(function (e) {
+        lines.push('map ' + (e.name || '') + ' → ' + (e.maps_to || '') + ' (' + (e.role || '') + ')');
+    });
+    if (sp.material_lib && sp.material_lib.palette) {
+        lines.push('palette: ' + sp.material_lib.palette);
+    }
+    if (data.outer_voice) lines.push('voice: ' + data.outer_voice);
+    el.textContent = lines.join('\n');
+    el.style.display = lines.length ? 'block' : 'none';
+}
+
+async function loadImageCapabilities() {
+    const el = document.getElementById('image-capability-card');
+    const statusEl = document.getElementById('image-studio-status');
+    if (!el) return;
+    try {
+        const res = await fetch('/api/v1/image/capabilities');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || res.status);
+        const can = (data.can || []).map(function (x) { return '✓ ' + x; }).join('\n');
+        const cannot = (data.cannot || []).map(function (x) { return '✗ ' + x; }).join('\n');
+        el.innerHTML = '<strong style="color:#7dd3fc;">SI Image — ' + escapeHtmlStudio(data.engine_version || data.engine || '')
+            + '</strong><div style="margin-top:4px;color:#94a3b8;">' + escapeHtmlStudio(data.si_vs_ai || '')
+            + '</div><pre style="margin:6px 0 0;white-space:pre-wrap;color:#86efac;">' + escapeHtmlStudio(can)
+            + '</pre><pre style="margin:4px 0 0;white-space:pre-wrap;color:#fca5a5;">' + escapeHtmlStudio(cannot) + '</pre>';
+        el.style.display = 'block';
+        if (statusEl) statusEl.innerHTML = '<span style="color:#38bdf8;">Capability card loaded (SI ≠ diffusion)</span>';
+    } catch (e) {
+        el.style.display = 'block';
+        el.textContent = 'Capabilities unavailable: ' + (e.message || e);
+    }
+}
+
+async function runImagePlaylist(name) {
+    name = name || 'finish';
+    const statusEl = document.getElementById('image-studio-status');
+    const previewEl = document.getElementById('image-studio-preview');
+    if (!_lastStudioSceneId) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">Generate first for finish job</span>';
+        return;
+    }
+    if (statusEl) statusEl.innerHTML = '<span style="color:#fbbf24;">Finish playlist "' + escapeHtmlStudio(name) + '"…</span>';
+    try {
+        const res = await fetch('/api/v1/image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                scene_id: _lastStudioSceneId,
+                playlist: name,
+                pass_only: true,
+                resolution: parseInt((document.getElementById('image-res') || {}).value || '512', 10),
+            }),
+        });
+        const data = await res.json().catch(function () { return {}; });
+        if (!res.ok || !data.image_base64) {
+            throw new Error((data && (data.message || data.error)) || ('HTTP ' + res.status));
+        }
+        const frames = data.playlist_frames || [];
+        if (frames.length > 1) {
+            showStudioVariations(frames, data.mime_type || 'image/png');
+        } else {
+            showStudioImage('data:image/png;base64,' + data.image_base64, data);
+        }
+        if (statusEl) {
+            statusEl.innerHTML = '<span style="color:#4ade80;">Playlist OK — ' + (data.frame_count || frames.length)
+                + ' passes on stock · not diffusion</span>';
+        }
+    } catch (e) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">Playlist failed: ' + escapeHtmlStudio(e.message || e) + '</span>';
+        if (previewEl) previewEl.innerHTML = '<span style="color:#f87171;">Error</span>';
+    }
 }
 
 function studioCollectEditKnobs() {
@@ -2651,6 +2818,8 @@ function renderLevelViewer(level) {
     // z: 0 near at bottom, 1 far at top
     const mapZ = (z) => pad + ((1 - Math.min(1, Math.max(0, z))) * (H - 2 * pad));
 
+    // Store hit targets for click → highlight
+    canvas._levelHits = [];
     ents.forEach(function (e) {
         const role = e.role || 'disc';
         let x = e.cx != null ? e.cx : (e.x != null ? e.x : 0.5);
@@ -2664,7 +2833,7 @@ function renderLevelViewer(level) {
         const px = mapX(Number(x) || 0.5);
         const py = mapZ(Number(z) || 0.5);
         const col = LEVEL_ROLE_COLORS[role] || LEVEL_ROLE_COLORS[e.entity] || '#94a3b8';
-        const r = role === 'person' ? 4 : (role === 'tree' || role === 'house' || role === 'building') ? 7 : 5;
+        const r = role === 'person' ? 4 : (role === 'tree' || role === 'house' || role === 'building' || role === 'lathe' || role === 'extrude') ? 7 : 5;
         ctx.beginPath();
         ctx.arc(px, py, r, 0, Math.PI * 2);
         ctx.fillStyle = col;
@@ -2674,6 +2843,7 @@ function renderLevelViewer(level) {
         ctx.fillStyle = '#cbd5e1';
         ctx.font = '9px sans-serif';
         ctx.fillText(String(e.entity || role).slice(0, 8), px + r + 2, py + 3);
+        canvas._levelHits.push({ x: px, y: py, r: r + 4, entity: e.entity || role, role: role, machine: e.machine || e.construction || '' });
     });
 
     // camera marker
@@ -2689,8 +2859,26 @@ function renderLevelViewer(level) {
     if (info) {
         info.innerHTML = escapeHtmlStudio(level.schema || 'level')
             + ' · ' + (level.entity_count != null ? level.entity_count : ents.length) + ' ents'
-            + (level.prompt ? '<br><span style="color:#94a3b8;">' + escapeHtmlStudio(String(level.prompt).slice(0, 80)) + '</span>' : '');
+            + (level.prompt ? '<br><span style="color:#94a3b8;">' + escapeHtmlStudio(String(level.prompt).slice(0, 80)) + '</span>' : '')
+            + '<br><span style="color:#64748b;">Click an entity to inspect</span>';
     }
+    canvas.onclick = function (ev) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = (ev.clientX - rect.left) * (canvas.width / rect.width);
+        const my = (ev.clientY - rect.top) * (canvas.height / rect.height);
+        const hits = canvas._levelHits || [];
+        let best = null, bestD = 1e9;
+        hits.forEach(function (h) {
+            const d = Math.hypot(h.x - mx, h.y - my);
+            if (d < h.r && d < bestD) { best = h; bestD = d; }
+        });
+        if (best && info) {
+            info.innerHTML = '<span style="color:#7dd3fc;">selected: ' + escapeHtmlStudio(best.entity)
+                + '</span> · role=' + escapeHtmlStudio(best.role)
+                + (best.machine ? ' · ' + escapeHtmlStudio(best.machine) : '')
+                + '<br><button class="glass-btn" style="font-size:0.7rem;margin-top:4px;" onclick="reRenderFromLastLevel()">Re-render from level</button>';
+        }
+    };
 }
 
 function loadLevelViewerFile(ev) {
@@ -2700,13 +2888,51 @@ function loadLevelViewerFile(ev) {
     reader.onload = function () {
         try {
             const level = JSON.parse(String(reader.result || '{}'));
-            renderLevelViewer(level.level || level);
+            const L = level.level || level;
+            renderLevelViewer(L);
+            const info = document.getElementById('level-viewer-info');
+            if (info) {
+                info.innerHTML = (info.innerHTML || '')
+                    + ' <button class="glass-btn" style="font-size:0.7rem;margin-top:4px;" onclick="reRenderFromLastLevel()">Re-render from level</button>';
+            }
+            window._lastLevelForRerender = L;
         } catch (e) {
             const info = document.getElementById('level-viewer-info');
             if (info) info.innerHTML = '<span style="color:#f87171;">Invalid JSON</span>';
         }
     };
     reader.readAsText(f);
+}
+
+async function reRenderFromLastLevel() {
+    const level = window._lastLevelForRerender || window._lastLevelJson;
+    const statusEl = document.getElementById('image-studio-status');
+    if (!level) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">No level loaded</span>';
+        return;
+    }
+    if (statusEl) statusEl.innerHTML = '<span style="color:#38bdf8;">Re-rendering from level stock…</span>';
+    try {
+        const res = await fetch('/api/v1/image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                level: level,
+                pass_only: true,
+                look: (document.getElementById('image-look') || {}).value || 'photo',
+                resolution: parseInt((document.getElementById('image-res') || {}).value || '512', 10),
+                grade: (document.getElementById('image-grade') || {}).value || 'none',
+            }),
+        });
+        const data = await res.json().catch(function () { return {}; });
+        if (!res.ok || !data.image_base64) throw new Error(data.message || data.error || res.status);
+        if (data.scene_id) setStudioSceneId(data.scene_id);
+        showStudioImage('data:image/png;base64,' + data.image_base64, data);
+        try { showPlanInspector(data); } catch (_) {}
+        if (statusEl) statusEl.innerHTML = '<span style="color:#4ade80;">Level re-render OK · scene stock ready</span>';
+    } catch (e) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">Level re-render failed: ' + escapeHtmlStudio(e.message || e) + '</span>';
+    }
 }
 
 async function exportImageLevel() {
@@ -2891,6 +3117,7 @@ async function runImageStudio(variations, extra) {
             setStudioSceneId(data.scene_id);
             if (typeof data.yaw_deg === 'number') _lastStudioYaw = data.yaw_deg;
         }
+        try { showPlanInspector(data); } catch (_) {}
         if (metaEl) {
             metaEl.textContent = [
                 `engine=${data.engine || 'synthesus_vsa_geometric'}`,

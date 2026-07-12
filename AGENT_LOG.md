@@ -665,3 +665,26 @@ m = generate_image("a vase on grass under a sky", out, keep_session=True)
 apply_scene_pass(m["scene_id"], out2, yaw_deg=20, look="cinema", grade="warm")
 # API: { "scene_id": "...", "pass_only": true, "yaw_deg": 15, "grade": "cool" }
 ```
+
+---
+
+## 2026-07-12 — feat/image-opt-enhance (v6.1 workshop full pack)
+
+### Mission
+Implement full suggestion set: disk sessions, playlists, intent modes, materials,
+level re-render, Studio inspector/capabilities, bench, Claude review package.
+
+### Shipped
+- Disk-backed `image_session` + playlists (finish/orbit/day_cycle)
+- More lathe profiles + yaw foreshortening; extrude entities expanded
+- `image_intent` draw/find/pass/refuse + capability card
+- `image_materials_lib` mood palettes
+- Level → session → re-render; level viewer click + re-render button
+- Studio: plan inspector, can/can't, finish job playlist
+- Chat: mode labels + pass knobs + refuse alternatives
+- API: `/capabilities`, `/intent`, `/sessions/{id}`, playlist + level on `/image`
+- `scripts/image_bench_regression.py` green
+- `docs/CLAUDE_REVIEW_IMAGE_WORKSHOP.md` for Claude
+- ENGINE `si-image-v6.1-workshop` · **26 tests passed**
+
+### Do NOT merge without Claude review of this package.

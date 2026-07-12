@@ -1735,6 +1735,8 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         "grade": grade,
         "edit_text": edit_text,
         "edit_vignette": edit_vignette,
+        "playlist": getattr(image_req, "playlist", None),
+        "level": getattr(image_req, "level", None),
     }
 
     try:
@@ -1786,6 +1788,54 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     except Exception as ve:
         logger.warning("ImageResponse validation soft-fail: %s", ve)
     return JSONResponse(content=payload)
+
+
+@app.get("/api/v1/image/capabilities")
+async def image_capabilities(auth=Depends(get_auth)):
+    """Honest can/can't card for SI image engine (not diffusion)."""
+    try:
+        from image_intent import capability_card
+        from image_session import list_playlists
+        from image_service import ENGINE_VERSION, DETAILS, LOOKS, GRADES
+        card = capability_card()
+        card["engine_version"] = ENGINE_VERSION
+        card["details"] = list(DETAILS)
+        card["looks"] = list(LOOKS)
+        card["grades"] = list(GRADES)
+        card["playlists"] = list(list_playlists().keys())
+        return card
+    except Exception as e:
+        raise HTTPException(503, detail={"error": "capabilities_unavailable", "message": str(e)})
+
+
+@app.get("/api/v1/image/sessions/{scene_id}")
+async def get_image_session(scene_id: str, auth=Depends(get_auth)):
+    try:
+        import image_session as sess
+        view = sess.public_session_view(scene_id)
+        if not view:
+            raise HTTPException(404, "scene_id not found (memory or disk)")
+        return view
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(503, detail=str(e))
+
+
+@app.post("/api/v1/image/intent")
+async def image_intent_route(req: Request, auth=Depends(get_auth)):
+    """Classify draw/find/talk/pass/refuse for chat surfaces."""
+    try:
+        body = await req.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    try:
+        from image_intent import classify_intent
+        msg = (body.get("message") or body.get("prompt") or "").strip()
+        has = bool(body.get("scene_id"))
+        return classify_intent(msg, has_scene_id=has)
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
 
 
 @app.get("/api/v1/image/jobs/{job_id}")
