@@ -306,3 +306,31 @@ input, textarea { user-select: text; -webkit-user-select: text; }
 .dock { position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border); backdrop-filter: blur(20px); padding: 0.5rem 1rem; border-radius: 20px; display: flex; gap: 1rem; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 9999; }
 .dock-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; width: 45px; height: 45px; border-radius: 12px; cursor: pointer; font-size: 1.2rem; transition: all 0.2s; }
 .dock-btn:hover { background: rgba(255,255,255,0.2); transform: translateY(-3px); }
+
+/* ── System Vitals — live subsystem readout (instrument-console look; new bolt-on) ── */
+#win-vitals{
+  --v-ink:#e9f1f8; --v-muted:#8595a9; --v-faint:#4c5a6d; --v-line:#1b2733;
+  --v-accent:#3ad0ef; --v-panel:#0c121b; --v-ok:#34d399; --v-crit:#fb7185; --v-violet:#a78bfa;
+  --v-mono:ui-monospace,"Cascadia Code","JetBrains Mono","Fira Code",Menlo,Consolas,monospace;
+}
+#win-vitals .window-content{ padding:15px; gap:13px; }
+.vitals-head{ display:flex; align-items:baseline; justify-content:space-between; font-family:var(--v-mono); }
+.vitals-status{ font-size:1.35rem; color:var(--v-accent); letter-spacing:.02em; line-height:1.05; }
+.vitals-status .sub{ display:block; font-size:.56rem; color:var(--v-muted); letter-spacing:.2em; text-transform:uppercase; margin-top:3px; }
+.vitals-live{ font-family:var(--v-mono); font-size:.56rem; color:var(--v-ok); display:inline-flex; align-items:center; gap:6px; letter-spacing:.14em; }
+.vitals-live i{ width:6px;height:6px;border-radius:50%;background:var(--v-ok);box-shadow:0 0 8px var(--v-ok); animation:vitalsPulse 2.4s ease-in-out infinite; }
+@keyframes vitalsPulse{0%,100%{opacity:1}50%{opacity:.35}}
+.vitals-rows{ display:flex; flex-direction:column; gap:1px; background:var(--v-line); border:1px solid var(--v-line); border-radius:11px; overflow:hidden; }
+.vrow{ display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:12px; padding:10px 14px; background:var(--v-panel); font-family:var(--v-mono); }
+.vrow .vk{ color:var(--v-muted); font-size:.6rem; letter-spacing:.16em; text-transform:uppercase; }
+.vrow .vv{ color:var(--v-ink); font-size:.82rem; text-align:right; font-variant-numeric:tabular-nums; }
+.vdot{ width:7px;height:7px;transform:rotate(45deg); }
+.vdot.ok{ background:var(--v-ok); box-shadow:0 0 8px color-mix(in srgb,var(--v-ok) 70%,transparent); }
+.vdot.acc{ background:var(--v-accent); box-shadow:0 0 8px rgba(58,208,239,.4); }
+.vdot.crit{ background:var(--v-crit); box-shadow:0 0 8px color-mix(in srgb,var(--v-crit) 70%,transparent); }
+.vdot.vi{ background:var(--v-violet); }
+.vitals-oath{ display:flex; gap:10px; align-items:flex-start; padding:12px 14px; border-radius:11px;
+  border:1px solid rgba(58,208,239,.30); background:rgba(58,208,239,.08); }
+.vitals-oath .sig{ font-family:var(--v-mono); color:var(--v-accent); font-size:1rem; line-height:1; }
+.vitals-oath p{ margin:0; font-size:.77rem; line-height:1.45; color:var(--v-ink); }
+.vitals-oath b{ font-family:var(--v-mono); font-size:.6rem; letter-spacing:.14em; text-transform:uppercase; color:var(--v-accent); }

@@ -3169,3 +3169,38 @@ const _origToggleWindow = typeof toggleWindow === 'function' ? null : null;
 document.addEventListener('DOMContentLoaded', function () {
     try { renderImageGallery(); } catch (_) {}
 });
+
+// ── System Vitals: live subsystem readout (new bolt-on; reads the real /api/v1/health) ──
+let _vitalsTimer = null;
+function toggleVitals() {
+    toggleWindow('win-vitals');
+    const win = document.getElementById('win-vitals');
+    const open = win && win.style.display !== 'none';
+    if (open) { loadVitals(); if (!_vitalsTimer) _vitalsTimer = setInterval(loadVitals, 4000); }
+    else if (_vitalsTimer) { clearInterval(_vitalsTimer); _vitalsTimer = null; }
+}
+async function loadVitals() {
+    const rowsEl = document.getElementById('vitals-rows');
+    const statusEl = document.getElementById('vitals-status');
+    if (!rowsEl || !statusEl) return;
+    let h = null;
+    try { const r = await fetch('/api/v1/health'); if (r.ok) h = await r.json(); } catch (e) {}
+    const esc = s => String(s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+    if (!h) {
+        statusEl.innerHTML = 'OFFLINE <span class="sub">runtime unreachable</span>';
+        rowsEl.innerHTML = '<div class="vrow"><span class="vdot crit"></span><span class="vk">Runtime</span><span class="vv">not reachable</span></div>';
+        return;
+    }
+    const llm = h.llm || {};
+    const on = b => b ? 'ok' : 'crit';
+    statusEl.innerHTML = `${esc((h.status || '—').toUpperCase())} <span class="sub">v${esc(h.version || '—')}</span>`;
+    const row = (dot, k, v) => `<div class="vrow"><span class="vdot ${dot}"></span><span class="vk">${k}</span><span class="vv">${esc(v)}</span></div>`;
+    rowsEl.innerHTML =
+        row('acc', 'Model', llm.model || '—') +
+        row(on(llm.ollama_reachable), 'LLM', llm.ollama_reachable ? 'reachable · local' : 'unreachable') +
+        row(on(h.rag_active), 'Grounding', h.rag_active ? 'active' : 'idle') +
+        row(on(h.ml_swarm_active), 'ML swarm', h.ml_swarm_active ? 'active' : 'idle') +
+        row(on(h.cognitive_engine_active !== false), 'Cognitive', (h.cognitive_engine_active !== false) ? 'online' : 'off') +
+        row('vi', 'Sessions', h.active_sessions != null ? h.active_sessions : '—') +
+        row('acc', 'Requests', h.total_requests != null ? h.total_requests : '—');
+}
