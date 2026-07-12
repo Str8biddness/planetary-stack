@@ -285,7 +285,7 @@ def test_draft_detail_and_engine_v4():
     )
 
     assert "draft" in DETAILS
-    assert ENGINE_VERSION == "si-image-v4-isp-parallel"
+    assert ENGINE_VERSION.startswith("si-image-v4")
 
     clear_image_cache(disk=True)
     with tempfile.TemporaryDirectory() as td:
@@ -302,7 +302,7 @@ def test_draft_detail_and_engine_v4():
             use_cache=True,
         )
         assert m["detail"] == "draft"
-        assert m.get("engine_version") == "si-image-v4-isp-parallel"
+        assert str(m.get("engine_version", "")).startswith("si-image-v4")
         assert m.get("path_mode") is True
         assert (m.get("path_entities") or 0) >= 1
         assert os.path.getsize(out) > 500
@@ -319,6 +319,25 @@ def test_draft_detail_and_engine_v4():
         )
         assert m["cache_hit"] is False
         assert m2["cache_hit"] is True
+
+        # draft + photo look still real PNG; ISP quality=draft when look active
+        out_p = os.path.join(td, "draft_photo.png")
+        mp = generate_image(
+            "a house on grass under a sky with a sun",
+            out_p,
+            res=256,
+            style="soft",
+            look="photo",
+            detail="draft",
+            seed=8,
+            path_mode=True,
+            use_cache=False,
+        )
+        assert mp["detail"] == "draft"
+        assert os.path.getsize(out_p) > 500
+        isp = mp.get("isp") or {}
+        if isp:
+            assert isp.get("quality") == "draft"
 
 
 def test_bbox_fill_matches_full_frame_semantics():

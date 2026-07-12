@@ -187,17 +187,28 @@ def apply_camera_look(
     sun_pos: Optional[Tuple[float, float]] = None,
     depth_map: Optional[np.ndarray] = None,
     focus_depth: Optional[float] = None,
+    quality: str = "full",
 ) -> dict[str, Any]:
+    """Apply camera/TV ISP finish.
+
+    quality:
+      full  — full bloom / DOF / CA / noise / clarity
+      draft — AE + WB + filmic + light bloom only (preview speed)
+    """
     look = (look or "photo").lower().strip()
     if look not in LOOKS:
         look = "photo"
     if look == "raw":
         return {
             "image": np.clip(img, 0, 1).astype(np.float32),
-            "meta": {"look": "raw", "pipeline": [], "engine": "none"},
+            "meta": {"look": "raw", "pipeline": [], "engine": "none", "quality": "raw"},
         }
 
     seed = 0 if seed is None else int(seed)
+    quality = (quality or "full").lower().strip()
+    if quality not in ("full", "draft"):
+        quality = "full"
+    draft = quality == "draft"
     pipeline: list[str] = []
     x = np.clip(img.astype(np.float32), 0, 4.0)
 
@@ -219,12 +230,19 @@ def apply_camera_look(
         target = 0.18
         bloom_r, dof_r = 4, 3
 
+    if draft:
+        bloom_amt *= 0.55
+        bloom_r = max(1, bloom_r - 2)
+        dof_amt = 0.0
+        contrast = 0.0
+        iso = min(iso, 100.0)
+
     x, gain = auto_exposure(x, target=target)
     pipeline.append(f"ae_gain={gain:.3f}")
     x = white_balance(x, temperature=temp)
     pipeline.append(f"wb_K={temp:.0f}")
 
-    if sun_pos is not None:
+    if sun_pos is not None and not draft:
         h, w = x.shape[:2]
         sx, sy = sun_pos
         yyg, xxg = np.mgrid[0:h, 0:w].astype(np.float32)
@@ -237,38 +255,45 @@ def apply_camera_look(
         )
         pipeline.append("sun_flare")
 
-    x = bloom(x, threshold=0.72, amount=bloom_amt, radius=bloom_r)
-    pipeline.append("bloom")
+    if bloom_amt > 0.01:
+        x = bloom(x, threshold=0.72, amount=bloom_amt, radius=bloom_r)
+        pipeline.append("bloom" + ("_draft" if draft else ""))
     # True DOF when per-object depth map present; else y-proxy
     fd = 0.35 if focus_depth is None else float(focus_depth)
     if depth_map is None:
         fd = 0.62  # legacy y-focus
-    x = depth_of_field(
-        x, yy, horizon, focus=fd, amount=dof_amt, max_radius=dof_r, depth_map=depth_map
-    )
-    pipeline.append("dof_z" if depth_map is not None else "dof_y")
-    if look in ("photo", "cinema"):
+    if not draft and dof_amt > 0.01:
+        x = depth_of_field(
+            x, yy, horizon, focus=fd, amount=dof_amt, max_radius=dof_r, depth_map=depth_map
+        )
+        pipeline.append("dof_z" if depth_map is not None else "dof_y")
+    if not draft and look in ("photo", "cinema"):
         x = chromatic_aberration(x, strength=0.0015 if look == "photo" else 0.0022)
         pipeline.append("ca")
 
     x = filmic_tonemap(x)
     pipeline.append("filmic")
-    x = local_contrast(x, amount=contrast, radius=2 if look == "tv" else 3)
-    pipeline.append("clarity")
-    x = sensor_noise(x, iso=iso, seed=seed)
-    pipeline.append(f"iso={iso:.0f}")
+    if not draft and contrast > 0.01:
+        x = local_contrast(x, amount=contrast, radius=2 if look == "tv" else 3)
+        pipeline.append("clarity")
+    if not draft:
+        x = sensor_noise(x, iso=iso, seed=seed)
+        pipeline.append(f"iso={iso:.0f}")
 
     h, w = x.shape[:2]
     yyg, xxg = np.mgrid[0:h, 0:w].astype(np.float32)
     yyg = yyg / max(h - 1, 1)
     xxg = xxg / max(w - 1, 1)
     rad = np.sqrt((xxg - 0.5) ** 2 + (yyg - 0.5) ** 2)
-    vig = 1.0 - 0.18 * np.clip((rad - 0.45) / 0.55, 0, 1) ** 1.5
+    vig_amt = 0.10 if draft else 0.18
+    vig = 1.0 - vig_amt * np.clip((rad - 0.45) / 0.55, 0, 1) ** 1.5
     x = x * vig[..., None]
     pipeline.append("vignette")
 
     x = srgb_oetf(np.clip(x, 0, 1))
     pipeline.append("srgb")
+    if draft:
+        pipeline.append("quality=draft")
 
     return {
         "image": np.clip(x, 0, 1).astype(np.float32),
@@ -277,8 +302,9 @@ def apply_camera_look(
             "pipeline": pipeline,
             "ae_gain": gain,
             "engine": "synthesus_camera_isp",
+            "quality": quality,
             "focus_depth": fd if depth_map is not None else None,
-            "depth_guided": depth_map is not None,
+            "depth_guided": depth_map is not None and not draft,
             "note": "camera/TV ISP math on SI scene — not diffusion",
         },
     }

@@ -50,7 +50,7 @@ _DISK_ENABLED = os.environ.get("SYNTHESUS_IMAGE_DISK_CACHE_OFF", "").strip() not
 STYLES = sorted(vpi.STYLES)
 DETAILS = ("draft", "standard", "high")
 # Bump when SHAPES, path raster, ISP, or materials change — invalidates disk/memory cache.
-ENGINE_VERSION = "si-image-v4-isp-parallel"
+ENGINE_VERSION = "si-image-v4.1-draft-isp"
 VOCAB_VERSION = ENGINE_VERSION  # alias for API meta field
 LOOKS = ("raw", "photo", "cinema", "vivid", "tv")
 
@@ -249,9 +249,9 @@ def generate_image(
         detail = "standard"
     if look not in LOOKS:
         look = "raw"
-    # Draft: standard paint + CNC contours without multi-pass pocket (fast preview)
+    # Draft: keep detail token so raster/ISP can take the fast path (no pocket, light ISP)
     draft = detail == "draft"
-    render_detail = "standard" if draft else detail
+    render_detail = detail  # "draft" | "standard" | "high" — vpi handles draft
     aspect = float(np.clip(float(aspect) if aspect else 1.0, 0.5, 2.0))
     if seed is not None:
         seed = int(seed)

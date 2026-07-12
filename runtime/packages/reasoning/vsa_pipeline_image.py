@@ -589,8 +589,14 @@ def render_doc(
     if style not in ("flat", "soft", "night"):
         style = "flat"
     detail = (detail or "standard").lower().strip()
-    high = detail == "high" or look in ("photo", "cinema", "vivid", "tv")
+    draft = detail == "draft"
+    # Draft: never force high atmosphere from photo look (preview path)
+    if draft:
+        high = False
+    else:
+        high = detail == "high" or look in ("photo", "cinema", "vivid", "tv")
     use_paths = bool(path_mode)
+    isp_quality = "draft" if draft else "full"
 
     h, w = _dims(res, aspect)
     # World coords: x in [0,1], y in [0,1] (y grows downward in image space)
@@ -1010,8 +1016,9 @@ def render_doc(
                 look=look if look in _isp.LOOKS else "photo",
                 seed=seed,
                 sun_pos=sun_pos if has_glow else None,
-                depth_map=depth_map,
+                depth_map=None if draft else depth_map,
                 focus_depth=focus_depth,
+                quality=isp_quality,
             )
             img = result["image"]
             isp_meta = result.get("meta")
