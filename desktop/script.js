@@ -23,7 +23,7 @@ function toggleWindow(id) {
         if (id === 'win-chat') maybeStreamWelcome();
         if (id === 'win-drive') loadDriveSources();
         if (id === 'win-core') loadLLMSettings();
-        if (id === 'win-image') { /* studio is self-contained */ }
+        if (id === 'win-image') { try { renderImageGallery(); } catch (e) {} }
     } else {
         win.style.display = 'none';
         if (id === 'win-twin' && twinInterval) clearInterval(twinInterval);
@@ -561,6 +561,16 @@ async function confirmAssistantFact(meta, btn, statusEl) {
     }
 }
 
+/** Detect "draw …" / "/draw …" / "imagine …" and route to SI image engine. */
+function parseDrawIntent(message) {
+    const m = (message || '').trim();
+    const re = /^(?:\/draw|draw(?:\s+this)?|imagine|picture|render|paint)\s*[:\-]?\s*(.+)$/i;
+    const hit = m.match(re);
+    if (!hit) return null;
+    const prompt = (hit[1] || '').trim();
+    return prompt || null;
+}
+
 async function sendChatMessage() {
     const input = document.getElementById('chat-input');
     const message = input.value.trim();
@@ -570,6 +580,61 @@ async function sendChatMessage() {
     chatHistory.innerHTML += `<div class="message" style="border-left: 3px solid #facc15;"><strong>User:</strong> ${escapeHtml(message)}</div>`;
     input.value = '';
     chatHistory.scrollTop = chatHistory.scrollHeight;
+
+    // SI Image shortcut: "draw a house left of a river…"
+    const drawPrompt = parseDrawIntent(message);
+    if (drawPrompt) {
+        const thinkId = 'think-' + Date.now();
+        chatHistory.innerHTML += `<div class="message ai-message" id="${thinkId}"><strong>Synthesus:</strong> <span class="thinking-bulb">&#128161;</span> <span style="color:#94a3b8; font-style:italic;">drawing SI illustration&hellip;</span></div>`;
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+        try {
+            const res = await fetch('/api/v1/image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: drawPrompt,
+                    resolution: 512,
+                    style: 'soft',
+                    detail: 'high',
+                    aspect: 1.0,
+                    use_cache: true,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            const bubble = document.getElementById(thinkId);
+            if (!res.ok || !data.image_base64) {
+                const msg = (data && (data.message || data.error)) || ('HTTP ' + res.status);
+                if (bubble) {
+                    bubble.innerHTML = '<strong>Synthesus:</strong> <span style="color:#f87171;">Could not draw — '
+                        + escapeHtml(String(msg)) + '</span><div style="font-size:0.8rem;color:#94a3b8;margin-top:4px;">'
+                        + 'Tip: open 🎨 SI Image Studio, or try: <code>draw a house on grass under a sky</code></div>';
+                }
+                return;
+            }
+            const mime = data.mime_type || 'image/png';
+            const src = 'data:' + mime + ';base64,' + data.image_base64;
+            const ents = (data.entities || []).map(e => escapeHtml(String(e))).join(', ');
+            if (bubble) {
+                bubble.innerHTML =
+                    '<strong>Synthesus:</strong> SI illustration of <em>' + escapeHtml(drawPrompt) + '</em>'
+                    + '<div style="margin-top:8px;"><img src="' + src + '" alt="SI render" style="max-width:100%; border-radius:8px; border:1px solid rgba(56,189,248,.3);"></div>'
+                    + '<div style="font-size:0.75rem; color:#64748b; margin-top:6px; font-family:monospace;">'
+                    + (data.engine || 'synthesus_vsa_geometric') + ' · ' + (data.style || 'soft')
+                    + ' · ' + (data.latency_ms != null ? data.latency_ms + 'ms' : '')
+                    + (ents ? ' · ' + ents : '')
+                    + ' · local SI (not cloud AI)</div>';
+            }
+            pushImageGallery(src, drawPrompt);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        } catch (e) {
+            const bubble = document.getElementById(thinkId);
+            if (bubble) {
+                bubble.innerHTML = '<strong>Synthesus:</strong> <span style="color:#f87171;">Draw failed: '
+                    + escapeHtml(e.message || String(e)) + '</span>';
+            }
+        }
+        return;
+    }
 
     // The lightbulb flickers while Synthesus forms the idea.
     const thinkId = 'think-' + Date.now();
@@ -2233,6 +2298,8 @@ const IMAGE_STUDIO_EXAMPLES = {
     river: 'a boat on a river under a sky with a bird and a tree right of a bridge',
     city: 'a person left of a building on a road under a sky with a sun',
 };
+const IMAGE_GALLERY_KEY = 'synthesus_image_gallery_v1';
+let _lastStudioDataUrl = null;
 
 function imageStudioExample(key) {
     const el = document.getElementById('image-prompt');
@@ -2245,7 +2312,115 @@ function escapeHtmlStudio(s) {
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-async function runImageStudio() {
+function entsSafe(n) {
+    return (typeof n === 'number' && !Number.isNaN(n)) ? n : '?';
+}
+
+function loadImageGallery() {
+    try {
+        return JSON.parse(localStorage.getItem(IMAGE_GALLERY_KEY) || '[]');
+    } catch (_) { return []; }
+}
+
+function saveImageGallery(items) {
+    try {
+        localStorage.setItem(IMAGE_GALLERY_KEY, JSON.stringify(items.slice(0, 8)));
+    } catch (_) { /* quota — ignore */ }
+}
+
+function pushImageGallery(dataUrl, prompt) {
+    // Store tiny thumbs only — strip to avoid localStorage bloat (keep last 8 refs as data urls max ~)
+    const items = loadImageGallery();
+    items.unshift({ src: dataUrl, prompt: (prompt || '').slice(0, 80), t: Date.now() });
+    // Keep at most 6; if too large, drop
+    while (items.length > 6) items.pop();
+    saveImageGallery(items);
+    renderImageGallery();
+}
+
+function renderImageGallery() {
+    const el = document.getElementById('image-studio-gallery');
+    if (!el) return;
+    const items = loadImageGallery();
+    if (!items.length) {
+        el.innerHTML = '<span style="color:#475569;font-size:0.75rem;">No recent renders yet</span>';
+        return;
+    }
+    el.innerHTML = items.map((it, i) =>
+        '<img src="' + it.src + '" title="' + escapeHtmlStudio(it.prompt || '') +
+        '" onclick="imageGalleryPick(' + i + ')" style="height:48px;width:48px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid rgba(148,163,184,.3);">'
+    ).join('');
+}
+
+function imageGalleryPick(i) {
+    const items = loadImageGallery();
+    const it = items[i];
+    if (!it) return;
+    const previewEl = document.getElementById('image-studio-preview');
+    if (previewEl) {
+        previewEl.innerHTML = '<img src="' + it.src + '" alt="gallery" style="max-width:100%; max-height:280px; border-radius:6px; object-fit:contain;">';
+    }
+    _lastStudioDataUrl = it.src;
+    const btn = document.getElementById('image-download-btn');
+    if (btn) btn.disabled = false;
+    const promptEl = document.getElementById('image-prompt');
+    if (promptEl && it.prompt) promptEl.value = it.prompt;
+}
+
+function downloadImageStudio() {
+    if (!_lastStudioDataUrl) return;
+    const a = document.createElement('a');
+    a.href = _lastStudioDataUrl;
+    a.download = 'synthesus-si-' + Date.now() + '.png';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+function showStudioImage(src, data) {
+    const previewEl = document.getElementById('image-studio-preview');
+    const varEl = document.getElementById('image-studio-variations');
+    if (varEl) { varEl.style.display = 'none'; varEl.innerHTML = ''; }
+    if (previewEl) {
+        previewEl.style.display = 'flex';
+        previewEl.innerHTML = '<img src="' + src + '" alt="SI render" style="max-width:100%; max-height:280px; border-radius:6px; object-fit:contain;">';
+    }
+    _lastStudioDataUrl = src;
+    const btn = document.getElementById('image-download-btn');
+    if (btn) btn.disabled = false;
+    pushImageGallery(src, data && data.prompt);
+}
+
+let _studioVarSrcs = [];
+
+function showStudioVariations(vars, mime) {
+    const previewEl = document.getElementById('image-studio-preview');
+    const varEl = document.getElementById('image-studio-variations');
+    if (previewEl) previewEl.style.display = 'none';
+    if (!varEl) return;
+    varEl.style.display = 'grid';
+    mime = mime || 'image/png';
+    _studioVarSrcs = vars.map(v => 'data:' + mime + ';base64,' + v.image_base64);
+    varEl.innerHTML = vars.map((v, i) => {
+        return '<img src="' + _studioVarSrcs[i] + '" title="seed ' + (v.seed != null ? v.seed : i) +
+            '" data-var-i="' + i + '" onclick="pickStudioVariation(' + i + ')" ' +
+            'style="width:100%; border-radius:6px; cursor:pointer; border:1px solid rgba(148,163,184,.25);">';
+    }).join('');
+    if (_studioVarSrcs[0]) {
+        _lastStudioDataUrl = _studioVarSrcs[0];
+        const btn = document.getElementById('image-download-btn');
+        if (btn) btn.disabled = false;
+    }
+}
+
+function pickStudioVariation(i) {
+    const src = _studioVarSrcs[i];
+    if (!src) return;
+    showStudioImage(src, { prompt: (document.getElementById('image-prompt') || {}).value || '' });
+}
+
+async function runImageStudio(variations) {
+    variations = variations || 1;
     const promptEl = document.getElementById('image-prompt');
     const statusEl = document.getElementById('image-studio-status');
     const previewEl = document.getElementById('image-studio-preview');
@@ -2261,15 +2436,25 @@ async function runImageStudio() {
     const style = (document.getElementById('image-style') || {}).value || 'soft';
     const resolution = parseInt((document.getElementById('image-res') || {}).value || '512', 10);
     const aspect = parseFloat((document.getElementById('image-aspect') || {}).value || '1');
+    const detail = (document.getElementById('image-detail') || {}).value || 'high';
     const seedRaw = (document.getElementById('image-seed') || {}).value;
-    const body = { prompt, style, resolution, aspect, use_cache: true };
+    const body = { prompt, style, resolution, aspect, detail, use_cache: true, variations };
     if (seedRaw !== undefined && seedRaw !== null && String(seedRaw).trim() !== '') {
         const n = parseInt(seedRaw, 10);
         if (!Number.isNaN(n)) body.seed = n;
     }
 
-    if (statusEl) statusEl.innerHTML = '<span style="color:#38bdf8;">Rendering SI scene graph…</span>';
-    if (previewEl) previewEl.innerHTML = '<span style="color:#64748b;">Working…</span>';
+    if (statusEl) {
+        statusEl.innerHTML = variations > 1
+            ? '<span style="color:#38bdf8;">Rendering ' + variations + ' SI variations…</span>'
+            : '<span style="color:#38bdf8;">Rendering SI scene graph…</span>';
+    }
+    if (previewEl) {
+        previewEl.style.display = 'flex';
+        previewEl.innerHTML = '<span style="color:#64748b;">Working…</span>';
+    }
+    const varEl = document.getElementById('image-studio-variations');
+    if (varEl) { varEl.style.display = 'none'; varEl.innerHTML = ''; }
     if (metaEl) metaEl.textContent = '';
     if (entEl) entEl.innerHTML = '';
 
@@ -2281,22 +2466,27 @@ async function runImageStudio() {
         });
         let data = null;
         try { data = await res.json(); } catch (_) { data = null; }
-        if (!res.ok || !data || !data.image_base64) {
+        if (!res.ok || !data || (!data.image_base64 && !(data.variations && data.variations.length))) {
             const msg = (data && (data.message || data.error || data.detail)) || (`HTTP ${res.status}`);
             if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Failed: ${escapeHtmlStudio(typeof msg === 'string' ? msg : JSON.stringify(msg))}</span>`;
             if (previewEl) previewEl.innerHTML = '<span style="color:#f87171;">No image</span>';
             return;
         }
         const mime = data.mime_type || 'image/png';
-        const src = `data:${mime};base64,${data.image_base64}`;
-        if (previewEl) {
-            previewEl.innerHTML = `<img src="${src}" alt="SI render" style="max-width:100%; max-height:280px; border-radius:6px; object-fit:contain;">`;
+        if (data.variations && data.variations.length > 1) {
+            showStudioVariations(data.variations, mime);
+        } else {
+            const src = `data:${mime};base64,${data.image_base64}`;
+            showStudioImage(src, data);
         }
-        const cacheTag = data.cache_hit ? 'cache HIT' : 'cache miss';
+        const cacheTag = data.cache_hit
+            ? ('cache HIT' + (data.cache_source ? ' (' + data.cache_source + ')' : ''))
+            : 'cache miss';
         if (metaEl) {
             metaEl.textContent = [
                 `engine=${data.engine || 'synthesus_vsa_geometric'}`,
                 `style=${data.style || style}`,
+                `detail=${data.detail || detail}`,
                 `${data.width || '?'}x${data.height || '?'}`,
                 `${data.latency_ms != null ? data.latency_ms + 'ms' : ''}`,
                 cacheTag,
@@ -2310,7 +2500,7 @@ async function runImageStudio() {
             ).join('');
         }
         if (statusEl) {
-            statusEl.innerHTML = `<span style="color:#4ade80;">OK — ${entsSafe(data.entity_count)} entities · SI illustration</span>`;
+            statusEl.innerHTML = `<span style="color:#4ade80;">OK — ${entsSafe(data.entity_count)} entities · SI illustration (local)</span>`;
         }
     } catch (e) {
         if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Error: ${escapeHtmlStudio(e.message || e)}</span>`;
@@ -2318,6 +2508,8 @@ async function runImageStudio() {
     }
 }
 
-function entsSafe(n) {
-    return (typeof n === 'number' && !Number.isNaN(n)) ? n : '?';
-}
+// Restore gallery when Studio opens
+const _origToggleWindow = typeof toggleWindow === 'function' ? null : null;
+document.addEventListener('DOMContentLoaded', function () {
+    try { renderImageGallery(); } catch (_) {}
+});

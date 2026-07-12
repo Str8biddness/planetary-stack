@@ -471,15 +471,16 @@ def _house_mask(x, y, cx, base, w, h, px: float):
     return np.maximum(body_soft, roof_soft), body_soft, roof_soft
 
 
-def _tree_fractal_mask(x, y, tx, base, r, res_h: int, res_w: int, px: float, seed: int = 0):
-    """Richer canopy: layered discs + trunk (cheap fractal-ish, no L-system per pixel)."""
+def _tree_fractal_mask(
+    x, y, tx, base, r, res_h: int, res_w: int, px: float, seed: int = 0, high: bool = False
+):
+    """Richer canopy: layered discs + trunk; high detail adds more clusters + limbs."""
     trunk_w = 0.014 + r * 0.05
     trunk = (
         (np.abs(x - tx) < trunk_w)
         & (y > base - r * 1.15)
         & (y < base)
     ).astype(np.float64)
-    # Canopy clusters
     cov = np.zeros((res_h, res_w), dtype=np.float64)
     centers = [
         (tx, base - r * 1.25, r * 1.05),
@@ -489,12 +490,38 @@ def _tree_fractal_mask(x, y, tx, base, r, res_h: int, res_w: int, px: float, see
         (tx - r * 0.30, base - r * 1.45, r * 0.45),
         (tx + r * 0.30, base - r * 1.45, r * 0.45),
     ]
+    if high:
+        centers.extend([
+            (tx - r * 0.75, base - r * 1.20, r * 0.40),
+            (tx + r * 0.75, base - r * 1.20, r * 0.40),
+            (tx - r * 0.15, base - r * 1.95, r * 0.38),
+            (tx + r * 0.15, base - r * 1.95, r * 0.38),
+            (tx, base - r * 2.15, r * 0.32),
+            (tx - r * 0.45, base - r * 1.65, r * 0.35),
+            (tx + r * 0.45, base - r * 1.65, r * 0.35),
+        ])
     rng = np.random.default_rng(seed + 17)
     for cx, cy, cr in centers:
-        jx = float(rng.uniform(-0.01, 0.01))
-        jy = float(rng.uniform(-0.01, 0.01))
+        jx = float(rng.uniform(-0.012, 0.012))
+        jy = float(rng.uniform(-0.012, 0.012))
         rr = np.sqrt((x - (cx + jx)) ** 2 + (y - (cy + jy)) ** 2)
         cov = np.maximum(cov, 1.0 - smoothstep(cr - px, cr + px, rr))
+    if high:
+        # Diagonal limbs (cheap branch suggestion)
+        for side in (-1.0, 1.0):
+            bx0, by0 = tx, base - r * 0.55
+            bx1, by1 = tx + side * r * 0.55, base - r * 1.15
+            # distance to segment
+            t = np.clip(
+                ((x - bx0) * (bx1 - bx0) + (y - by0) * (by1 - by0))
+                / max((bx1 - bx0) ** 2 + (by1 - by0) ** 2, 1e-9),
+                0, 1,
+            )
+            px_ = bx0 + t * (bx1 - bx0)
+            py_ = by0 + t * (by1 - by0)
+            d = np.sqrt((x - px_) ** 2 + (y - py_) ** 2)
+            limb = 1.0 - smoothstep(0.008 - px, 0.008 + px, d)
+            trunk = np.maximum(trunk, limb * 0.85)
     return trunk, cov
 
 
@@ -520,11 +547,17 @@ def render_doc(
     style: str = "flat",
     aspect: float = 1.0,
     seed: Optional[int] = None,
+    detail: str = "standard",
 ) -> str:
-    """Rasterize a pattern document to PNG at any resolution/aspect."""
+    """Rasterize a pattern document to PNG at any resolution/aspect.
+
+    detail='high' enables richer tree canopies + atmospheric post (vignette/haze).
+    """
     style = (style or "flat").lower().strip()
     if style not in STYLES:
         style = "flat"
+    detail = (detail or "standard").lower().strip()
+    high = detail == "high"
 
     h, w = _dims(res, aspect)
     # World coords: x in [0,1], y in [0,1] (y grows downward in image space)
@@ -628,7 +661,7 @@ def render_doc(
         elif role == "tree":
             s = int(seed if seed is not None else 0) + hash(p.get("entity", "tree")) % 1000
             trunk, canopy = _tree_fractal_mask(
-                xx, yy, p["x"], p["base"], p["r"], h, w, aa, seed=s
+                xx, yy, p["x"], p["base"], p["r"], h, w, aa, seed=s, high=high
             )
             paint(trunk, (.42, .28, .13))
             paint(canopy, c)
@@ -812,11 +845,48 @@ def render_doc(
         elif role == "bush":
             trunk, canopy = _tree_fractal_mask(
                 xx, yy, p["x"], p["base"], p["r"] * 0.9, h, w, aa,
-                seed=(int(seed or 0) + 99),
+                seed=(int(seed or 0) + 99), high=high,
             )
             # no tall trunk for bush — just canopy near ground
             low = canopy * (yy > p["base"] - p["r"] * 2.2).astype(np.float32)
             paint(low, c)
+
+    # ── atmospheric post (wow polish) ────────────────────────────────
+    if high or style in ("soft", "night"):
+        # Distance haze: lift toward horizon band
+        haze_strength = 0.14 if high else 0.08
+        if style == "night":
+            haze_col = np.array([0.08, 0.10, 0.18], dtype=np.float32)
+        else:
+            haze_col = np.array([0.72, 0.80, 0.92], dtype=np.float32)
+        # stronger near mid-distance (around horizon)
+        dist_w = np.exp(-((yy - horizon) ** 2) / 0.08) * haze_strength
+        for k in range(3):
+            img[:, :, k] = img[:, :, k] * (1.0 - dist_w) + haze_col[k] * dist_w
+
+    if high or style == "soft":
+        # Soft vignette
+        cx, cy = 0.5, 0.5
+        rad = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2 * 1.05)
+        vig = 1.0 - 0.22 * smoothstep(0.55, 0.98, rad)
+        img *= vig[..., None].astype(np.float32)
+
+    if high and style != "flat":
+        # Subtle film grain (deterministic from seed)
+        rng = np.random.default_rng(int(seed if seed is not None else 0) + 101)
+        grain = rng.normal(0.0, 0.012, size=img.shape).astype(np.float32)
+        img = np.clip(img + grain, 0, 1)
+
+    # Contact shadow under ground objects (subtle lift of presence)
+    if high:
+        for p in doc:
+            if p.get("role") in ("house", "tree", "person", "building", "boat", "disc"):
+                ox = p.get("x", p.get("cx", 0.5))
+                by = p.get("base", p.get("y", horizon))
+                if by is None:
+                    continue
+                sh = np.exp(-(((xx - ox) / 0.08) ** 2 + ((yy - (by + 0.01)) / 0.025) ** 2))
+                img *= (1.0 - 0.18 * sh)[..., None].astype(np.float32)
 
     Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8)).save(out)
     return out

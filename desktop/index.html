@@ -365,7 +365,7 @@
                             <option value="256">256 (fast)</option>
                             <option value="512" selected>512</option>
                             <option value="768">768</option>
-                            <option value="1024">1024</option>
+                            <option value="1024">1024 HD</option>
                         </select>
                     </div>
                     <div>
@@ -377,12 +377,21 @@
                         </select>
                     </div>
                     <div>
+                        <label style="color:#94a3b8; font-size:0.75rem;">Detail</label>
+                        <select id="image-detail" class="glass-input" style="width:100%;">
+                            <option value="standard">standard</option>
+                            <option value="high" selected>high (atmosphere)</option>
+                        </select>
+                    </div>
+                    <div>
                         <label style="color:#94a3b8; font-size:0.75rem;">Seed (optional)</label>
                         <input type="number" id="image-seed" class="glass-input" style="width:100%; box-sizing:border-box;" placeholder="auto">
                     </div>
                 </div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <button class="glass-btn primary-btn" style="flex:1;" onclick="runImageStudio()">Generate</button>
+                    <button class="glass-btn primary-btn" style="flex:1;" onclick="runImageStudio(1)">Generate</button>
+                    <button class="glass-btn" style="background:rgba(167,139,250,0.2);" onclick="runImageStudio(4)" title="4 seed variations">✦ 4×</button>
+                    <button class="glass-btn" id="image-download-btn" onclick="downloadImageStudio()" disabled>⬇ Save</button>
                     <button class="glass-btn" onclick="imageStudioExample('house')">House</button>
                     <button class="glass-btn" onclick="imageStudioExample('river')">River</button>
                     <button class="glass-btn" onclick="imageStudioExample('city')">City</button>
@@ -391,8 +400,13 @@
                 <div id="image-studio-preview" style="flex:1; min-height:180px; background:rgba(0,0,0,0.35); border-radius:8px; border:1px solid rgba(148,163,184,0.2); display:flex; align-items:center; justify-content:center; overflow:hidden;">
                     <span style="color:#64748b; font-size:0.85rem;">Preview appears here</span>
                 </div>
+                <div id="image-studio-variations" style="display:none; grid-template-columns:1fr 1fr; gap:6px;"></div>
                 <div id="image-studio-meta" style="font-size:0.75rem; color:#64748b; font-family:'Fira Code',monospace;"></div>
                 <div id="image-studio-entities" style="display:flex; flex-wrap:wrap; gap:4px;"></div>
+                <div>
+                    <div style="color:#64748b; font-size:0.72rem; margin-bottom:4px;">Recent (this browser)</div>
+                    <div id="image-studio-gallery" style="display:flex; gap:6px; overflow-x:auto; min-height:52px;"></div>
+                </div>
             </div>
         </div>
 
@@ -410,7 +424,7 @@
         <button onclick="showTiers()" class="dock-btn" title="Unlock Pro — premium personas">⭐</button>
     </nav>
 
-    <script src="script.js?v=10024"></script>
+    <script src="script.js?v=10025"></script>
     <script src="hyperspace.js?v=4"></script>
 
     <!-- OTA Update Screen -->

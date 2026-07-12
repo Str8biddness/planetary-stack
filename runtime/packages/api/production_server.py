@@ -1621,9 +1621,14 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     seed = image_req.seed
     aspect = image_req.aspect
     use_cache = bool(image_req.use_cache)
+    detail = (getattr(image_req, "detail", None) or "standard").lower().strip()
+    if detail not in ("standard", "high"):
+        detail = "standard"
+    n_var = int(getattr(image_req, "variations", 1) or 1)
+    n_var = max(1, min(8, n_var))
 
     try:
-        from image_service import generate_image, renderable_vocabulary
+        from image_service import generate_image, generate_variations, renderable_vocabulary
     except Exception as e:
         # Engine or an image dep (numpy/PIL) is missing — degrade loudly, don't fake.
         raise HTTPException(
@@ -1635,8 +1640,66 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     import os
     import tempfile
 
-    out_path = os.path.join(tempfile.gettempdir(), f"synth_img_{uuid.uuid4().hex[:12]}.png")
     t0 = time.time()
+
+    # Multi-variation path
+    if n_var > 1:
+        try:
+            vars_meta = await run_in_threadpool(
+                generate_variations,
+                prompt,
+                n_var,
+                res,
+                style,
+                seed,
+                aspect,
+                detail,
+                use_cache,
+            )
+        except Exception as e:
+            logger.warning("image variations failed: %s", e)
+            raise HTTPException(
+                status_code=500,
+                detail={"error": "image_generation_failed", "message": str(e)},
+            )
+        primary = vars_meta[0]
+        payload = {
+            "ok": True,
+            "engine": primary.get("engine", "synthesus_vsa_geometric"),
+            "prompt": prompt,
+            "resolution": res,
+            "width": primary.get("width"),
+            "height": primary.get("height"),
+            "style": style,
+            "detail": detail,
+            "seed": primary.get("seed"),
+            "aspect": aspect,
+            "entities": primary.get("entities", []),
+            "entity_count": primary.get("entity_count", 0),
+            "roles": primary.get("roles", []),
+            "renderable_vocabulary": renderable_vocabulary(),
+            "cache_hit": bool(primary.get("cache_hit")),
+            "cache_source": primary.get("cache_source"),
+            "latency_ms": round((time.time() - t0) * 1000.0, 1),
+            "image_base64": primary.get("image_base64", ""),
+            "mime_type": "image/png",
+            "vocab_version": primary.get("vocab_version"),
+            "variations": [
+                {
+                    "seed": v.get("seed"),
+                    "image_base64": v.get("image_base64"),
+                    "entities": v.get("entities", []),
+                    "latency_ms": v.get("latency_ms"),
+                    "cache_hit": v.get("cache_hit"),
+                    "width": v.get("width"),
+                    "height": v.get("height"),
+                }
+                for v in vars_meta
+            ],
+        }
+        return JSONResponse(content=payload)
+
+    out_path = os.path.join(tempfile.gettempdir(), f"synth_img_{uuid.uuid4().hex[:12]}.png")
     try:
         meta = await run_in_threadpool(
             generate_image,
@@ -1647,6 +1710,7 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
             seed,
             aspect,
             use_cache,
+            detail,
         )
         with open(out_path, "rb") as f:
             png_b64 = base64.b64encode(f.read()).decode("ascii")
@@ -1670,19 +1734,20 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         "width": meta.get("width"),
         "height": meta.get("height"),
         "style": style,
-        "seed": seed,
+        "detail": detail,
+        "seed": meta.get("seed", seed),
         "aspect": aspect,
         "entities": meta.get("entities", []),
         "entity_count": meta.get("entity_count", 0),
         "roles": meta.get("roles", []),
         "renderable_vocabulary": renderable_vocabulary(),
         "cache_hit": bool(meta.get("cache_hit")),
+        "cache_source": meta.get("cache_source"),
         "latency_ms": round((time.time() - t0) * 1000.0, 1),
         "image_base64": png_b64,
         "mime_type": "image/png",
         "vocab_version": meta.get("vocab_version"),
     }
-    # Validate envelope against schema (keeps contract honest)
     try:
         ImageResponse(**payload)
     except Exception as ve:

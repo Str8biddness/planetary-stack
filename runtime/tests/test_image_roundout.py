@@ -229,7 +229,44 @@ def test_studio_vocab_entities_paint():
         assert e in entities, f"missing entity {e}"
     with tempfile.TemporaryDirectory() as td:
         out = os.path.join(td, "studio.png")
-        vpi.render_doc(doc, horizon, res=320, out=out, style="soft", seed=8)
+        vpi.render_doc(doc, horizon, res=320, out=out, style="soft", seed=8, detail="high")
         assert os.path.getsize(out) > 1000
         arr = np.asarray(Image.open(out).convert("RGB"))
         assert arr.std() > 5.0
+
+
+def test_detail_high_and_variations():
+    from image_service import generate_image, generate_variations, clear_image_cache
+
+    clear_image_cache()
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "high.png")
+        m = generate_image(
+            "a tree on grass under a sky with a sun",
+            out,
+            res=256,
+            style="soft",
+            seed=1,
+            detail="high",
+            use_cache=True,
+        )
+        assert m["detail"] == "high"
+        assert os.path.getsize(out) > 500
+        # memory cache hit
+        m2 = generate_image(
+            "a tree on grass under a sky with a sun",
+            os.path.join(td, "high2.png"),
+            res=256,
+            style="soft",
+            seed=1,
+            detail="high",
+        )
+        assert m2["cache_hit"] is True
+
+    vars_ = generate_variations(
+        "a boat on a river under a sky", n=3, res=192, style="soft", detail="standard"
+    )
+    assert len(vars_) == 3
+    seeds = {v["seed"] for v in vars_}
+    assert len(seeds) == 3
+    assert all(v.get("image_base64") for v in vars_)

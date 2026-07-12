@@ -284,3 +284,32 @@ Dock 🎨 → SI Image Studio. Runtime must be on :5010 (shell proxies).
 Still SI illustration, not photoreal. Relations are binary phrase-based.
 
 ### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-wow
+
+### Mission
+Push SI image gen toward product wow: atmosphere, disk cache, variations,
+chat "draw this", Studio gallery/download. Still SI (not Midjourney photoreal) —
+position for the huge illustration/local-privacy audience honestly.
+
+### What changed
+- `image_service.py`: disk cache `~/.cache/synthesus/image_cache`, detail high|standard,
+  `generate_variations(n)`, vocab_version `image-wow-v1`
+- `vsa_pipeline_image.py`: high-detail trees (limbs), haze, vignette, grain, contact shadows
+- API: `detail`, `variations` on ImageRequest; multi-PNG envelope
+- Desktop Studio: detail, ✦4× variations, Save, recent gallery
+- Chat: `draw …` / `/draw …` / `imagine …` → SI image inline
+- Shell proxy forwards detail + variations
+- Tests: **13 passed**
+
+### Positioning note (for review / mon)
+SI path = local, deterministic, private, infinite res vector-style scenes.
+Not a drop-in for photoreal Midjourney. Monetizable as: private studio +
+"draw in chat" + no cloud GPU bill. Optional labeled AI tier later.
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 13 passed
+```
+
+### Do NOT merge without Claude review.

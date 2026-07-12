@@ -255,7 +255,17 @@ class ImageRequest(BaseModel):
     )
     use_cache: bool = Field(
         True,
-        description="Serve from process LRU cache when prompt+params match",
+        description="Serve from memory+disk cache when prompt+params match",
+    )
+    detail: str = Field(
+        "standard",
+        description="Render detail: standard | high (richer trees + atmosphere)",
+    )
+    variations: int = Field(
+        1,
+        ge=1,
+        le=8,
+        description="If >1, return multiple seed variations (see variations[] in response)",
     )
 
 
@@ -268,6 +278,7 @@ class ImageResponse(BaseModel):
     width: Optional[int] = None
     height: Optional[int] = None
     style: str = "flat"
+    detail: str = "standard"
     seed: Optional[int] = None
     aspect: float = 1.0
     entities: List[str] = Field(default_factory=list)
@@ -275,7 +286,9 @@ class ImageResponse(BaseModel):
     roles: List[str] = Field(default_factory=list)
     renderable_vocabulary: List[str] = Field(default_factory=list)
     cache_hit: bool = False
+    cache_source: Optional[str] = None
     latency_ms: float = 0.0
-    image_base64: str
+    image_base64: str = ""
     mime_type: str = "image/png"
     vocab_version: Optional[str] = None
+    variations: Optional[List[Dict[str, Any]]] = None
