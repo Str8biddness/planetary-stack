@@ -204,7 +204,58 @@ def image_proxy():
         "path_mode": data.get("path_mode", True),
         "preset": data.get("preset"),
         "variations": data.get("variations", 1),
+        "views": data.get("views", 1),
+        "yaw_span": data.get("yaw_span", 30),
+        "frames": data.get("frames", 1),
+        "yaw_deg": data.get("yaw_deg", 0),
+        "pitch_deg": data.get("pitch_deg", 0),
+        "time_of_day": data.get("time_of_day"),
+        "as_gif": data.get("as_gif", False),
+        "gif_format": data.get("gif_format", "gif"),
+        "gif_duration_ms": data.get("gif_duration_ms", 400),
+        "return_level": data.get("return_level", False),
+        "orbit_day": data.get("orbit_day", False),
+        "orbit_frames": data.get("orbit_frames", 6),
+        "async_mode": data.get("async_mode", False),
     }
+
+
+@app.route('/api/v1/image/jobs/<job_id>', methods=['GET'])
+def image_job_proxy(job_id):
+    """Poll async SI image job."""
+    try:
+        r = requests.get(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/image/jobs/{job_id}",
+            headers=_runtime_api_headers(),
+            timeout=30,
+        )
+        try:
+            payload = r.json()
+        except Exception:
+            payload = {"ok": False, "error": "bad_runtime_body", "message": (r.text or "")[:400]}
+        return (json.dumps(payload), r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": "runtime_unavailable", "message": str(e)}), 503
+
+
+@app.route('/api/v1/image/level', methods=['POST'])
+def image_level_proxy():
+    """SI level JSON export → runtime."""
+    data = request.get_json(silent=True) or {}
+    try:
+        r = requests.post(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/image/level",
+            json=data,
+            headers=_runtime_api_headers(),
+            timeout=60,
+        )
+        try:
+            payload = r.json()
+        except Exception:
+            payload = {"ok": False, "error": "bad_runtime_body", "message": (r.text or "")[:400]}
+        return (json.dumps(payload), r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": "runtime_unavailable", "message": str(e)}), 503
 
 
 @app.route('/api/v1/image/presets', methods=['GET'])

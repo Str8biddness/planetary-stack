@@ -1611,9 +1611,11 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     except Exception as e:
         raise HTTPException(400, f"Invalid image request: {e}")
 
-    prompt = image_req.prompt.strip()
-    if not prompt:
-        raise HTTPException(400, "prompt is required")
+    prompt = (image_req.prompt or "").strip()
+    _pass = bool(getattr(image_req, "pass_only", False) or getattr(image_req, "from_scene", False))
+    _sid = getattr(image_req, "scene_id", None)
+    if not prompt and not (_pass and _sid):
+        raise HTTPException(400, "prompt is required (or scene_id + pass_only for multi-pass)")
     res = image_req.resolution
     style = (image_req.style or "soft").lower().strip()
     if style not in ("flat", "soft", "night", "photo"):
@@ -1625,7 +1627,7 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     aspect = image_req.aspect
     use_cache = bool(image_req.use_cache)
     detail = (getattr(image_req, "detail", None) or "high").lower().strip()
-    if detail not in ("standard", "high"):
+    if detail not in ("draft", "standard", "high"):
         detail = "high"
     n_var = int(getattr(image_req, "variations", 1) or 1)
     n_var = max(1, min(8, n_var))
@@ -1661,149 +1663,229 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         except Exception as pe:
             logger.warning("preset merge soft-fail: %s", pe)
 
+    yaw_deg = float(getattr(image_req, "yaw_deg", 0.0) or 0.0)
+    pitch_deg = float(getattr(image_req, "pitch_deg", 0.0) or 0.0)
+    time_of_day = getattr(image_req, "time_of_day", None)
+    n_views = int(getattr(image_req, "views", 1) or 1)
+    n_views = max(1, min(8, n_views))
+    yaw_span = float(getattr(image_req, "yaw_span", 30.0) or 30.0)
+    n_frames = int(getattr(image_req, "frames", 1) or 1)
+    n_frames = max(1, min(8, n_frames))
+    as_gif = bool(getattr(image_req, "as_gif", False))
+    gif_format = (getattr(image_req, "gif_format", None) or "gif").lower().strip()
+    if gif_format not in ("gif", "webp"):
+        gif_format = "gif"
+    gif_duration_ms = int(getattr(image_req, "gif_duration_ms", 400) or 400)
+    return_level = bool(getattr(image_req, "return_level", False))
+    orbit_day = bool(getattr(image_req, "orbit_day", False))
+    orbit_frames = int(getattr(image_req, "orbit_frames", 6) or 6)
+    orbit_frames = max(2, min(12, orbit_frames))
+    async_mode = bool(getattr(image_req, "async_mode", False))
+    compile_plan = bool(getattr(image_req, "compile_plan", True))
+    use_llm_plan = getattr(image_req, "use_llm_plan", None)
+    return_plan = bool(getattr(image_req, "return_plan", True))
+    keep_session = bool(getattr(image_req, "keep_session", True))
+    scene_id = getattr(image_req, "scene_id", None)
+    pass_only = bool(getattr(image_req, "pass_only", False) or getattr(image_req, "from_scene", False))
+    grade = (getattr(image_req, "grade", None) or "none")
+    edit_text = getattr(image_req, "edit_text", None) or ""
+    edit_vignette = float(getattr(image_req, "edit_vignette", 0.0) or 0.0)
+
+    # Soft-DoS guard: high-res / multi-frame auto-async unless client forces sync
+    multi = bool(orbit_day or n_frames > 1 or n_views > 1 or n_var > 1)
     try:
-        from image_service import generate_image, generate_variations, renderable_vocabulary
+        import image_jobs as _ijobs
+        force_async = _ijobs.should_force_async(res, multi=multi)
+    except Exception:
+        _ijobs = None  # type: ignore
+        force_async = False
+    use_async = async_mode or force_async
+
+    params = {
+        "prompt": prompt,
+        "resolution": res,
+        "style": style,
+        "look": look,
+        "seed": seed,
+        "aspect": aspect,
+        "use_cache": use_cache,
+        "detail": detail,
+        "path_mode": path_mode,
+        "preset": preset,
+        "yaw_deg": yaw_deg,
+        "pitch_deg": pitch_deg,
+        "time_of_day": time_of_day,
+        "variations": n_var,
+        "views": n_views,
+        "yaw_span": yaw_span,
+        "frames": n_frames,
+        "as_gif": as_gif,
+        "gif_format": gif_format,
+        "gif_duration_ms": gif_duration_ms,
+        "return_level": return_level,
+        "orbit_day": orbit_day,
+        "orbit_frames": orbit_frames,
+        "compile_plan": compile_plan,
+        "use_llm_plan": use_llm_plan,
+        "return_plan": return_plan,
+        "keep_session": keep_session,
+        "scene_id": scene_id,
+        "pass_only": pass_only,
+        "from_scene": pass_only,
+        "grade": grade,
+        "edit_text": edit_text,
+        "edit_vignette": edit_vignette,
+        "playlist": getattr(image_req, "playlist", None),
+        "level": getattr(image_req, "level", None),
+    }
+
+    try:
+        from image_service import execute_image_request
     except Exception as e:
-        # Engine or an image dep (numpy/PIL) is missing — degrade loudly, don't fake.
         raise HTTPException(
             status_code=503,
             detail={"error": "image_engine_unavailable", "message": str(e)},
         )
 
-    import base64
-    import os
-    import tempfile
+    if use_async and _ijobs is not None:
+        def _runner(p, progress):
+            return execute_image_request(p, progress=progress)
 
-    t0 = time.time()
-
-    # Multi-variation path
-    if n_var > 1:
         try:
-            vars_meta = await run_in_threadpool(
-                generate_variations,
-                prompt,
-                n_var,
-                res,
-                style,
-                seed,
-                aspect,
-                detail,
-                use_cache,
-                look,
-                path_mode,
+            job_id = _ijobs.submit_job(
+                "orbit_day" if orbit_day else (
+                    "time" if n_frames > 1 else (
+                        "multiview" if n_views > 1 else (
+                            "variations" if n_var > 1 else "image"
+                        )
+                    )
+                ),
+                params,
+                _runner,
             )
         except Exception as e:
-            logger.warning("image variations failed: %s", e)
+            logger.warning("image job submit failed: %s", e)
             raise HTTPException(
-                status_code=500,
-                detail={"error": "image_generation_failed", "message": str(e)},
+                status_code=503,
+                detail={"error": "image_queue_full", "message": str(e)},
             )
-        primary = vars_meta[0]
-        payload = {
-            "ok": True,
-            "engine": primary.get("engine", "synthesus_vsa_geometric"),
-            "prompt": prompt,
-            "resolution": res,
-            "width": primary.get("width"),
-            "height": primary.get("height"),
-            "style": style,
-            "detail": detail,
-            "look": look,
-            "seed": primary.get("seed"),
-            "aspect": aspect,
-            "entities": primary.get("entities", []),
-            "entity_count": primary.get("entity_count", 0),
-            "roles": primary.get("roles", []),
-            "renderable_vocabulary": renderable_vocabulary(),
-            "cache_hit": bool(primary.get("cache_hit")),
-            "cache_source": primary.get("cache_source"),
-            "latency_ms": round((time.time() - t0) * 1000.0, 1),
-            "image_base64": primary.get("image_base64", ""),
-            "mime_type": "image/png",
-            "vocab_version": primary.get("vocab_version"),
-            "isp": primary.get("isp"),
-            "path_mode": path_mode,
-            "path_entities": primary.get("path_entities"),
-            "path_ops_sample": primary.get("path_ops_sample"),
-            "variations": [
-                {
-                    "seed": v.get("seed"),
-                    "image_base64": v.get("image_base64"),
-                    "entities": v.get("entities", []),
-                    "latency_ms": v.get("latency_ms"),
-                    "cache_hit": v.get("cache_hit"),
-                    "width": v.get("width"),
-                    "height": v.get("height"),
-                }
-                for v in vars_meta
-            ],
-        }
-        return JSONResponse(content=payload)
-
-    out_path = os.path.join(tempfile.gettempdir(), f"synth_img_{uuid.uuid4().hex[:12]}.png")
-    try:
-        meta = await run_in_threadpool(
-            generate_image,
-            prompt,
-            out_path,
-            res,
-            style,
-            seed,
-            aspect,
-            use_cache,
-            detail,
-            look,
-            path_mode,
-            preset,
+        job = _ijobs.get_job(job_id)
+        return JSONResponse(
+            status_code=202,
+            content=_ijobs.job_public_view(job or {"job_id": job_id, "status": "queued", "progress": 0}),
         )
-        with open(out_path, "rb") as f:
-            png_b64 = base64.b64encode(f.read()).decode("ascii")
+
+    try:
+        payload = await run_in_threadpool(execute_image_request, params, None)
     except Exception as e:
         logger.warning("image generation failed: %s", e)
         raise HTTPException(
             status_code=500,
             detail={"error": "image_generation_failed", "message": str(e)},
         )
-    finally:
-        try:
-            os.remove(out_path)
-        except OSError:
-            pass
-
-    payload = {
-        "ok": True,
-        "engine": meta.get("engine", "synthesus_vsa_geometric"),
-        "prompt": prompt,
-        "resolution": res,
-        "width": meta.get("width"),
-        "height": meta.get("height"),
-        "style": style,
-        "detail": detail,
-        "look": look,
-        "seed": meta.get("seed", seed),
-        "aspect": aspect,
-        "entities": meta.get("entities", []),
-        "entity_count": meta.get("entity_count", 0),
-        "roles": meta.get("roles", []),
-        "renderable_vocabulary": renderable_vocabulary(),
-        "cache_hit": bool(meta.get("cache_hit")),
-        "cache_source": meta.get("cache_source"),
-        "latency_ms": round((time.time() - t0) * 1000.0, 1),
-        "image_base64": png_b64,
-        "mime_type": "image/png",
-        "vocab_version": meta.get("vocab_version"),
-        "isp": meta.get("isp"),
-        "depth": meta.get("depth"),
-        "preset": meta.get("preset") or preset,
-        "path_mode": path_mode,
-        "path_entities": meta.get("path_entities"),
-        "path_ops_sample": meta.get("path_ops_sample"),
-    }
     try:
-        ImageResponse(**payload)
+        ImageResponse(**{k: v for k, v in payload.items() if k in ImageResponse.model_fields})
     except Exception as ve:
         logger.warning("ImageResponse validation soft-fail: %s", ve)
     return JSONResponse(content=payload)
+
+
+@app.get("/api/v1/image/capabilities")
+async def image_capabilities(auth=Depends(get_auth)):
+    """Honest can/can't card for SI image engine (not diffusion)."""
+    try:
+        from image_intent import capability_card
+        from image_session import list_playlists
+        from image_service import ENGINE_VERSION, DETAILS, LOOKS, GRADES
+        card = capability_card()
+        card["engine_version"] = ENGINE_VERSION
+        card["details"] = list(DETAILS)
+        card["looks"] = list(LOOKS)
+        card["grades"] = list(GRADES)
+        card["playlists"] = list(list_playlists().keys())
+        return card
+    except Exception as e:
+        raise HTTPException(503, detail={"error": "capabilities_unavailable", "message": str(e)})
+
+
+@app.get("/api/v1/image/sessions/{scene_id}")
+async def get_image_session(scene_id: str, auth=Depends(get_auth)):
+    try:
+        import image_session as sess
+        view = sess.public_session_view(scene_id)
+        if not view:
+            raise HTTPException(404, "scene_id not found (memory or disk)")
+        return view
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(503, detail=str(e))
+
+
+@app.post("/api/v1/image/intent")
+async def image_intent_route(req: Request, auth=Depends(get_auth)):
+    """Classify draw/find/talk/pass/refuse for chat surfaces."""
+    try:
+        body = await req.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    try:
+        from image_intent import classify_intent
+        msg = (body.get("message") or body.get("prompt") or "").strip()
+        has = bool(body.get("scene_id"))
+        return classify_intent(msg, has_scene_id=has)
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
+
+
+@app.get("/api/v1/image/jobs/{job_id}")
+async def get_image_job(job_id: str, auth=Depends(get_auth)):
+    """Poll async SI image job status / result."""
+    try:
+        import image_jobs as _ijobs
+    except Exception as e:
+        raise HTTPException(503, detail={"error": "image_jobs_unavailable", "message": str(e)})
+    job = _ijobs.get_job(job_id)
+    if not job:
+        raise HTTPException(404, detail={"error": "job_not_found", "job_id": job_id})
+    return JSONResponse(content=_ijobs.job_public_view(job, include_result=True))
+
+
+@app.post("/api/v1/image/level")
+async def export_image_level(req: Request, auth=Depends(get_auth)):
+    """Export SI scene graph as a portable level JSON (virtual-world blueprint).
+
+    Body: same knobs as /api/v1/image (prompt, preset, yaw, pitch, time_of_day, …).
+    No PNG required — pure construction dump.
+    """
+    is_auth, rate_key = auth
+    if not await _check_rate_limit(rate_key, AUTH_RATE_LIMIT if is_auth else DEMO_RATE_LIMIT):
+        raise HTTPException(429, "Rate limit exceeded.")
+    try:
+        body = await req.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    prompt = (body.get("prompt") or "").strip()
+    if not prompt and body.get("preset"):
+        prompt = ""  # preset may fill
+    try:
+        from image_service import export_level
+        level = await run_in_threadpool(
+            export_level,
+            prompt or "a house on grass under a sky",
+            seed=body.get("seed"),
+            style=body.get("style") or "soft",
+            look=body.get("look") or "photo",
+            path_mode=bool(body.get("path_mode", True)),
+            preset=body.get("preset"),
+            yaw_deg=float(body.get("yaw_deg") or 0),
+            pitch_deg=float(body.get("pitch_deg") or 0),
+            time_of_day=body.get("time_of_day"),
+        )
+    except Exception as e:
+        logger.warning("level export failed: %s", e)
+        raise HTTPException(500, detail={"error": "level_export_failed", "message": str(e)})
+    return JSONResponse(content={"ok": True, "level": level, "schema": level.get("schema")})
 
 
 @app.post("/api/v1/drive/ingest")

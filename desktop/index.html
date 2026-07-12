@@ -390,6 +390,7 @@
                     <div>
                         <label style="color:#94a3b8; font-size:0.75rem;">Detail</label>
                         <select id="image-detail" class="glass-input" style="width:100%;">
+                            <option value="draft">draft (fast)</option>
                             <option value="standard">standard</option>
                             <option value="high" selected>high (atmosphere)</option>
                         </select>
@@ -402,17 +403,66 @@
                         </select>
                     </div>
                     <div>
+                        <label style="color:#94a3b8; font-size:0.75rem;">Picture grade</label>
+                        <select id="image-grade" class="glass-input" style="width:100%;" title="Photoshop-lite post-raster (not new construction)">
+                            <option value="none" selected>none</option>
+                            <option value="warm">warm</option>
+                            <option value="cool">cool</option>
+                            <option value="contrast">contrast</option>
+                            <option value="fade">fade</option>
+                            <option value="vivid">vivid grade</option>
+                        </select>
+                    </div>
+                    <div>
                         <label style="color:#94a3b8; font-size:0.75rem;">Seed (optional)</label>
                         <input type="number" id="image-seed" class="glass-input" style="width:100%; box-sizing:border-box;" placeholder="auto">
                     </div>
                 </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:8px;">
+                    <div>
+                        <label style="color:#94a3b8; font-size:0.75rem;">Pass yaw °</label>
+                        <input type="number" id="image-pass-yaw" class="glass-input" style="width:100%; box-sizing:border-box;" value="15" min="-60" max="60" step="5" title="Re-pass camera orbit">
+                    </div>
+                    <div>
+                        <label style="color:#94a3b8; font-size:0.75rem;">Pass title</label>
+                        <input type="text" id="image-pass-text" class="glass-input" style="width:100%; box-sizing:border-box;" placeholder="overlay text" maxlength="80">
+                    </div>
+                    <div>
+                        <label style="color:#94a3b8; font-size:0.75rem;">Scene stock</label>
+                        <div id="image-scene-id" style="font-size:0.7rem; color:#64748b; font-family:'Fira Code',monospace; padding:6px 4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="scene_id for multi-pass">— generate first —</div>
+                    </div>
+                </div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
                     <button class="glass-btn primary-btn" style="flex:1;" onclick="runImageStudio(1)">Generate</button>
-                    <button class="glass-btn" style="background:rgba(167,139,250,0.2);" onclick="runImageStudio(4)" title="4 seed variations">✦ 4×</button>
+                    <button class="glass-btn" id="image-repass-btn" style="background:rgba(251,146,60,0.22); border:1px solid rgba(251,146,60,0.35);" onclick="runImageStudioPass()" title="Re-render same scene graph (multi-pass)" disabled>↻ Re-pass</button>
+                    <button class="glass-btn" style="background:rgba(251,146,60,0.12);" onclick="runImageStudioPass({yaw_delta:15})" title="Orbit +15° same world" id="image-repass-yaw-btn" disabled>↻ +yaw</button>
+                    <button class="glass-btn" style="background:rgba(251,191,36,0.2);" onclick="runImagePlaylist('finish')" title="draft→high→cinema→warm on stock" id="image-playlist-btn" disabled>🎞 Finish job</button>
+                    <button class="glass-btn" onclick="loadImageCapabilities()" title="What SI can/can't do">ℹ Can/can't</button>
+                    <button class="glass-btn" style="background:rgba(167,139,250,0.2);" onclick="runImageStudio(4)" title="4 seed variations">✦ 4× seeds</button>
+                    <button class="glass-btn" style="background:rgba(56,189,248,0.2);" onclick="runImageStudioViews(3)" title="3 camera yaws — same world">⟲ 3 views</button>
+                    <button class="glass-btn" style="background:rgba(74,222,128,0.15);" onclick="runImageStudioFrames(4)" title="dawn→night + GIF">⏱ 4 times + GIF</button>
+                    <button class="glass-btn" style="background:rgba(251,191,36,0.18);" onclick="runImageOrbitDay(6)" title="yaw+time cinematic GIF">🌐 Orbit day</button>
+                    <button class="glass-btn" onclick="exportImageLevel()" title="Download SI level JSON">⧉ Level</button>
                     <button class="glass-btn" id="image-download-btn" onclick="downloadImageStudio()" disabled>⬇ Save</button>
                     <button class="glass-btn" onclick="imageStudioExample('house')">House</button>
                     <button class="glass-btn" onclick="imageStudioExample('river')">River</button>
                     <button class="glass-btn" onclick="imageStudioExample('city')">City</button>
+                    <button class="glass-btn" onclick="imageStudioExample('vase')">Vase+cup</button>
+                    <button class="glass-btn" onclick="imageStudioExample('crate')">Crate</button>
+                </div>
+                <div style="margin-top:6px;">
+                    <label style="color:#94a3b8; font-size:0.75rem;">Level viewer (top-down X×Z)</label>
+                    <div style="display:flex; gap:8px; align-items:flex-start; margin-top:4px;">
+                        <canvas id="level-viewer-canvas" width="220" height="160"
+                            style="background:rgba(0,0,0,0.45); border-radius:8px; border:1px solid rgba(148,163,184,0.25);"></canvas>
+                        <div style="flex:1; min-width:0;">
+                            <input type="file" id="level-viewer-file" accept="application/json,.json" style="font-size:0.72rem; color:#94a3b8; width:100%;"
+                                onchange="loadLevelViewerFile(event)">
+                            <div id="level-viewer-info" style="font-size:0.72rem; color:#64748b; margin-top:6px; font-family:'Fira Code',monospace;">
+                                Export Level or open a .json to inspect the SI world.
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <label style="color:#94a3b8; font-size:0.75rem;">Cinematic presets (SI packs)</label>
@@ -426,6 +476,8 @@
                     </div>
                 </div>
                 <div id="image-studio-status" style="font-size:0.8rem; color:#94a3b8; min-height:1.2em;"></div>
+                <div id="image-capability-card" style="display:none; font-size:0.72rem; color:#94a3b8; background:rgba(15,23,42,0.6); border:1px solid rgba(56,189,248,0.25); border-radius:8px; padding:8px; margin-bottom:6px;"></div>
+                <div id="image-plan-inspector" style="display:none; font-size:0.72rem; color:#a5b4fc; background:rgba(30,27,75,0.4); border:1px solid rgba(167,139,250,0.3); border-radius:8px; padding:8px; margin-bottom:6px; font-family:'Fira Code',monospace; white-space:pre-wrap; max-height:100px; overflow:auto;"></div>
                 <div id="image-studio-preview" style="flex:1; min-height:180px; background:rgba(0,0,0,0.35); border-radius:8px; border:1px solid rgba(148,163,184,0.2); display:flex; align-items:center; justify-content:center; overflow:hidden;">
                     <span style="color:#64748b; font-size:0.85rem;">Preview appears here</span>
                 </div>
@@ -453,7 +505,7 @@
         <button onclick="showTiers()" class="dock-btn" title="Unlock Pro — premium personas">⭐</button>
     </nav>
 
-    <script src="script.js?v=10028"></script>
+    <script src="script.js?v=10031"></script>
     <script src="hyperspace.js?v=4"></script>
 
     <!-- OTA Update Screen -->

@@ -427,3 +427,264 @@ pytest tests/test_image_roundout.py → 17 passed
 ```
 
 ### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-multiview (yaw orbit + time axis)
+
+### Mission
+Keep going: real camera yaw + time-of-day axes on the same SI scene graph.
+Same world → many projections (bridge to virtual worlds). Still not diffusion.
+
+### What changed
+- NEW `world_camera.py` — parallax-by-Z orbit, sun path, night moon
+- `generate_multiview` / `generate_time_sequence` in image_service
+- API: `views`, `yaw_span`, `frames`, `yaw_deg`, `time_of_day`
+- Studio: ⟲ 3 views, ⏱ 4 times buttons
+- Tests: **18 passed**
+
+### Axes now
+X, Y (plane) · Z (depth) · yaw (orbit) · time (sun)
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 18 passed
+world_camera demo: house cx shifts with yaw; night → moon
+```
+
+### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-world-export (pitch + GIF + level JSON)
+
+### Mission
+Continue SI world stack: camera pitch, animated GIF export of sequences,
+portable level JSON for virtual-world handoff. Still not diffusion.
+
+### What changed
+- `world_camera.py` — pitch DOF (horizon shift + vertical parallax)
+- NEW `gif_export.py` — GIF/WebP from frame metas
+- NEW `level_export.py` — `synthesus.si_level.v1` scene graph dump
+- API: pitch_deg, as_gif, return_level; `POST /api/v1/image/level`
+- Studio: ⏱ frames+GIF, ⧉ Level download
+- Tests: **19 passed**
+
+### Axes
+x, y, z, yaw, pitch, time
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 19 passed
+```
+
+### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-orbit-day
+
+### Mission
+Orbiting-day cinematic (yaw×time GIF) + tiny SI level viewer (X×Z map).
+
+### What changed
+- `generate_orbit_day` — same seed world, yaw+time schedules, GIF attach
+- API: `orbit_day`, `orbit_frames`
+- Studio: 🌐 Orbit day button; canvas level viewer + file open
+- Level export also paints into viewer
+- Tests: **20 passed**
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 20 passed
+```
+
+### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-perf-review-fix (Claude review blockers)
+
+### Claude findings addressed
+1. **PERF blocker** — replaced O(edges×pixels) PIP fill/stroke with PIL scanline
+   polygon/line + Gaussian soft AA. Pocket passes 3→2.
+2. **Default res** — API/schema default 1024→512.
+3. **Cache key** — explicit `ENGINE_VERSION=si-image-v2-pil-fill` in key.
+4. **Honesty** — "Neural Load/link" → "SI Grid Load" / "SI link".
+
+### Benchmark (pasted, look=raw, path_mode=True, seed=7)
+```
+res= 256     0.53s   (was ~2.7s in review env)
+res= 512     1.44s
+res=1024     7.48s   (was 79.11s — ~10× faster)
+```
+Tests: **20 passed in 2.99s** (was ~20s suite time).
+
+### Remaining non-blocking
+- 2048 still heavy; async job later
+- Further vectorize materials if needed
+
+### Do NOT merge without Claude re-verify.
+
+## 2026-07-12 — feat/image-async-jobs
+
+### Mission
+Continue after Claude perf fix: merge main, async jobs for HD/multi-frame
+(soft-DoS guard), job poll API, Studio polling.
+
+### What changed
+- Merged `origin/main` (ac98b91) into image tip
+- NEW `image_jobs.py` — 2-worker queue, TTL, status/progress
+- `execute_image_request` — single sync entry for API + workers
+- POST /api/v1/image → 202 + job_id when async_mode or res≥1024 or multi-frame
+- GET /api/v1/image/jobs/{id}
+- Studio polls job_id with progress %
+- Tests: **21 passed**
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 21 passed (~4.5s)
+```
+
+### Do NOT merge without Claude re-review of async + prior perf fix.
+
+## 2026-07-12 — feat/image-bbox-perf (Claude follow-up #6)
+
+### Mission
+BBox-restrict per-object fill/stroke/materials so raster cost ∝ object area,
+not full frame × objects. Output-preserving (outside bbox coverage = 0).
+
+### What changed
+- `cnc_paths.raster_fill_bbox` / `raster_stroke_bbox` — PIL only on padded bbox
+- `paint_path` blends materials/depth only on crop slices
+- `depth_buffer.write_depth` accepts matching crop shapes
+- ENGINE_VERSION → `si-image-v3-bbox-fill`
+- Test: bbox vs full-frame support agreement
+
+### Benchmark (pasted, look=raw, path_mode, seed=7)
+```
+res= 256    0.19s   (was 0.53s after PIL; was ~2.7s original review)
+res= 512    0.20s   (was 1.44s)
+res=1024    0.59s   (was 7.48s / originally 79s)
+photo512    0.56s
+tests: 22 passed in 1.39s
+```
+
+### Do NOT merge without Claude re-verify.
+
+---
+
+## 2026-07-12 — feat/image-opt-enhance (ISP parallel + draft)
+
+### Mission
+Continue SI image optimization after bbox-fill: faster ISP, draft preview
+quality, shared scene graph for multi-frame, parallel frame renders.
+
+### What changed
+- `camera_isp.box_blur` — PIL Gaussian on mono or full RGB (not 3× mono);
+  smaller bloom/DOF radii for camera looks
+- `cnc_paths.paint_path` — honor `path.meta["no_pocket"]` to skip multi-pass pocket
+- `image_service`
+  - `ENGINE_VERSION = si-image-v4-isp-parallel` (cache invalidation)
+  - `DETAILS` includes **draft** (standard paint + CNC contours, no pocket)
+  - `_build_base_scene` shared once for multiview / time / orbit-day
+  - `ThreadPoolExecutor` parallel frames (up to 4 workers)
+  - meta exposes `engine_version`
+- Desktop + schema: draft detail option documented
+- Test: `test_draft_detail_and_engine_v4`
+
+### Benchmark (use_cache=False, seed=3)
+```
+ENGINE si-image-v4-isp-parallel
+draft512     0.182s
+raw512       0.166s
+photo512     0.418s
+photo1024    1.624s
+multiview3   0.328s   (shared scene + parallel)
+orbit3       0.034s
+tests: 23 passed in 1.46s
+```
+
+### Honest notes
+- Draft is preview speed (no pocket), not a fake photoreal shortcut.
+- ISP is camera/TV math on SI geometry — still not diffusion.
+- Do NOT merge to main without Claude re-review.
+
+### Branch
+`feat/image-opt-enhance` (from `feat/image-bbox-perf`) — commit `61f79cd`
+
+---
+
+## 2026-07-12 — feat/image-opt-enhance (scene plan compiler)
+
+### Mission
+Fully build LLM/rules scene compile: outer voice + inner monologue + puzzle-piece
+composites so free language maps into SI constructible shapes (not diffusion).
+
+### What changed
+- **New** `runtime/packages/reasoning/scene_plan.py`
+  - Rule compiler always on: synonyms, multi-word phrases, mood→camera,
+    composite recipes (espresso, robot, cart, windmill, table, …) + heuristic
+    assemblies from allowed roles only
+  - Optional Ollama enrich via `use_llm_plan` / `SYNTHESUS_IMAGE_LLM_PLAN`
+  - `inject_composites` appends paintable prims + optional CNC paths
+  - Honesty: `construction` native|mapped|composite|mixed, outer_voice, monologue
+- `image_service.generate_image` / `execute_image_request` default `compile_plan=True`
+- Multiview/orbit/time share planned base graph
+- API schema + production_server knobs; desktop chat draw + Studio show voice/plan
+- ENGINE_VERSION → `si-image-v5-scene-plan`
+- Tests: `test_scene_plan_compile_and_composite_render` (24 image tests green)
+
+### Usage
+```python
+# rules only (default offline)
+generate_image("espresso machine on grass under a sky", out, use_llm_plan=False)
+# optional LLM enrich
+# SYNTHESUS_IMAGE_LLM_PLAN=1  or  use_llm_plan=True
+```
+
+### Honest ceiling
+LLM/rules supply recipes and routing; SI still only paints known roles.
+Composites are procedural stand-ins, not photoreal invention.
+
+---
+
+## 2026-07-12 — feat/image-opt-enhance (v6 machine dialects + multi-pass)
+
+### Mission
+Full roadmap: lathe + extrude + plan routing + session multi-pass + picture-edit.
+
+### What shipped
+- `image_contract.py` + `docs/SI_IMAGE_CONTRACT.md` — honesty modes, stock=scene_graph
+- `lathe_paths.py` — solid of revolution paint (cup/vase/column/bottle/fruit…)
+- `extrude_paths.py` — print-lite box volumes + strata lines
+- `image_session.py` — in-memory scene stock for multi-pass
+- `picture_edit.py` — grade / vignette / text overlay (post-raster)
+- `scene_plan` routes LATHE_ENTITIES / EXTRUDE_ENTITIES; inject machines
+- `vsa_pipeline_image` paints `role=lathe|extrude`
+- API: `scene_id`, `pass_only`/`from_scene`, `grade`, `edit_text`, `keep_session`
+- `apply_scene_pass()` re-render without re-prompt
+- ENGINE `si-image-v6-machine-pass`
+- Tests: 25 passed (`test_lathe_extrude_session_and_picture_edit`)
+
+### Multi-pass usage
+```python
+m = generate_image("a vase on grass under a sky", out, keep_session=True)
+apply_scene_pass(m["scene_id"], out2, yaw_deg=20, look="cinema", grade="warm")
+# API: { "scene_id": "...", "pass_only": true, "yaw_deg": 15, "grade": "cool" }
+```
+
+---
+
+## 2026-07-12 — feat/image-opt-enhance (v6.1 workshop full pack)
+
+### Mission
+Implement full suggestion set: disk sessions, playlists, intent modes, materials,
+level re-render, Studio inspector/capabilities, bench, Claude review package.
+
+### Shipped
+- Disk-backed `image_session` + playlists (finish/orbit/day_cycle)
+- More lathe profiles + yaw foreshortening; extrude entities expanded
+- `image_intent` draw/find/pass/refuse + capability card
+- `image_materials_lib` mood palettes
+- Level → session → re-render; level viewer click + re-render button
+- Studio: plan inspector, can/can't, finish job playlist
+- Chat: mode labels + pass knobs + refuse alternatives
+- API: `/capabilities`, `/intent`, `/sessions/{id}`, playlist + level on `/image`
+- `scripts/image_bench_regression.py` green
+- `docs/CLAUDE_REVIEW_IMAGE_WORKSHOP.md` for Claude
+- ENGINE `si-image-v6.1-workshop` · **26 tests passed**
+
+### Do NOT merge without Claude review of this package.

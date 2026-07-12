@@ -564,7 +564,7 @@ def _dims(res: int, aspect: float) -> tuple[int, int]:
 def render_doc(
     doc: list[dict[str, Any]],
     horizon: float,
-    res: int = 1024,
+    res: int = 512,
     out: str = "pipeline.png",
     style: str = "flat",
     aspect: float = 1.0,
@@ -572,6 +572,7 @@ def render_doc(
     detail: str = "standard",
     look: str = "raw",
     path_mode: bool = True,
+    camera_yaw: float = 0.0,
 ) -> str:
     """Rasterize a pattern document to PNG at any resolution/aspect.
 
@@ -579,7 +580,9 @@ def render_doc(
     look: raw | photo | cinema | vivid | tv — camera/TV ISP finish (not diffusion).
     style='photo' is alias for soft paint + look=photo.
     path_mode: prefer CNC path construction for supported roles (house/tree/…).
+    camera_yaw: degrees — lathe foreshortening cue for multi-pass orbit.
     """
+    render_doc.camera_yaw = float(camera_yaw or 0.0)  # type: ignore[attr-defined]
     style = (style or "flat").lower().strip()
     look = (look or "raw").lower().strip()
     if style == "photo":
@@ -589,8 +592,14 @@ def render_doc(
     if style not in ("flat", "soft", "night"):
         style = "flat"
     detail = (detail or "standard").lower().strip()
-    high = detail == "high" or look in ("photo", "cinema", "vivid", "tv")
+    draft = detail == "draft"
+    # Draft: never force high atmosphere from photo look (preview path)
+    if draft:
+        high = False
+    else:
+        high = detail == "high" or look in ("photo", "cinema", "vivid", "tv")
     use_paths = bool(path_mode)
+    isp_quality = "draft" if draft else "full"
 
     h, w = _dims(res, aspect)
     # World coords: x in [0,1], y in [0,1] (y grows downward in image space)
@@ -960,6 +969,76 @@ def render_doc(
             # no tall trunk for bush — just canopy near ground
             low = canopy * (yy > p["base"] - p["r"] * 2.2).astype(np.float32)
             paint(low, c)
+        elif role == "lathe":
+            try:
+                import lathe_paths as _lathe
+                import depth_buffer as _db
+                z = None
+                if depth_map is not None:
+                    try:
+                        z = _db.depth_for_primitive(p, horizon=horizon)
+                    except Exception:
+                        z = 0.4
+                _lathe.paint_lathe(
+                    img, xx, yy,
+                    cx=float(p.get("cx", p.get("x", 0.5))),
+                    base=float(p.get("base", horizon)),
+                    height=float(p.get("h", 0.12)),
+                    max_radius=float(p.get("r", 0.05)),
+                    color=c,
+                    profile=p.get("profile"),
+                    entity=str(p.get("entity", "lathe")),
+                    aa=aa,
+                    sun_pos=sun_pos if has_glow else None,
+                    depth_map=depth_map,
+                    depth_z=z,
+                    yaw_deg=float(p.get("yaw_deg") or getattr(render_doc, "camera_yaw", 0.0) or 0.0),
+                )
+            except Exception:
+                # soft fallback: disc stack
+                r = float(p.get("r", 0.05))
+                cx = float(p.get("cx", 0.5))
+                base = float(p.get("base", horizon))
+                hh = float(p.get("h", 0.1))
+                for t in (0.2, 0.5, 0.8):
+                    cy = base - hh * t
+                    rr = r * (0.7 + 0.3 * (1 - abs(t - 0.5)))
+                    rad = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2)
+                    paint(1.0 - smoothstep(rr - aa, rr + aa, rad), c)
+        elif role == "extrude":
+            try:
+                import extrude_paths as _ex
+                import depth_buffer as _db
+                z = None
+                if depth_map is not None:
+                    try:
+                        z = _db.depth_for_primitive(p, horizon=horizon)
+                    except Exception:
+                        z = 0.45
+                _ex.paint_extrude(
+                    img, xx, yy,
+                    cx=float(p.get("cx", p.get("x", 0.5))),
+                    base=float(p.get("base", horizon)),
+                    width=float(p.get("w", 0.12)),
+                    height=float(p.get("h", 0.14)),
+                    color=c,
+                    layers=int(p.get("layers") or 1),
+                    aa=aa,
+                    sun_pos=sun_pos if has_glow else None,
+                    depth_map=depth_map,
+                    depth_z=z,
+                )
+            except Exception:
+                cx = float(p.get("cx", 0.5))
+                base = float(p.get("base", horizon))
+                ww = float(p.get("w", 0.1))
+                hh = float(p.get("h", 0.12))
+                box = (
+                    (np.abs(xx - cx) < ww * 0.5)
+                    & (yy < base)
+                    & (yy > base - hh)
+                ).astype(np.float32)
+                paint(box, c)
 
     # ── atmospheric post (wow polish) ────────────────────────────────
     if high or style in ("soft", "night"):
@@ -1010,8 +1089,9 @@ def render_doc(
                 look=look if look in _isp.LOOKS else "photo",
                 seed=seed,
                 sun_pos=sun_pos if has_glow else None,
-                depth_map=depth_map,
+                depth_map=None if draft else depth_map,
                 focus_depth=focus_depth,
+                quality=isp_quality,
             )
             img = result["image"]
             isp_meta = result.get("meta")

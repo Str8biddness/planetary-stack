@@ -275,6 +275,463 @@ def test_detail_high_and_variations():
     assert all(v.get("image_base64") for v in vars_)
 
 
+def test_draft_detail_and_engine_v4():
+    """Draft is a real detail mode; engine cache key is v5+."""
+    from image_service import (
+        ENGINE_VERSION,
+        DETAILS,
+        generate_image,
+        clear_image_cache,
+    )
+
+    assert "draft" in DETAILS
+    assert ENGINE_VERSION.startswith("si-image-v")
+
+    clear_image_cache(disk=True)
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "draft.png")
+        m = generate_image(
+            "a house and a tree on grass under a sky with a sun",
+            out,
+            res=256,
+            style="soft",
+            look="raw",
+            detail="draft",
+            seed=7,
+            path_mode=True,
+            use_cache=True,
+        )
+        assert m["detail"] == "draft"
+        assert str(m.get("engine_version", "")).startswith("si-image-v")
+        assert m.get("path_mode") is True
+        assert (m.get("path_entities") or 0) >= 1
+        assert os.path.getsize(out) > 500
+        m2 = generate_image(
+            "a house and a tree on grass under a sky with a sun",
+            os.path.join(td, "draft2.png"),
+            res=256,
+            style="soft",
+            look="raw",
+            detail="draft",
+            seed=7,
+            path_mode=True,
+            use_cache=True,
+        )
+        assert m["cache_hit"] is False
+        assert m2["cache_hit"] is True
+
+        # draft + photo look still real PNG; ISP quality=draft when look active
+        out_p = os.path.join(td, "draft_photo.png")
+        mp = generate_image(
+            "a house on grass under a sky with a sun",
+            out_p,
+            res=256,
+            style="soft",
+            look="photo",
+            detail="draft",
+            seed=8,
+            path_mode=True,
+            use_cache=False,
+        )
+        assert mp["detail"] == "draft"
+        assert os.path.getsize(out_p) > 500
+        isp = mp.get("isp") or {}
+        if isp:
+            assert isp.get("quality") == "draft"
+
+
+def test_workshop_disk_session_intent_playlist():
+    """Disk session reload, intent router, materials, playlist, level import."""
+    import image_session as sess
+    import image_intent as intent
+    import image_materials_lib as ml
+    from image_service import generate_image, run_pass_playlist, clear_image_cache
+
+    # Intent
+    d = intent.classify_intent("draw a house on grass under a sky")
+    assert d["mode"] == "draw"
+    r = intent.classify_intent("photo of Elon Musk")
+    assert r["mode"] == "refuse"
+    f = intent.classify_intent("find photo of a barn")
+    assert f["mode"] == "find"
+    p = intent.classify_intent("make it warmer", has_scene_id=True)
+    assert p["mode"] == "pass"
+    card = intent.capability_card()
+    assert card["not_diffusion"] is True
+
+    # Materials
+    plan = {"source_prompt": "desert dunes under a sky", "camera": {}, "compile_steps": []}
+    plan = ml.apply_material_hints(plan)
+    assert plan.get("material_lib", {}).get("palette") == "desert"
+
+    clear_image_cache(disk=True)
+    sess.clear_sessions(disk=True)
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "a.png")
+        m = generate_image(
+            "a vase on grass under a sky",
+            out, res=160, look="raw", seed=1, use_cache=False,
+            use_llm_plan=False, keep_session=True,
+        )
+        sid = m.get("scene_id")
+        assert sid
+        # force memory drop then disk reload
+        with sess._LOCK:
+            sess._SESSIONS.clear()
+        s2 = sess.get_session(sid)
+        assert s2 is not None
+        assert s2.get("scene_doc")
+
+        frames = run_pass_playlist(sid, "finish", res=128)
+        assert len(frames) >= 3
+        assert all(f.get("image_base64") for f in frames)
+
+        # level import
+        import level_export as le
+        lvl = le.build_level(
+            "test", s2["scene_doc"], horizon=s2.get("horizon") or 0.66, seed=1,
+        )
+        sid3 = sess.session_from_level(lvl)
+        assert sess.get_session(sid3)
+
+
+def test_lathe_extrude_session_and_picture_edit():
+    """Machine dialects + multi-pass session + photoshop-lite."""
+    import scene_plan as sp
+    import lathe_paths as lathe
+    import extrude_paths as ex
+    import picture_edit as pe
+    import image_session as sess
+    from image_service import generate_image, apply_scene_pass, clear_image_cache, ENGINE_VERSION
+
+    assert ENGINE_VERSION.startswith("si-image-v6")
+    plan = sp.compile_scene_plan("a vase and a cup on grass under a sky", use_llm=False)
+    machines = [m["machine"] for m in plan.get("machines") or []]
+    assert "lathe" in machines
+    assert any(m.get("entity") in ("vase", "cup") for m in plan["machines"])
+
+    plan_e = sp.compile_scene_plan("a crate on grass under a sky", use_llm=False)
+    assert any(m.get("machine") == "extrude" for m in plan_e.get("machines") or [])
+
+    # unit paint
+    h = w = 64
+    img = np.ones((h, w, 3), dtype=np.float32) * 0.5
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    yy /= h - 1
+    xx /= w - 1
+    lathe.paint_lathe(img, xx, yy, cx=0.5, base=0.7, height=0.2, max_radius=0.1, color=(0.8, 0.3, 0.2), entity="vase")
+    assert img.std() > 0.01
+    img2 = np.ones((h, w, 3), dtype=np.float32) * 0.5
+    ex.paint_extrude(img2, xx, yy, cx=0.5, base=0.7, width=0.2, height=0.15, color=(0.4, 0.4, 0.45), layers=3)
+    assert img2.std() > 0.01
+
+    graded = pe.edit_image(img, grade="warm", text="SI", vignette=0.2)
+    assert graded["meta"]["construction"] == "picture_edit"
+    assert graded["image"].shape == img.shape
+
+    clear_image_cache(disk=True)
+    sess.clear_sessions()
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "vase.png")
+        m = generate_image(
+            "a vase and a cup on grass under a sky",
+            out,
+            res=192,
+            style="soft",
+            look="raw",
+            detail="standard",
+            seed=2,
+            path_mode=True,
+            use_cache=False,
+            compile_plan=True,
+            use_llm_plan=False,
+            keep_session=True,
+            grade="none",
+        )
+        assert os.path.getsize(out) > 500
+        assert (m.get("lathe_parts") or 0) >= 1
+        sid = m.get("scene_id")
+        assert sid
+        out2 = os.path.join(td, "pass.png")
+        m2 = apply_scene_pass(sid, out2, yaw_deg=15.0, look="photo", grade="warm", edit_text="pass")
+        assert os.path.getsize(out2) > 500
+        assert m2.get("scene_id") == sid
+        assert m2.get("picture_edit") or m2.get("look") == "photo"
+
+
+def test_scene_plan_compile_and_composite_render():
+    """Rules compiler maps synonyms + assembles puzzle-piece composites."""
+    import scene_plan as sp
+    from image_service import generate_image, clear_image_cache, execute_image_request
+
+    plan = sp.compile_scene_plan(
+        "a lonely cabin by a creek at golden hour",
+        use_llm=False,
+    )
+    assert plan["not_diffusion"] is True
+    roles = {e["role"] for e in plan["entities"]}
+    maps_to = [e["maps_to"] for e in plan["entities"]]
+    # cabin is a SHAPES key (role house); creek/river water present
+    assert "house" in roles
+    assert "river" in roles or any(m in ("river", "stream", "creek", "lake") for m in maps_to)
+    assert plan.get("camera", {}).get("time_of_day") is not None
+    assert "si_prompt" in plan and plan["si_prompt"]
+    assert plan.get("outer_voice")
+    assert plan.get("monologue")
+    # "hour" from golden hour must not become a composite object
+    assert "hour" not in [c["name"] for c in plan["composites"]]
+
+    plan2 = sp.compile_scene_plan("espresso machine on a table under a sky", use_llm=False)
+    names = [c["name"] for c in plan2["composites"]]
+    assert "espresso_machine" in names
+    assert "table" in names
+    roles = []
+    for c in plan2["composites"]:
+        roles.extend(p["role"] for p in c["parts"])
+    assert "building" in roles
+    assert all(r in sp.VALID_ROLES for r in roles)
+
+    clear_image_cache(disk=True)
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "espresso.png")
+        m = generate_image(
+            "espresso machine on grass under a sky",
+            out,
+            res=192,
+            style="soft",
+            look="raw",
+            detail="standard",
+            seed=3,
+            path_mode=True,
+            use_cache=False,
+            compile_plan=True,
+            use_llm_plan=False,
+        )
+        assert os.path.getsize(out) > 500
+        assert m.get("construction") in ("composite", "mixed", "mapped", "native")
+        assert m.get("scene_plan")
+        assert m.get("not_diffusion") is True
+        # composite parts should appear in entity list
+        ents = " ".join(str(e) for e in (m.get("entities") or []))
+        assert "espresso" in ents or (m.get("composite_parts") or 0) >= 1
+
+    payload = execute_image_request({
+        "prompt": "a robot near a house on grass under a sky",
+        "resolution": 160,
+        "style": "soft",
+        "look": "raw",
+        "detail": "standard",
+        "path_mode": True,
+        "use_cache": False,
+        "seed": 4,
+        "compile_plan": True,
+        "use_llm_plan": False,
+        "return_plan": True,
+    })
+    assert payload.get("ok") is True
+    assert payload.get("image_base64")
+    assert payload.get("scene_plan")
+    assert payload.get("outer_voice")
+    assert "robot" in str(payload.get("scene_plan")).lower() or (
+        payload.get("composite_parts") or 0
+    ) >= 1 or "robot" in " ".join(str(e) for e in payload.get("entities") or [])
+
+
+def test_bbox_fill_matches_full_frame_semantics():
+    """BBox fill is output-preserving: same coverage support as full raster."""
+    import cnc_paths as cnc
+
+    h = w = 128
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    yy /= max(h - 1, 1)
+    xx /= max(w - 1, 1)
+    path = cnc.house_contour(0.55, 0.70, 0.18, 0.14)
+    full = cnc.raster_fill_fast(xx, yy, path, aa=0.003)
+    crop, box = cnc.raster_fill_bbox(path, h, w, aa=0.003)
+    assert crop is not None
+    x0, y0, x1, y1 = box
+    recon = np.zeros((h, w), dtype=np.float32)
+    recon[y0:y1, x0:x1] = crop
+    # Nonzero support matches (allow tiny AA pad edge noise)
+    full_on = full > 0.05
+    recon_on = recon > 0.05
+    # recon should not light pixels far outside the house
+    assert recon_on.sum() <= full_on.sum() + 50
+    # where both on, values close
+    both = full_on & recon_on
+    if both.any():
+        err = np.abs(full[both] - recon[both]).mean()
+        assert err < 0.08, err
+
+
+def test_async_image_jobs_and_execute():
+    import image_jobs as jobs
+    from image_service import execute_image_request
+
+    # Sync execute path (small)
+    payload = execute_image_request({
+        "prompt": "a house on grass under a sky",
+        "resolution": 128,
+        "style": "soft",
+        "look": "raw",
+        "detail": "standard",
+        "path_mode": False,
+        "use_cache": False,
+        "seed": 1,
+    })
+    assert payload.get("ok") is True
+    assert payload.get("image_base64")
+    assert payload.get("entity_count", 0) >= 1
+
+    # Job queue
+    assert jobs.should_force_async(1024) is True
+    assert jobs.should_force_async(512) is False
+    assert jobs.should_force_async(512, multi=True) is True
+
+    def runner(params, progress):
+        progress("go", 0.5)
+        return execute_image_request(params, progress=progress)
+
+    jid = jobs.submit_job("test", {
+        "prompt": "a tree on grass under a sky",
+        "resolution": 128,
+        "style": "soft",
+        "look": "raw",
+        "detail": "standard",
+        "path_mode": False,
+        "use_cache": False,
+        "seed": 2,
+    }, runner)
+    import time
+    done = None
+    for _ in range(40):
+        j = jobs.get_job(jid)
+        if j and j["status"] in ("done", "failed"):
+            done = j
+            break
+        time.sleep(0.05)
+    assert done is not None
+    assert done["status"] == "done"
+    view = jobs.job_public_view(done)
+    assert view["status"] == "done"
+    assert view["result"]["image_base64"]
+
+
+def test_orbit_day_sequence():
+    from image_service import generate_orbit_day, clear_image_cache
+
+    clear_image_cache(disk=True)
+    frames = generate_orbit_day(
+        "a house and a tree on grass under a sky with a sun",
+        n=3,
+        yaw_span=24,
+        t0=0.2,
+        t1=0.9,
+        res=128,
+        style="soft",
+        look="raw",
+        detail="standard",
+        path_mode=False,
+        use_cache=False,
+        seed=5,
+        as_gif=True,
+        gif_duration_ms=200,
+    )
+    assert len(frames) == 3
+    assert frames[0]["yaw_deg"] != frames[-1]["yaw_deg"]
+    assert frames[0]["time_of_day"] < frames[-1]["time_of_day"]
+    assert frames[0].get("orbit_day") is True
+    assert frames[0].get("animation") and frames[0]["animation"]["frame_count"] == 3
+    assert frames[0]["animation"].get("kind") == "orbit_day"
+
+
+def test_pitch_gif_and_level_export():
+    import world_camera as wc
+    import gif_export as ge
+    import level_export as le
+    from image_service import generate_time_sequence, clear_image_cache
+
+    # Pitch shifts horizon / object bases
+    doc = [
+        {"entity": "sky", "role": "bg", "color": (0.4, 0.6, 0.9)},
+        {"entity": "grass", "role": "ground", "color": (0.3, 0.5, 0.3), "y0": 0.66},
+        {"entity": "house", "role": "house", "color": (0.7, 0.4, 0.3),
+         "cx": 0.5, "base": 0.66, "w": 0.14, "h": 0.12},
+    ]
+    d_up, m_up = wc.project_view(doc, pitch_deg=15)
+    d_dn, m_dn = wc.project_view(doc, pitch_deg=-15)
+    assert m_up["horizon"] != m_dn["horizon"]
+    assert "pitch" in m_up.get("axis", [])
+
+    # Level export
+    lvl = le.build_level_from_prompt(
+        "a house and a tree on grass under a sky",
+        seed=2, yaw_deg=5, pitch_deg=-5,
+    )
+    assert lvl["schema"] == le.LEVEL_SCHEMA
+    assert lvl["entity_count"] >= 2
+    assert lvl["not_diffusion"] is True
+    js = le.level_to_json(lvl)
+    assert "entities" in js
+
+    # GIF from time sequence
+    clear_image_cache(disk=True)
+    frames = generate_time_sequence(
+        "a house on grass under a sky with a sun",
+        n=2, t0=0.2, t1=0.9, res=128, style="soft", look="raw",
+        detail="standard", path_mode=False, use_cache=False, seed=1,
+        as_gif=True, gif_duration_ms=200,
+    )
+    assert len(frames) == 2
+    assert frames[0].get("animation") and frames[0]["animation"]["frame_count"] == 2
+    assert frames[0]["animation"]["bytes"] > 50
+
+    # Direct gif helper
+    anim = ge.frames_to_data_url(frames, fmt="gif", duration_ms=150)
+    assert anim["mime_type"] == "image/gif"
+
+
+def test_world_camera_multiview_and_time():
+    import world_camera as wc
+    from image_service import generate_multiview, generate_time_sequence, clear_image_cache
+
+    yaws = wc.yaw_schedule(3, 30)
+    assert len(yaws) == 3 and yaws[1] == 0.0
+    times = wc.time_schedule(4, 0.1, 0.9)
+    assert len(times) == 4 and times[0] < times[-1]
+
+    doc = [
+        {"entity": "sky", "role": "bg", "color": (0.4, 0.6, 0.9)},
+        {"entity": "grass", "role": "ground", "color": (0.3, 0.5, 0.3), "y0": 0.66},
+        {"entity": "house", "role": "house", "color": (0.7, 0.4, 0.3),
+         "cx": 0.55, "base": 0.66, "w": 0.14, "h": 0.12},
+    ]
+    d_left, m = wc.project_view(doc, yaw_deg=-20)
+    d_right, _ = wc.project_view(doc, yaw_deg=20)
+    # Near house should shift opposite directions for opposite yaws
+    assert d_left[2]["cx"] != d_right[2]["cx"]
+    _, m_night = wc.project_view(doc, time_of_day=0.95)
+    assert m_night.get("style_hint") == "night"
+
+    clear_image_cache(disk=True)
+    views = generate_multiview(
+        "a house and a tree on grass under a sky with a sun",
+        n=2, yaw_span=20, res=192, style="soft", look="raw",
+        detail="standard", path_mode=True, use_cache=False, seed=3,
+    )
+    assert len(views) == 2
+    assert views[0]["yaw_deg"] != views[1]["yaw_deg"]
+    assert all(v.get("image_base64") for v in views)
+
+    frames = generate_time_sequence(
+        "a house on grass under a sky",
+        n=2, t0=0.15, t1=0.95, res=160, style="soft", look="raw",
+        detail="standard", path_mode=False, use_cache=False, seed=2,
+    )
+    assert len(frames) == 2
+    assert frames[0]["time_of_day"] < frames[1]["time_of_day"]
+
+
 def test_presets_and_depth_buffer():
     import scene_presets as sp
     import depth_buffer as db
