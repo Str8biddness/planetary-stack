@@ -688,3 +688,19 @@ level re-render, Studio inspector/capabilities, bench, Claude review package.
 - ENGINE `si-image-v6.1-workshop` · **26 tests passed**
 
 ### Do NOT merge without Claude review of this package.
+
+## 2026-07-12 — feat/tier-badges: instrument trust chips in real chat
+
+### What
+- Answer-level instrument badges: ✓ Verified / ~ Grounded / • Unverified from real chat payload
+  (`/api/chat` → runtime `/api/v1/query` sources + verification).
+- Citation chips (`.instr-cite-chip`) from `data.sources`.
+- 👍 confirm still mints `/api/human/attestation` then `/api/feedback` → runtime `/api/v1/feedback`.
+  On upgrade: badge flips to ✓ Verified. If human-session secret missing: **fail closed** (stay Grounded).
+
+### Proof
+- Real query path returns `answer_id` + `sources`; UI renders `instr-tier-badge` + citation chips.
+- Confirm path hits shell feedback proxy → `/api/v1/feedback`; without secret stays not upgraded.
+
+### Branch
+`feat/tier-badges` — do not merge without Claude review.
