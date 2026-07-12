@@ -47,7 +47,7 @@ _DISK_ENABLED = os.environ.get("SYNTHESUS_IMAGE_DISK_CACHE_OFF", "").strip() not
 
 STYLES = sorted(vpi.STYLES)
 DETAILS = ("standard", "high")
-VOCAB_VERSION = "image-multiview-v1"
+VOCAB_VERSION = "image-world-export-v1"
 LOOKS = ("raw", "photo", "cinema", "vivid", "tv")
 
 
@@ -111,13 +111,14 @@ def _cache_key(
     look: str = "raw",
     path_mode: bool = True,
     yaw_deg: float = 0.0,
+    pitch_deg: float = 0.0,
     time_of_day: Optional[float] = None,
 ) -> str:
     tod = "none" if time_of_day is None else f"{float(time_of_day):.4f}"
     raw = (
         f"{VOCAB_VERSION}|{prompt.strip()}|{res}|{style}|{seed}|"
         f"{aspect:.4f}|{detail}|{look}|path={int(bool(path_mode))}|"
-        f"yaw={float(yaw_deg):.3f}|t={tod}"
+        f"yaw={float(yaw_deg):.3f}|pitch={float(pitch_deg):.3f}|t={tod}"
     )
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -182,6 +183,8 @@ def generate_image(
     preset: Optional[str] = None,
     yaw_deg: float = 0.0,
     time_of_day: Optional[float] = None,
+    pitch_deg: float = 0.0,
+    return_level: bool = False,
 ) -> dict[str, Any]:
     """Reason ``prompt`` into a scene graph and render it to ``out_path`` (PNG).
 
@@ -189,7 +192,8 @@ def generate_image(
     style=photo also enables soft paint + photo look.
     path_mode: CNC path construction (G1/arc/offset math) for form.
     preset: optional cinematic pack id (scene_presets) fills blanks.
-    yaw_deg: camera orbit (parallax by Z). time_of_day: 0..1 sun path / night.
+    yaw_deg/pitch_deg: camera orbit/tilt (parallax by Z). time_of_day: 0..1 sun path.
+    return_level: attach serializable SI level JSON object for world export.
     """
     # Apply cinematic preset pack (fills missing knobs only)
     if preset:
@@ -242,11 +246,13 @@ def generate_image(
     if seed is not None:
         seed = int(seed)
     yaw_deg = float(np.clip(float(yaw_deg or 0.0), -60.0, 60.0))
+    pitch_deg = float(np.clip(float(pitch_deg or 0.0), -35.0, 35.0))
     if time_of_day is not None:
         time_of_day = float(np.clip(float(time_of_day), 0.0, 1.0))
 
     key = _cache_key(
-        prompt, res, style, seed, aspect, detail, look, path_mode, yaw_deg, time_of_day
+        prompt, res, style, seed, aspect, detail, look, path_mode,
+        yaw_deg, pitch_deg, time_of_day,
     )
     t0 = time.time()
 
@@ -276,12 +282,18 @@ def generate_image(
         path_mode=path_mode,
     )
     camera_meta = None
-    if abs(yaw_deg) > 1e-6 or time_of_day is not None:
+    if abs(yaw_deg) > 1e-6 or abs(pitch_deg) > 1e-6 or time_of_day is not None:
         try:
             import world_camera as _wc
             doc, camera_meta = _wc.project_view(
-                doc, horizon=horizon, yaw_deg=yaw_deg, time_of_day=time_of_day
+                doc,
+                horizon=horizon,
+                yaw_deg=yaw_deg,
+                pitch_deg=pitch_deg,
+                time_of_day=time_of_day,
             )
+            if camera_meta.get("horizon") is not None:
+                horizon = float(camera_meta["horizon"])
             if camera_meta.get("style_hint") == "night":
                 paint_style = "night"
             if time_of_day is not None and look not in ("raw", "none", "off"):
@@ -363,6 +375,7 @@ def generate_image(
         "seed": seed,
         "aspect": aspect,
         "yaw_deg": yaw_deg,
+        "pitch_deg": pitch_deg,
         "time_of_day": time_of_day,
         "camera": camera_meta,
         "cache_hit": False,
@@ -381,7 +394,27 @@ def generate_image(
 
     meta["latency_ms"] = round((time.time() - t0) * 1000.0, 2)
 
-    if use_cache:
+    if return_level:
+        try:
+            import level_export as _le
+            meta["level"] = _le.build_level(
+                prompt, doc, horizon,
+                seed=seed, camera=camera_meta, style=style, look=look,
+                path_mode=path_mode, preset=preset,
+            )
+        except Exception as le:
+            meta["level_error"] = str(le)
+
+    if use_cache and not return_level:
+        # Don't cache huge level payloads in the small LRU by default
+        _cache_put(
+            key,
+            {
+                "png_bytes": png_bytes,
+                "meta": {k: v for k, v in meta.items() if k not in ("path", "level")},
+            },
+        )
+    elif use_cache:
         _cache_put(
             key,
             {
@@ -465,6 +498,7 @@ def generate_multiview(
     path_mode: bool = True,
     preset: Optional[str] = None,
     time_of_day: Optional[float] = None,
+    pitch_deg: float = 0.0,
 ) -> list[dict[str, Any]]:
     """Same scene graph, multiple camera yaws (orbit). SI multi-view, not diffusion."""
     import base64
@@ -490,6 +524,7 @@ def generate_multiview(
                 preset=preset if i == 0 else None,
                 yaw_deg=yaw,
                 time_of_day=time_of_day,
+                pitch_deg=pitch_deg,
             )
             with open(out, "rb") as f:
                 png = f.read()
@@ -527,8 +562,16 @@ def generate_time_sequence(
     path_mode: bool = True,
     preset: Optional[str] = None,
     yaw_deg: float = 0.0,
+    pitch_deg: float = 0.0,
+    as_gif: bool = False,
+    gif_duration_ms: int = 400,
+    gif_format: str = "gif",
 ) -> list[dict[str, Any]]:
-    """Same world, time-of-day axis (dawn→night). SI temporal sequence."""
+    """Same world, time-of-day axis (dawn→night). SI temporal sequence.
+
+    If as_gif=True, appends a synthetic last result is NOT used — caller should
+    use sequence_to_animation(results) or set attach_animation on API.
+    """
     import base64
     import world_camera as wc
 
@@ -552,6 +595,7 @@ def generate_time_sequence(
                 preset=preset if i == 0 else None,
                 yaw_deg=yaw_deg,
                 time_of_day=t,
+                pitch_deg=pitch_deg,
             )
             with open(out, "rb") as f:
                 png = f.read()
@@ -561,6 +605,15 @@ def generate_time_sequence(
             m["frame_index"] = i
             m["time_of_day"] = t
             results.append(m)
+        if as_gif and results:
+            try:
+                import gif_export as _ge
+                anim = _ge.frames_to_data_url(
+                    results, fmt=gif_format, duration_ms=gif_duration_ms
+                )
+                results[0]["animation"] = anim
+            except Exception as ge:
+                results[0]["animation_error"] = str(ge)
     finally:
         for name in os.listdir(tmpdir):
             try:
@@ -572,6 +625,26 @@ def generate_time_sequence(
         except OSError:
             pass
     return results
+
+
+def sequence_to_animation(
+    frames: list[dict[str, Any]],
+    *,
+    fmt: str = "gif",
+    duration_ms: int = 400,
+) -> dict[str, Any]:
+    """Turn frame metas (with image_base64) into GIF/WebP data URL payload."""
+    import gif_export as ge
+    return ge.frames_to_data_url(frames, fmt=fmt, duration_ms=duration_ms)
+
+
+def export_level(
+    prompt: str,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Build SI level JSON for a prompt (no PNG required)."""
+    import level_export as le
+    return le.build_level_from_prompt(prompt, **kwargs)
 
 
 if __name__ == "__main__":

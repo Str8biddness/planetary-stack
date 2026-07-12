@@ -291,6 +291,12 @@ class ImageRequest(BaseModel):
         le=60.0,
         description="Camera orbit yaw degrees (parallax by depth Z)",
     )
+    pitch_deg: float = Field(
+        0.0,
+        ge=-35.0,
+        le=35.0,
+        description="Camera pitch (tilt) degrees — vertical parallax + horizon shift",
+    )
     time_of_day: Optional[float] = Field(
         None,
         ge=0.0,
@@ -314,6 +320,24 @@ class ImageRequest(BaseModel):
         ge=1,
         le=8,
         description="If >1, time-of-day sequence (same world, dawn→night)",
+    )
+    as_gif: bool = Field(
+        False,
+        description="When frames>1, also attach animated GIF/WebP of the sequence",
+    )
+    gif_format: str = Field(
+        "gif",
+        description="Animation format when as_gif: gif | webp",
+    )
+    gif_duration_ms: int = Field(
+        400,
+        ge=50,
+        le=2000,
+        description="Per-frame duration for animation export",
+    )
+    return_level: bool = Field(
+        False,
+        description="Attach SI level JSON (scene graph world dump) for virtual-world use",
     )
 
 

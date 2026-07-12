@@ -1662,12 +1662,19 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
             logger.warning("preset merge soft-fail: %s", pe)
 
     yaw_deg = float(getattr(image_req, "yaw_deg", 0.0) or 0.0)
+    pitch_deg = float(getattr(image_req, "pitch_deg", 0.0) or 0.0)
     time_of_day = getattr(image_req, "time_of_day", None)
     n_views = int(getattr(image_req, "views", 1) or 1)
     n_views = max(1, min(8, n_views))
     yaw_span = float(getattr(image_req, "yaw_span", 30.0) or 30.0)
     n_frames = int(getattr(image_req, "frames", 1) or 1)
     n_frames = max(1, min(8, n_frames))
+    as_gif = bool(getattr(image_req, "as_gif", False))
+    gif_format = (getattr(image_req, "gif_format", None) or "gif").lower().strip()
+    if gif_format not in ("gif", "webp"):
+        gif_format = "gif"
+    gif_duration_ms = int(getattr(image_req, "gif_duration_ms", 400) or 400)
+    return_level = bool(getattr(image_req, "return_level", False))
 
     try:
         from image_service import (
@@ -1675,6 +1682,7 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
             generate_variations,
             generate_multiview,
             generate_time_sequence,
+            export_level,
             renderable_vocabulary,
         )
     except Exception as e:
@@ -1762,6 +1770,10 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
                 path_mode,
                 preset,
                 yaw_deg,
+                pitch_deg,
+                as_gif,
+                gif_duration_ms,
+                gif_format,
             )
         except Exception as e:
             logger.warning("image time sequence failed: %s", e)
@@ -1769,7 +1781,10 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
                 status_code=500,
                 detail={"error": "image_generation_failed", "message": str(e)},
             )
-        return JSONResponse(content=_grid_payload(items, "time"))
+        payload = _grid_payload(items, "time")
+        if items and items[0].get("animation"):
+            payload["animation"] = items[0]["animation"]
+        return JSONResponse(content=payload)
 
     if n_views > 1:
         try:
@@ -1788,6 +1803,7 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
                 path_mode,
                 preset,
                 time_of_day,
+                pitch_deg,
             )
         except Exception as e:
             logger.warning("image multiview failed: %s", e)
@@ -1795,7 +1811,16 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
                 status_code=500,
                 detail={"error": "image_generation_failed", "message": str(e)},
             )
-        return JSONResponse(content=_grid_payload(items, "yaw"))
+        payload = _grid_payload(items, "yaw")
+        if as_gif and items:
+            try:
+                from image_service import sequence_to_animation
+                payload["animation"] = sequence_to_animation(
+                    items, fmt=gif_format, duration_ms=gif_duration_ms
+                )
+            except Exception as ge:
+                payload["animation_error"] = str(ge)
+        return JSONResponse(content=payload)
 
     # Multi-variation path
     if n_var > 1:
@@ -1839,6 +1864,8 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
             preset,
             yaw_deg,
             time_of_day,
+            pitch_deg,
+            return_level,
         )
         with open(out_path, "rb") as f:
             png_b64 = base64.b64encode(f.read()).decode("ascii")
@@ -1883,14 +1910,53 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         "path_entities": meta.get("path_entities"),
         "path_ops_sample": meta.get("path_ops_sample"),
         "yaw_deg": meta.get("yaw_deg", yaw_deg),
+        "pitch_deg": meta.get("pitch_deg", pitch_deg),
         "time_of_day": meta.get("time_of_day", time_of_day),
         "camera": meta.get("camera"),
+        "level": meta.get("level"),
     }
     try:
         ImageResponse(**payload)
     except Exception as ve:
         logger.warning("ImageResponse validation soft-fail: %s", ve)
     return JSONResponse(content=payload)
+
+
+@app.post("/api/v1/image/level")
+async def export_image_level(req: Request, auth=Depends(get_auth)):
+    """Export SI scene graph as a portable level JSON (virtual-world blueprint).
+
+    Body: same knobs as /api/v1/image (prompt, preset, yaw, pitch, time_of_day, …).
+    No PNG required — pure construction dump.
+    """
+    is_auth, rate_key = auth
+    if not await _check_rate_limit(rate_key, AUTH_RATE_LIMIT if is_auth else DEMO_RATE_LIMIT):
+        raise HTTPException(429, "Rate limit exceeded.")
+    try:
+        body = await req.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    prompt = (body.get("prompt") or "").strip()
+    if not prompt and body.get("preset"):
+        prompt = ""  # preset may fill
+    try:
+        from image_service import export_level
+        level = await run_in_threadpool(
+            export_level,
+            prompt or "a house on grass under a sky",
+            seed=body.get("seed"),
+            style=body.get("style") or "soft",
+            look=body.get("look") or "photo",
+            path_mode=bool(body.get("path_mode", True)),
+            preset=body.get("preset"),
+            yaw_deg=float(body.get("yaw_deg") or 0),
+            pitch_deg=float(body.get("pitch_deg") or 0),
+            time_of_day=body.get("time_of_day"),
+        )
+    except Exception as e:
+        logger.warning("level export failed: %s", e)
+        raise HTTPException(500, detail={"error": "level_export_failed", "message": str(e)})
+    return JSONResponse(content={"ok": True, "level": level, "schema": level.get("schema")})
 
 
 @app.post("/api/v1/drive/ingest")

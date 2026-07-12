@@ -451,3 +451,27 @@ world_camera demo: house cx shifts with yaw; night → moon
 ```
 
 ### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-world-export (pitch + GIF + level JSON)
+
+### Mission
+Continue SI world stack: camera pitch, animated GIF export of sequences,
+portable level JSON for virtual-world handoff. Still not diffusion.
+
+### What changed
+- `world_camera.py` — pitch DOF (horizon shift + vertical parallax)
+- NEW `gif_export.py` — GIF/WebP from frame metas
+- NEW `level_export.py` — `synthesus.si_level.v1` scene graph dump
+- API: pitch_deg, as_gif, return_level; `POST /api/v1/image/level`
+- Studio: ⏱ frames+GIF, ⧉ Level download
+- Tests: **19 passed**
+
+### Axes
+x, y, z, yaw, pitch, time
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 19 passed
+```
+
+### Do NOT merge without Claude review.

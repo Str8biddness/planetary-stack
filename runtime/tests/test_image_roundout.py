@@ -275,6 +275,52 @@ def test_detail_high_and_variations():
     assert all(v.get("image_base64") for v in vars_)
 
 
+def test_pitch_gif_and_level_export():
+    import world_camera as wc
+    import gif_export as ge
+    import level_export as le
+    from image_service import generate_time_sequence, clear_image_cache
+
+    # Pitch shifts horizon / object bases
+    doc = [
+        {"entity": "sky", "role": "bg", "color": (0.4, 0.6, 0.9)},
+        {"entity": "grass", "role": "ground", "color": (0.3, 0.5, 0.3), "y0": 0.66},
+        {"entity": "house", "role": "house", "color": (0.7, 0.4, 0.3),
+         "cx": 0.5, "base": 0.66, "w": 0.14, "h": 0.12},
+    ]
+    d_up, m_up = wc.project_view(doc, pitch_deg=15)
+    d_dn, m_dn = wc.project_view(doc, pitch_deg=-15)
+    assert m_up["horizon"] != m_dn["horizon"]
+    assert "pitch" in m_up.get("axis", [])
+
+    # Level export
+    lvl = le.build_level_from_prompt(
+        "a house and a tree on grass under a sky",
+        seed=2, yaw_deg=5, pitch_deg=-5,
+    )
+    assert lvl["schema"] == le.LEVEL_SCHEMA
+    assert lvl["entity_count"] >= 2
+    assert lvl["not_diffusion"] is True
+    js = le.level_to_json(lvl)
+    assert "entities" in js
+
+    # GIF from time sequence
+    clear_image_cache(disk=True)
+    frames = generate_time_sequence(
+        "a house on grass under a sky with a sun",
+        n=2, t0=0.2, t1=0.9, res=128, style="soft", look="raw",
+        detail="standard", path_mode=False, use_cache=False, seed=1,
+        as_gif=True, gif_duration_ms=200,
+    )
+    assert len(frames) == 2
+    assert frames[0].get("animation") and frames[0]["animation"]["frame_count"] == 2
+    assert frames[0]["animation"]["bytes"] > 50
+
+    # Direct gif helper
+    anim = ge.frames_to_data_url(frames, fmt="gif", duration_ms=150)
+    assert anim["mime_type"] == "image/gif"
+
+
 def test_world_camera_multiview_and_time():
     import world_camera as wc
     from image_service import generate_multiview, generate_time_sequence, clear_image_cache

@@ -2447,10 +2447,54 @@ function pickStudioVariation(i) {
 }
 
 async function runImageStudioViews(n) {
-    return runImageStudio(1, { views: n || 3, yaw_span: 30 });
+    return runImageStudio(1, { views: n || 3, yaw_span: 30, as_gif: true });
 }
 async function runImageStudioFrames(n) {
-    return runImageStudio(1, { frames: n || 4 });
+    return runImageStudio(1, { frames: n || 4, as_gif: true });
+}
+
+async function exportImageLevel() {
+    const promptEl = document.getElementById('image-prompt');
+    const statusEl = document.getElementById('image-studio-status');
+    const prompt = (promptEl && promptEl.value || '').trim();
+    if (!prompt && !_activeImagePreset) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">Prompt or preset required for level export.</span>';
+        return;
+    }
+    if (statusEl) statusEl.innerHTML = '<span style="color:#38bdf8;">Exporting SI level JSON…</span>';
+    try {
+        const body = {
+            prompt: prompt || 'a house on grass under a sky',
+            style: (document.getElementById('image-style') || {}).value || 'photo',
+            look: (document.getElementById('image-look') || {}).value || 'photo',
+            path_mode: ((document.getElementById('image-path-mode') || {}).value !== '0'),
+        };
+        if (_activeImagePreset) body.preset = _activeImagePreset;
+        const res = await fetch('/api/v1/image/level', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.level) {
+            if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">Level export failed</span>';
+            return;
+        }
+        const blob = new Blob([JSON.stringify(data.level, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'synthesus-si-level-' + Date.now() + '.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        if (statusEl) {
+            statusEl.innerHTML = '<span style="color:#4ade80;">Level exported — '
+                + (data.level.entity_count || '?') + ' entities · '
+                + escapeHtmlStudio(data.level.schema || '') + '</span>';
+        }
+    } catch (e) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">' + escapeHtmlStudio(e.message || e) + '</span>';
+    }
 }
 
 async function runImageStudio(variations, extra) {
@@ -2480,6 +2524,7 @@ async function runImageStudio(variations, extra) {
     if (_activeImagePreset) body.preset = _activeImagePreset;
     if (extra.views) { body.views = extra.views; body.yaw_span = extra.yaw_span || 30; body.variations = 1; }
     if (extra.frames) { body.frames = extra.frames; body.variations = 1; body.views = 1; }
+    if (extra.as_gif) { body.as_gif = true; body.gif_format = extra.gif_format || 'gif'; body.gif_duration_ms = 350; }
     if (seedRaw !== undefined && seedRaw !== null && String(seedRaw).trim() !== '') {
         const n = parseInt(seedRaw, 10);
         if (!Number.isNaN(n)) body.seed = n;
@@ -2525,6 +2570,22 @@ async function runImageStudio(variations, extra) {
         } else {
             const src = `data:${mime};base64,${data.image_base64}`;
             showStudioImage(src, data);
+        }
+        // Animated GIF/WebP of sequence if present
+        if (data.animation && data.animation.image_base64) {
+            const amime = data.animation.mime_type || 'image/gif';
+            const asrc = 'data:' + amime + ';base64,' + data.animation.image_base64;
+            _lastStudioDataUrl = asrc;
+            const previewEl2 = document.getElementById('image-studio-preview');
+            if (previewEl2) {
+                previewEl2.style.display = 'flex';
+                previewEl2.innerHTML = '<img src="' + asrc + '" alt="SI animation" style="max-width:100%; max-height:280px; border-radius:6px;">'
+                    + '<div style="font-size:0.72rem;color:#94a3b8;margin-top:4px;">animation · '
+                    + (data.animation.frame_count || '?') + ' frames · ' + (data.animation.format || 'gif') + '</div>';
+            }
+            const btn = document.getElementById('image-download-btn');
+            if (btn) btn.disabled = false;
+            pushImageGallery(asrc, (data.prompt || prompt) + ' [anim]');
         }
         const cacheTag = data.cache_hit
             ? ('cache HIT' + (data.cache_source ? ' (' + data.cache_source + ')' : ''))

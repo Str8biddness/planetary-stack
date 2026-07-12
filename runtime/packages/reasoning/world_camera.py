@@ -5,6 +5,7 @@ World camera — multi-view orbit + time axis on the same SI scene graph.
 
 Real degrees of freedom (not fake high-D):
   - yaw   : horizontal camera orbit → parallax by depth Z (near moves more)
+  - pitch : vertical camera tilt → vertical parallax + horizon shift
   - time  : sun/moon path + day/night style hints (0=dawn … 0.5=noon … 1=night)
 
 Same scene graph → many projections. That's the bridge from single images to
@@ -26,13 +27,18 @@ except Exception:  # pragma: no cover
     _db = None
 
 
-def _shift_keys(p: dict, dx: float) -> None:
+def _shift_keys(p: dict, dx: float = 0.0, dy: float = 0.0) -> None:
     for k in ("x", "cx"):
         if k in p and isinstance(p[k], (int, float)):
             p[k] = float(np.clip(float(p[k]) + dx, 0.02, 0.98))
     if "x0" in p and "x1" in p:
         p["x0"] = float(np.clip(float(p["x0"]) + dx, 0.0, 0.95))
         p["x1"] = float(np.clip(float(p["x1"]) + dx, 0.05, 1.0))
+    if abs(dy) > 1e-9:
+        for k in ("y", "base", "y0"):
+            if k in p and isinstance(p[k], (int, float)):
+                lo, hi = (0.05, 0.55) if k == "y" else (0.35, 0.92)
+                p[k] = float(np.clip(float(p[k]) + dy, lo, hi))
 
 
 def sun_for_time(time_of_day: float) -> Tuple[float, float, str]:
@@ -73,17 +79,23 @@ def project_view(
     doc: List[Dict[str, Any]],
     horizon: float = 0.66,
     yaw_deg: float = 0.0,
+    pitch_deg: float = 0.0,
     time_of_day: Optional[float] = None,
     parallax: float = 0.14,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    """Project scene graph under camera yaw + optional time-of-day sun.
+    """Project scene graph under camera yaw/pitch + optional time-of-day sun.
 
-    Returns (new_doc, camera_meta).
+    Returns (new_doc, camera_meta). Horizon may shift with pitch.
     """
     yaw_deg = float(np.clip(yaw_deg, -60.0, 60.0))
+    pitch_deg = float(np.clip(pitch_deg, -35.0, 35.0))
     yaw = math.radians(yaw_deg)
-    # horizontal pan factor
+    pitch = math.radians(pitch_deg)
+    # horizontal / vertical pan factors
     pan_base = parallax * math.sin(yaw)
+    # pitch>0 looks up → horizon drops (higher y), near objects rise less than far
+    pitch_base = parallax * 0.85 * math.sin(pitch)
+    horizon_out = float(np.clip(horizon + 0.10 * math.sin(pitch), 0.50, 0.80))
 
     out: List[Dict[str, Any]] = []
     for prim in doc:
@@ -95,12 +107,25 @@ def project_view(
         p["depth_z"] = z
         # nearer (small z) shifts more; camera yaw>0 → world appears to slide left for near objs
         dx = -pan_base * (1.0 - z)
+        # pitch: near objects move opposite to far; look up → near drops slightly, far rises
+        dy = pitch_base * (0.35 - z)  # near z~0.3 → negative dy when pitch>0
         role = p.get("role")
-        if role not in ("bg",):  # sky full-frame; ground spans width
+        if role not in ("bg",):  # sky full-frame
             if role == "ground":
-                pass  # full-width plane; no x shift
+                if "y0" in p:
+                    p["y0"] = horizon_out
             else:
-                _shift_keys(p, dx)
+                _shift_keys(p, dx, dy)
+                # keep ground-anchored bases near new horizon
+                if role in (
+                    "house", "tree", "person", "building", "boat", "fence",
+                    "bush", "flower", "bridge", "disc", "triangle",
+                ) and "base" in p:
+                    # soft pull base toward horizon_out for ground objects
+                    if role != "triangle":
+                        p["base"] = float(
+                            np.clip(0.65 * float(p["base"]) + 0.35 * horizon_out, 0.4, 0.92)
+                        )
         # paths are geometric in absolute coords — invalidate cached paths so render rebuilds
         if "paths" in p:
             p.pop("paths", None)
@@ -109,8 +134,10 @@ def project_view(
 
     cam: Dict[str, Any] = {
         "yaw_deg": yaw_deg,
+        "pitch_deg": pitch_deg,
         "parallax": parallax,
-        "axis": ["x", "y", "z", "yaw"],
+        "horizon": horizon_out,
+        "axis": ["x", "y", "z", "yaw", "pitch"],
     }
 
     if time_of_day is not None:
@@ -120,7 +147,7 @@ def project_view(
         cam["sun_pos"] = (sx, sy)
         cam["style_hint"] = style_hint
         cam["look_hint"] = look_for_time(t)
-        cam["axis"] = ["x", "y", "z", "yaw", "time"]
+        cam["axis"] = ["x", "y", "z", "yaw", "pitch", "time"]
         # inject / move disc_top sun or moon
         has_sun = False
         for p in out:
@@ -159,7 +186,17 @@ def project_view(
                     p["entity"] = "night"
                     p["color"] = (0.07, 0.09, 0.20)
 
+    cam["horizon"] = horizon_out
     return out, cam
+
+
+def pitch_schedule(n: int = 3, span_deg: float = 20.0) -> List[float]:
+    """Even pitch samples centered at 0."""
+    n = max(1, min(12, int(n)))
+    span = float(np.clip(span_deg, 0.0, 50.0))
+    if n == 1:
+        return [0.0]
+    return [float(-span / 2 + span * i / (n - 1)) for i in range(n)]
 
 
 def yaw_schedule(n: int = 3, span_deg: float = 30.0) -> List[float]:

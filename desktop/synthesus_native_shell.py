@@ -208,8 +208,33 @@ def image_proxy():
         "yaw_span": data.get("yaw_span", 30),
         "frames": data.get("frames", 1),
         "yaw_deg": data.get("yaw_deg", 0),
+        "pitch_deg": data.get("pitch_deg", 0),
         "time_of_day": data.get("time_of_day"),
+        "as_gif": data.get("as_gif", False),
+        "gif_format": data.get("gif_format", "gif"),
+        "gif_duration_ms": data.get("gif_duration_ms", 400),
+        "return_level": data.get("return_level", False),
     }
+
+
+@app.route('/api/v1/image/level', methods=['POST'])
+def image_level_proxy():
+    """SI level JSON export → runtime."""
+    data = request.get_json(silent=True) or {}
+    try:
+        r = requests.post(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/image/level",
+            json=data,
+            headers=_runtime_api_headers(),
+            timeout=60,
+        )
+        try:
+            payload = r.json()
+        except Exception:
+            payload = {"ok": False, "error": "bad_runtime_body", "message": (r.text or "")[:400]}
+        return (json.dumps(payload), r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": "runtime_unavailable", "message": str(e)}), 503
 
 
 @app.route('/api/v1/image/presets', methods=['GET'])
