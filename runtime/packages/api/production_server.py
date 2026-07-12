@@ -67,7 +67,9 @@ from api.schemas import ( # type: ignore
     ProcessResponse,
     ErrorResponse,
     CharacterEvolutionResponse,
-    SpawnCharacterRequest
+    SpawnCharacterRequest,
+    ImageRequest,
+    ImageResponse,
 )
 from api.database import init_db, SessionLocal, APIKey, UsageMetric # type: ignore
 
@@ -1588,7 +1590,8 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     Reasons the prompt into a resolution-free scene graph and renders an HD
     raster locally — deterministic, CPU-only, no diffusion. Renders concepts in
     the visual vocabulary; unknown words map to the nearest renderable concept.
-    Returns the PNG as base64 plus the real scene entities. Degrades LOUDLY
+    Supports style (flat|soft|night), seed, aspect, and process-local LRU cache.
+    Returns the PNG as base64 plus real scene entities. Degrades LOUDLY
     (503 with the reason) if the engine/deps are unavailable — never a fake image.
     """
     global _request_count
@@ -1602,17 +1605,64 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         body = await req.json()
     except Exception:
         raise HTTPException(400, "Invalid JSON")
-    prompt = (body.get("prompt") or "").strip()
-    if not prompt:
-        raise HTTPException(400, "prompt is required")
-    try:
-        res = int(body.get("resolution", 1024))
-    except (TypeError, ValueError):
-        res = 1024
-    res = max(128, min(2048, res))  # bound render size
 
     try:
-        from image_service import generate_image, renderable_vocabulary
+        image_req = ImageRequest(**body)
+    except Exception as e:
+        raise HTTPException(400, f"Invalid image request: {e}")
+
+    prompt = image_req.prompt.strip()
+    if not prompt:
+        raise HTTPException(400, "prompt is required")
+    res = image_req.resolution
+    style = (image_req.style or "soft").lower().strip()
+    if style not in ("flat", "soft", "night", "photo"):
+        style = "soft"
+    look = (getattr(image_req, "look", None) or "photo").lower().strip()
+    if look not in ("raw", "photo", "cinema", "vivid", "tv"):
+        look = "photo"
+    seed = image_req.seed
+    aspect = image_req.aspect
+    use_cache = bool(image_req.use_cache)
+    detail = (getattr(image_req, "detail", None) or "high").lower().strip()
+    if detail not in ("standard", "high"):
+        detail = "high"
+    n_var = int(getattr(image_req, "variations", 1) or 1)
+    n_var = max(1, min(8, n_var))
+    path_mode = bool(getattr(image_req, "path_mode", True))
+    preset = getattr(image_req, "preset", None)
+
+    # Merge cinematic preset into knobs (fills blanks; explicit body already in image_req)
+    if preset:
+        try:
+            import scene_presets as _sp
+            merged = _sp.apply_preset_to_request({
+                "preset": preset,
+                "prompt": prompt,
+                "style": style,
+                "look": look,
+                "detail": detail,
+                "path_mode": path_mode,
+                "aspect": aspect,
+                "seed": seed,
+                "resolution": res,
+            })
+            prompt = (merged.get("prompt") or prompt).strip()
+            style = merged.get("style") or style
+            look = merged.get("look") or look
+            detail = merged.get("detail") or detail
+            path_mode = bool(merged.get("path_mode", path_mode))
+            aspect = float(merged.get("aspect", aspect))
+            if seed is None and merged.get("seed") is not None:
+                seed = int(merged["seed"])
+            if merged.get("resolution"):
+                res = int(merged["resolution"])
+            preset = merged.get("preset") or preset
+        except Exception as pe:
+            logger.warning("preset merge soft-fail: %s", pe)
+
+    try:
+        from image_service import generate_image, generate_variations, renderable_vocabulary
     except Exception as e:
         # Engine or an image dep (numpy/PIL) is missing — degrade loudly, don't fake.
         raise HTTPException(
@@ -1624,10 +1674,88 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     import os
     import tempfile
 
-    out_path = os.path.join(tempfile.gettempdir(), f"synth_img_{uuid.uuid4().hex[:12]}.png")
     t0 = time.time()
+
+    # Multi-variation path
+    if n_var > 1:
+        try:
+            vars_meta = await run_in_threadpool(
+                generate_variations,
+                prompt,
+                n_var,
+                res,
+                style,
+                seed,
+                aspect,
+                detail,
+                use_cache,
+                look,
+                path_mode,
+            )
+        except Exception as e:
+            logger.warning("image variations failed: %s", e)
+            raise HTTPException(
+                status_code=500,
+                detail={"error": "image_generation_failed", "message": str(e)},
+            )
+        primary = vars_meta[0]
+        payload = {
+            "ok": True,
+            "engine": primary.get("engine", "synthesus_vsa_geometric"),
+            "prompt": prompt,
+            "resolution": res,
+            "width": primary.get("width"),
+            "height": primary.get("height"),
+            "style": style,
+            "detail": detail,
+            "look": look,
+            "seed": primary.get("seed"),
+            "aspect": aspect,
+            "entities": primary.get("entities", []),
+            "entity_count": primary.get("entity_count", 0),
+            "roles": primary.get("roles", []),
+            "renderable_vocabulary": renderable_vocabulary(),
+            "cache_hit": bool(primary.get("cache_hit")),
+            "cache_source": primary.get("cache_source"),
+            "latency_ms": round((time.time() - t0) * 1000.0, 1),
+            "image_base64": primary.get("image_base64", ""),
+            "mime_type": "image/png",
+            "vocab_version": primary.get("vocab_version"),
+            "isp": primary.get("isp"),
+            "path_mode": path_mode,
+            "path_entities": primary.get("path_entities"),
+            "path_ops_sample": primary.get("path_ops_sample"),
+            "variations": [
+                {
+                    "seed": v.get("seed"),
+                    "image_base64": v.get("image_base64"),
+                    "entities": v.get("entities", []),
+                    "latency_ms": v.get("latency_ms"),
+                    "cache_hit": v.get("cache_hit"),
+                    "width": v.get("width"),
+                    "height": v.get("height"),
+                }
+                for v in vars_meta
+            ],
+        }
+        return JSONResponse(content=payload)
+
+    out_path = os.path.join(tempfile.gettempdir(), f"synth_img_{uuid.uuid4().hex[:12]}.png")
     try:
-        meta = await run_in_threadpool(generate_image, prompt, out_path, res)
+        meta = await run_in_threadpool(
+            generate_image,
+            prompt,
+            out_path,
+            res,
+            style,
+            seed,
+            aspect,
+            use_cache,
+            detail,
+            look,
+            path_mode,
+            preset,
+        )
         with open(out_path, "rb") as f:
             png_b64 = base64.b64encode(f.read()).decode("ascii")
     except Exception as e:
@@ -1642,18 +1770,40 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         except OSError:
             pass
 
-    return JSONResponse(content={
+    payload = {
         "ok": True,
-        "engine": "synthesus_vsa_geometric",
+        "engine": meta.get("engine", "synthesus_vsa_geometric"),
         "prompt": prompt,
         "resolution": res,
+        "width": meta.get("width"),
+        "height": meta.get("height"),
+        "style": style,
+        "detail": detail,
+        "look": look,
+        "seed": meta.get("seed", seed),
+        "aspect": aspect,
         "entities": meta.get("entities", []),
         "entity_count": meta.get("entity_count", 0),
+        "roles": meta.get("roles", []),
         "renderable_vocabulary": renderable_vocabulary(),
+        "cache_hit": bool(meta.get("cache_hit")),
+        "cache_source": meta.get("cache_source"),
         "latency_ms": round((time.time() - t0) * 1000.0, 1),
         "image_base64": png_b64,
         "mime_type": "image/png",
-    })
+        "vocab_version": meta.get("vocab_version"),
+        "isp": meta.get("isp"),
+        "depth": meta.get("depth"),
+        "preset": meta.get("preset") or preset,
+        "path_mode": path_mode,
+        "path_entities": meta.get("path_entities"),
+        "path_ops_sample": meta.get("path_ops_sample"),
+    }
+    try:
+        ImageResponse(**payload)
+    except Exception as ve:
+        logger.warning("ImageResponse validation soft-fail: %s", ve)
+    return JSONResponse(content=payload)
 
 
 @app.post("/api/v1/drive/ingest")

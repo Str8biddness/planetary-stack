@@ -566,7 +566,7 @@ async def query(req: QueryRequest, auth=Depends(get_auth)):
             global _kernel_proc
             _kernel_proc = None # Force restart on next call
             return QueryResponse(
-                response="Neural link interrupted. Re-initializing...",
+                response="SI link interrupted. Re-initializing...",
                 confidence=0.0, module="kernel", source="error"
             )
         data = json.loads(line.strip())
@@ -581,7 +581,7 @@ async def query(req: QueryRequest, auth=Depends(get_auth)):
         print(f"[kernel] Runtime error: {e}")
         _kernel_proc = None
         return QueryResponse(
-            response="Neural link interrupted. Please retry.",
+            response="SI link interrupted. Please retry.",
             confidence=0.0, module="kernel", source="error"
         )
 

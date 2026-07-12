@@ -212,3 +212,218 @@ Server log: KernelBridge initialized in ipc mode
 1. Claude review + merge `feat/launch-smoke`
 2. Redeploy install dir with `tools/redeploy_install.sh` on the box that ships
 3. Optional: re-run smoke after redeploy with production API key
+
+## 2026-07-12 — feat/image-roundout
+
+### Mission
+Optimize + scale SI image generation into a well-rounded illustration product
+(not diffusion). No CNC/G-code, no new swarm features.
+
+### What changed
+- `runtime/packages/reasoning/vsa_pipeline_image.py`
+  - Full SHAPES ↔ renderer parity (`house`, `star_top`, fire inner flame)
+  - Multi-object layout packing (ground + sky slots, seed jitter)
+  - Styles: `flat` | `soft` | `night`
+  - Aspect ratio + float32 raster
+  - Richer tree canopy (layered discs) + multi-blob clouds
+- `runtime/packages/reasoning/image_service.py`
+  - LRU PNG cache (prompt+res+style+seed+aspect), env `SYNTHESUS_IMAGE_CACHE_SIZE`
+  - Forwards style/seed/aspect; reports `cache_hit`, dims, roles
+- `runtime/packages/api/schemas.py` — `ImageRequest` / `ImageResponse`
+- `runtime/packages/api/production_server.py` — validates request, returns full envelope
+- `runtime/tests/test_image_roundout.py` — 9 golden/parity tests
+
+### Verified (pasted)
+```
+pytest tests/test_image_roundout.py -v
+→ 9 passed
+
+python packages/reasoning/image_service.py
+→ entities: house, tree, grass, sky, sun, star
+→ PNG 43966 bytes; cache_hit second call: True
+```
+
+### Honest ceiling
+Still SI procedural illustration (~26 vocab concepts), not photoreal.
+Photoreal / local SD remains optional future tier with explicit labeling.
+
+### Left off
+- Desktop Image Studio UI (next if product wants it)
+- Optional raw PNG URL response (base64 still default)
+- C++ optics paint acceleration (measure first)
+
+### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-studio
+
+### Mission
+Take SI image gen further: Image Studio UI + relation-aware layout + vocab growth.
+Built on feat/image-roundout. No CNC, no swarm, no diffusion claims.
+
+### What changed
+- `scene_composer.SHAPES`: +road/path, river/stream, fence, boat, person, building/tower/castle, flower, bird, bridge, bush
+- `vsa_pipeline_image.py`: relation parser (left of / right of / beside / behind / in front of / above / under / on); paint paths for all new roles
+- `image_service.py`: vocab_version `image-studio-v1`
+- Desktop: `win-image` Studio UI (prompt, style, res, aspect, seed, preview, entity chips)
+- `synthesus_native_shell.py`: `POST /api/v1/image` proxy → runtime
+- Tests: 12 golden (relations + studio vocab)
+
+### Verified
+```
+pytest tests/test_image_roundout.py -v
+→ 12 passed
+
+generate_image('a person left of a house ... bird ... flower')
+→ real PNG; person+house entities present
+```
+
+### How to use
+Dock 🎨 → SI Image Studio. Runtime must be on :5010 (shell proxies).
+
+### Honest ceiling
+Still SI illustration, not photoreal. Relations are binary phrase-based.
+
+### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-wow
+
+### Mission
+Push SI image gen toward product wow: atmosphere, disk cache, variations,
+chat "draw this", Studio gallery/download. Still SI (not Midjourney photoreal) —
+position for the huge illustration/local-privacy audience honestly.
+
+### What changed
+- `image_service.py`: disk cache `~/.cache/synthesus/image_cache`, detail high|standard,
+  `generate_variations(n)`, vocab_version `image-wow-v1`
+- `vsa_pipeline_image.py`: high-detail trees (limbs), haze, vignette, grain, contact shadows
+- API: `detail`, `variations` on ImageRequest; multi-PNG envelope
+- Desktop Studio: detail, ✦4× variations, Save, recent gallery
+- Chat: `draw …` / `/draw …` / `imagine …` → SI image inline
+- Shell proxy forwards detail + variations
+- Tests: **13 passed**
+
+### Positioning note (for review / mon)
+SI path = local, deterministic, private, infinite res vector-style scenes.
+Not a drop-in for photoreal Midjourney. Monetizable as: private studio +
+"draw in chat" + no cloud GPU bill. Optional labeled AI tier later.
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 13 passed
+```
+
+### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-camera (camera/TV ISP, not diffusion)
+
+### Mission
+Keep hammering image quality + scale. Path to *photo-real look* without
+copying diffusion: **digital camera + smart-TV ISP math** on the SI scene graph.
+
+### Thesis (aligned with research)
+Diffusion invents content. Cameras/TVs invent *appearance* of a captured signal:
+AE, white balance, bloom/glare, DOF, chromatic aberration, filmic tonemap,
+local contrast (clarity), sensor noise, sRGB OETF, vignette.
+Apply that stack to SI geometry → photographic finish, still pure SI content.
+
+### What changed
+- NEW `runtime/packages/reasoning/camera_isp.py` — full CPU ISP pipeline
+- `render_doc(..., look=photo|cinema|vivid|tv|raw)`
+- `image_service` / API / Studio / chat draw default toward `look=photo`
+- Vocab: lake/pond/meadow, barn/cabin, forest/pine, lamp, car (primitive reuse)
+- Tests: **14 passed** including `test_camera_isp_photo_look`
+
+### Honest ceiling
+- Photo *look* ≠ Midjourney inventing novel objects/faces
+- Content ceiling still vocabulary; ISP is the finish, not the model
+- Provenance: `engine=synthesus_vsa_geometric+camera_isp`, `isp.pipeline` listed
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 14 passed
+camera_isp demo → /tmp/camera_isp_demo.png with ae/bloom/dof/filmic/...
+```
+
+### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-cnc-paths (CNC form language)
+
+### Mission
+All-in: wire CNC path math into SI image construction. Not raw G-code UI —
+the *math* (G1/G2/G3, offset, contour fill, multi-pass) builds form; camera ISP
+still owns photo look.
+
+### What changed
+- NEW `runtime/packages/reasoning/cnc_paths.py`
+  - Line/arc segments, polyline, house/tree/person/fence/boat/building/…
+  - Discretize, tool-radius offset, multi-pass offsets
+  - Raster stroke + closed fill with AA
+  - Provenance sample as g-like ops (`G1 X…`, `G3 …`, `CLOSE`)
+- `pattern_document` / `render_doc` `path_mode=True` (default)
+- API/Studio/shell: `path_mode` toggle; engine string includes `cnc_paths`
+- Tests: **15 passed**
+
+### Stack (form → finish)
+```
+prompt → scene graph → CNC paths (form) → raster → camera ISP (look)
+```
+
+### Honest
+- CNC = precision construction, not Midjourney content invention
+- Users never type G-code; ops are internal + debug sample
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 15 passed
+cnc_paths demo → /tmp/cnc_paths_demo.png
+```
+
+### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-materials (materials + sky + CNC pocket)
+
+### Mission
+Continue image stack: surface response + atmospheric sky + deeper CNC multi-pass.
+
+### What changed
+- NEW `materials.py` — Lambertian + Schlick fresnel + roughness/metalness shading
+- NEW `sky_model.py` — Preetham-lite analytical sky (zenith/horizon/aureole)
+- `cnc_paths.paint_path` — multi-pass pocket fills + material shading
+- `render_doc` bg uses sky model; ground uses material shade
+- vocab_version `image-materials-v1`
+- Tests: **16 passed**
+
+### Stack
+```
+prompt → scene graph → CNC paths (form + pocket) → materials shade
+       → sky model → camera ISP (look)
+```
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 16 passed
+```
+
+### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-depth-presets
+
+### Mission
+1) Cinematic scene presets  2) Per-object depth map + true DOF bokeh.
+Also documents SI multi-axis opinion: real DOF only when Z is first-class.
+
+### What changed
+- NEW `scene_presets.py` — cottage_dawn, harbor_day, city_dusk, mountain_lake,
+  night_village, orchard, bridge_crossing, tv_vivid_park
+- NEW `depth_buffer.py` — per-object Z, z-test write, focus picker
+- `camera_isp.depth_of_field` uses depth_map when present (`dof_z`)
+- `render_doc` builds depth while painting paths; passes focus to ISP
+- Studio preset buttons; API `preset` field; shell `/api/v1/image/presets`
+- Tests: **17 passed**
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 17 passed
+```
+
+### Do NOT merge without Claude review.

@@ -226,3 +226,94 @@ class PatternIngest(BaseModel):
     domain: Optional[str] = "general"
     character_id: Optional[str] = None
     create_character: bool = False
+
+
+# --- SI Image Generation (procedural VSA/geometric — not diffusion) ---
+
+class ImageRequest(BaseModel):
+    """Request for POST /api/v1/image (SI illustration engine)."""
+    prompt: str = Field(..., min_length=1, max_length=2000, description="Scene description")
+    resolution: int = Field(
+        512,
+        ge=128,
+        le=2048,
+        description="Long-edge resolution in pixels (128–2048). Default 512 keeps"
+        " renders responsive; the per-object SDF fill is ~O(res^2) so 1024 is"
+        " noticeably slower until the bbox-restricted fill lands.",
+    )
+    style: str = Field(
+        "soft",
+        description="Paint style: flat | soft | night | photo (photo = soft + camera look)",
+    )
+    look: str = Field(
+        "photo",
+        description=(
+            "Camera/TV ISP finish (not diffusion): raw | photo | cinema | vivid | tv. "
+            "Applies AE, WB, bloom, DOF, filmic tonemap, sensor noise."
+        ),
+    )
+    seed: Optional[int] = Field(
+        None,
+        description="Optional deterministic layout seed; omit for prompt-stable default",
+    )
+    aspect: float = Field(
+        1.0,
+        ge=0.5,
+        le=2.0,
+        description="Width/height aspect ratio (0.5–2.0). 1.0 = square.",
+    )
+    use_cache: bool = Field(
+        True,
+        description="Serve from memory+disk cache when prompt+params match",
+    )
+    detail: str = Field(
+        "standard",
+        description="Render detail: standard | high (richer trees + atmosphere)",
+    )
+    variations: int = Field(
+        1,
+        ge=1,
+        le=8,
+        description="If >1, return multiple seed variations (see variations[] in response)",
+    )
+    path_mode: bool = Field(
+        True,
+        description=(
+            "CNC path construction for form (G1/arc/offset math). "
+            "Not raw G-code UI — SI uses the math to build contours."
+        ),
+    )
+    preset: Optional[str] = Field(
+        None,
+        description="Cinematic scene preset id (cottage_dawn, harbor_day, city_dusk, …)",
+    )
+
+
+class ImageResponse(BaseModel):
+    """Response envelope for SI image generation."""
+    ok: bool = True
+    engine: str = "synthesus_vsa_geometric"
+    prompt: str
+    resolution: int
+    width: Optional[int] = None
+    height: Optional[int] = None
+    style: str = "soft"
+    detail: str = "standard"
+    look: str = "photo"
+    seed: Optional[int] = None
+    aspect: float = 1.0
+    entities: List[str] = Field(default_factory=list)
+    entity_count: int = 0
+    roles: List[str] = Field(default_factory=list)
+    renderable_vocabulary: List[str] = Field(default_factory=list)
+    cache_hit: bool = False
+    cache_source: Optional[str] = None
+    latency_ms: float = 0.0
+    image_base64: str = ""
+    mime_type: str = "image/png"
+    vocab_version: Optional[str] = None
+    variations: Optional[List[Dict[str, Any]]] = None
+    isp: Optional[Dict[str, Any]] = None
+    path_mode: bool = True
+    path_entities: Optional[int] = None
+    path_ops_sample: Optional[List[str]] = None

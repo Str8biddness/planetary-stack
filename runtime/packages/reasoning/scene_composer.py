@@ -24,6 +24,8 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 SHARD_DIR = Path(__file__).resolve().parents[1] / "data" / "geometric_shards"
 
 # atomic visual vocabulary: entity -> primitive role
+# image-studio: +road/path, river/stream, fence, boat, person, building/tower,
+# flower, bird, bridge, bush (honest SI primitives — not photoreal).
 SHAPES = {
     "sky": "bg", "space": "bg", "night": "bg",
     "grass": "ground", "sea": "ground", "ocean": "ground", "water": "ground",
@@ -32,6 +34,30 @@ SHAPES = {
     "apple": "disc", "ball": "disc", "orange": "disc", "rock": "disc", "stone": "disc",
     "tree": "tree", "mountain": "triangle", "hill": "triangle", "pyramid": "triangle",
     "house": "house", "fire": "triangle",
+    # ── image-studio expansions ──────────────────────────────────────
+    "road": "strip", "path": "strip", "highway": "strip",
+    "river": "river", "stream": "river", "creek": "river",
+    "fence": "fence",
+    "boat": "boat", "ship": "boat",
+    "person": "person", "human": "person", "figure": "person",
+    "building": "building", "tower": "building", "castle": "building",
+    "flower": "flower", "rose": "flower",
+    "bird": "bird",
+    "bridge": "bridge",
+    "bush": "bush", "shrub": "bush",
+    # ── image-camera expansions ──────────────────────────────────────
+    "lake": "ground", "pond": "ground", "meadow": "ground",
+    "barn": "house", "cabin": "house", "cottage": "house",
+    "forest": "tree", "pine": "tree",
+    "lamp": "disc_top", "light": "disc_top",
+    "car": "boat",  # silhouette vehicle on ground (honest primitive reuse)
+    "lakehouse": "house",
+}
+DEFAULT_ROLES_EXTRA = {
+    "strip": (90, 90, 95), "river": (40, 100, 170), "fence": (120, 90, 50),
+    "boat": (140, 90, 55), "person": (50, 50, 70), "building": (100, 105, 120),
+    "flower": (210, 60, 100), "bird": (40, 40, 50), "bridge": (110, 95, 70),
+    "bush": (45, 110, 50),
 }
 # colour adjectives -> RGB (for explicit "red apple")
 ADJ = {"red": (200, 40, 40), "green": (50, 150, 60), "blue": (60, 100, 210),
@@ -42,7 +68,8 @@ ADJ = {"red": (200, 40, 40), "green": (50, 150, 60), "blue": (60, 100, 210),
 DEFAULT = {"bg": (150, 195, 235), "ground": (95, 150, 80), "disc": (200, 60, 50),
            "disc_top": (240, 215, 70), "cloud_top": (235, 235, 240),
            "star_top": (245, 225, 90), "tree": (60, 120, 55),
-           "triangle": (120, 110, 105), "house": (170, 90, 70)}
+           "triangle": (120, 110, 105), "house": (170, 90, 70),
+           **DEFAULT_ROLES_EXTRA}
 
 
 def load_colors():

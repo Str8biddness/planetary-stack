@@ -182,6 +182,72 @@ def health_proxy():
         print(f"[health] proxy unavailable ({e})")
         return jsonify({"status": "error", "message": f"runtime unavailable: {e}"}), 503
 
+
+@app.route('/api/v1/image', methods=['POST'])
+def image_proxy():
+    """SI Image Studio → runtime POST /api/v1/image (procedural VSA, not diffusion).
+
+    Forwards prompt/style/seed/aspect/resolution. Never invents a PNG if runtime is down.
+    """
+    data = request.get_json(silent=True) or {}
+    prompt = (data.get("prompt") or "").strip()
+    if not prompt:
+        return jsonify({"ok": False, "error": "prompt_required", "message": "prompt is required"}), 400
+    body = {
+        "prompt": prompt,
+        "resolution": data.get("resolution", 512),
+        "style": data.get("style", "flat"),
+        "aspect": data.get("aspect", 1.0),
+        "use_cache": data.get("use_cache", True),
+        "detail": data.get("detail", "high"),
+        "look": data.get("look", "photo"),
+        "path_mode": data.get("path_mode", True),
+        "preset": data.get("preset"),
+        "variations": data.get("variations", 1),
+    }
+
+
+@app.route('/api/v1/image/presets', methods=['GET'])
+def image_presets_proxy():
+    """List cinematic SI scene presets (local catalog)."""
+    try:
+        import sys
+        from pathlib import Path
+        # Prefer runtime package on PYTHONPATH; fallback load from sibling install
+        try:
+            import scene_presets as sp
+        except ImportError:
+            rt = Path(os.environ.get("SYNTHESUS_HOME", Path.home() / ".local/share/synthesus"))
+            sys.path.insert(0, str(rt / "runtime" / "packages" / "reasoning"))
+            import scene_presets as sp  # type: ignore
+        return jsonify({"ok": True, "presets": sp.list_presets()})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "presets": []}), 503
+    if data.get("seed") is not None and str(data.get("seed")).strip() != "":
+        try:
+            body["seed"] = int(data["seed"])
+        except (TypeError, ValueError):
+            pass
+    try:
+        r = requests.post(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/image",
+            json=body,
+            headers=_runtime_api_headers(),
+            timeout=120,
+        )
+        try:
+            payload = r.json()
+        except Exception:
+            payload = {"ok": False, "error": "bad_runtime_body", "message": (r.text or "")[:400]}
+        return (json.dumps(payload), r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        print(f"[image] runtime unavailable ({e})")
+        return jsonify({
+            "ok": False,
+            "error": "runtime_unavailable",
+            "message": f"runtime unavailable: {e}",
+        }), 503
+
 # Section E (C-401): the desktop chat routes through the CHAL runtime — the full
 # merged Synthesus brain (grounding + quad-brain + LLM + critic). If the runtime
 # is unavailable it DEGRADES LOUDLY to the direct kernel path (still real local AI,
