@@ -688,3 +688,26 @@ level re-render, Studio inspector/capabilities, bench, Claude review package.
 - ENGINE `si-image-v6.1-workshop` · **26 tests passed**
 
 ### Do NOT merge without Claude review of this package.
+
+---
+
+## 2026-07-12 — feat/image-perf (bbox SDF/fill lock)
+
+### What
+BBox-restricted path fill/stroke was already merged via image-opt-enhance
+(`raster_fill_bbox` / `paint_path` crop blend). This branch locks the claim:
+
+### Proof (this machine, look=raw, path_mode, seed=7)
+```
+historical_1024_pre_bbox_s 79.0  # Claude review era
+OK res= 512   0.26s  budget<=5.0
+OK res=1024   0.50s  budget<=10.0
+test_image_roundout.py: 26 passed
+```
+Target 1024 well under 10s: **met (~0.5s)**.
+
+### Added
+- `scripts/image_perf_bench.py` — fails if 1024 > 10s
+
+### Branch
+`feat/image-perf` — no further fill rewrite needed; output-preserving bbox already live.
