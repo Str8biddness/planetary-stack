@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 import time
 import uuid
@@ -33,8 +34,19 @@ _DISK_ON = os.environ.get("SYNTHESUS_IMAGE_SESSION_DISK_OFF", "").strip().lower(
 )
 
 
+# scene_id is user-supplied via the API and becomes a filename here, so it must
+# never be able to escape _DISK_ROOT (path traversal). Keep only filename-safe
+# characters and bound the length; both _read_disk and _write_disk route through
+# this, so sanitizing here closes traversal for read AND write.
+_SID_SANITIZE = re.compile(r"[^A-Za-z0-9_-]")
+
+
+def _safe_sid(sid: str) -> str:
+    return _SID_SANITIZE.sub("", str(sid))[:64] or "invalid"
+
+
 def _disk_path(sid: str) -> Path:
-    return _DISK_ROOT / f"{sid}.json"
+    return _DISK_ROOT / f"{_safe_sid(sid)}.json"
 
 
 def _serialize_doc(doc: Optional[list]) -> list:
