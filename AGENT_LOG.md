@@ -688,3 +688,18 @@ level re-render, Studio inspector/capabilities, bench, Claude review package.
 - ENGINE `si-image-v6.1-workshop` · **26 tests passed**
 
 ### Do NOT merge without Claude review of this package.
+
+---
+
+## 2026-07-12 — feat/loose-ends
+
+### a. image_intent draw triggers
+Widened DRAW routing for "make/create/generate a picture|image|drawing|illustration of X".
+Bare "make coffee" stays talk (not draw).
+Tests: `runtime/tests/test_image_intent_draw.py` 4 passed.
+
+### b. feat/ui-bugfixes
+Rebased onto latest main (separate commit on that branch) — left for Claude review; not merged.
+
+### Branch
+`feat/loose-ends` — do not merge without Claude review.
