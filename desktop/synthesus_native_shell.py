@@ -204,6 +204,11 @@ def image_proxy():
         "path_mode": data.get("path_mode", True),
         "preset": data.get("preset"),
         "variations": data.get("variations", 1),
+        "views": data.get("views", 1),
+        "yaw_span": data.get("yaw_span", 30),
+        "frames": data.get("frames", 1),
+        "yaw_deg": data.get("yaw_deg", 0),
+        "time_of_day": data.get("time_of_day"),
     }
 
 

@@ -275,6 +275,47 @@ def test_detail_high_and_variations():
     assert all(v.get("image_base64") for v in vars_)
 
 
+def test_world_camera_multiview_and_time():
+    import world_camera as wc
+    from image_service import generate_multiview, generate_time_sequence, clear_image_cache
+
+    yaws = wc.yaw_schedule(3, 30)
+    assert len(yaws) == 3 and yaws[1] == 0.0
+    times = wc.time_schedule(4, 0.1, 0.9)
+    assert len(times) == 4 and times[0] < times[-1]
+
+    doc = [
+        {"entity": "sky", "role": "bg", "color": (0.4, 0.6, 0.9)},
+        {"entity": "grass", "role": "ground", "color": (0.3, 0.5, 0.3), "y0": 0.66},
+        {"entity": "house", "role": "house", "color": (0.7, 0.4, 0.3),
+         "cx": 0.55, "base": 0.66, "w": 0.14, "h": 0.12},
+    ]
+    d_left, m = wc.project_view(doc, yaw_deg=-20)
+    d_right, _ = wc.project_view(doc, yaw_deg=20)
+    # Near house should shift opposite directions for opposite yaws
+    assert d_left[2]["cx"] != d_right[2]["cx"]
+    _, m_night = wc.project_view(doc, time_of_day=0.95)
+    assert m_night.get("style_hint") == "night"
+
+    clear_image_cache(disk=True)
+    views = generate_multiview(
+        "a house and a tree on grass under a sky with a sun",
+        n=2, yaw_span=20, res=192, style="soft", look="raw",
+        detail="standard", path_mode=True, use_cache=False, seed=3,
+    )
+    assert len(views) == 2
+    assert views[0]["yaw_deg"] != views[1]["yaw_deg"]
+    assert all(v.get("image_base64") for v in views)
+
+    frames = generate_time_sequence(
+        "a house on grass under a sky",
+        n=2, t0=0.15, t1=0.95, res=160, style="soft", look="raw",
+        detail="standard", path_mode=False, use_cache=False, seed=2,
+    )
+    assert len(frames) == 2
+    assert frames[0]["time_of_day"] < frames[1]["time_of_day"]
+
+
 def test_presets_and_depth_buffer():
     import scene_presets as sp
     import depth_buffer as db

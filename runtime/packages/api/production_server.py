@@ -1661,8 +1661,22 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         except Exception as pe:
             logger.warning("preset merge soft-fail: %s", pe)
 
+    yaw_deg = float(getattr(image_req, "yaw_deg", 0.0) or 0.0)
+    time_of_day = getattr(image_req, "time_of_day", None)
+    n_views = int(getattr(image_req, "views", 1) or 1)
+    n_views = max(1, min(8, n_views))
+    yaw_span = float(getattr(image_req, "yaw_span", 30.0) or 30.0)
+    n_frames = int(getattr(image_req, "frames", 1) or 1)
+    n_frames = max(1, min(8, n_frames))
+
     try:
-        from image_service import generate_image, generate_variations, renderable_vocabulary
+        from image_service import (
+            generate_image,
+            generate_variations,
+            generate_multiview,
+            generate_time_sequence,
+            renderable_vocabulary,
+        )
     except Exception as e:
         # Engine or an image dep (numpy/PIL) is missing — degrade loudly, don't fake.
         raise HTTPException(
@@ -1676,30 +1690,24 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
 
     t0 = time.time()
 
-    # Multi-variation path
-    if n_var > 1:
-        try:
-            vars_meta = await run_in_threadpool(
-                generate_variations,
-                prompt,
-                n_var,
-                res,
-                style,
-                seed,
-                aspect,
-                detail,
-                use_cache,
-                look,
-                path_mode,
-            )
-        except Exception as e:
-            logger.warning("image variations failed: %s", e)
-            raise HTTPException(
-                status_code=500,
-                detail={"error": "image_generation_failed", "message": str(e)},
-            )
-        primary = vars_meta[0]
-        payload = {
+    def _grid_payload(items, kind: str):
+        primary = items[0]
+        key = "variations" if kind == "seed" else ("views" if kind == "yaw" else "frames")
+        grid = []
+        for v in items:
+            entry = {
+                "image_base64": v.get("image_base64"),
+                "entities": v.get("entities", []),
+                "latency_ms": v.get("latency_ms"),
+                "cache_hit": v.get("cache_hit"),
+                "width": v.get("width"),
+                "height": v.get("height"),
+                "seed": v.get("seed"),
+                "yaw_deg": v.get("yaw_deg"),
+                "time_of_day": v.get("time_of_day"),
+            }
+            grid.append(entry)
+        return {
             "ok": True,
             "engine": primary.get("engine", "synthesus_vsa_geometric"),
             "prompt": prompt,
@@ -1722,23 +1730,97 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
             "mime_type": "image/png",
             "vocab_version": primary.get("vocab_version"),
             "isp": primary.get("isp"),
+            "depth": primary.get("depth"),
+            "camera": primary.get("camera"),
             "path_mode": path_mode,
             "path_entities": primary.get("path_entities"),
             "path_ops_sample": primary.get("path_ops_sample"),
-            "variations": [
-                {
-                    "seed": v.get("seed"),
-                    "image_base64": v.get("image_base64"),
-                    "entities": v.get("entities", []),
-                    "latency_ms": v.get("latency_ms"),
-                    "cache_hit": v.get("cache_hit"),
-                    "width": v.get("width"),
-                    "height": v.get("height"),
-                }
-                for v in vars_meta
-            ],
+            "preset": primary.get("preset") or preset,
+            "yaw_deg": primary.get("yaw_deg", yaw_deg),
+            "time_of_day": primary.get("time_of_day", time_of_day),
+            "grid_kind": kind,
+            key: grid,
+            "variations": grid if kind == "seed" else None,
         }
-        return JSONResponse(content=payload)
+
+    # Priority: time sequence > multiview > seed variations > single
+    if n_frames > 1:
+        try:
+            items = await run_in_threadpool(
+                generate_time_sequence,
+                prompt,
+                n_frames,
+                0.1,
+                0.95,
+                res,
+                style,
+                seed,
+                aspect,
+                detail,
+                use_cache,
+                look,
+                path_mode,
+                preset,
+                yaw_deg,
+            )
+        except Exception as e:
+            logger.warning("image time sequence failed: %s", e)
+            raise HTTPException(
+                status_code=500,
+                detail={"error": "image_generation_failed", "message": str(e)},
+            )
+        return JSONResponse(content=_grid_payload(items, "time"))
+
+    if n_views > 1:
+        try:
+            items = await run_in_threadpool(
+                generate_multiview,
+                prompt,
+                n_views,
+                yaw_span,
+                res,
+                style,
+                seed,
+                aspect,
+                detail,
+                use_cache,
+                look,
+                path_mode,
+                preset,
+                time_of_day,
+            )
+        except Exception as e:
+            logger.warning("image multiview failed: %s", e)
+            raise HTTPException(
+                status_code=500,
+                detail={"error": "image_generation_failed", "message": str(e)},
+            )
+        return JSONResponse(content=_grid_payload(items, "yaw"))
+
+    # Multi-variation path
+    if n_var > 1:
+        try:
+            vars_meta = await run_in_threadpool(
+                generate_variations,
+                prompt,
+                n_var,
+                res,
+                style,
+                seed,
+                aspect,
+                detail,
+                use_cache,
+                look,
+                path_mode,
+                preset,
+            )
+        except Exception as e:
+            logger.warning("image variations failed: %s", e)
+            raise HTTPException(
+                status_code=500,
+                detail={"error": "image_generation_failed", "message": str(e)},
+            )
+        return JSONResponse(content=_grid_payload(vars_meta, "seed"))
 
     out_path = os.path.join(tempfile.gettempdir(), f"synth_img_{uuid.uuid4().hex[:12]}.png")
     try:
@@ -1755,6 +1837,8 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
             look,
             path_mode,
             preset,
+            yaw_deg,
+            time_of_day,
         )
         with open(out_path, "rb") as f:
             png_b64 = base64.b64encode(f.read()).decode("ascii")
@@ -1798,6 +1882,9 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         "path_mode": path_mode,
         "path_entities": meta.get("path_entities"),
         "path_ops_sample": meta.get("path_ops_sample"),
+        "yaw_deg": meta.get("yaw_deg", yaw_deg),
+        "time_of_day": meta.get("time_of_day", time_of_day),
+        "camera": meta.get("camera"),
     }
     try:
         ImageResponse(**payload)

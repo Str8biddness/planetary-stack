@@ -2446,8 +2446,16 @@ function pickStudioVariation(i) {
     showStudioImage(src, { prompt: (document.getElementById('image-prompt') || {}).value || '' });
 }
 
-async function runImageStudio(variations) {
+async function runImageStudioViews(n) {
+    return runImageStudio(1, { views: n || 3, yaw_span: 30 });
+}
+async function runImageStudioFrames(n) {
+    return runImageStudio(1, { frames: n || 4 });
+}
+
+async function runImageStudio(variations, extra) {
     variations = variations || 1;
+    extra = extra || {};
     const promptEl = document.getElementById('image-prompt');
     const statusEl = document.getElementById('image-studio-status');
     const previewEl = document.getElementById('image-studio-preview');
@@ -2470,15 +2478,19 @@ async function runImageStudio(variations) {
     const seedRaw = (document.getElementById('image-seed') || {}).value;
     const body = { prompt, style, look, resolution, aspect, detail, path_mode, use_cache: true, variations };
     if (_activeImagePreset) body.preset = _activeImagePreset;
+    if (extra.views) { body.views = extra.views; body.yaw_span = extra.yaw_span || 30; body.variations = 1; }
+    if (extra.frames) { body.frames = extra.frames; body.variations = 1; body.views = 1; }
     if (seedRaw !== undefined && seedRaw !== null && String(seedRaw).trim() !== '') {
         const n = parseInt(seedRaw, 10);
         if (!Number.isNaN(n)) body.seed = n;
     }
 
     if (statusEl) {
-        statusEl.innerHTML = variations > 1
-            ? '<span style="color:#38bdf8;">Rendering ' + variations + ' SI variations…</span>'
-            : '<span style="color:#38bdf8;">Rendering SI scene graph…</span>';
+        let msg = 'Rendering SI scene graph…';
+        if (body.frames > 1) msg = 'Rendering ' + body.frames + ' time-of-day frames (same world)…';
+        else if (body.views > 1) msg = 'Rendering ' + body.views + ' camera views (orbit)…';
+        else if (variations > 1) msg = 'Rendering ' + variations + ' SI seed variations…';
+        statusEl.innerHTML = '<span style="color:#38bdf8;">' + msg + '</span>';
     }
     if (previewEl) {
         previewEl.style.display = 'flex';
@@ -2504,8 +2516,12 @@ async function runImageStudio(variations) {
             return;
         }
         const mime = data.mime_type || 'image/png';
-        if (data.variations && data.variations.length > 1) {
-            showStudioVariations(data.variations, mime);
+        const grid = (data.views && data.views.length > 1) ? data.views
+            : (data.frames && data.frames.length > 1) ? data.frames
+            : (data.variations && data.variations.length > 1) ? data.variations
+            : null;
+        if (grid) {
+            showStudioVariations(grid, mime);
         } else {
             const src = `data:${mime};base64,${data.image_base64}`;
             showStudioImage(src, data);

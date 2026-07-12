@@ -285,6 +285,36 @@ class ImageRequest(BaseModel):
         None,
         description="Cinematic scene preset id (cottage_dawn, harbor_day, city_dusk, …)",
     )
+    yaw_deg: float = Field(
+        0.0,
+        ge=-60.0,
+        le=60.0,
+        description="Camera orbit yaw degrees (parallax by depth Z)",
+    )
+    time_of_day: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Time axis 0=dawn … 0.5=noon … 1=night (sun path)",
+    )
+    views: int = Field(
+        1,
+        ge=1,
+        le=8,
+        description="If >1, multi-view orbit around scene (same world, different yaw)",
+    )
+    yaw_span: float = Field(
+        30.0,
+        ge=0.0,
+        le=90.0,
+        description="Total yaw span degrees when views>1",
+    )
+    frames: int = Field(
+        1,
+        ge=1,
+        le=8,
+        description="If >1, time-of-day sequence (same world, dawn→night)",
+    )
 
 
 class ImageResponse(BaseModel):

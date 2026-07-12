@@ -427,3 +427,27 @@ pytest tests/test_image_roundout.py → 17 passed
 ```
 
 ### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-multiview (yaw orbit + time axis)
+
+### Mission
+Keep going: real camera yaw + time-of-day axes on the same SI scene graph.
+Same world → many projections (bridge to virtual worlds). Still not diffusion.
+
+### What changed
+- NEW `world_camera.py` — parallax-by-Z orbit, sun path, night moon
+- `generate_multiview` / `generate_time_sequence` in image_service
+- API: `views`, `yaw_span`, `frames`, `yaw_deg`, `time_of_day`
+- Studio: ⟲ 3 views, ⏱ 4 times buttons
+- Tests: **18 passed**
+
+### Axes now
+X, Y (plane) · Z (depth) · yaw (orbit) · time (sun)
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 18 passed
+world_camera demo: house cx shifts with yaw; night → moon
+```
+
+### Do NOT merge without Claude review.

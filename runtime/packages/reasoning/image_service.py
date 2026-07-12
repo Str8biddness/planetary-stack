@@ -47,7 +47,7 @@ _DISK_ENABLED = os.environ.get("SYNTHESUS_IMAGE_DISK_CACHE_OFF", "").strip() not
 
 STYLES = sorted(vpi.STYLES)
 DETAILS = ("standard", "high")
-VOCAB_VERSION = "image-depth-presets-v1"
+VOCAB_VERSION = "image-multiview-v1"
 LOOKS = ("raw", "photo", "cinema", "vivid", "tv")
 
 
@@ -110,10 +110,14 @@ def _cache_key(
     detail: str,
     look: str = "raw",
     path_mode: bool = True,
+    yaw_deg: float = 0.0,
+    time_of_day: Optional[float] = None,
 ) -> str:
+    tod = "none" if time_of_day is None else f"{float(time_of_day):.4f}"
     raw = (
         f"{VOCAB_VERSION}|{prompt.strip()}|{res}|{style}|{seed}|"
-        f"{aspect:.4f}|{detail}|{look}|path={int(bool(path_mode))}"
+        f"{aspect:.4f}|{detail}|{look}|path={int(bool(path_mode))}|"
+        f"yaw={float(yaw_deg):.3f}|t={tod}"
     )
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -176,6 +180,8 @@ def generate_image(
     look: str = "raw",
     path_mode: bool = True,
     preset: Optional[str] = None,
+    yaw_deg: float = 0.0,
+    time_of_day: Optional[float] = None,
 ) -> dict[str, Any]:
     """Reason ``prompt`` into a scene graph and render it to ``out_path`` (PNG).
 
@@ -183,6 +189,7 @@ def generate_image(
     style=photo also enables soft paint + photo look.
     path_mode: CNC path construction (G1/arc/offset math) for form.
     preset: optional cinematic pack id (scene_presets) fills blanks.
+    yaw_deg: camera orbit (parallax by Z). time_of_day: 0..1 sun path / night.
     """
     # Apply cinematic preset pack (fills missing knobs only)
     if preset:
@@ -234,8 +241,13 @@ def generate_image(
     aspect = float(np.clip(float(aspect) if aspect else 1.0, 0.5, 2.0))
     if seed is not None:
         seed = int(seed)
+    yaw_deg = float(np.clip(float(yaw_deg or 0.0), -60.0, 60.0))
+    if time_of_day is not None:
+        time_of_day = float(np.clip(float(time_of_day), 0.0, 1.0))
 
-    key = _cache_key(prompt, res, style, seed, aspect, detail, look, path_mode)
+    key = _cache_key(
+        prompt, res, style, seed, aspect, detail, look, path_mode, yaw_deg, time_of_day
+    )
     t0 = time.time()
 
     if use_cache:
@@ -263,6 +275,38 @@ def generate_image(
         style=paint_style,
         path_mode=path_mode,
     )
+    camera_meta = None
+    if abs(yaw_deg) > 1e-6 or time_of_day is not None:
+        try:
+            import world_camera as _wc
+            doc, camera_meta = _wc.project_view(
+                doc, horizon=horizon, yaw_deg=yaw_deg, time_of_day=time_of_day
+            )
+            if camera_meta.get("style_hint") == "night":
+                paint_style = "night"
+            if time_of_day is not None and look not in ("raw", "none", "off"):
+                # gentle look nudge from time (does not override explicit cinema/tv if set)
+                if look in ("photo", "soft", "flat"):
+                    look = _wc.look_for_time(time_of_day, default_look=look)
+        except Exception:
+            camera_meta = {"error": "world_camera_unavailable"}
+    # Re-attach paths after view projection if path_mode
+    if path_mode:
+        try:
+            import cnc_paths as _cnc
+            for i, prim in enumerate(doc):
+                if prim.get("role") in (
+                    "house", "building", "triangle", "tree", "bush", "person",
+                    "fence", "boat", "flower", "bridge", "disc", "disc_top",
+                    "star_top", "cloud_top",
+                ):
+                    ps = _cnc.paths_for_primitive(prim, seed=int(seed or 0) + i * 17)
+                    if ps:
+                        prim["paths"] = ps
+                        prim["path_ops"] = _cnc.path_provenance(ps)
+                        prim["construction"] = "cnc_paths"
+        except Exception:
+            pass
     vpi.render_doc(
         doc,
         horizon,
@@ -318,9 +362,12 @@ def generate_image(
         "preset": preset,
         "seed": seed,
         "aspect": aspect,
+        "yaw_deg": yaw_deg,
+        "time_of_day": time_of_day,
+        "camera": camera_meta,
         "cache_hit": False,
         "cache_source": None,
-        "engine": "+".join(engine_bits),
+        "engine": "+".join(engine_bits + (["world_camera"] if camera_meta else [])),
         "bytes": len(png_bytes),
         "isp": getattr(vpi.render_doc, "last_isp_meta", None),
         "depth": getattr(vpi.render_doc, "last_depth_stats", None),
@@ -357,6 +404,7 @@ def generate_variations(
     use_cache: bool = True,
     look: str = "photo",
     path_mode: bool = True,
+    preset: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """Render N variations with different seeds. Returns list of metas (+ png on path)."""
     n = max(1, min(8, int(n)))
@@ -380,6 +428,7 @@ def generate_variations(
                 detail=detail,
                 look=look,
                 path_mode=path_mode,
+                preset=preset if i == 0 else None,
             )
             with open(out, "rb") as f:
                 png = f.read()
@@ -388,6 +437,129 @@ def generate_variations(
             m["image_base64"] = base64.b64encode(png).decode("ascii")
             m["mime_type"] = "image/png"
             m["variation_index"] = i
+            results.append(m)
+    finally:
+        for name in os.listdir(tmpdir):
+            try:
+                os.remove(os.path.join(tmpdir, name))
+            except OSError:
+                pass
+        try:
+            os.rmdir(tmpdir)
+        except OSError:
+            pass
+    return results
+
+
+def generate_multiview(
+    prompt: str,
+    n: int = 3,
+    yaw_span: float = 30.0,
+    res: int = 512,
+    style: str = "photo",
+    seed: Optional[int] = None,
+    aspect: float = 1.0,
+    detail: str = "high",
+    use_cache: bool = True,
+    look: str = "photo",
+    path_mode: bool = True,
+    preset: Optional[str] = None,
+    time_of_day: Optional[float] = None,
+) -> list[dict[str, Any]]:
+    """Same scene graph, multiple camera yaws (orbit). SI multi-view, not diffusion."""
+    import base64
+    import world_camera as wc
+
+    yaws = wc.yaw_schedule(n=n, span_deg=yaw_span)
+    results = []
+    tmpdir = tempfile.mkdtemp(prefix="synth_img_mv_")
+    try:
+        for i, yaw in enumerate(yaws):
+            out = os.path.join(tmpdir, f"mv{i}.png")
+            meta = generate_image(
+                prompt,
+                out,
+                res=res,
+                style=style,
+                seed=seed,
+                aspect=aspect,
+                use_cache=use_cache,
+                detail=detail,
+                look=look,
+                path_mode=path_mode,
+                preset=preset if i == 0 else None,
+                yaw_deg=yaw,
+                time_of_day=time_of_day,
+            )
+            with open(out, "rb") as f:
+                png = f.read()
+            m = dict(meta)
+            m["image_base64"] = base64.b64encode(png).decode("ascii")
+            m["mime_type"] = "image/png"
+            m["view_index"] = i
+            m["yaw_deg"] = yaw
+            results.append(m)
+    finally:
+        for name in os.listdir(tmpdir):
+            try:
+                os.remove(os.path.join(tmpdir, name))
+            except OSError:
+                pass
+        try:
+            os.rmdir(tmpdir)
+        except OSError:
+            pass
+    return results
+
+
+def generate_time_sequence(
+    prompt: str,
+    n: int = 4,
+    t0: float = 0.1,
+    t1: float = 0.95,
+    res: int = 512,
+    style: str = "photo",
+    seed: Optional[int] = None,
+    aspect: float = 1.0,
+    detail: str = "high",
+    use_cache: bool = True,
+    look: str = "photo",
+    path_mode: bool = True,
+    preset: Optional[str] = None,
+    yaw_deg: float = 0.0,
+) -> list[dict[str, Any]]:
+    """Same world, time-of-day axis (dawn→night). SI temporal sequence."""
+    import base64
+    import world_camera as wc
+
+    times = wc.time_schedule(n=n, t0=t0, t1=t1)
+    results = []
+    tmpdir = tempfile.mkdtemp(prefix="synth_img_ts_")
+    try:
+        for i, t in enumerate(times):
+            out = os.path.join(tmpdir, f"t{i}.png")
+            meta = generate_image(
+                prompt,
+                out,
+                res=res,
+                style=style,
+                seed=seed,
+                aspect=aspect,
+                use_cache=use_cache,
+                detail=detail,
+                look=look,
+                path_mode=path_mode,
+                preset=preset if i == 0 else None,
+                yaw_deg=yaw_deg,
+                time_of_day=t,
+            )
+            with open(out, "rb") as f:
+                png = f.read()
+            m = dict(meta)
+            m["image_base64"] = base64.b64encode(png).decode("ascii")
+            m["mime_type"] = "image/png"
+            m["frame_index"] = i
+            m["time_of_day"] = t
             results.append(m)
     finally:
         for name in os.listdir(tmpdir):
