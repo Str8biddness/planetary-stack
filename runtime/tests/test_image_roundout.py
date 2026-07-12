@@ -45,6 +45,9 @@ from image_service import (  # noqa: E402
 PAINTABLE_ROLES = frozenset({
     "bg", "ground", "disc_top", "cloud_top", "star_top",
     "triangle", "disc", "tree", "house",
+    # image-studio expansions
+    "strip", "river", "fence", "boat", "person", "building",
+    "flower", "bird", "bridge", "bush",
 })
 
 
@@ -174,6 +177,8 @@ def test_known_entity_coverage_measure():
         "a red apple on green grass under a blue sky with a sun",
         "a mountain and a tree on grass under a sky with a cloud",
         "a house and a star under a night sky over snow",
+        "a boat on a river under a sky with a bird",
+        "a person left of a house near a fence and a flower",
     ]
     tot = cov = 0
     for req in tests:
@@ -185,3 +190,46 @@ def test_known_entity_coverage_measure():
             cov += int(w in rendered)
     score = cov / tot if tot else 0.0
     assert score >= 0.9, f"entity coverage {score:.2f} below 0.9 ({cov}/{tot})"
+
+
+def test_relation_left_of_places_subject_left():
+    doc, _ = vpi.pattern_document(
+        "a tree left of a house on grass under a sky",
+        seed=3, style="flat",
+    )
+    by_ent = {p["entity"]: p for p in doc}
+    assert "tree" in by_ent and "house" in by_ent
+    tx = by_ent["tree"].get("x", by_ent["tree"].get("cx"))
+    hx = by_ent["house"].get("x", by_ent["house"].get("cx"))
+    assert tx is not None and hx is not None
+    assert tx < hx, f"tree ({tx}) should be left of house ({hx})"
+
+
+def test_relation_right_of_places_subject_right():
+    doc, _ = vpi.pattern_document(
+        "a person right of a building on grass under a sky",
+        seed=4, style="flat",
+    )
+    by_ent = {p["entity"]: p for p in doc}
+    assert "person" in by_ent and "building" in by_ent
+    px = by_ent["person"].get("x", by_ent["person"].get("cx"))
+    bx = by_ent["building"].get("x", by_ent["building"].get("cx"))
+    assert px > bx, f"person ({px}) should be right of building ({bx})"
+
+
+def test_studio_vocab_entities_paint():
+    prompt = (
+        "a road and a river and a fence and a boat and a person and a building "
+        "and a flower and a bird and a bridge and a bush on grass under a sky"
+    )
+    doc, horizon = vpi.pattern_document(prompt, seed=8, style="soft")
+    entities = {p["entity"] for p in doc}
+    for e in ("road", "river", "fence", "boat", "person", "building",
+              "flower", "bird", "bridge", "bush"):
+        assert e in entities, f"missing entity {e}"
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "studio.png")
+        vpi.render_doc(doc, horizon, res=320, out=out, style="soft", seed=8)
+        assert os.path.getsize(out) > 1000
+        arr = np.asarray(Image.open(out).convert("RGB"))
+        assert arr.std() > 5.0

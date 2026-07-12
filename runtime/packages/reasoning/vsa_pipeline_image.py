@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Coarse-to-fine image pipeline — Synthesus 5 (image-roundout)
-===========================================================
+Coarse-to-fine image pipeline — Synthesus 5 (image-studio)
+==========================================================
 
   request --(reasoning kernel)--> PATTERN DOCUMENT (resolution-free scene graph)
           --(Hopfield imagination)--> fills vague/unknown entities
@@ -10,13 +10,11 @@ Coarse-to-fine image pipeline — Synthesus 5 (image-roundout)
 Honest scope: procedural / vector illustrations from the known SHAPES vocabulary.
 Not photoreal. Growing realism = growing the vocabulary + templates.
 
-Roundout additions:
-  - full SHAPES ↔ renderer parity (house, star_top, fire)
-  - multi-object layout packing (no more everything at x=0.5)
-  - style knobs: flat | soft | night
-  - seed for deterministic jitter
-  - aspect ratio (width/height)
-  - float32 raster path
+Studio additions on top of image-roundout:
+  - relation-aware layout (left of / right of / behind / in front of / above / under)
+  - expanded vocab templates: road, river, fence, boat, person, building, flower,
+    bird, bridge, bush
+  - all new roles have paint paths (parity with SHAPES)
 
 Run:  ./venv/bin/python packages/reasoning/vsa_pipeline_image.py
 """
@@ -26,7 +24,7 @@ import hashlib
 import json
 import os
 import sys
-from typing import Any, Iterable, Optional
+from typing import Any, Optional
 
 import numpy as np
 from PIL import Image
@@ -51,6 +49,17 @@ PAL = {
     "fire": (.92, .40, .12), "ball": (.70, .20, .20), "orange": (.92, .55, .15),
     "rock": (.50, .48, .46), "stone": (.48, .46, .44), "hill": (.42, .50, .34),
     "pyramid": (.78, .68, .42),
+    # image-studio expansions
+    "road": (.35, .35, .38), "path": (.48, .42, .32), "highway": (.30, .30, .33),
+    "river": (.18, .42, .70), "stream": (.20, .48, .72), "creek": (.22, .50, .68),
+    "fence": (.50, .38, .22),
+    "boat": (.55, .35, .20), "ship": (.40, .42, .48),
+    "person": (.22, .22, .30), "human": (.22, .22, .30), "figure": (.22, .22, .30),
+    "building": (.42, .44, .50), "tower": (.38, .40, .48), "castle": (.45, .42, .40),
+    "flower": (.85, .25, .40), "rose": (.80, .15, .28),
+    "bird": (.18, .18, .22),
+    "bridge": (.48, .40, .30),
+    "bush": (.22, .48, .24), "shrub": (.24, .46, .22),
 }
 ADJ = {
     "red": (.78, .18, .16), "green": (.20, .55, .25), "blue": (.24, .40, .82),
@@ -62,15 +71,37 @@ ADJ = {
 
 # Paint order (background → foreground)
 ROLE_ORDER = {
-    "bg": 0, "ground": 1, "triangle": 2, "house": 3, "tree": 4,
-    "disc": 5, "disc_top": 6, "cloud_top": 6, "star_top": 7,
+    "bg": 0, "ground": 1, "strip": 2, "river": 2, "bridge": 3,
+    "triangle": 4, "building": 5, "house": 6, "fence": 7, "tree": 8, "bush": 8,
+    "boat": 9, "disc": 10, "flower": 10, "person": 11,
+    "disc_top": 12, "cloud_top": 12, "star_top": 13, "bird": 14,
 }
 
 # Roles that sit on/near the horizon and need horizontal packing
-GROUND_ROLES = frozenset({"triangle", "tree", "disc", "house"})
-SKY_ROLES = frozenset({"disc_top", "cloud_top", "star_top"})
+GROUND_ROLES = frozenset({
+    "triangle", "tree", "disc", "house", "building", "fence", "boat",
+    "person", "flower", "bush", "bridge",
+})
+SKY_ROLES = frozenset({"disc_top", "cloud_top", "star_top", "bird"})
+# Full-width layers (not packed as point objects)
+SPAN_ROLES = frozenset({"strip", "river"})
 
 STYLES = frozenset({"flat", "soft", "night"})
+
+# Relation phrases: (span_tokens, kind) — multi-word first
+_REL_PHRASES: list[tuple[tuple[str, ...], str]] = [
+    (("in", "front", "of"), "front"),
+    (("left", "of"), "left"),
+    (("right", "of"), "right"),
+    (("next", "to"), "beside"),
+    (("behind",), "behind"),
+    (("beside",), "beside"),
+    (("above",), "above"),
+    (("over",), "above"),
+    (("below",), "below"),
+    (("under",), "below"),
+    (("on",), "on"),
+]
 
 
 def _rng_from_seed(seed: Optional[int], prompt: str = "") -> np.random.Generator:
@@ -110,6 +141,84 @@ def _style_modulate_color(color: tuple, style: str, entity: str, role: str) -> t
     return tuple(float(np.clip(v, 0, 1)) for v in c)
 
 
+def _parse_relations(toks: list[str], entity_token_idxs: list[int]) -> list[dict[str, Any]]:
+    """Find binary spatial relations between consecutive entities in the prompt.
+
+    Returns list of {subject_tok, object_tok, kind} using token indices into `toks`.
+    """
+    if len(entity_token_idxs) < 2:
+        return []
+    ent_set = set(entity_token_idxs)
+    rels: list[dict[str, Any]] = []
+    i = 0
+    while i < len(toks):
+        matched = None
+        for phrase, kind in _REL_PHRASES:
+            n = len(phrase)
+            if i + n <= len(toks) and tuple(toks[i:i + n]) == phrase:
+                matched = (n, kind)
+                break
+        if not matched:
+            i += 1
+            continue
+        n, kind = matched
+        # subject = nearest entity token before phrase; object = nearest after
+        subj = max((e for e in ent_set if e < i), default=None)
+        obj = min((e for e in ent_set if e >= i + n), default=None)
+        if subj is not None and obj is not None and subj != obj:
+            rels.append({"subject_tok": subj, "object_tok": obj, "kind": kind})
+        i += n
+    return rels
+
+
+def _apply_relations(
+    x_by_raw: dict[int, float],
+    y_off_by_raw: dict[int, float],
+    scale_by_raw: dict[int, float],
+    raw: list[dict[str, Any]],
+    tok_to_raw: dict[int, int],
+    relations: list[dict[str, Any]],
+) -> None:
+    """Mutate layout maps from parsed relations (subject relative to object)."""
+    for rel in relations:
+        si = tok_to_raw.get(rel["subject_tok"])
+        oi = tok_to_raw.get(rel["object_tok"])
+        if si is None or oi is None:
+            continue
+        # Skip pure bg/ground as subjects for left/right
+        if raw[si]["role"] in ("bg", "ground") or raw[oi]["role"] in ("bg", "ground"):
+            if rel["kind"] not in ("on", "above", "below"):
+                continue
+        ox = x_by_raw.get(oi, 0.5)
+        kind = rel["kind"]
+        if kind == "left":
+            x_by_raw[si] = float(np.clip(ox - 0.18, 0.08, 0.92))
+        elif kind == "right":
+            x_by_raw[si] = float(np.clip(ox + 0.18, 0.08, 0.92))
+        elif kind == "beside":
+            # place to the side with less crowding
+            side = -0.14 if ox > 0.5 else 0.14
+            x_by_raw[si] = float(np.clip(ox + side, 0.08, 0.92))
+        elif kind == "behind":
+            x_by_raw[si] = float(np.clip(ox + 0.02, 0.08, 0.92))
+            y_off_by_raw[si] = y_off_by_raw.get(si, 0.0) - 0.06  # higher on canvas
+            scale_by_raw[si] = scale_by_raw.get(si, 1.0) * 0.85
+        elif kind == "front":
+            x_by_raw[si] = float(np.clip(ox - 0.02, 0.08, 0.92))
+            y_off_by_raw[si] = y_off_by_raw.get(si, 0.0) + 0.04
+            scale_by_raw[si] = scale_by_raw.get(si, 1.0) * 1.12
+        elif kind == "above":
+            y_off_by_raw[si] = y_off_by_raw.get(si, 0.0) - 0.12
+            x_by_raw[si] = float(np.clip(ox + 0.0, 0.08, 0.92))
+        elif kind == "below":
+            y_off_by_raw[si] = y_off_by_raw.get(si, 0.0) + 0.08
+            x_by_raw[si] = float(np.clip(ox, 0.08, 0.92))
+        elif kind == "on":
+            # subject rests at object's x (or horizon if object is ground)
+            x_by_raw[si] = float(np.clip(ox if raw[oi]["role"] != "ground" else x_by_raw.get(si, ox), 0.08, 0.92))
+            y_off_by_raw[si] = 0.0
+
+
 # ── Stage 1: reasoning kernel -> pattern document (scene graph) ──
 def pattern_document(
     request: str,
@@ -119,7 +228,7 @@ def pattern_document(
     seed: Optional[int] = None,
     style: str = "flat",
 ) -> tuple[list[dict[str, Any]], float]:
-    """Parse prompt into a resolution-free scene graph with multi-object layout."""
+    """Parse prompt into a resolution-free scene graph with multi-object + relation layout."""
     style = (style or "flat").lower().strip()
     if style not in STYLES:
         style = "flat"
@@ -131,6 +240,8 @@ def pattern_document(
 
     # First pass: resolve entities (with optional Hopfield imagination)
     raw: list[dict[str, Any]] = []
+    tok_to_raw: dict[int, int] = {}
+    entity_token_idxs: list[int] = []
     for i, t in enumerate(toks):
         entity = t
         role = scene_composer.SHAPES.get(entity)
@@ -143,7 +254,9 @@ def pattern_document(
             continue
         color = ADJ[toks[i - 1]] if i and toks[i - 1] in ADJ else PAL.get(entity, (.6, .6, .6))
         color = _style_modulate_color(color, style, entity, role)
-        raw.append({"entity": entity, "role": role, "color": color})
+        tok_to_raw[i] = len(raw)
+        entity_token_idxs.append(i)
+        raw.append({"entity": entity, "role": role, "color": color, "_tok": i})
 
     # Night style injects a dark sky if no bg present
     if style == "night" and not any(p["role"] == "bg" for p in raw):
@@ -151,60 +264,146 @@ def pattern_document(
             "entity": "night",
             "role": "bg",
             "color": _style_modulate_color(PAL["night"], style, "night", "bg"),
+            "_tok": -1,
         })
+        # shift maps
+        tok_to_raw = {k: v + 1 for k, v in tok_to_raw.items()}
 
     rng = _rng_from_seed(seed, request)
+    relations = _parse_relations(toks, entity_token_idxs)
 
-    # Collect indices for packing
+    # Default packing
     ground_idx = [i for i, p in enumerate(raw) if p["role"] in GROUND_ROLES]
     sky_idx = [i for i, p in enumerate(raw) if p["role"] in SKY_ROLES]
     ground_xs = _pack_positions(len(ground_idx), 0.18, 0.82, rng)
     sky_xs = _pack_positions(len(sky_idx), 0.15, 0.88, rng)
-    g_map = {idx: x for idx, x in zip(ground_idx, ground_xs)}
-    s_map = {idx: x for idx, x in zip(sky_idx, sky_xs)}
+    x_by_raw: dict[int, float] = {}
+    for idx, x in zip(ground_idx, ground_xs):
+        x_by_raw[idx] = x
+    for idx, x in zip(sky_idx, sky_xs):
+        x_by_raw[idx] = x
+    y_off_by_raw: dict[int, float] = {}
+    scale_by_raw: dict[int, float] = {}
+
+    _apply_relations(x_by_raw, y_off_by_raw, scale_by_raw, raw, tok_to_raw, relations)
 
     doc: list[dict[str, Any]] = []
     for i, p in enumerate(raw):
         role = p["role"]
-        prim = dict(p)
+        prim = {k: v for k, v in p.items() if k != "_tok"}
+        sc = scale_by_raw.get(i, 1.0)
+        yoff = y_off_by_raw.get(i, 0.0)
         if role == "bg":
             prim.update(x=0.0, y=0.0, w=1.0, h=1.0)
         elif role == "ground":
             prim.update(y0=horizon)
+        elif role == "strip":  # road / path
+            prim.update(y0=horizon + 0.02 + yoff, h=0.06 * sc, taper=0.35)
+        elif role == "river":
+            prim.update(y0=horizon + 0.04 + yoff, h=0.05 * sc, meander=0.03)
         elif role == "disc_top":
-            y = 0.18 + float(rng.uniform(-0.02, 0.03))
-            r = 0.075 + float(rng.uniform(-0.01, 0.015))
-            prim.update(x=s_map.get(i, 0.72), y=y, r=r)
+            y = 0.18 + float(rng.uniform(-0.02, 0.03)) + yoff
+            r = (0.075 + float(rng.uniform(-0.01, 0.015))) * sc
+            prim.update(x=x_by_raw.get(i, 0.72), y=float(np.clip(y, 0.05, 0.45)), r=r)
         elif role == "cloud_top":
-            y = 0.16 + float(rng.uniform(-0.02, 0.04))
-            r = 0.065 + float(rng.uniform(-0.01, 0.01))
-            prim.update(x=s_map.get(i, 0.30), y=y, r=r)
+            y = 0.16 + float(rng.uniform(-0.02, 0.04)) + yoff
+            r = (0.065 + float(rng.uniform(-0.01, 0.01))) * sc
+            prim.update(x=x_by_raw.get(i, 0.30), y=float(np.clip(y, 0.05, 0.40)), r=r)
         elif role == "star_top":
-            y = 0.12 + float(rng.uniform(0.0, 0.18))
-            r = 0.028 + float(rng.uniform(0.0, 0.012))
-            prim.update(x=s_map.get(i, 0.50), y=y, r=r, points=5)
+            y = 0.12 + float(rng.uniform(0.0, 0.18)) + yoff
+            r = (0.028 + float(rng.uniform(0.0, 0.012))) * sc
+            prim.update(x=x_by_raw.get(i, 0.50), y=float(np.clip(y, 0.04, 0.40)), r=r, points=5)
+        elif role == "bird":
+            y = 0.22 + float(rng.uniform(-0.05, 0.08)) + yoff
+            prim.update(x=x_by_raw.get(i, 0.55), y=float(np.clip(y, 0.08, 0.50)), s=0.035 * sc)
         elif role == "triangle":
-            # mountain / hill / pyramid / fire (fire gets taller + warmer handled in color)
             h = 0.38 if p["entity"] != "fire" else 0.22
             hw = 0.28 if p["entity"] != "fire" else 0.10
             if p["entity"] == "hill":
                 h, hw = 0.22, 0.34
             if p["entity"] == "pyramid":
                 h, hw = 0.36, 0.24
-            prim.update(cx=g_map.get(i, 0.5), base=horizon, h=h, hw=hw)
+            prim.update(
+                cx=x_by_raw.get(i, 0.5),
+                base=float(np.clip(horizon + yoff, 0.4, 0.9)),
+                h=h * sc, hw=hw * sc,
+            )
         elif role == "disc":
-            r = 0.065 + float(rng.uniform(-0.01, 0.015))
-            prim.update(x=g_map.get(i, 0.5), y=horizon - r * 0.95, r=r)
+            r = (0.065 + float(rng.uniform(-0.01, 0.015))) * sc
+            base = float(np.clip(horizon + yoff, 0.4, 0.9))
+            prim.update(x=x_by_raw.get(i, 0.5), y=base - r * 0.95, r=r)
         elif role == "tree":
-            r = 0.09 + float(rng.uniform(-0.015, 0.02))
-            prim.update(x=g_map.get(i, 0.30), base=horizon, r=r, fractal=True)
+            r = (0.09 + float(rng.uniform(-0.015, 0.02))) * sc
+            prim.update(
+                x=x_by_raw.get(i, 0.30),
+                base=float(np.clip(horizon + yoff, 0.4, 0.9)),
+                r=r, fractal=True,
+            )
+        elif role == "bush":
+            r = (0.055 + float(rng.uniform(-0.01, 0.01))) * sc
+            prim.update(
+                x=x_by_raw.get(i, 0.40),
+                base=float(np.clip(horizon + yoff, 0.4, 0.9)),
+                r=r,
+            )
         elif role == "house":
-            w = 0.14 + float(rng.uniform(-0.02, 0.02))
-            h = 0.12 + float(rng.uniform(-0.015, 0.02))
-            prim.update(cx=g_map.get(i, 0.55), base=horizon, w=w, h=h)
+            w = (0.14 + float(rng.uniform(-0.02, 0.02))) * sc
+            hh = (0.12 + float(rng.uniform(-0.015, 0.02))) * sc
+            prim.update(
+                cx=x_by_raw.get(i, 0.55),
+                base=float(np.clip(horizon + yoff, 0.4, 0.9)),
+                w=w, h=hh,
+            )
+        elif role == "building":
+            w = (0.10 + float(rng.uniform(-0.02, 0.03))) * sc
+            hh = (0.22 + float(rng.uniform(0.0, 0.12))) * sc
+            if p["entity"] == "tower":
+                w, hh = 0.07 * sc, 0.32 * sc
+            if p["entity"] == "castle":
+                w, hh = 0.18 * sc, 0.20 * sc
+            prim.update(
+                cx=x_by_raw.get(i, 0.5),
+                base=float(np.clip(horizon + yoff, 0.4, 0.9)),
+                w=w, h=hh,
+            )
+        elif role == "fence":
+            prim.update(
+                x0=float(np.clip(x_by_raw.get(i, 0.35) - 0.12, 0.05, 0.7)),
+                x1=float(np.clip(x_by_raw.get(i, 0.35) + 0.12, 0.2, 0.95)),
+                base=float(np.clip(horizon + yoff, 0.4, 0.9)),
+                h=0.06 * sc,
+            )
+        elif role == "boat":
+            prim.update(
+                x=x_by_raw.get(i, 0.45),
+                y=float(np.clip(horizon + 0.02 + yoff, 0.45, 0.92)),
+                w=0.10 * sc, h=0.035 * sc,
+            )
+        elif role == "person":
+            prim.update(
+                x=x_by_raw.get(i, 0.5),
+                base=float(np.clip(horizon + yoff, 0.4, 0.9)),
+                h=0.10 * sc,
+            )
+        elif role == "flower":
+            prim.update(
+                x=x_by_raw.get(i, 0.5),
+                base=float(np.clip(horizon + yoff, 0.4, 0.9)),
+                r=0.025 * sc,
+            )
+        elif role == "bridge":
+            prim.update(
+                cx=x_by_raw.get(i, 0.5),
+                base=float(np.clip(horizon + yoff, 0.4, 0.9)),
+                w=0.22 * sc, h=0.08 * sc,
+            )
         else:
-            # Unknown role: still emit so callers see honesty; renderer no-ops safely
-            prim.update(x=0.5, y=0.5, r=0.05)
+            prim.update(x=x_by_raw.get(i, 0.5), y=0.5, r=0.05)
+        if relations:
+            prim["relations"] = [
+                r["kind"] for r in relations
+                if tok_to_raw.get(r["subject_tok"]) == i
+            ]
         doc.append(prim)
 
     return doc, horizon
@@ -459,6 +658,165 @@ def render_doc(
             ).astype(np.float32)
             win_c = (.55, .75, .90) if style != "night" else (.90, .80, .35)
             paint(win, win_c)
+        elif role == "strip":  # road / path
+            y0 = float(p.get("y0", horizon + 0.02))
+            hh = float(p.get("h", 0.06))
+            # perspective taper toward horizon
+            taper = float(p.get("taper", 0.35))
+            t = np.clip((yy - y0) / max(hh, 1e-6), 0, 1)
+            half = 0.08 + (0.42 - 0.08) * t  # wider near camera
+            band = (
+                (yy >= y0) & (yy <= y0 + hh)
+                & (np.abs(xx - 0.5) < half * (1.0 - taper * (1.0 - t) * 0.3))
+            )
+            m = band.astype(np.float32) * smoothstep(y0 - aa, y0 + aa, yy)
+            paint(m, c)
+            # center dashed line for road-like
+            if p.get("entity") in ("road", "highway"):
+                dash = (
+                    (np.abs(xx - 0.5) < 0.008)
+                    & (yy >= y0 + 0.01)
+                    & (yy <= y0 + hh - 0.01)
+                    & (((yy * 40).astype(int) % 2) == 0)
+                ).astype(np.float32)
+                paint(dash, (.85, .80, .40))
+        elif role == "river":
+            y0 = float(p.get("y0", horizon + 0.04))
+            hh = float(p.get("h", 0.05))
+            meander = float(p.get("meander", 0.03))
+            center = 0.5 + meander * np.sin(yy * PI * 3.0)
+            half = 0.06 + 0.02 * np.sin(yy * PI * 5.0)
+            band = (yy >= y0) & (yy <= y0 + hh * 3.5) & (np.abs(xx - center) < half)
+            # also a softer band crossing the ground near horizon
+            band2 = (np.abs(yy - horizon) < hh * 1.2) & (np.abs(xx - center) < half * 1.4)
+            paint(np.maximum(band, band2).astype(np.float32), c)
+        elif role == "building":
+            half = p["w"] * 0.5
+            top = p["base"] - p["h"]
+            body = (
+                smoothstep(half - 2 * aa, half + 2 * aa, half - np.abs(xx - p["cx"]))
+                * smoothstep(top - 2 * aa, top + 2 * aa, yy)
+                * (1.0 - smoothstep(p["base"] - 2 * aa, p["base"] + 2 * aa, yy))
+            )
+            paint(body, c)
+            # window grid
+            for row in range(3):
+                for col in range(2):
+                    wx = p["cx"] - p["w"] * 0.22 + col * p["w"] * 0.28
+                    wy = top + p["h"] * (0.2 + row * 0.25)
+                    wr = p["w"] * 0.08
+                    win = (
+                        (np.abs(xx - wx) < wr)
+                        & (np.abs(yy - wy) < wr * 0.7)
+                    ).astype(np.float32)
+                    win_c = (.55, .72, .90) if style != "night" else (.95, .85, .40)
+                    paint(win * 0.9, win_c)
+        elif role == "fence":
+            x0, x1 = float(p["x0"]), float(p["x1"])
+            base, fh = float(p["base"]), float(p["h"])
+            # rail
+            rail = (
+                (xx >= x0) & (xx <= x1)
+                & (yy > base - fh * 0.7) & (yy < base - fh * 0.55)
+            ).astype(np.float32)
+            paint(rail, c)
+            # posts
+            n_posts = 5
+            for k in range(n_posts):
+                px_ = x0 + (x1 - x0) * k / max(n_posts - 1, 1)
+                post = (
+                    (np.abs(xx - px_) < 0.008)
+                    & (yy > base - fh) & (yy < base)
+                ).astype(np.float32)
+                paint(post, c)
+        elif role == "boat":
+            # hull (half-ellipse) + cabin
+            hx, hy, bw, bh = p["x"], p["y"], p["w"], p["h"]
+            hull = (
+                ((xx - hx) / max(bw, 1e-6)) ** 2 + ((yy - hy) / max(bh, 1e-6)) ** 2 < 1.0
+            ) & (yy >= hy)
+            paint(hull.astype(np.float32), c)
+            cabin = (
+                (np.abs(xx - hx) < bw * 0.25)
+                & (yy > hy - bh * 1.6) & (yy < hy)
+            ).astype(np.float32)
+            paint(cabin, tuple(float(np.clip(v * 1.15, 0, 1)) for v in c))
+        elif role == "person":
+            # simple stick silhouette: head + body + legs
+            px_, base, ph = p["x"], p["base"], p["h"]
+            head_y = base - ph
+            head = 1.0 - smoothstep(
+                0.012 * (ph / 0.10) - aa, 0.012 * (ph / 0.10) + aa,
+                np.sqrt((xx - px_) ** 2 + (yy - head_y) ** 2),
+            )
+            body = (
+                (np.abs(xx - px_) < 0.012)
+                & (yy > head_y) & (yy < base - ph * 0.35)
+            ).astype(np.float32)
+            legs = (
+                ((np.abs(xx - (px_ - 0.012)) < 0.008) | (np.abs(xx - (px_ + 0.012)) < 0.008))
+                & (yy > base - ph * 0.4) & (yy < base)
+            ).astype(np.float32)
+            paint(np.maximum(np.maximum(head, body), legs), c)
+        elif role == "flower":
+            px_, base, fr = p["x"], p["base"], p["r"]
+            stem = (
+                (np.abs(xx - px_) < 0.006)
+                & (yy > base - fr * 3.5) & (yy < base)
+            ).astype(np.float32)
+            paint(stem, (.20, .50, .22))
+            bloom = 1.0 - smoothstep(fr - aa, fr + aa,
+                                     np.sqrt((xx - px_) ** 2 + (yy - (base - fr * 3.5)) ** 2))
+            paint(bloom, c)
+            # petals
+            for ang in (0, 72, 144, 216, 288):
+                rad = np.radians(ang)
+                cx = px_ + np.cos(rad) * fr * 0.9
+                cy = (base - fr * 3.5) + np.sin(rad) * fr * 0.9
+                petal = 1.0 - smoothstep(
+                    fr * 0.55 - aa, fr * 0.55 + aa,
+                    np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2),
+                )
+                paint(petal * 0.85, c)
+        elif role == "bird":
+            # V wings
+            bx, by, s = p["x"], p["y"], p["s"]
+            left = (
+                (np.abs((yy - by) - (bx - xx) * 0.6) < s * 0.35)
+                & (xx > bx - s * 2) & (xx < bx)
+                & (yy > by - s) & (yy < by + s)
+            )
+            right = (
+                (np.abs((yy - by) - (xx - bx) * 0.6) < s * 0.35)
+                & (xx < bx + s * 2) & (xx > bx)
+                & (yy > by - s) & (yy < by + s)
+            )
+            paint((left | right).astype(np.float32), c)
+        elif role == "bridge":
+            cx, base, bw, bh = p["cx"], p["base"], p["w"], p["h"]
+            # deck
+            deck = (
+                (np.abs(xx - cx) < bw * 0.5)
+                & (yy > base - bh * 0.35) & (yy < base - bh * 0.15)
+            ).astype(np.float32)
+            paint(deck, c)
+            # arch
+            arch_r = bw * 0.45
+            arch_cy = base - bh * 0.15
+            dist = np.sqrt((xx - cx) ** 2 + (yy - arch_cy) ** 2)
+            arch = (
+                (dist < arch_r) & (dist > arch_r - 0.02)
+                & (yy < arch_cy)
+            ).astype(np.float32)
+            paint(arch, c)
+        elif role == "bush":
+            trunk, canopy = _tree_fractal_mask(
+                xx, yy, p["x"], p["base"], p["r"] * 0.9, h, w, aa,
+                seed=(int(seed or 0) + 99),
+            )
+            # no tall trunk for bush — just canopy near ground
+            low = canopy * (yy > p["base"] - p["r"] * 2.2).astype(np.float32)
+            paint(low, c)
 
     Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8)).save(out)
     return out

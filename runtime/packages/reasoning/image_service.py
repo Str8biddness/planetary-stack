@@ -37,7 +37,7 @@ _cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
 _cache_lock = threading.Lock()
 
 STYLES = sorted(vpi.STYLES)
-VOCAB_VERSION = "image-roundout-v1"
+VOCAB_VERSION = "image-studio-v1"
 
 
 def renderable_vocabulary() -> list[str]:

@@ -23,6 +23,7 @@ function toggleWindow(id) {
         if (id === 'win-chat') maybeStreamWelcome();
         if (id === 'win-drive') loadDriveSources();
         if (id === 'win-core') loadLLMSettings();
+        if (id === 'win-image') { /* studio is self-contained */ }
     } else {
         win.style.display = 'none';
         if (id === 'win-twin' && twinInterval) clearInterval(twinInterval);
@@ -2223,3 +2224,100 @@ async function denyForeman(stepId) {
 }
 
 startForemanSync();
+
+// ==========================================
+// SI IMAGE STUDIO (procedural VSA — not diffusion)
+// ==========================================
+const IMAGE_STUDIO_EXAMPLES = {
+    house: 'a house and a tree on green grass under a blue sky with a sun and a cloud',
+    river: 'a boat on a river under a sky with a bird and a tree right of a bridge',
+    city: 'a person left of a building on a road under a sky with a sun',
+};
+
+function imageStudioExample(key) {
+    const el = document.getElementById('image-prompt');
+    if (el && IMAGE_STUDIO_EXAMPLES[key]) el.value = IMAGE_STUDIO_EXAMPLES[key];
+}
+
+function escapeHtmlStudio(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+async function runImageStudio() {
+    const promptEl = document.getElementById('image-prompt');
+    const statusEl = document.getElementById('image-studio-status');
+    const previewEl = document.getElementById('image-studio-preview');
+    const metaEl = document.getElementById('image-studio-meta');
+    const entEl = document.getElementById('image-studio-entities');
+    if (!promptEl) return;
+
+    const prompt = (promptEl.value || '').trim();
+    if (!prompt) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">Prompt is required.</span>';
+        return;
+    }
+    const style = (document.getElementById('image-style') || {}).value || 'soft';
+    const resolution = parseInt((document.getElementById('image-res') || {}).value || '512', 10);
+    const aspect = parseFloat((document.getElementById('image-aspect') || {}).value || '1');
+    const seedRaw = (document.getElementById('image-seed') || {}).value;
+    const body = { prompt, style, resolution, aspect, use_cache: true };
+    if (seedRaw !== undefined && seedRaw !== null && String(seedRaw).trim() !== '') {
+        const n = parseInt(seedRaw, 10);
+        if (!Number.isNaN(n)) body.seed = n;
+    }
+
+    if (statusEl) statusEl.innerHTML = '<span style="color:#38bdf8;">Rendering SI scene graph…</span>';
+    if (previewEl) previewEl.innerHTML = '<span style="color:#64748b;">Working…</span>';
+    if (metaEl) metaEl.textContent = '';
+    if (entEl) entEl.innerHTML = '';
+
+    try {
+        const res = await fetch('/api/v1/image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        let data = null;
+        try { data = await res.json(); } catch (_) { data = null; }
+        if (!res.ok || !data || !data.image_base64) {
+            const msg = (data && (data.message || data.error || data.detail)) || (`HTTP ${res.status}`);
+            if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Failed: ${escapeHtmlStudio(typeof msg === 'string' ? msg : JSON.stringify(msg))}</span>`;
+            if (previewEl) previewEl.innerHTML = '<span style="color:#f87171;">No image</span>';
+            return;
+        }
+        const mime = data.mime_type || 'image/png';
+        const src = `data:${mime};base64,${data.image_base64}`;
+        if (previewEl) {
+            previewEl.innerHTML = `<img src="${src}" alt="SI render" style="max-width:100%; max-height:280px; border-radius:6px; object-fit:contain;">`;
+        }
+        const cacheTag = data.cache_hit ? 'cache HIT' : 'cache miss';
+        if (metaEl) {
+            metaEl.textContent = [
+                `engine=${data.engine || 'synthesus_vsa_geometric'}`,
+                `style=${data.style || style}`,
+                `${data.width || '?'}x${data.height || '?'}`,
+                `${data.latency_ms != null ? data.latency_ms + 'ms' : ''}`,
+                cacheTag,
+                data.vocab_version || '',
+            ].filter(Boolean).join(' · ');
+        }
+        if (entEl) {
+            const ents = data.entities || [];
+            entEl.innerHTML = ents.map(e =>
+                `<span style="background:rgba(56,189,248,0.15); color:#7dd3fc; border:1px solid rgba(56,189,248,0.3); border-radius:999px; padding:2px 8px; font-size:0.72rem;">${escapeHtmlStudio(e)}</span>`
+            ).join('');
+        }
+        if (statusEl) {
+            statusEl.innerHTML = `<span style="color:#4ade80;">OK — ${entsSafe(data.entity_count)} entities · SI illustration</span>`;
+        }
+    } catch (e) {
+        if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Error: ${escapeHtmlStudio(e.message || e)}</span>`;
+        if (previewEl) previewEl.innerHTML = '<span style="color:#f87171;">Error</span>';
+    }
+}
+
+function entsSafe(n) {
+    return (typeof n === 'number' && !Number.isNaN(n)) ? n : '?';
+}

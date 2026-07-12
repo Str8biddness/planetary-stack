@@ -253,3 +253,34 @@ Photoreal / local SD remains optional future tier with explicit labeling.
 - C++ optics paint acceleration (measure first)
 
 ### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-studio
+
+### Mission
+Take SI image gen further: Image Studio UI + relation-aware layout + vocab growth.
+Built on feat/image-roundout. No CNC, no swarm, no diffusion claims.
+
+### What changed
+- `scene_composer.SHAPES`: +road/path, river/stream, fence, boat, person, building/tower/castle, flower, bird, bridge, bush
+- `vsa_pipeline_image.py`: relation parser (left of / right of / beside / behind / in front of / above / under / on); paint paths for all new roles
+- `image_service.py`: vocab_version `image-studio-v1`
+- Desktop: `win-image` Studio UI (prompt, style, res, aspect, seed, preview, entity chips)
+- `synthesus_native_shell.py`: `POST /api/v1/image` proxy → runtime
+- Tests: 12 golden (relations + studio vocab)
+
+### Verified
+```
+pytest tests/test_image_roundout.py -v
+→ 12 passed
+
+generate_image('a person left of a house ... bird ... flower')
+→ real PNG; person+house entities present
+```
+
+### How to use
+Dock 🎨 → SI Image Studio. Runtime must be on :5010 (shell proxies).
+
+### Honest ceiling
+Still SI illustration, not photoreal. Relations are binary phrase-based.
+
+### Do NOT merge without Claude review.
