@@ -52,15 +52,38 @@ def test_larynx_int16_and_accent_wired():
 
 def test_empty_raises_loud():
     lar = LarynxVocalizer(16000)
-    # empty after strip
-    try:
-        # force empty phones path
-        from formant_g2p import text_to_phonemes
-        assert text_to_phonemes("...")  # may be pauses only
-    except Exception:
-        pass
     a = lar.synthesize("hello")
     assert a.std() > 0.01
+
+
+def test_utterance_plan_and_multipass():
+    import formant_session as usess
+    from formant_plan import compile_utterance_plan, apply_pass_knobs, classify_speech_pass
+
+    usess.clear_sessions(disk=True)
+    plan = compile_utterance_plan("hello world", use_llm=False)
+    assert plan["not_neural_tts"] is True
+    assert len(plan["words"]) == 2
+    assert plan["words"][0]["phones"][0] == "HH"
+
+    kn = classify_speech_pass("say it slower and higher")
+    assert kn and kn.get("slower") and kn.get("higher")
+    p2 = apply_pass_knobs(plan, kn)
+    assert p2["rate"] < plan["rate"]
+    assert p2["f0_base_hz"] > plan["f0_base_hz"]
+
+    lar = LarynxVocalizer(16000)
+    a = lar.synthesize("hello world", seed=25, use_llm=False, keep_session=True)
+    assert a.std() > 0.01
+    uid = lar.last_utterance_id
+    assert uid
+    r = lar.apply_pass(uid, {"slower": True, "rising_final": True})
+    assert r["audio"].std() > 0.01
+    assert r["meta"].get("utterance_id") == uid
+    # disk reload
+    with usess._LOCK:
+        usess._SESSIONS.clear()
+    assert usess.get_session(uid) is not None
 
 
 if __name__ == "__main__":
@@ -68,4 +91,5 @@ if __name__ == "__main__":
     test_formant_not_tone()
     test_larynx_int16_and_accent_wired()
     test_empty_raises_loud()
+    test_utterance_plan_and_multipass()
     print("test_formant_larynx: OK")
