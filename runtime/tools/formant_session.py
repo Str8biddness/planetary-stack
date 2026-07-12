@@ -11,6 +11,7 @@ import json
 import os
 import threading
 import time
+import re
 import uuid
 from collections import OrderedDict
 from pathlib import Path
@@ -30,8 +31,17 @@ _DISK_ON = os.environ.get("SYNTHESUS_FORMANT_SESSION_DISK_OFF", "").strip().lowe
 )
 
 
+_SID_SANITIZE = re.compile(r"[^A-Za-z0-9_-]")
+
+
+def _safe_sid(sid: str) -> str:
+    # utterance_id is user-supplied and becomes a filename; never let it escape
+    # _DISK_ROOT (path traversal). Keep only filename-safe chars, bound length.
+    return _SID_SANITIZE.sub("", str(sid))[:64] or "invalid"
+
+
 def _path(sid: str) -> Path:
-    return _DISK_ROOT / f"{sid}.json"
+    return _DISK_ROOT / f"{_safe_sid(sid)}.json"
 
 
 def _write_disk(sid: str, rec: dict[str, Any]) -> None:
