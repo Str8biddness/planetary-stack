@@ -395,6 +395,13 @@
                         </select>
                     </div>
                     <div>
+                        <label style="color:#94a3b8; font-size:0.75rem;">CNC paths</label>
+                        <select id="image-path-mode" class="glass-input" style="width:100%;">
+                            <option value="1" selected>on (machine form)</option>
+                            <option value="0">off (legacy blobs)</option>
+                        </select>
+                    </div>
+                    <div>
                         <label style="color:#94a3b8; font-size:0.75rem;">Seed (optional)</label>
                         <input type="number" id="image-seed" class="glass-input" style="width:100%; box-sizing:border-box;" placeholder="auto">
                     </div>
@@ -435,7 +442,7 @@
         <button onclick="showTiers()" class="dock-btn" title="Unlock Pro — premium personas">⭐</button>
     </nav>
 
-    <script src="script.js?v=10026"></script>
+    <script src="script.js?v=10027"></script>
     <script src="hyperspace.js?v=4"></script>
 
     <!-- OTA Update Screen -->

@@ -1629,6 +1629,7 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         detail = "high"
     n_var = int(getattr(image_req, "variations", 1) or 1)
     n_var = max(1, min(8, n_var))
+    path_mode = bool(getattr(image_req, "path_mode", True))
 
     try:
         from image_service import generate_image, generate_variations, renderable_vocabulary
@@ -1659,6 +1660,7 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
                 detail,
                 use_cache,
                 look,
+                path_mode,
             )
         except Exception as e:
             logger.warning("image variations failed: %s", e)
@@ -1690,6 +1692,9 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
             "mime_type": "image/png",
             "vocab_version": primary.get("vocab_version"),
             "isp": primary.get("isp"),
+            "path_mode": path_mode,
+            "path_entities": primary.get("path_entities"),
+            "path_ops_sample": primary.get("path_ops_sample"),
             "variations": [
                 {
                     "seed": v.get("seed"),
@@ -1718,6 +1723,7 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
             use_cache,
             detail,
             look,
+            path_mode,
         )
         with open(out_path, "rb") as f:
             png_b64 = base64.b64encode(f.read()).decode("ascii")
@@ -1757,6 +1763,9 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         "vocab_version": meta.get("vocab_version"),
         "isp": meta.get("isp"),
         "engine": meta.get("engine", "synthesus_vsa_geometric"),
+        "path_mode": path_mode,
+        "path_entities": meta.get("path_entities"),
+        "path_ops_sample": meta.get("path_ops_sample"),
     }
     try:
         ImageResponse(**payload)

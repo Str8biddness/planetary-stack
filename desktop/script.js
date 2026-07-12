@@ -597,6 +597,7 @@ async function sendChatMessage() {
                     style: 'photo',
                     look: 'photo',
                     detail: 'high',
+                    path_mode: true,
                     aspect: 1.0,
                     use_cache: true,
                 }),
@@ -2439,8 +2440,10 @@ async function runImageStudio(variations) {
     const resolution = parseInt((document.getElementById('image-res') || {}).value || '512', 10);
     const aspect = parseFloat((document.getElementById('image-aspect') || {}).value || '1');
     const detail = (document.getElementById('image-detail') || {}).value || 'high';
+    const pathModeEl = document.getElementById('image-path-mode');
+    const path_mode = !pathModeEl || pathModeEl.value !== '0';
     const seedRaw = (document.getElementById('image-seed') || {}).value;
-    const body = { prompt, style, look, resolution, aspect, detail, use_cache: true, variations };
+    const body = { prompt, style, look, resolution, aspect, detail, path_mode, use_cache: true, variations };
     if (seedRaw !== undefined && seedRaw !== null && String(seedRaw).trim() !== '') {
         const n = parseInt(seedRaw, 10);
         if (!Number.isNaN(n)) body.seed = n;
@@ -2490,6 +2493,8 @@ async function runImageStudio(variations) {
                 `style=${data.style || style}`,
                 `look=${data.look || look}`,
                 `detail=${data.detail || detail}`,
+                path_mode ? 'cnc_paths' : 'legacy',
+                data.path_entities != null ? ('paths=' + data.path_entities) : '',
                 `${data.width || '?'}x${data.height || '?'}`,
                 `${data.latency_ms != null ? data.latency_ms + 'ms' : ''}`,
                 cacheTag,

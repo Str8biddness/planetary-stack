@@ -274,6 +274,13 @@ class ImageRequest(BaseModel):
         le=8,
         description="If >1, return multiple seed variations (see variations[] in response)",
     )
+    path_mode: bool = Field(
+        True,
+        description=(
+            "CNC path construction for form (G1/arc/offset math). "
+            "Not raw G-code UI — SI uses the math to build contours."
+        ),
+    )
 
 
 class ImageResponse(BaseModel):
@@ -301,3 +308,6 @@ class ImageResponse(BaseModel):
     vocab_version: Optional[str] = None
     variations: Optional[List[Dict[str, Any]]] = None
     isp: Optional[Dict[str, Any]] = None
+    path_mode: bool = True
+    path_entities: Optional[int] = None
+    path_ops_sample: Optional[List[str]] = None

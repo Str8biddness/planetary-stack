@@ -47,7 +47,7 @@ _DISK_ENABLED = os.environ.get("SYNTHESUS_IMAGE_DISK_CACHE_OFF", "").strip() not
 
 STYLES = sorted(vpi.STYLES)
 DETAILS = ("standard", "high")
-VOCAB_VERSION = "image-camera-v1"
+VOCAB_VERSION = "image-cnc-paths-v1"
 LOOKS = ("raw", "photo", "cinema", "vivid", "tv")
 
 
@@ -109,10 +109,11 @@ def _cache_key(
     aspect: float,
     detail: str,
     look: str = "raw",
+    path_mode: bool = True,
 ) -> str:
     raw = (
         f"{VOCAB_VERSION}|{prompt.strip()}|{res}|{style}|{seed}|"
-        f"{aspect:.4f}|{detail}|{look}"
+        f"{aspect:.4f}|{detail}|{look}|path={int(bool(path_mode))}"
     )
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -173,11 +174,13 @@ def generate_image(
     use_cache: bool = True,
     detail: str = "standard",
     look: str = "raw",
+    path_mode: bool = True,
 ) -> dict[str, Any]:
     """Reason ``prompt`` into a scene graph and render it to ``out_path`` (PNG).
 
     look: raw | photo | cinema | vivid | tv — camera/TV ISP finish (not diffusion).
     style=photo also enables soft paint + photo look.
+    path_mode: CNC path construction (G1/arc/offset math) for form.
     """
     if not prompt or not prompt.strip():
         raise ValueError("prompt is required")
@@ -185,14 +188,13 @@ def generate_image(
     res = max(128, min(2048, int(res)))
     style = (style or "flat").lower().strip()
     look = (look or "raw").lower().strip()
+    path_mode = bool(path_mode)
     if style == "photo":
         if look in ("raw", "", "none"):
             look = "photo"
         style = "soft"
-    if style not in STYLES and style not in ("flat", "soft", "night"):
-        # STYLES may include photo alias
-        if style != "photo":
-            style = "flat"
+    if style not in ("flat", "soft", "night", "photo"):
+        style = "flat"
     detail = (detail or "standard").lower().strip()
     if detail not in DETAILS:
         detail = "standard"
@@ -202,7 +204,7 @@ def generate_image(
     if seed is not None:
         seed = int(seed)
 
-    key = _cache_key(prompt, res, style, seed, aspect, detail, look)
+    key = _cache_key(prompt, res, style, seed, aspect, detail, look, path_mode)
     t0 = time.time()
 
     if use_cache:
@@ -222,7 +224,13 @@ def generate_image(
     if paint_style not in ("flat", "soft", "night"):
         paint_style = "soft" if look != "raw" else "flat"
     doc, horizon = vpi.pattern_document(
-        prompt, s["imag"], s["vidx"], s["E"], seed=seed, style=paint_style
+        prompt,
+        s["imag"],
+        s["vidx"],
+        s["E"],
+        seed=seed,
+        style=paint_style,
+        path_mode=path_mode,
     )
     vpi.render_doc(
         doc,
@@ -234,16 +242,30 @@ def generate_image(
         seed=seed,
         detail=detail,
         look=look,
+        path_mode=path_mode,
     )
     entities = [
         p.get("entity") for p in doc if isinstance(p, dict) and p.get("entity")
     ]
     roles = sorted({p.get("role") for p in doc if p.get("role")})
+    path_built = sum(1 for p in doc if p.get("construction") == "cnc_paths")
+    path_ops: list[str] = []
+    for p in doc:
+        for op in (p.get("path_ops") or [])[:8]:
+            path_ops.append(op)
+        if len(path_ops) >= 24:
+            break
 
     with open(out_path, "rb") as f:
         png_bytes = f.read()
     if len(png_bytes) < 64:
         raise RuntimeError("render produced empty/invalid PNG")
+
+    engine_bits = ["synthesus_vsa_geometric"]
+    if path_mode and path_built:
+        engine_bits.append("cnc_paths")
+    if look not in ("raw", "none", "off"):
+        engine_bits.append("camera_isp")
 
     meta: dict[str, Any] = {
         "prompt": prompt,
@@ -256,18 +278,17 @@ def generate_image(
         "roles": roles,
         "vocabulary_size": len(s["vidx"]),
         "vocab_version": VOCAB_VERSION,
-        "style": style if style != "soft" or look == "raw" else style,
+        "style": style,
         "detail": detail,
         "look": look,
+        "path_mode": path_mode,
+        "path_entities": path_built,
+        "path_ops_sample": path_ops[:16],
         "seed": seed,
         "aspect": aspect,
         "cache_hit": False,
         "cache_source": None,
-        "engine": (
-            "synthesus_vsa_geometric+camera_isp"
-            if look not in ("raw", "none", "off")
-            else "synthesus_vsa_geometric"
-        ),
+        "engine": "+".join(engine_bits),
         "bytes": len(png_bytes),
         "isp": getattr(vpi.render_doc, "last_isp_meta", None),
     }
@@ -302,6 +323,7 @@ def generate_variations(
     detail: str = "standard",
     use_cache: bool = True,
     look: str = "photo",
+    path_mode: bool = True,
 ) -> list[dict[str, Any]]:
     """Render N variations with different seeds. Returns list of metas (+ png on path)."""
     n = max(1, min(8, int(n)))
@@ -324,6 +346,7 @@ def generate_variations(
                 use_cache=use_cache,
                 detail=detail,
                 look=look,
+                path_mode=path_mode,
             )
             with open(out, "rb") as f:
                 png = f.read()

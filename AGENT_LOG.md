@@ -345,3 +345,37 @@ camera_isp demo → /tmp/camera_isp_demo.png with ae/bloom/dof/filmic/...
 ```
 
 ### Do NOT merge without Claude review.
+
+## 2026-07-12 — feat/image-cnc-paths (CNC form language)
+
+### Mission
+All-in: wire CNC path math into SI image construction. Not raw G-code UI —
+the *math* (G1/G2/G3, offset, contour fill, multi-pass) builds form; camera ISP
+still owns photo look.
+
+### What changed
+- NEW `runtime/packages/reasoning/cnc_paths.py`
+  - Line/arc segments, polyline, house/tree/person/fence/boat/building/…
+  - Discretize, tool-radius offset, multi-pass offsets
+  - Raster stroke + closed fill with AA
+  - Provenance sample as g-like ops (`G1 X…`, `G3 …`, `CLOSE`)
+- `pattern_document` / `render_doc` `path_mode=True` (default)
+- API/Studio/shell: `path_mode` toggle; engine string includes `cnc_paths`
+- Tests: **15 passed**
+
+### Stack (form → finish)
+```
+prompt → scene graph → CNC paths (form) → raster → camera ISP (look)
+```
+
+### Honest
+- CNC = precision construction, not Midjourney content invention
+- Users never type G-code; ops are internal + debug sample
+
+### Verified
+```
+pytest tests/test_image_roundout.py → 15 passed
+cnc_paths demo → /tmp/cnc_paths_demo.png
+```
+
+### Do NOT merge without Claude review.

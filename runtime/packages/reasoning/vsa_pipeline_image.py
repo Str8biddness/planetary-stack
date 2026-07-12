@@ -233,10 +233,16 @@ def pattern_document(
     E=None,
     seed: Optional[int] = None,
     style: str = "flat",
+    path_mode: bool = True,
 ) -> tuple[list[dict[str, Any]], float]:
-    """Parse prompt into a resolution-free scene graph with multi-object + relation layout."""
+    """Parse prompt into a resolution-free scene graph with multi-object + relation layout.
+
+    path_mode: attach CNC path construction (G1/G2/G3 math) for supported entities.
+    """
     style = (style or "flat").lower().strip()
-    if style not in STYLES:
+    if style == "photo":
+        style = "soft"
+    if style not in ("flat", "soft", "night"):
         style = "flat"
 
     toks = [t.strip(".,!?;:\"'") for t in request.lower().split()]
@@ -410,6 +416,16 @@ def pattern_document(
                 r["kind"] for r in relations
                 if tok_to_raw.get(r["subject_tok"]) == i
             ]
+        if path_mode:
+            try:
+                import cnc_paths as _cnc
+                ps = _cnc.paths_for_primitive(prim, seed=int(seed or 0) + i * 17)
+                if ps:
+                    prim["paths"] = ps
+                    prim["path_ops"] = _cnc.path_provenance(ps)
+                    prim["construction"] = "cnc_paths"
+            except Exception:
+                pass
         doc.append(prim)
 
     return doc, horizon
@@ -555,12 +571,14 @@ def render_doc(
     seed: Optional[int] = None,
     detail: str = "standard",
     look: str = "raw",
+    path_mode: bool = True,
 ) -> str:
     """Rasterize a pattern document to PNG at any resolution/aspect.
 
     detail='high' enables richer tree canopies + atmospheric post (vignette/haze).
     look: raw | photo | cinema | vivid | tv — camera/TV ISP finish (not diffusion).
     style='photo' is alias for soft paint + look=photo.
+    path_mode: prefer CNC path construction for supported roles (house/tree/…).
     """
     style = (style or "flat").lower().strip()
     look = (look or "raw").lower().strip()
@@ -568,10 +586,11 @@ def render_doc(
         style = "soft"
         if look in ("raw", "", "none"):
             look = "photo"
-    if style not in STYLES - {"photo"} and style not in ("flat", "soft", "night"):
+    if style not in ("flat", "soft", "night"):
         style = "flat"
     detail = (detail or "standard").lower().strip()
     high = detail == "high" or look in ("photo", "cinema", "vivid", "tv")
+    use_paths = bool(path_mode)
 
     h, w = _dims(res, aspect)
     # World coords: x in [0,1], y in [0,1] (y grows downward in image space)
@@ -599,9 +618,53 @@ def render_doc(
         for k in range(3):
             img[:, :, k] = img[:, :, k] * (1.0 - m) + c[k] * m
 
+    # Optional CNC path paint for structured entities
+    try:
+        import cnc_paths as _cnc
+    except Exception:
+        _cnc = None  # type: ignore
+        use_paths = False
+
+    def _paint_paths_for(p, default_color):
+        """Paint CNC paths if present; return True if fully handled."""
+        if not use_paths or _cnc is None:
+            return False
+        paths = p.get("paths")
+        if not paths:
+            paths = _cnc.paths_for_primitive(p, seed=int(seed or 0))
+        if not paths:
+            return False
+        for pth in paths:
+            layer = pth.meta.get("layer")
+            if layer == "door":
+                col = (.35, .22, .14)
+            elif layer == "window":
+                col = (.55, .75, .90) if style != "night" else (.90, .80, .35)
+            elif pth.meta.get("stroke_only") and p.get("role") == "tree":
+                col = (.42, .28, .13)
+            else:
+                col = default_color
+            _cnc.paint_path(img, xx, yy, pth, col, aa=aa)
+        return True
+
     for p in sorted(doc, key=lambda p: ROLE_ORDER.get(p["role"], 9)):
         c = p["color"]
         role = p["role"]
+        # Path-built entities (CNC construction language)
+        if role in (
+            "house", "building", "triangle", "tree", "bush", "person",
+            "fence", "boat", "flower", "bridge", "disc", "disc_top",
+            "star_top", "cloud_top",
+        ):
+            if _paint_paths_for(p, c):
+                # Fire still needs inner hot triangle if entity is fire
+                if role == "triangle" and p.get("entity") == "fire":
+                    ay2 = p["base"] - p["h"] * 0.65
+                    hw2 = p["hw"] * 0.55 * np.clip((yy - ay2) / max(p["base"] - ay2, 1e-9), 0, 1)
+                    inside2 = np.minimum(hw2 - np.abs(xx - p["cx"]),
+                                         np.minimum(yy - ay2, p["base"] - yy))
+                    paint(smoothstep(-2 * aa, 2 * aa, inside2) * 0.85, (.98, .85, .25))
+                continue
         if role == "bg":
             shade = 0.78 + 0.22 * (1.0 - yy)
             if style == "night":

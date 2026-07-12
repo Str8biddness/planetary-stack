@@ -201,6 +201,7 @@ def image_proxy():
         "use_cache": data.get("use_cache", True),
         "detail": data.get("detail", "high"),
         "look": data.get("look", "photo"),
+        "path_mode": data.get("path_mode", True),
         "variations": data.get("variations", 1),
     }
     if data.get("seed") is not None and str(data.get("seed")).strip() != "":

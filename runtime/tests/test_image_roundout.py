@@ -114,13 +114,14 @@ def test_styles_and_aspect_produce_real_pngs():
 
 
 def test_cache_hit_on_second_call():
-    clear_image_cache()
+    # Wipe memory + disk so first call is a true miss (disk cache survives restarts).
+    clear_image_cache(disk=True)
     prompt = "a red apple on green grass under a blue sky with a sun"
     with tempfile.TemporaryDirectory() as td:
         a = os.path.join(td, "a.png")
         b = os.path.join(td, "b.png")
-        m1 = generate_image(prompt, a, res=256, style="flat", seed=9)
-        m2 = generate_image(prompt, b, res=256, style="flat", seed=9)
+        m1 = generate_image(prompt, a, res=256, style="flat", seed=9, look="raw")
+        m2 = generate_image(prompt, b, res=256, style="flat", seed=9, look="raw")
         assert m1["cache_hit"] is False
         assert m2["cache_hit"] is True
         assert os.path.getsize(a) == os.path.getsize(b)
@@ -272,6 +273,53 @@ def test_detail_high_and_variations():
     seeds = {v["seed"] for v in vars_}
     assert len(seeds) == 3
     assert all(v.get("image_base64") for v in vars_)
+
+
+def test_cnc_path_engine_and_render():
+    """CNC path math builds form; path_mode paint produces real PNG + ops sample."""
+    import cnc_paths as cnc
+    from image_service import generate_image, clear_image_cache
+
+    # Unit: house contour closed, discretize, fill mask nonzero
+    hp = cnc.house_contour(0.5, 0.66, 0.16, 0.14)
+    assert hp.closed
+    poly = cnc.discretize(hp)
+    assert len(poly) >= 4
+    ops = cnc.path_provenance([hp])
+    assert any(o.startswith("G1") for o in ops)
+
+    # Offset multi-pass
+    offs = cnc.multi_pass_offsets(poly, 0.01, passes=2, closed=True)
+    assert len(offs) == 2
+
+    clear_image_cache()
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "cnc.png")
+        m = generate_image(
+            "a house and a tree and a person on grass under a sky",
+            path,
+            res=256,
+            style="soft",
+            look="raw",
+            detail="standard",
+            seed=11,
+            path_mode=True,
+            use_cache=False,
+        )
+        assert m.get("path_mode") is True
+        assert (m.get("path_entities") or 0) >= 2
+        assert "cnc_paths" in (m.get("engine") or "")
+        assert os.path.getsize(path) > 800
+        # legacy path_mode off still works
+        m2 = generate_image(
+            "a house on grass under a sky",
+            os.path.join(td, "legacy.png"),
+            res=192,
+            look="raw",
+            path_mode=False,
+            use_cache=False,
+        )
+        assert m2.get("path_mode") is False
 
 
 def test_camera_isp_photo_look():
