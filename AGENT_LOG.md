@@ -1,5 +1,19 @@
 # AGENT_LOG.md — session continuity for memory-provenance build
 
+## 2026-07-12 — fix/qa-sev1 wow: full QA close + instrument front-end
+
+### Fixed
+- File explorer: real home tree with `path`, preview pane, GET `/api/ide/read` (path-contained)
+- Drive: dual `/api/drive/*` + `/api/v1/drive/*` aliases; local text paste ingest
+- Dock: labeled buttons + active glow; boot opens Chat+Vitals once
+- Login/chat/explorer instrument chrome; boot flash; offline oath on lock screen
+
+### Proof
+- image/chat/voice 200 via shell; paste ingest chunks_added=1; ide read AGENT_LOG.md ok
+
+### Branch
+`fix/qa-sev1` (not merged)
+
 ## 2026-07-12 — fix/qa-sev1: QA punch-list SEV-1/2
 
 ### What (from Full QA Report July 12)

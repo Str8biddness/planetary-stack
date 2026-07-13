@@ -38,6 +38,7 @@ function toggleWindow(id) {
             foremanInterval = null;
         }
     }
+    try { syncDockActive(); } catch (_) {}
     
     // Broadcast to Grid
     if (window.gridSocket && gridSocket.readyState === WebSocket.OPEN) {
@@ -336,30 +337,93 @@ async function fetchOSStatus() {
 }
 
 // ==========================================
-// IDE FILE EXPLORER
+// IDE FILE EXPLORER — real home tree + preview
 // ==========================================
 async function fetchIDEFiles() {
+    const treeEl = document.getElementById('ide-file-tree');
+    if (!treeEl) return;
+    treeEl.innerHTML = '<div class="explorer-loading">Mounting storage array…</div>';
     try {
-        const response = await fetch('http://' + window.location.host + '/api/ide/files');
+        const response = await fetch('/api/ide/files');
+        if (!response.ok) throw new Error('HTTP ' + response.status);
         const treeData = await response.json();
-        document.getElementById('ide-file-tree').innerHTML = '<ul><li><span class="folder" style="color: #38bdf8;">🌐 Storage Array</span>' + buildTreeHTML(treeData) + '</li></ul>';
-    } catch(err) {
-        document.getElementById('ide-file-tree').innerHTML = '<p style="color:red;">Failed to mount.</p>';
+        const nodes = Array.isArray(treeData) ? treeData : [];
+        treeEl.innerHTML = buildTreeHTML(nodes);
+    } catch (err) {
+        treeEl.innerHTML = '<p class="explorer-err">Failed to mount storage array.</p>';
+        console.log('fetchIDEFiles', err);
     }
 }
 
 function buildTreeHTML(nodes) {
-    let html = '<ul>';
-    nodes.forEach(node => {
-        if(node.type === 'dir') html += `<li><span class="folder">📂 ${node.name}</span>${buildTreeHTML(node.children)}</li>`;
-        else html += `<li onclick="openFile('${node.name}')" style="cursor:pointer; padding: 2px 0;">📄 <span style="color: #94a3b8;">${node.name}</span></li>`;
+    if (!Array.isArray(nodes) || !nodes.length) return '<ul class="ide-tree"><li class="ide-empty">Empty</li></ul>';
+    let html = '<ul class="ide-tree">';
+    nodes.forEach(function (node) {
+        if (!node) return;
+        const name = escapeHtml(String(node.name || ''));
+        const path = String(node.path || node.name || '');
+        const pathAttr = escapeHtml(path);
+        if (node.type === 'dir') {
+            const kids = buildTreeHTML(node.children || []);
+            html += '<li class="ide-dir">'
+                + '<span class="folder" onclick="this.parentElement.classList.toggle(\'open\')">📂 ' + name + '</span>'
+                + kids + '</li>';
+        } else {
+            html += '<li class="ide-file" data-path="' + pathAttr + '" onclick="openFileFromEl(this)">'
+                + '<span class="file-ico">📄</span> <span class="file-name">' + name + '</span></li>';
+        }
     });
     return html + '</ul>';
 }
 
-function openFile(filename) {
-    document.getElementById('ide-current-file').innerText = filename;
-    document.getElementById('ide-code-editor').value = `// Secure KVM File Stream: ${filename}\n\n[Content loaded from Storage Array]`;
+function openFileFromEl(el) {
+    if (!el) return;
+    openFile(el.getAttribute('data-path') || '');
+}
+
+async function openFile(relPath) {
+    const nameEl = document.getElementById('ide-current-file');
+    const metaEl = document.getElementById('ide-file-meta');
+    const editor = document.getElementById('ide-code-editor');
+    if (!editor) return;
+    const path = String(relPath || '').trim();
+    if (!path) return;
+    document.querySelectorAll('.ide-file.active').forEach(function (el) { el.classList.remove('active'); });
+    document.querySelectorAll('.ide-file[data-path]').forEach(function (el) {
+        if (el.getAttribute('data-path') === path) el.classList.add('active');
+    });
+    if (nameEl) nameEl.textContent = path.split('/').pop() || path;
+    if (metaEl) metaEl.textContent = 'loading…';
+    editor.textContent = '// Streaming ' + path + ' …';
+    try {
+        const res = await fetch('/api/ide/read?path=' + encodeURIComponent(path));
+        const data = await res.json().catch(function () { return {}; });
+        if (!res.ok || data.ok === false) {
+            const msg = data.message || data.error || ('HTTP ' + res.status);
+            editor.textContent = '// PREVIEW FAILED\n// ' + msg;
+            if (metaEl) metaEl.textContent = String(msg);
+            return;
+        }
+        editor.textContent = data.content != null ? String(data.content) : '';
+        if (metaEl) {
+            metaEl.textContent = (data.bytes != null ? data.bytes + ' B' : '—')
+                + ' · ' + (data.path || path);
+        }
+        if (nameEl) nameEl.textContent = data.name || path;
+    } catch (e) {
+        editor.textContent = '// DEGRADED: ' + (e.message || e);
+        if (metaEl) metaEl.textContent = 'unreachable';
+    }
+}
+
+/** Keep dock buttons lit when their window is open. */
+function syncDockActive() {
+    document.querySelectorAll('.dock-btn[data-win]').forEach(function (btn) {
+        const id = btn.getAttribute('data-win');
+        const win = id && document.getElementById(id);
+        const open = win && win.style.display !== 'none' && win.style.display !== '';
+        btn.classList.toggle('active', !!open);
+    });
 }
 
 // ==========================================
@@ -1314,10 +1378,33 @@ function showTiers() {
 
 // Dismiss the plan picker and boot the desktop on the current plan.
 function enterDesktop() {
-    document.getElementById('login-modal').style.display = 'none';
+    const login = document.getElementById('login-modal');
+    if (login) login.style.display = 'none';
     const tm = document.getElementById('tier-modal');
     if (tm) tm.style.display = 'none';
+    document.body.classList.add('desktop-live');
+    // Boot flash — instrument console coming online
+    const flash = document.createElement('div');
+    flash.className = 'boot-flash';
+    document.body.appendChild(flash);
+    setTimeout(function () { flash.remove(); }, 900);
     try { initGridStateSync(); } catch (e) { console.log(e); }
+    try { startInstrStatusStrip(); } catch (e) {}
+    // First boot: surface the two critical surfaces so the OS feels alive
+    try {
+        if (!sessionStorage.getItem('synthesus_booted_ui')) {
+            sessionStorage.setItem('synthesus_booted_ui', '1');
+            setTimeout(function () {
+                const chat = document.getElementById('win-chat');
+                if (chat && chat.style.display === 'none') toggleWindow('win-chat');
+            }, 280);
+            setTimeout(function () {
+                const vit = document.getElementById('win-vitals');
+                if (vit && vit.style.display === 'none') toggleVitals();
+            }, 520);
+        }
+    } catch (e) {}
+    try { syncDockActive(); } catch (e) {}
 }
 
 // Build the personal greeting (markdown; the name renders bold).
@@ -1869,6 +1956,47 @@ function driveGoStep(n) {
         d.style.color = (parseInt(d.dataset.step) === n) ? '#22d3ee' : '#64748b';
         d.style.fontWeight = (parseInt(d.dataset.step) === n) ? '700' : '400';
     });
+}
+
+/** Paste arbitrary local text → write under ~/.synthesus/local_paste → folder ingest. */
+async function drivePasteLocal() {
+    const ta = document.getElementById('drive-paste-text');
+    const status = document.getElementById('drive-paste-status');
+    const text = (ta && ta.value || '').trim();
+    if (!text) {
+        if (status) status.textContent = 'Paste some text first.';
+        return;
+    }
+    if (status) status.textContent = 'Writing + indexing locally…';
+    try {
+        const res = await fetch('/api/v1/drive/paste', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text, name: 'local-paste' }),
+        });
+        const data = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+            if (status) {
+                status.style.color = '#fb7185';
+                status.textContent = 'Failed: ' + (data.message || data.error || ('HTTP ' + res.status));
+            }
+            return;
+        }
+        if (status) {
+            status.style.color = '#34d399';
+            status.textContent = 'Indexed local paste'
+                + (data.chunks_added != null ? (' · ' + data.chunks_added + ' chunk(s)') : '')
+                + (data.local_file ? (' · ' + data.local_file) : '')
+                + ' · stays on this machine';
+        }
+        if (ta) ta.value = '';
+        try { loadDriveSources(); } catch (_) {}
+    } catch (e) {
+        if (status) {
+            status.style.color = '#fb7185';
+            status.textContent = 'DEGRADED: ' + (e.message || e);
+        }
+    }
 }
 
 function driveSelectSource(key) {
@@ -3323,6 +3451,7 @@ function toggleVitals() {
     const open = win && win.style.display !== 'none';
     if (open) { loadVitals(); if (!_vitalsTimer) _vitalsTimer = setInterval(loadVitals, 4000); }
     else if (_vitalsTimer) { clearInterval(_vitalsTimer); _vitalsTimer = null; }
+    try { syncDockActive(); } catch (_) {}
 }
 async function loadVitals() {
     const rowsEl = document.getElementById('vitals-rows');

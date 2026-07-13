@@ -641,7 +641,9 @@ def feedback_proxy():
 # (GitHub, synced cloud folders). Thin proxy to the runtime, which owns the
 # per-user index. Fetch is from the user's own source; indexing stays local.
 # ===================================================================
+# Dual-mount /api/drive/* and /api/v1/drive/* — desktop JS uses both paths.
 @app.route('/api/drive/sources', methods=['GET'])
+@app.route('/api/v1/drive/sources', methods=['GET'])
 def drive_sources():
     """List ingestable source types (live vs planned) for the drive UI."""
     try:
@@ -657,6 +659,7 @@ def drive_sources():
         return jsonify({"sources": [], "error": "runtime unavailable"}), 503
 
 @app.route('/api/drive/remotes', methods=['GET'])
+@app.route('/api/v1/drive/remotes', methods=['GET'])
 def drive_remotes():
     """Which rclone cloud remotes are actually configured (for the creator)."""
     try:
@@ -672,6 +675,7 @@ def drive_remotes():
         return jsonify({"rclone_available": False, "remotes": [], "error": "runtime unavailable"}), 503
 
 @app.route('/api/drive/ingest', methods=['POST'])
+@app.route('/api/v1/drive/ingest', methods=['POST'])
 def drive_ingest():
     """Ingest a user source into their grounding index (via the runtime)."""
     data = request.get_json(silent=True) or {}
@@ -690,6 +694,7 @@ def drive_ingest():
         return jsonify({"status": "error", "message": f"runtime unavailable: {e}"}), 503
 
 @app.route('/api/drive/progress/<job_id>', methods=['GET'])
+@app.route('/api/v1/drive/progress/<job_id>', methods=['GET'])
 def drive_progress(job_id):
     try:
         r = requests.get(
@@ -703,6 +708,7 @@ def drive_progress(job_id):
         return jsonify({"status": "error", "message": f"runtime unavailable: {e}"}), 503
 
 @app.route('/api/drive/preview', methods=['POST'])
+@app.route('/api/v1/drive/preview', methods=['POST'])
 def drive_preview():
     data = request.get_json(silent=True) or {}
     try:
@@ -718,6 +724,7 @@ def drive_preview():
         return jsonify({"chunks": [], "error": f"runtime unavailable: {e}"}), 503
 
 @app.route('/api/drive/rclone/status', methods=['GET'])
+@app.route('/api/v1/drive/rclone/status', methods=['GET'])
 def drive_rclone_status():
     try:
         r = requests.get(
@@ -729,6 +736,59 @@ def drive_rclone_status():
     except Exception as e:
         print(f"[drive] rclone status unavailable ({e})")
         return jsonify({"installed": False, "remotes": [], "error": f"runtime unavailable: {e}"}), 503
+
+
+@app.route('/api/drive/paste', methods=['POST'])
+@app.route('/api/v1/drive/paste', methods=['POST'])
+def drive_paste_local():
+    """Write pasted text to a local folder and ingest it (no cloud).
+
+    Body: {text, name?}. Saves under ~/.synthesus/local_paste/ then folder-ingests.
+    """
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"ok": False, "error": "text_required", "message": "text is required"}), 400
+    if len(text) > 200_000:
+        return jsonify({"ok": False, "error": "too_long", "message": "max 200k chars"}), 400
+    name = (data.get("name") or data.get("namespace") or "local-paste").strip() or "local-paste"
+    paste_root = os.path.join(os.path.expanduser("~"), ".synthesus", "local_paste")
+    try:
+        os.makedirs(paste_root, exist_ok=True)
+        fname = os.path.join(paste_root, f"paste_{int(time.time())}.txt")
+        with open(fname, "w", encoding="utf-8") as fh:
+            fh.write(text)
+    except Exception as e:
+        return jsonify({"ok": False, "error": "write_failed", "message": str(e)}), 500
+    # Forward as folder ingest to runtime
+    try:
+        r = requests.post(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/drive/ingest",
+            json={
+                "connector": "folder",
+                "target": paste_root,
+                "namespace": name,
+                "async": False,
+            },
+            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            timeout=120,
+        )
+        try:
+            payload = r.json()
+        except Exception:
+            payload = {"ok": False, "error": "bad_runtime_body", "message": (r.text or "")[:400]}
+        if isinstance(payload, dict):
+            payload.setdefault("local_file", fname)
+            payload.setdefault("namespace", name)
+        return (json.dumps(payload), r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "error": "runtime_unavailable",
+            "message": str(e),
+            "local_file": fname,
+            "note": "Text saved locally; runtime ingest failed",
+        }), 503
 
 # ===================================================================
 # REAL AUTH (email + password)
@@ -912,25 +972,93 @@ def deny_foreman_step():
 
 @app.route('/api/ide/files', methods=['GET'])
 def list_files():
-    # Bind the file explorer to the user's actual home directory on the Host OS
+    """List files under the user's home directory (depth-limited, no hidden).
+
+    Each node carries a `path` relative to home so the UI can open real content
+    via GET /api/ide/read?path=...
+    """
     base_dir = os.path.expanduser('~')
-    
+
     def build_tree(dir_path, depth=0):
-        if depth > 1: return [] # Limit depth to avoid massive payload
+        if depth > 2:
+            return []
         tree = []
         try:
-            for item in os.listdir(dir_path):
-                if item.startswith('.'): continue # Skip hidden files
-                full_path = os.path.join(dir_path, item)
-                if os.path.isdir(full_path):
-                    tree.append({"name": item, "type": "dir", "children": build_tree(full_path, depth+1)})
-                else:
-                    tree.append({"name": item, "type": "file"})
+            entries = sorted(os.listdir(dir_path), key=lambda s: s.lower())
         except Exception:
-            pass
+            return []
+        for item in entries:
+            if item.startswith('.'):
+                continue
+            full_path = os.path.join(dir_path, item)
+            rel = os.path.relpath(full_path, base_dir)
+            try:
+                if os.path.isdir(full_path):
+                    tree.append({
+                        "name": item,
+                        "type": "dir",
+                        "path": rel,
+                        "children": build_tree(full_path, depth + 1),
+                    })
+                else:
+                    tree.append({"name": item, "type": "file", "path": rel})
+            except Exception:
+                continue
         return tree
-        
-    return jsonify([{"name": "Host OS User Directory", "type": "dir", "children": build_tree(base_dir)}])
+
+    return jsonify([{
+        "name": "Home",
+        "type": "dir",
+        "path": "",
+        "children": build_tree(base_dir),
+    }])
+
+
+@app.route('/api/ide/read', methods=['GET'])
+def read_ide_file():
+    """Read a text file under the user's home (path-safe). Never escapes home."""
+    rel = (request.args.get("path") or "").strip().lstrip("/")
+    if not rel or ".." in rel.split(os.sep):
+        return jsonify({"ok": False, "error": "path_required"}), 400
+    base = os.path.realpath(os.path.expanduser("~"))
+    target = os.path.realpath(os.path.join(base, rel))
+    # Containment: must stay inside home
+    if target != base and not (target.startswith(base + os.sep)):
+        return jsonify({"ok": False, "error": "path_escape"}), 403
+    if not os.path.isfile(target):
+        return jsonify({"ok": False, "error": "not_found", "path": rel}), 404
+    try:
+        size = os.path.getsize(target)
+    except OSError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    if size > 512_000:
+        return jsonify({
+            "ok": False,
+            "error": "too_large",
+            "bytes": size,
+            "message": "File > 512KB — open in an external editor",
+        }), 413
+    # Binary sniff — refuse obvious non-text
+    try:
+        with open(target, "rb") as fh:
+            head = fh.read(512)
+        if b"\x00" in head:
+            return jsonify({
+                "ok": False,
+                "error": "binary",
+                "message": "Binary file — preview not available",
+                "bytes": size,
+            }), 415
+        text = open(target, "r", encoding="utf-8", errors="replace").read()
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    return jsonify({
+        "ok": True,
+        "path": rel,
+        "name": os.path.basename(target),
+        "bytes": size,
+        "content": text,
+    })
 
 @app.route('/api/terminal/run', methods=['POST'])
 def run_command():
