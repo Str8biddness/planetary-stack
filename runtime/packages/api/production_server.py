@@ -1791,9 +1791,27 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         payload = await run_in_threadpool(execute_image_request, params, None)
     except Exception as e:
         logger.warning("image generation failed: %s", e)
+        msg = str(e)
+        # Honest neural enhance failure (same contract as piper voice)
+        if "realesrgan_unavailable" in msg.lower():
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "error": "realesrgan_unavailable",
+                    "message": msg,
+                    "enhance_requested": "realesrgan",
+                    "enhance_applied": "none",
+                    "note": (
+                        "install onnxruntime + place RealESRGAN x4 ONNX under "
+                        "data/models/ (or set SYNTHESUS_ESRGAN_MODEL). "
+                        "si_detail / si_upscale2 always work without neural weights."
+                    ),
+                    "not_diffusion": True,
+                },
+            )
         raise HTTPException(
             status_code=500,
-            detail={"error": "image_generation_failed", "message": str(e)},
+            detail={"error": "image_generation_failed", "message": msg},
         )
     try:
         ImageResponse(**{k: v for k, v in payload.items() if k in ImageResponse.model_fields})

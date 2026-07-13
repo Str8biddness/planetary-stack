@@ -218,7 +218,18 @@ body {
 @keyframes planet-wobble { 0%, 100% { transform: translateY(0px) rotate(0deg); } 25% { transform: translateY(-10px) rotate(5deg); } 50% { transform: translateY(0px) rotate(0deg); } 75% { transform: translateY(10px) rotate(-5deg); } }
 
 
-#desktop-area { position: absolute; top: 0; left: 0; width: 100%; height: calc(100% - 80px); overflow: hidden; }
+/* Leave room for status strip (top) + dock (bottom). overflow:visible so
+   clampIntoView can keep title bars reachable on narrow viewports (QA BUG-7). */
+#desktop-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: calc(100% - 72px);
+    overflow: visible;
+    padding-top: 28px; /* status strip clearance; harmless if strip absent */
+    box-sizing: border-box;
+}
 
 /* WINDOW MANAGER CSS */
 .window {
@@ -296,16 +307,80 @@ body {
 /* Terminal */
 .terminal-container { background: rgba(0,0,0,0.8); color: #a78bfa; font-family: 'Fira Code', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace; font-size: 0.9rem; padding: 1rem; border-radius: 8px; }
 
+/* Focused window: light cyan ring so z-order is obvious (QA BUG-8) */
+.window.focused {
+    box-shadow: 0 16px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(58,208,239,0.35);
+}
+.window-controls .win-btn {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 6px;
+    flex-shrink: 0;
+}
+.window-controls .win-btn.close { background: #fb7185 !important; }
+.window-controls .win-btn.close:hover { filter: brightness(1.15); }
+
 /* Forms & Inputs */
 input, textarea { user-select: text; -webkit-user-select: text; }
 .glass-input { background: rgba(0, 0, 0, 0.4); border: 1px solid var(--glass-border); color: var(--text-primary); padding: 0.8rem; border-radius: 8px; width: 100%; outline: none; }
 .glass-input:focus { border-color: var(--accent); }
 .glass-btn { background: var(--accent); color: #000; border: none; padding: 0 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; }
 
-/* Dock Navigation */
-.dock { position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border); backdrop-filter: blur(20px); padding: 0.5rem 1rem; border-radius: 20px; display: flex; gap: 1rem; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 9999; }
-.dock-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; width: 45px; height: 45px; border-radius: 12px; cursor: pointer; font-size: 1.2rem; transition: all 0.2s; }
-.dock-btn:hover { background: rgba(255,255,255,0.2); transform: translateY(-3px); }
+/* Dock Navigation
+   QA BUG-1: centered fixed dock overflowed left/right on narrow viewports so
+   📡 ⚙️ 🧠 had no hit-test coordinates (clipped). Wrap + full-width safe inset. */
+.dock {
+    position: fixed;
+    bottom: 10px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: calc(100vw - 16px);
+    margin: 0 auto;
+    transform: none;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(20px);
+    padding: 0.4rem 0.55rem;
+    border-radius: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 0.4rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    z-index: 10060; /* above status strip (10050) and windows */
+    box-sizing: border-box;
+    pointer-events: auto;
+}
+.dock-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #fff;
+    width: 44px;
+    height: 44px;
+    min-width: 40px;
+    min-height: 40px;
+    flex: 0 0 auto;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 1.15rem;
+    transition: background 0.15s ease, transform 0.15s ease;
+    pointer-events: auto;
+}
+.dock-btn:hover { background: rgba(255,255,255,0.2); transform: translateY(-2px); }
+.dock-btn:focus-visible { outline: 2px solid #3ad0ef; outline-offset: 2px; }
+@media (max-width: 720px) {
+    .dock { gap: 0.3rem; padding: 0.35rem 0.4rem; bottom: 6px; }
+    .dock-btn { width: 38px; height: 38px; font-size: 1.05rem; border-radius: 10px; }
+}
+@media (max-width: 420px) {
+    .dock-btn { width: 34px; height: 34px; font-size: 0.95rem; }
+}
 
 /* ── System Vitals — live subsystem readout (instrument-console look; new bolt-on) ── */
 #win-vitals{
@@ -438,12 +513,15 @@ input, textarea { user-select: text; -webkit-user-select: text; }
 #instr-status-strip {
     position: fixed;
     top: 0; left: 0; right: 0;
-    height: 28px;
+    min-height: 28px;
+    height: auto;
     z-index: 10050;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 14px;
-    padding: 0 14px;
+    gap: 10px 14px;
+    row-gap: 4px;
+    padding: 4px 14px;
     background: rgba(7,10,16,0.92);
     border-bottom: 1px solid var(--instr-line);
     font-family: var(--instr-mono);
@@ -452,6 +530,7 @@ input, textarea { user-select: text; -webkit-user-select: text; }
     color: var(--instr-muted);
     font-variant-numeric: tabular-nums;
     backdrop-filter: blur(10px);
+    box-sizing: border-box;
 }
 #instr-status-strip .strip-item { display: inline-flex; align-items: center; gap: 6px; }
 #instr-status-strip .strip-dot {
@@ -469,7 +548,13 @@ input, textarea { user-select: text; -webkit-user-select: text; }
     border: 1px solid rgba(58,208,239,0.35);
     border-radius: 999px;
     padding: 2px 10px;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: min(42vw, 280px);
 }
 body.has-instr-strip #desktop-root,
 body.has-instr-strip main,
@@ -535,3 +620,299 @@ body.has-instr-strip .window { margin-top: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
     .instr-btn, .dock-btn, .message { transition: none !important; animation: none !important; }
+
+/* ===================== WOW PASS — instrument OS chrome ===================== */
+body.desktop-live #desktop-area {
+    animation: desktop-in 0.55s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes desktop-in {
+    from { opacity: 0; filter: brightness(0.6) saturate(0.7); }
+    to   { opacity: 1; filter: none; }
+}
+.boot-flash {
+    position: fixed; inset: 0; z-index: 200000; pointer-events: none;
+    background: radial-gradient(ellipse at 50% 40%, rgba(58,208,239,0.28), transparent 55%);
+    animation: boot-flash 0.85s ease-out forwards;
+}
+@keyframes boot-flash {
+    0%   { opacity: 0.9; }
+    100% { opacity: 0; }
+}
+
+/* Login — instrument lock screen */
+.instr-login {
+    background: rgba(12,18,27,0.92) !important;
+    border: 1px solid #1b2733 !important;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.65), 0 0 0 1px rgba(58,208,239,0.12) !important;
+    padding: 28px 24px 32px !important;
+}
+.login-mark {
+    font-family: ui-monospace, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.35em;
+    color: #3ad0ef;
+    margin-bottom: 4px;
+}
+.login-title {
+    font-family: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace !important;
+    font-size: 1.55rem !important;
+    letter-spacing: 0.18em !important;
+    color: #e9f1f8 !important;
+    margin: 0 0 6px !important;
+    text-transform: uppercase !important;
+    font-weight: 600 !important;
+}
+.login-sub { color: #8595a9 !important; margin: 8px 0 14px !important; font-size: 0.9rem !important; }
+.login-oath {
+    display: inline-block;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    color: #3ad0ef;
+    border: 1px solid rgba(58,208,239,0.35);
+    border-radius: 999px;
+    padding: 4px 12px;
+    margin-bottom: 18px;
+}
+
+/* Windows — global instrument lift */
+.window {
+    border-color: rgba(27,39,51,0.95) !important;
+    background: rgba(12,18,27,0.92) !important;
+}
+.window.focused {
+    border-color: rgba(58,208,239,0.45) !important;
+    box-shadow: 0 18px 56px rgba(0,0,0,0.6), 0 0 0 1px rgba(58,208,239,0.28) !important;
+}
+.window-header {
+    background: rgba(7,10,16,0.95) !important;
+    border-bottom: 1px solid #1b2733 !important;
+}
+.window-title {
+    font-family: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+    font-size: 0.72rem !important;
+    letter-spacing: 0.12em !important;
+    color: #8595a9 !important;
+}
+.instr-window .window-title,
+.window-title.instr-title {
+    color: #3ad0ef !important;
+}
+.win-btn.export {
+    width: auto !important;
+    height: auto !important;
+    border-radius: 4px !important;
+    background: transparent !important;
+    color: #3ad0ef !important;
+    border: 1px solid rgba(58,208,239,0.4) !important;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.58rem !important;
+    letter-spacing: 0.08em;
+    padding: 2px 6px !important;
+    margin-left: 4px;
+}
+
+/* Dock — labeled instrument rail */
+.dock {
+    background: rgba(7,10,16,0.88) !important;
+    border: 1px solid #1b2733 !important;
+    gap: 0.35rem !important;
+    padding: 0.45rem 0.6rem !important;
+}
+.dock-btn {
+    width: auto !important;
+    min-width: 52px;
+    height: auto !important;
+    min-height: 52px;
+    padding: 6px 8px 5px !important;
+    display: inline-flex !important;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border-radius: 14px !important;
+    border: 1px solid transparent !important;
+    background: rgba(255,255,255,0.03) !important;
+}
+.dock-btn .dock-ico { font-size: 1.2rem; line-height: 1; }
+.dock-btn .dock-lbl {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.55rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8595a9;
+}
+.dock-btn:hover {
+    background: rgba(58,208,239,0.12) !important;
+    border-color: rgba(58,208,239,0.35) !important;
+    transform: translateY(-3px) !important;
+}
+.dock-btn:hover .dock-lbl { color: #3ad0ef; }
+.dock-btn.active {
+    background: rgba(58,208,239,0.16) !important;
+    border-color: rgba(58,208,239,0.5) !important;
+    box-shadow: 0 0 16px rgba(58,208,239,0.2);
+}
+.dock-btn.active .dock-lbl { color: #3ad0ef; }
+@media (max-width: 720px) {
+    .dock-btn { min-width: 44px; min-height: 44px; padding: 4px 5px !important; }
+    .dock-btn .dock-ico { font-size: 1.05rem; }
+    .dock-btn .dock-lbl { font-size: 0.5rem; }
+}
+
+/* Chat instrument */
+.chat-banner {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    color: #8595a9;
+    border: 1px solid #1b2733;
+    border-radius: 8px;
+    padding: 6px 10px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(7,10,16,0.55);
+}
+.chat-banner-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #34d399;
+    box-shadow: 0 0 8px rgba(52,211,153,0.6);
+    animation: vitalsPulse 2.4s ease-in-out infinite;
+}
+.chat-history .message {
+    border: 1px solid rgba(27,39,51,0.8);
+    background: rgba(7,10,16,0.55);
+}
+.chat-history .ai-message {
+    border-left: 2px solid rgba(58,208,239,0.45);
+}
+.chat-input-area .instr-btn.primary {
+    flex-shrink: 0;
+    min-width: 72px;
+}
+
+/* File explorer */
+.explorer-layout {
+    display: flex !important;
+    flex-direction: row !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    min-height: 0;
+    flex: 1;
+    height: 100%;
+}
+.explorer-side {
+    width: 240px;
+    min-width: 200px;
+    border-right: 1px solid #1b2733;
+    background: rgba(7,10,16,0.75);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.explorer-side-title {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.14em;
+    color: #3ad0ef;
+    margin-bottom: 6px;
+}
+.explorer-side-note {
+    font-size: 0.72rem;
+    color: #64748b;
+    margin: 0 0 10px;
+    line-height: 1.35;
+}
+.explorer-tree {
+    flex: 1;
+    overflow: auto;
+    font-size: 0.82rem;
+    color: #cbd5e1;
+}
+.explorer-tree ul { list-style: none; margin: 0; padding-left: 12px; }
+.explorer-tree > ul { padding-left: 0; }
+.ide-dir > .folder {
+    cursor: pointer;
+    color: #3ad0ef;
+    user-select: none;
+    display: block;
+    padding: 3px 0;
+}
+.ide-dir > ul { display: none; }
+.ide-dir.open > ul { display: block; }
+.ide-file {
+    cursor: pointer;
+    padding: 3px 6px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #8595a9;
+}
+.ide-file:hover { background: rgba(58,208,239,0.08); color: #e9f1f8; }
+.ide-file.active {
+    background: rgba(58,208,239,0.14);
+    color: #e9f1f8;
+    border: 1px solid rgba(58,208,239,0.3);
+}
+.file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.explorer-preview {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: rgba(7,10,16,0.5);
+}
+.explorer-preview-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #1b2733;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.explorer-fname { color: #e9f1f8; font-size: 0.78rem; letter-spacing: 0.04em; }
+.explorer-meta { color: #64748b; font-size: 0.68rem; font-variant-numeric: tabular-nums; }
+.explorer-code {
+    flex: 1;
+    margin: 0;
+    padding: 14px 16px;
+    overflow: auto;
+    background: transparent;
+    color: #a78bfa;
+    font-family: ui-monospace, "Cascadia Code", "Fira Code", Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.explorer-loading, .explorer-err { color: #8595a9; font-size: 0.85rem; padding: 8px 0; }
+.explorer-err { color: #fb7185; }
+
+/* Drive local paste */
+.drive-paste-panel {
+    margin-top: 12px;
+    padding: 10px;
+    border: 1px solid #1b2733;
+    border-radius: 10px;
+    background: rgba(7,10,16,0.55);
+}
+
+/* Status strip polish */
+#instr-status-strip {
+    box-shadow: 0 1px 0 rgba(58,208,239,0.08);
+}
+
+/* Core config open by default gets instrument chrome too */
+#win-core { border-color: rgba(27,39,51,0.95); }
+
+@media (prefers-reduced-motion: reduce) {
+    .boot-flash, body.desktop-live #desktop-area, .chat-banner-dot, .thinking-bulb {
+        animation: none !important;
+    }
+    .dock-btn:hover { transform: none !important; }
+}

@@ -1,5 +1,15 @@
 # AGENT_LOG.md — session continuity for memory-provenance build
 
+## 2026-07-13 — feat/scale-si-hybrid: merge main + Claude review fixes
+
+### What
+- Merged `origin/main` (ingest-flush + qa-sev1 wow) into scale branch; both preserved.
+- FIX 1: `_cache_key` includes `enhance` + `enhance_strength` (no wrong-image cache hits).
+- FIX 2: `enhance=realesrgan` unavailable → **503** (same honesty as piper); si_detail/si_upscale2 stay 200.
+
+### Branch
+`feat/scale-si-hybrid` — do not merge without Claude re-review.
+
 ## 2026-07-12 — feat/scale-si-hybrid: scale image + voice (no mocks)
 
 ### Research brief → shipped tiers
@@ -7,23 +17,39 @@
 - Pure SI construction remains default stock/master (diagrams moat intact).
 - `enhance=si_detail` — classical multi-scale unsharp (always-on, deterministic).
 - `enhance=si_upscale2` — Lanczos 2× + detail (always-on).
-- `enhance=realesrgan` — optional local ONNX; **loud meta error** if model/ORT missing (no silent fake photoreal).
+- `enhance=realesrgan` — optional local ONNX; **loud 503** if model/ORT missing.
 - Capabilities card documents honest photoreal ceiling.
 
 **Voice (Q2)**
-- Formant path: Fujisaki-lite F0 + anticipatory coarticulation + raised-cosine diphone joins (still robotic, better multi-word).
-- `backend=formant` default (no neural weights).
-- `backend=piper` opt-in local neural — **503** if CLI/model missing (no cloud TTS).
-- `GET /api/v1/voice/capabilities` honest availability.
-
-### Proof
-- image si_detail 200 + enhance.engine=si_detail_multiscale
-- image si_upscale2 200 → 512 from 256
-- realesrgan unavailable → enhance.error (SI raster kept)
-- voice formant 200 RIFF; piper 503 with install note
+- Formant path: Fujisaki-lite F0 + anticipatory coarticulation + raised-cosine diphone joins.
+- `backend=formant` default; `backend=piper` opt-in — **503** if missing.
 
 ### Branch
-`feat/scale-si-hybrid` — do not merge without Claude review.
+`feat/scale-si-hybrid`
+
+## 2026-07-12 — fix/qa-sev1 wow: full QA close + instrument front-end
+
+### Fixed
+- File explorer: real home tree with `path`, preview pane, GET `/api/ide/read` (path-contained)
+- Drive: dual `/api/drive/*` + `/api/v1/drive/*` aliases; local text paste ingest
+- Dock: labeled buttons + active glow; boot opens Chat+Vitals once
+- Login/chat/explorer instrument chrome; boot flash; offline oath on lock screen
+
+### Branch
+`fix/qa-sev1` (merged to main)
+
+## 2026-07-12 — fix/qa-sev1: QA punch-list SEV-1/2
+
+### What (from Full QA Report July 12)
+1. **BUG-1 dock clip**: full-width wrap dock — 📡⚙️🧠 hit-testable
+2. **BUG-2 image HTTP 500**: shell `image_proxy` restored real POST
+3. **BUG-3 chat**: reachable after dock fix; `/api/chat` on shell
+4. **BUG-4 voice audio**: `load()` / `canplay` then play
+5. **BUG-5 foreman poll**: only while `#win-foreman` open
+
+### Branch
+`fix/qa-sev1` (merged to main)
+
 
 ## 2026-07-11 — SW-1..SW-5 Persona-Clone Expert Swarm
 

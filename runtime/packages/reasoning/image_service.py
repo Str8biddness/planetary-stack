@@ -120,13 +120,28 @@ def _cache_key(
     pitch_deg: float = 0.0,
     time_of_day: Optional[float] = None,
     plan_fp: str = "",
+    enhance: str = "none",
+    enhance_strength: float = 0.55,
 ) -> str:
+    """Hash all knobs that change the PNG bytes (incl. post-raster enhance).
+
+    FIX (Claude review): omitting enhance caused cache collisions — same prompt
+    with enhance=none vs si_detail returned the un-enhanced image on hit.
+    """
     tod = "none" if time_of_day is None else f"{float(time_of_day):.4f}"
+    enh = (enhance or "none").lower().strip() or "none"
+    if enh in ("off", "false", "0"):
+        enh = "none"
+    try:
+        estr = f"{float(enhance_strength):.4f}"
+    except (TypeError, ValueError):
+        estr = "0.5500"
     raw = (
         f"engine={ENGINE_VERSION}|{prompt.strip()}|{res}|{style}|{seed}|"
         f"{aspect:.4f}|{detail}|{look}|path={int(bool(path_mode))}|"
         f"yaw={float(yaw_deg):.3f}|pitch={float(pitch_deg):.3f}|t={tod}|"
-        f"plan={plan_fp or 'none'}"
+        f"plan={plan_fp or 'none'}|"
+        f"enh={enh}|estr={estr}"
     )
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -329,9 +344,35 @@ def generate_image(
             si_prompt = plan.get("si_prompt") or prompt
             plan_fp = "given"
 
+    enhance_norm = (enhance or "none").lower().strip() or "none"
+    if enhance_norm in ("off", "false", "0"):
+        enhance_norm = "none"
+    try:
+        enhance_strength_f = float(enhance_strength if enhance_strength is not None else 0.55)
+    except (TypeError, ValueError):
+        enhance_strength_f = 0.55
+
+    # Fail LOUD before expensive render if neural enhance is requested but missing
+    # (same honesty as piper voice — never return 200 implying realesrgan ran).
+    if enhance_norm == "realesrgan":
+        try:
+            import si_enhance as _enh_pre
+            st = _enh_pre.realesrgan_status()
+            if not st.get("available"):
+                raise RuntimeError(
+                    "realesrgan_unavailable: "
+                    + (st.get("note") or "install onnxruntime + place RealESRGAN x4 ONNX")
+                )
+        except RuntimeError:
+            raise
+        except Exception as e:
+            raise RuntimeError(f"realesrgan_unavailable: {e}") from e
+
     key = _cache_key(
         user_prompt, res, style, seed, aspect, detail, look, path_mode,
         yaw_deg, pitch_deg, time_of_day, plan_fp=plan_fp,
+        enhance=enhance_norm,
+        enhance_strength=enhance_strength_f,
     )
     t0 = time.time()
 
@@ -460,19 +501,32 @@ def generate_image(
 
     # Post-raster enhance (SI detail / optional local Real-ESRGAN). Graph stock unchanged.
     enhance_meta = None
-    enhance = (enhance or "none").lower().strip()
+    enhance = enhance_norm
+    enhance_strength = enhance_strength_f
     if enhance and enhance not in ("none", "off", "false", "0"):
         try:
             import si_enhance as _enh
             enhance_meta = _enh.enhance_file(
                 out_path,
                 mode=enhance,
-                strength=float(enhance_strength if enhance_strength is not None else 0.55),
+                strength=float(enhance_strength),
             )
+            if isinstance(enhance_meta, dict):
+                enhance_meta.setdefault("enhance_applied", enhance)
+                enhance_meta.setdefault("enhance_requested", enhance)
+                enhance_meta.setdefault("ok", True)
         except Exception as ee:
-            # Loud in meta; do not invent a photoreal fake
+            # realesrgan: never soft-degrade to unenhanced 200 (Claude review FIX 2)
+            if enhance == "realesrgan" or "realesrgan_unavailable" in str(ee):
+                raise RuntimeError(
+                    "realesrgan_unavailable: " + str(ee)
+                ) from ee
+            # si_detail / si_upscale2 unexpected failures: surface in meta, keep SI raster
             enhance_meta = {
                 "enhance": enhance,
+                "enhance_requested": enhance,
+                "enhance_applied": "none",
+                "enhance_error": str(ee),
                 "error": str(ee),
                 "ok": False,
                 "note": "Enhance failed — SI raster left unenhanced (no silent neural substitute)",
@@ -1484,13 +1538,24 @@ def execute_image_request(
         "not_diffusion": True,
         "engine_version": meta.get("engine_version"),
     }
-    # If enhance changed resolution (e.g. si_upscale2 / realesrgan), surface true size
-    if isinstance(meta.get("enhance"), dict):
-        em = meta["enhance"]
+    # Top-level enhance honesty (never imply a mode ran if it didn't)
+    em = meta.get("enhance") if isinstance(meta.get("enhance"), dict) else None
+    if em:
+        payload["enhance_requested"] = em.get("enhance_requested") or em.get("enhance") or enhance
+        payload["enhance_applied"] = em.get("enhance_applied") or (
+            em.get("enhance") if em.get("ok") is not False and not em.get("error") else "none"
+        )
+        if em.get("enhance_error") or em.get("error"):
+            payload["enhance_error"] = em.get("enhance_error") or em.get("error")
         if em.get("width"):
             payload["width"] = em["width"]
         if em.get("height"):
             payload["height"] = em["height"]
+    else:
+        payload["enhance_requested"] = enhance if enhance and enhance not in ("none", "off") else "none"
+        payload["enhance_applied"] = (
+            enhance if enhance and enhance not in ("none", "off", "false", "0") else "none"
+        )
     _p("done", 1.0)
     return payload
 

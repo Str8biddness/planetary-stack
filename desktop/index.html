@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Synthesus Planetary OS Ultra</title>
     <link rel="icon" href="data:,"><!-- silence the browser's automatic /favicon.ico 404 -->
-    <link rel="stylesheet" href="styles.css?v=10070">
+    <link rel="stylesheet" href="styles.css?v=10071">
     <!-- No external font CDN: Synthesus is local-first — nothing leaves the machine and the
          UI must render offline. Uses locally-installed Outfit/Fira Code if present, else a
          native system stack. To pin the exact look later, self-host the woff2 via @font-face. -->
@@ -31,10 +31,12 @@
             <div id="login-time">--:--</div>
             <div id="login-date"></div>
         </div>
-        <div class="modal-content glass-panel login-card" style="width: 420px; text-align: center;">
-            <h1 style="color: #38bdf8; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 2px;">Synthesus</h1>
-            <p class="login-tagline">Synthetic Intelligence &middot; Operating System</p>
-            <p id="login-subtitle" style="color: #94a3b8; margin-bottom: 25px;">Log in to your account.</p>
+        <div class="modal-content glass-panel login-card instr-login" style="width: 440px; text-align: center;">
+            <div class="login-mark">SYNTHESUS</div>
+            <h1 class="login-title">PLANETARY OS</h1>
+            <p class="login-tagline">Synthetic Intelligence · Local Substrate · No Cloud</p>
+            <p id="login-subtitle" class="login-sub">Authenticate to mount the desktop.</p>
+            <div class="login-oath">⦸ OFFLINE — nothing leaves this machine</div>
 
             <input type="email" id="login-email" class="glass-input" placeholder="Email" autocomplete="email"
                    onkeypress="if(event.key==='Enter') document.getElementById('login-password').focus()"
@@ -216,23 +218,30 @@
         </div>
 
         <!-- AI Chat Window -->
-        <div class="window glass-panel" id="win-chat" style="top: 100px; left: 550px; width: 400px; height: 500px; display: none;">
+        <div class="window glass-panel instr-window" id="win-chat" style="top: 70px; left: 380px; width: 520px; height: 580px; display: none;">
             <div class="window-header" onmousedown="dragWindow(event, 'win-chat')">
-                <span class="window-title">💬 Quadbrain Interface</span>
+                <span class="window-title instr-title">🧠 QUADBRAIN · SI</span>
                 <div class="window-controls">
-                    <button class="win-btn" onclick="window.open('/api/conversations/synthesus/export?format=json')" style="background: transparent; color: #38bdf8; border:1px solid #38bdf8; border-radius:3px; padding:0 4px; font-size:10px; cursor:pointer;">JSON</button>
-                    <button class="win-btn" onclick="window.open('/api/conversations/synthesus/export?format=md')" style="background: transparent; color: #38bdf8; border:1px solid #38bdf8; border-radius:3px; padding:0 4px; font-size:10px; cursor:pointer; margin-right:8px;">MD</button>
-                    <button class="win-btn minimize" onclick="minimizeWindow(this)" style="background: #facc15;"></button><button class="win-btn maximize" onclick="maximizeWindow(this)" style="background: #22c55e;"></button><button class="win-btn close" onclick="toggleWindow('win-chat')"></button></div>
+                    <button class="win-btn export" onclick="window.open('/api/conversations/synthesus/export?format=json')" title="Export JSON">JSON</button>
+                    <button class="win-btn export" onclick="window.open('/api/conversations/synthesus/export?format=md')" title="Export Markdown">MD</button>
+                    <button class="win-btn minimize" onclick="minimizeWindow(this)" style="background: #facc15;"></button>
+                    <button class="win-btn maximize" onclick="maximizeWindow(this)" style="background: #22c55e;"></button>
+                    <button class="win-btn close" onclick="toggleWindow('win-chat')"></button>
+                </div>
             </div>
             <div class="window-content chat-container">
+                <div class="chat-banner">
+                    <span class="chat-banner-dot"></span>
+                    LOCAL SI · formant + knowledge · not a cloud chat
+                </div>
                 <div class="chat-history" id="chat-history">
                     <div class="message ai-message" style="margin: 0.5rem 0;">
-                        <strong>Synthesus SI:</strong> Node active. I am monitoring the abstract drive and telemetry grid. How can I optimize your environment today?
+                        <strong>Synthesus SI:</strong> Node active. Abstract drive and telemetry grid online. Ask anything — or try <em>draw a house on grass under a sky</em>.
                     </div>
                 </div>
                 <div class="chat-input-area">
-                    <input type="text" id="chat-input" placeholder="Query Synthesus or execute command..." class="glass-input" onkeypress="handleChatKey(event)">
-                    <button class="glass-btn" onclick="sendChatMessage()">Execute</button>
+                    <input type="text" id="chat-input" placeholder="Query SI · draw · ground · reason…" class="glass-input instr-input" onkeypress="handleChatKey(event)">
+                    <button class="glass-btn instr-btn primary" onclick="sendChatMessage()">SEND</button>
                 </div>
             </div>
         </div>
@@ -258,6 +267,12 @@
                         Pick where Synthesus learns from. Fetched from <em>your</em> source; embedded &amp; indexed <strong>locally</strong> — nothing leaves this machine.
                     </p>
                     <div id="drive-tiles" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;"></div>
+                    <div class="drive-paste-panel">
+                        <label class="instr-label" for="drive-paste-text">Or paste local text (no cloud)</label>
+                        <textarea id="drive-paste-text" class="instr-input" rows="3" placeholder="Paste notes, facts, lore… indexed only on this machine."></textarea>
+                        <button type="button" class="instr-btn primary" style="margin-top:8px;" onclick="drivePasteLocal()">INGEST LOCAL TEXT</button>
+                        <div id="drive-paste-status" class="instr-meta" style="margin-top:6px;"></div>
+                    </div>
                 </div>
 
                 <!-- STEP 2: connect / point -->
@@ -296,22 +311,29 @@
             </div>
         </div>
 
-        <!-- File Explorer Window -->
-        <div class="window glass-panel" id="win-explorer" style="top: 150px; left: 150px; width: 700px; height: 500px; display: none;">
+        <!-- File Explorer Window — real home tree + content preview -->
+        <div class="window glass-panel instr-window" id="win-explorer" style="top: 80px; left: 80px; width: 760px; height: 540px; display: none;">
             <div class="window-header" onmousedown="dragWindow(event, 'win-explorer')">
-                <span class="window-title">📁 File Explorer</span>
+                <span class="window-title instr-title">📁 STORAGE ARRAY</span>
                 <div class="window-controls">
                     <button class="win-btn minimize" onclick="minimizeWindow('win-explorer')" style="background: #facc15;"></button>
                     <button class="win-btn maximize" onclick="maximizeWindow('win-explorer')" style="background: #22c55e;"></button>
                     <button class="win-btn close" onclick="toggleWindow('win-explorer')"></button>
                 </div>
             </div>
-            <div class="window-content" style="padding: 0; display: flex; flex: 1; min-height: 0;">
-                <div style="width: 200px; border-right: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); padding: 10px;">
-                    <div style="padding: 5px; color: #38bdf8;">🌐 Storage Array</div>
-                    <div style="padding: 5px; font-size: 0.78rem; color: #64748b;">Live view of the mounted Synthesus storage array. Nothing here is fabricated — it streams from the backend.</div>
-                </div>
-                <div id="ide-file-tree" style="flex: 1; padding: 15px; overflow: auto; font-size: 0.9rem; color: #cbd5e1;">Loading files from Storage Array…</div>
+            <div class="window-content explorer-layout">
+                <aside class="explorer-side">
+                    <div class="explorer-side-title">HOME · LIVE</div>
+                    <p class="explorer-side-note">Real host files under your home directory. Path-contained. Nothing fabricated.</p>
+                    <div id="ide-file-tree" class="explorer-tree">Loading storage array…</div>
+                </aside>
+                <section class="explorer-preview">
+                    <div class="explorer-preview-head">
+                        <span id="ide-current-file" class="explorer-fname">Select a file</span>
+                        <span id="ide-file-meta" class="explorer-meta">—</span>
+                    </div>
+                    <pre id="ide-code-editor" class="explorer-code" spellcheck="false">// Click a file in the tree to stream its contents.</pre>
+                </section>
             </div>
         </div>
 
@@ -530,7 +552,8 @@
                 </div>
                 <div style="display:flex; gap:8px;">
                     <button class="instr-btn primary" style="flex:1;" onclick="runVoiceSpeak()">SPEAK</button>
-                    <button class="instr-btn" onclick="document.getElementById('voice-text').value='the quick brown fox'">FOX</button>
+                    <button class="instr-btn" title="Load test phrase: the quick brown fox (formant ASR regression)"
+                            onclick="document.getElementById('voice-text').value='the quick brown fox'">FOX</button>
                 </div>
                 <audio id="voice-audio" controls style="width:100%; margin-top:4px;"></audio>
                 <div class="instr-meta" id="voice-status">ready · local SI larynx</div>
@@ -562,22 +585,42 @@
         </div>
     </div>
 
-    <!-- OS Taskbar (Dock) -->
-    <nav class="dock">
-        <button onclick="toggleVitals()" class="dock-btn" title="System Vitals — live subsystem status">📡</button>
-        <button onclick="toggleWindow('win-core')" class="dock-btn" title="Settings">⚙️</button>
-        <button onclick="toggleWindow('win-chat')" class="dock-btn" title="Quadbrain SI">🧠</button>
-        <button onclick="toggleWindow('win-image')" class="dock-btn" title="SI Image Studio">🎨</button>
-        <button onclick="toggleWindow('win-voice')" class="dock-btn" title="SI Voice Studio — formant larynx">🔊</button>
-        <button onclick="toggleWindow('win-drive')" class="dock-btn" title="Expansion Drive — ground on your sources">💽</button>
-        <button onclick="toggleWindow('win-explorer')" class="dock-btn" title="File Explorer">📁</button>
-        <button onclick="toggleWindow('win-foreman')" class="dock-btn" title="Foreman Bridge">🛡️</button>
-        <button onclick="spawnTerminalWindow()" class="dock-btn" title="Ring-0 Command Interface">_</button>
-        <button onclick="showTiers()" class="dock-btn" title="Unlock Pro — premium personas">⭐</button>
+    <!-- OS Taskbar (Dock) — labels + data-win for active glow -->
+    <nav class="dock" id="os-dock" aria-label="System dock">
+        <button type="button" onclick="toggleVitals()" class="dock-btn" data-win="win-vitals" title="System Vitals">
+            <span class="dock-ico">📡</span><span class="dock-lbl">Vitals</span>
+        </button>
+        <button type="button" onclick="toggleWindow('win-core')" class="dock-btn" data-win="win-core" title="System Configuration">
+            <span class="dock-ico">⚙️</span><span class="dock-lbl">Config</span>
+        </button>
+        <button type="button" onclick="toggleWindow('win-chat')" class="dock-btn" data-win="win-chat" title="Quadbrain SI">
+            <span class="dock-ico">🧠</span><span class="dock-lbl">Chat</span>
+        </button>
+        <button type="button" onclick="toggleWindow('win-image')" class="dock-btn" data-win="win-image" title="SI Image Studio">
+            <span class="dock-ico">🎨</span><span class="dock-lbl">Image</span>
+        </button>
+        <button type="button" onclick="toggleWindow('win-voice')" class="dock-btn" data-win="win-voice" title="SI Voice Studio">
+            <span class="dock-ico">🔊</span><span class="dock-lbl">Voice</span>
+        </button>
+        <button type="button" onclick="toggleWindow('win-drive')" class="dock-btn" data-win="win-drive" title="Expansion Drive">
+            <span class="dock-ico">💽</span><span class="dock-lbl">Drive</span>
+        </button>
+        <button type="button" onclick="toggleWindow('win-explorer')" class="dock-btn" data-win="win-explorer" title="File Explorer">
+            <span class="dock-ico">📁</span><span class="dock-lbl">Files</span>
+        </button>
+        <button type="button" onclick="toggleWindow('win-foreman')" class="dock-btn" data-win="win-foreman" title="Foreman Bridge">
+            <span class="dock-ico">🛡️</span><span class="dock-lbl">Secure</span>
+        </button>
+        <button type="button" onclick="spawnTerminalWindow()" class="dock-btn" title="Ring-0 Terminal">
+            <span class="dock-ico">_</span><span class="dock-lbl">Term</span>
+        </button>
+        <button type="button" onclick="showTiers()" class="dock-btn" title="Unlock Pro">
+            <span class="dock-ico">⭐</span><span class="dock-lbl">Pro</span>
+        </button>
     </nav>
 
-    <script src="script.js?v=10070"></script>
-    <script src="hyperspace.js?v=4"></script>
+    <script src="script.js?v=10071"></script>
+    <script src="hyperspace.js?v=5"></script>
 
     <!-- OTA Update Screen -->
     <div id="ota-modal" style="display: none; position: fixed; top:0; left:0; width: 100vw; height: 100vh; background: #000; z-index: 10000; justify-content: center; align-items: center; font-family: 'Courier New', Courier, monospace;">
