@@ -408,6 +408,21 @@ class ImageRequest(BaseModel):
         le=1.0,
         description="Extra vignette amount for picture_edit pass",
     )
+    enhance: str = Field(
+        "none",
+        description=(
+            "Post-raster enhance on SI construction (scene graph stays master stock): "
+            "none | si_detail | si_upscale2 | realesrgan. "
+            "si_* are pure classical/DSP; realesrgan is optional local ONNX neural upscale "
+            "(not open-domain diffusion). Loud fail if realesrgan model missing."
+        ),
+    )
+    enhance_strength: float = Field(
+        0.55,
+        ge=0.0,
+        le=1.5,
+        description="Strength for si_detail multi-scale unsharp (ignored by realesrgan)",
+    )
     playlist: Optional[str] = Field(
         None,
         description="Named multi-pass job on scene_id: finish | orbit_sample | day_cycle",

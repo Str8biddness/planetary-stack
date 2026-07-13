@@ -1,5 +1,30 @@
 # AGENT_LOG.md — session continuity for memory-provenance build
 
+## 2026-07-12 — feat/scale-si-hybrid: scale image + voice (no mocks)
+
+### Research brief → shipped tiers
+**Image (Q1)**
+- Pure SI construction remains default stock/master (diagrams moat intact).
+- `enhance=si_detail` — classical multi-scale unsharp (always-on, deterministic).
+- `enhance=si_upscale2` — Lanczos 2× + detail (always-on).
+- `enhance=realesrgan` — optional local ONNX; **loud meta error** if model/ORT missing (no silent fake photoreal).
+- Capabilities card documents honest photoreal ceiling.
+
+**Voice (Q2)**
+- Formant path: Fujisaki-lite F0 + anticipatory coarticulation + raised-cosine diphone joins (still robotic, better multi-word).
+- `backend=formant` default (no neural weights).
+- `backend=piper` opt-in local neural — **503** if CLI/model missing (no cloud TTS).
+- `GET /api/v1/voice/capabilities` honest availability.
+
+### Proof
+- image si_detail 200 + enhance.engine=si_detail_multiscale
+- image si_upscale2 200 → 512 from 256
+- realesrgan unavailable → enhance.error (SI raster kept)
+- voice formant 200 RIFF; piper 503 with install note
+
+### Branch
+`feat/scale-si-hybrid` — do not merge without Claude review.
+
 ## 2026-07-11 — SW-1..SW-5 Persona-Clone Expert Swarm
 
 ### What

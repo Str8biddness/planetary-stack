@@ -204,6 +204,8 @@ def generate_image(
     grade: str = "none",
     edit_text: str = "",
     edit_vignette: float = 0.0,
+    enhance: str = "none",
+    enhance_strength: float = 0.55,
 ) -> dict[str, Any]:
     """Reason ``prompt`` into a scene graph and render it to ``out_path`` (PNG).
 
@@ -219,6 +221,8 @@ def generate_image(
     scene_plan: precomputed plan dict (skips compile when provided).
     keep_session: store graph in image_session for multi-pass re-render.
     grade/edit_text/edit_vignette: Photoshop-lite post-raster (picture_edit).
+    enhance: none | si_detail | si_upscale2 | realesrgan — post-raster polish
+      (SI graph remains stock; realesrgan is optional local neural on the raster).
     """
     # Apply cinematic preset pack (fills missing knobs only)
     if preset:
@@ -454,6 +458,26 @@ def generate_image(
         except Exception as pe:
             picture_meta = {"error": str(pe), "construction": "picture_edit"}
 
+    # Post-raster enhance (SI detail / optional local Real-ESRGAN). Graph stock unchanged.
+    enhance_meta = None
+    enhance = (enhance or "none").lower().strip()
+    if enhance and enhance not in ("none", "off", "false", "0"):
+        try:
+            import si_enhance as _enh
+            enhance_meta = _enh.enhance_file(
+                out_path,
+                mode=enhance,
+                strength=float(enhance_strength if enhance_strength is not None else 0.55),
+            )
+        except Exception as ee:
+            # Loud in meta; do not invent a photoreal fake
+            enhance_meta = {
+                "enhance": enhance,
+                "error": str(ee),
+                "ok": False,
+                "note": "Enhance failed — SI raster left unenhanced (no silent neural substitute)",
+            }
+
     entities = [
         p.get("entity") for p in doc if isinstance(p, dict) and p.get("entity")
     ]
@@ -516,6 +540,7 @@ def generate_image(
         "not_diffusion": True,
         "stock": "scene_graph",
         "picture_edit": picture_meta,
+        "enhance": enhance_meta,
     }
     if plan and return_plan:
         try:
@@ -1053,6 +1078,8 @@ def apply_scene_pass(
     edit_text: Optional[str] = None,
     edit_vignette: Optional[float] = None,
     style: Optional[str] = None,
+    enhance: Optional[str] = None,
+    enhance_strength: Optional[float] = None,
 ) -> dict[str, Any]:
     """Re-render an existing session graph with new view/ISP/picture-edit knobs.
 
@@ -1089,6 +1116,10 @@ def apply_scene_pass(
         grade=grade if grade is not None else kn.get("grade") or "none",
         edit_text=edit_text if edit_text is not None else "",
         edit_vignette=float(edit_vignette if edit_vignette is not None else 0.0),
+        enhance=enhance if enhance is not None else kn.get("enhance") or "none",
+        enhance_strength=float(
+            enhance_strength if enhance_strength is not None else kn.get("enhance_strength") or 0.55
+        ),
         return_plan=True,
     )
 
@@ -1252,6 +1283,8 @@ def execute_image_request(
     grade = (params.get("grade") or "none")
     edit_text = params.get("edit_text") or ""
     edit_vignette = float(params.get("edit_vignette") or 0.0)
+    enhance = (params.get("enhance") or "none")
+    enhance_strength = float(params.get("enhance_strength") or 0.55)
 
     t0 = _time.time()
     _p("starting", 0.05)
@@ -1391,6 +1424,8 @@ def execute_image_request(
             grade=grade,
             edit_text=edit_text,
             edit_vignette=edit_vignette,
+            enhance=enhance,
+            enhance_strength=enhance_strength,
         )
         with open(out_path, "rb") as f:
             png_b64 = base64.b64encode(f.read()).decode("ascii")
@@ -1443,11 +1478,19 @@ def execute_image_request(
         "lathe_parts": meta.get("lathe_parts"),
         "extrude_parts": meta.get("extrude_parts"),
         "picture_edit": meta.get("picture_edit"),
+        "enhance": meta.get("enhance"),
         "scene_id": meta.get("scene_id"),
         "stock": "scene_graph",
         "not_diffusion": True,
         "engine_version": meta.get("engine_version"),
     }
+    # If enhance changed resolution (e.g. si_upscale2 / realesrgan), surface true size
+    if isinstance(meta.get("enhance"), dict):
+        em = meta["enhance"]
+        if em.get("width"):
+            payload["width"] = em["width"]
+        if em.get("height"):
+            payload["height"] = em["height"]
     _p("done", 1.0)
     return payload
 
