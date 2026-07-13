@@ -729,3 +729,18 @@ curl -s -X POST http://127.0.0.1:5010/api/v1/voice \
 
 ### Branch
 `feat/voice-ui` — do not merge without Claude review.
+## 2026-07-12 — feat/tier-badges: instrument trust chips in real chat
+
+### What
+- Answer-level instrument badges: ✓ Verified / ~ Grounded / • Unverified from real chat payload
+  (`/api/chat` → runtime `/api/v1/query` sources + verification).
+- Citation chips (`.instr-cite-chip`) from `data.sources`.
+- 👍 confirm still mints `/api/human/attestation` then `/api/feedback` → runtime `/api/v1/feedback`.
+  On upgrade: badge flips to ✓ Verified. If human-session secret missing: **fail closed** (stay Grounded).
+
+### Proof
+- Real query path returns `answer_id` + `sources`; UI renders `instr-tier-badge` + citation chips.
+- Confirm path hits shell feedback proxy → `/api/v1/feedback`; without secret stays not upgraded.
+
+### Branch
+`feat/tier-badges` — do not merge without Claude review.

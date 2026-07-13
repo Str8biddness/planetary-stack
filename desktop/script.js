@@ -415,15 +415,14 @@ function attachConfirmControl(bubble, meta) {
 
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'confirm-fact-btn glass-btn';
+    btn.className = 'confirm-fact-btn glass-btn instr-confirm';
     btn.title = 'Confirm this answer as a verified fact (human only)';
     btn.setAttribute('data-answer-id', meta.answer_id);
-    btn.style.cssText = 'background:rgba(34,197,94,0.15); border:1px solid #22c55e; color:#86efac; padding:4px 10px; font-size:0.85rem; cursor:pointer;';
-    btn.innerHTML = '&#128077; Confirm as fact';
+    btn.innerHTML = '&#128077; confirm';
 
     const status = document.createElement('span');
-    status.className = 'confirm-fact-status';
-    status.style.cssText = 'font-size:0.75rem; color:#94a3b8;';
+    status.className = 'confirm-fact-status instr-meta';
+    status.style.cssText = 'font-size:0.68rem; color:#8595a9;';
 
     btn.addEventListener('click', function () {
         confirmAssistantFact(meta, btn, status);
@@ -431,7 +430,10 @@ function attachConfirmControl(bubble, meta) {
 
     bar.appendChild(btn);
     bar.appendChild(status);
-    bubble.appendChild(bar);
+    // Prefer attaching under instrument meta row if present
+    const metaRow = bubble.querySelector('.instr-answer-meta');
+    if (metaRow) metaRow.appendChild(bar);
+    else bubble.appendChild(bar);
 }
 
 async function confirmAssistantFact(meta, btn, statusEl) {
@@ -526,26 +528,39 @@ async function confirmAssistantFact(meta, btn, statusEl) {
         if (fbResp.ok && upgrade.upgraded) {
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = '&#10003; Verified fact';
-                btn.style.borderColor = '#4ade80';
-                btn.style.color = '#4ade80';
+                btn.innerHTML = '&#10003; Verified';
+                btn.style.borderColor = '#34d399';
+                btn.style.color = '#34d399';
             }
             if (statusEl) {
-                statusEl.style.color = '#4ade80';
+                statusEl.style.color = '#34d399';
                 statusEl.textContent = 'Mc upgrade: ' +
                     (upgrade.provenance || 'user_confirmed') +
                     ' / tier ' + String(upgrade.verification) +
                     (upgrade.confirmed_by ? ' by ' + upgrade.confirmed_by : '');
             }
+            // Flip answer-level badge to Verified
+            const bubble = btn.closest('.message, .ai-message') || btn.parentElement;
+            if (bubble) {
+                const badge = bubble.querySelector('.instr-tier-badge, .verification-badge');
+                if (badge) {
+                    badge.className = 'instr-tier-badge t2 verification-badge';
+                    badge.setAttribute('data-tier', '2');
+                    badge.textContent = '✓ Verified';
+                } else {
+                    attachAnswerTrustMeta(bubble, { verification: 2, sources: meta.sources || [] });
+                }
+            }
         } else {
+            // Fail closed: stay Grounded/Unverified — honest when human-session secret missing
             if (statusEl) {
-                statusEl.style.color = '#f87171';
-                statusEl.textContent = 'Not upgraded: ' +
+                statusEl.style.color = '#fb7185';
+                statusEl.textContent = 'Not upgraded (fail-closed): ' +
                     (upgrade.reason || fbBody.message || ('HTTP ' + fbResp.status));
             }
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = '&#128077; Confirm as fact';
+                btn.innerHTML = '&#128077; confirm';
             }
         }
     } catch (e) {
@@ -735,11 +750,16 @@ async function sendChatMessage() {
         // Idea arrives: bulb lights up solid, then the answer streams out.
         // After stream, attach 👍 confirm bound to this answer_id.
         streamInto(document.getElementById(thinkId), answerText, function (bubble) {
+            // Answer-level instrument tier badge + citation chips (real sources)
+            try {
+                attachAnswerTrustMeta(bubble, data);
+            } catch (e) { console.log('tier meta', e); }
             if (answerId) {
                 attachConfirmControl(bubble, {
                     answer_id: answerId,
                     query: message,
                     response: answerText,
+                    sources: data.sources || [],
                 });
             }
         });
@@ -764,29 +784,29 @@ async function sendChatMessage() {
             chatHistory.innerHTML += planHtml;
         }
 
-        // Sources under grounded answers — each shows verification tier badge
-        // (anti-collapse Mc: verified > grounded > unverified).
+        // Sources under grounded answers — instrument citation chips + tier badges
         if (Array.isArray(data.sources) && data.sources.length) {
             const items = data.sources.map(s => {
                 if (typeof s === 'string') {
                     return '<li style="margin:4px 0; list-style:none;">' +
-                        verificationTierBadge(null) + ' ' + escapeHtml(s) + '</li>';
+                        verificationTierBadge(null) +
+                        ' <span class="instr-cite-chip">' + escapeHtml(s) + '</span></li>';
                 }
                 const label = (s && (s.file || s.name || s.path || s.source || s.title || s.pattern)) || JSON.stringify(s);
                 const badge = verificationTierBadge(s);
                 const score = (s && s.score != null) ? ' <span style="opacity:0.6;">(' + Number(s.score).toFixed(2) + ')</span>' : '';
                 return '<li style="margin:4px 0; list-style:none; display:flex; align-items:flex-start; gap:6px;">' +
                     badge +
-                    '<span style="flex:1; word-break:break-word;">' + escapeHtml(String(label)) + score + '</span></li>';
+                    '<span class="instr-cite-chip" style="flex:1; max-width:none; white-space:normal;">' +
+                    escapeHtml(String(label)) + score + '</span></li>';
             }).join('');
             const sourcesHtml =
-                '<details class="rag-sources" style="margin-top:8px; background:rgba(20,25,40,0.6); ' +
-                'border:1px solid rgba(56,189,248,.3); border-radius:8px; padding:6px 10px;">' +
-                '<summary style="cursor:pointer; color:#38bdf8; font-size:0.8rem;">' +
-                '&#128206; Sources (' + data.sources.length + ')</summary>' +
-                '<ul style="margin:6px 0 2px 0; padding:0; color:#94a3b8; font-size:0.8rem;">' +
+                '<details class="rag-sources" style="margin-top:8px; background:rgba(12,18,27,0.9); ' +
+                'border:1px solid #1b2733; border-radius:8px; padding:6px 10px;">' +
+                '<summary style="cursor:pointer; color:#3ad0ef; font-size:0.72rem; font-family:var(--instr-mono); letter-spacing:0.08em;">' +
+                'SOURCES (' + data.sources.length + ')</summary>' +
+                '<ul style="margin:6px 0 2px 0; padding:0; color:#8595a9; font-size:0.8rem;">' +
                 items + '</ul></details>';
-            // insertAdjacentHTML keeps the streaming bubble node intact (unlike innerHTML +=).
             chatHistory.insertAdjacentHTML('beforeend', sourcesHtml);
         }
 
@@ -2161,17 +2181,81 @@ function verificationTierBadge(source) {
     // Default unknown → Unverified (do not claim trust)
     if (tier !== 0 && tier !== 1 && tier !== 2) tier = 0;
 
-    const styles = {
-        2: { label: '✓ Verified', color: '#4ade80', border: 'rgba(74,222,128,0.45)', bg: 'rgba(74,222,128,0.12)' },
-        1: { label: '~ Grounded', color: '#38bdf8', border: 'rgba(56,189,248,0.45)', bg: 'rgba(56,189,248,0.12)' },
-        0: { label: '• Unverified', color: '#94a3b8', border: 'rgba(148,163,184,0.35)', bg: 'rgba(148,163,184,0.08)' },
-    };
-    const s = styles[tier];
-    return '<span class="verification-badge" data-tier="' + tier + '" title="Trust tier from provenance" ' +
-        'style="display:inline-block; flex-shrink:0; font-size:0.72rem; font-weight:600; ' +
-        'padding:1px 7px; border-radius:999px; border:1px solid ' + s.border + '; ' +
-        'color:' + s.color + '; background:' + s.bg + '; white-space:nowrap;">' +
-        s.label + '</span>';
+    // Instrument-console badge (match design tokens)
+    const labels = { 2: '✓ Verified', 1: '~ Grounded', 0: '• Unverified' };
+    return '<span class="instr-tier-badge t' + tier + ' verification-badge" data-tier="' + tier +
+        '" title="Trust tier from provenance / sources">' + labels[tier] + '</span>';
+}
+
+/** Derive answer-level tier from sources array (max trust among sources). */
+function answerTierFromSources(sources) {
+    if (!Array.isArray(sources) || !sources.length) return 0;
+    let maxT = 0;
+    sources.forEach(function (s) {
+        if (typeof s === 'string') return;
+        // reuse verificationTierBadge parsing via temp
+        let tier = 0;
+        if (s && s.verification != null) {
+            const n = Number(s.verification);
+            if (n === 2 || n === 1 || n === 0) tier = n;
+            else {
+                const u = String(s.verification).toUpperCase();
+                if (u === 'VERIFIED') tier = 2;
+                else if (u === 'GROUNDED') tier = 1;
+            }
+        } else if (s && s.provenance) {
+            const p = String(s.provenance).toLowerCase();
+            if (p === 'user_document' || p === 'user_stated' || p === 'user_confirmed') tier = 2;
+            else if (p === 'grounded_cited') tier = 1;
+        }
+        if (tier > maxT) maxT = tier;
+    });
+    // any retrieved source at least Grounded (1) if not LLM-only
+    if (maxT === 0 && sources.length) {
+        const anyGround = sources.some(function (s) {
+            if (typeof s === 'string') return true;
+            const p = String((s && s.provenance) || '').toLowerCase();
+            return p && p !== 'llm_generation';
+        });
+        if (anyGround) maxT = 1;
+    }
+    return maxT;
+}
+
+function citationChipsHtml(sources) {
+    if (!Array.isArray(sources) || !sources.length) return '';
+    return sources.slice(0, 8).map(function (s) {
+        let label;
+        if (typeof s === 'string') label = s;
+        else label = (s && (s.file || s.name || s.path || s.source || s.title || s.pattern)) || 'source';
+        return '<span class="instr-cite-chip" title="' + escapeHtml(String(label)) + '">' +
+            escapeHtml(String(label).slice(0, 48)) + '</span>';
+    }).join('');
+}
+
+function attachAnswerTrustMeta(bubble, data) {
+    if (!bubble || !data) return;
+    // remove prior meta row if re-attach
+    const old = bubble.querySelector('.instr-answer-meta');
+    if (old) old.remove();
+    const sources = data.sources || [];
+    let tier = 0;
+    if (data.verification != null) {
+        const n = Number(data.verification);
+        if (n === 0 || n === 1 || n === 2) tier = n;
+        else {
+            const u = String(data.verification).toUpperCase();
+            if (u === 'VERIFIED') tier = 2;
+            else if (u === 'GROUNDED') tier = 1;
+        }
+    } else {
+        tier = answerTierFromSources(sources);
+    }
+    const row = document.createElement('div');
+    row.className = 'instr-answer-meta';
+    row.innerHTML = verificationTierBadge({ verification: tier }) + citationChipsHtml(sources);
+    bubble.appendChild(row);
+    return tier;
 }
 
 // ---------------------------------------------------------------------------
