@@ -9,6 +9,10 @@ let offsetX = 0, offsetY = 0;
 
 function toggleWindow(id) {
     const win = document.getElementById(id);
+    if (!win) {
+        console.warn('toggleWindow: missing element', id);
+        return;
+    }
     let displayState = 'none';
     if (win.style.display === 'none') {
         win.style.display = 'flex';
@@ -24,9 +28,15 @@ function toggleWindow(id) {
         if (id === 'win-drive') loadDriveSources();
         if (id === 'win-core') loadLLMSettings();
         if (id === 'win-image') { try { renderImageGallery(); } catch (e) {} }
+        // Foreman poll only while the window is open (QA BUG-5)
+        if (id === 'win-foreman') startForemanSync();
     } else {
         win.style.display = 'none';
         if (id === 'win-twin' && twinInterval) clearInterval(twinInterval);
+        if (id === 'win-foreman' && foremanInterval) {
+            clearInterval(foremanInterval);
+            foremanInterval = null;
+        }
     }
     
     // Broadcast to Grid
@@ -51,11 +61,26 @@ function focusWindow(win) {
 // positions (or a small/rotated screen) opening a window you can't grab.
 function clampIntoView(win) {
     if (!win) return;
-    const w = win.offsetWidth || 400, h = win.offsetHeight || 300;
+    const stripH = document.getElementById('instr-status-strip') ? 28 : 0;
+    const dockH = 72; // leave room for dock (may wrap on narrow viewports)
+    const vw = window.innerWidth || 800;
+    const vh = window.innerHeight || 600;
+    // Prefer measured size; fall back to CSS width/height if still 0 (display:none→flex race)
+    let w = win.offsetWidth || parseInt(win.style.width, 10) || 400;
+    let h = win.offsetHeight || parseInt(win.style.height, 10) || 300;
+    // Shrink oversized windows so title bar stays reachable on tiny viewports
+    if (w > vw - 8) {
+        w = Math.max(280, vw - 8);
+        win.style.width = w + 'px';
+    }
+    if (h > vh - stripH - dockH) {
+        h = Math.max(200, vh - stripH - dockH);
+        win.style.height = h + 'px';
+    }
     let left = parseInt(win.style.left, 10); if (isNaN(left)) left = win.offsetLeft || 40;
     let top  = parseInt(win.style.top, 10);  if (isNaN(top))  top  = win.offsetTop  || 40;
-    left = Math.max(0, Math.min(left, window.innerWidth  - w));
-    top  = Math.max(0, Math.min(top,  window.innerHeight - h));
+    left = Math.max(0, Math.min(left, Math.max(0, vw - Math.min(w, 100))));
+    top  = Math.max(stripH, Math.min(top, Math.max(stripH, vh - dockH - 40)));
     win.style.left = left + 'px';
     win.style.top  = top + 'px';
 }
@@ -92,8 +117,9 @@ function onMouseMove(e) {
         animationFrameId = requestAnimationFrame(() => {
             if (currentWindow) {
                 // Apply bounded constraints so windows can't be dragged offscreen
+                const stripH = document.getElementById('instr-status-strip') ? 28 : 0;
                 const newLeft = Math.max(0, Math.min(currentMouseX - offsetX, window.innerWidth - 100));
-                const newTop = Math.max(0, Math.min(currentMouseY - offsetY, window.innerHeight - 50));
+                const newTop = Math.max(stripH, Math.min(currentMouseY - offsetY, window.innerHeight - 50));
                 currentWindow.style.left = newLeft + 'px';
                 currentWindow.style.top = newTop + 'px';
                 
@@ -1752,10 +1778,11 @@ function maximizeWindow(el) {
         win.dataset.oldTop = win.style.top;
         win.dataset.oldLeft = win.style.left;
         
-        win.style.top = '0px';
+        const stripH = document.getElementById('instr-status-strip') ? 28 : 0;
+        win.style.top = stripH + 'px';
         win.style.left = '0px';
         win.style.width = '100vw';
-        win.style.height = 'calc(100vh - 60px)'; // leave room for dock
+        win.style.height = 'calc(100vh - ' + (60 + stripH) + 'px)'; // leave room for dock + strip
         win.dataset.maximized = 'true';
     }
 }
@@ -2379,20 +2406,31 @@ async function saveLLMSettings() {
 }
 
 let foremanInterval;
+let _foremanFailStreak = 0;
 function startForemanSync() {
+    // Only poll while Foreman window is open — never on page load (QA BUG-5).
     if (foremanInterval) clearInterval(foremanInterval);
+    _foremanFailStreak = 0;
+    fetchForemanQueue();
     foremanInterval = setInterval(fetchForemanQueue, 2000);
+}
+
+function stopForemanSync() {
+    if (foremanInterval) { clearInterval(foremanInterval); foremanInterval = null; }
 }
 
 async function fetchForemanQueue() {
     try {
         const res = await fetch('/api/foreman/queue');
         if (!res.ok) {
-            // Foreman is held/unmounted in this build — stop polling so we don't
-            // spam the browser console with a 404 every 2s. Resumes if the route exists.
-            if (res.status === 404 && foremanInterval) { clearInterval(foremanInterval); foremanInterval = null; }
+            // Foreman unmounted / FastAPI 404 detail — stop polling (QA BUG-5).
+            _foremanFailStreak++;
+            if ((res.status === 404 || res.status === 501 || _foremanFailStreak >= 2) && foremanInterval) {
+                stopForemanSync();
+            }
             return;
         }
+        _foremanFailStreak = 0;
         const data = await res.json();
         const listEl = document.getElementById('foreman-queue-list');
         if (!listEl) return;
@@ -2476,7 +2514,7 @@ async function denyForeman(stepId) {
     } catch(e) {}
 }
 
-startForemanSync();
+// Foreman poll is started only when #win-foreman opens (see toggleWindow).
 
 // ==========================================
 // SI IMAGE STUDIO (procedural VSA — not diffusion)
@@ -3423,19 +3461,50 @@ async function runVoiceSpeak() {
             }
             return;
         }
-        const mime = data.mime_type || 'audio/wav';
-        const bin = atob(data.audio_base64);
+        // Force WAV MIME — some browsers refuse to decode with a generic type.
+        const mime = 'audio/wav';
+        const b64 = String(data.audio_base64 || '').replace(/\s+/g, '');
+        const bin = atob(b64);
         const bytes = new Uint8Array(bin.length);
         for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
         // RIFF check in browser
         const riffOk = bytes.length >= 12 &&
-            String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) === 'RIFF';
-        const blob = new Blob([bytes], { type: mime });
-        if (_lastVoiceObjectUrl) URL.revokeObjectURL(_lastVoiceObjectUrl);
+            String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) === 'RIFF' &&
+            String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]) === 'WAVE';
+        // Copy into a fresh ArrayBuffer-backed view (avoids detached-buffer edge cases)
+        const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+        const blob = new Blob([ab], { type: mime });
+        if (_lastVoiceObjectUrl) {
+            try { URL.revokeObjectURL(_lastVoiceObjectUrl); } catch (_) {}
+        }
         _lastVoiceObjectUrl = URL.createObjectURL(blob);
         if (audioEl) {
+            audioEl.pause();
+            audioEl.removeAttribute('src');
             audioEl.src = _lastVoiceObjectUrl;
-            audioEl.play().catch(function () {});
+            audioEl.type = mime;
+            // load() is required so duration leaves 0:00/0:00 (QA BUG-4)
+            try { audioEl.load(); } catch (_) {}
+            const tryPlay = function () {
+                const p = audioEl.play();
+                if (p && typeof p.catch === 'function') {
+                    p.catch(function (err) {
+                        if (statusEl) {
+                            statusEl.textContent = (statusEl.textContent || '') +
+                                ' · click ▶ to play (autoplay blocked)';
+                        }
+                        console.log('voice play blocked/failed', err && err.message);
+                    });
+                }
+            };
+            if (audioEl.readyState >= 2) tryPlay();
+            else {
+                audioEl.addEventListener('canplay', tryPlay, { once: true });
+                // Fallback if canplay never fires
+                setTimeout(function () {
+                    if (audioEl.paused) tryPlay();
+                }, 400);
+            }
         }
         if (statusEl) {
             statusEl.style.color = '#8595a9';

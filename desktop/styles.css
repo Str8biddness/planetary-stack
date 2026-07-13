@@ -218,7 +218,18 @@ body {
 @keyframes planet-wobble { 0%, 100% { transform: translateY(0px) rotate(0deg); } 25% { transform: translateY(-10px) rotate(5deg); } 50% { transform: translateY(0px) rotate(0deg); } 75% { transform: translateY(10px) rotate(-5deg); } }
 
 
-#desktop-area { position: absolute; top: 0; left: 0; width: 100%; height: calc(100% - 80px); overflow: hidden; }
+/* Leave room for status strip (top) + dock (bottom). overflow:visible so
+   clampIntoView can keep title bars reachable on narrow viewports (QA BUG-7). */
+#desktop-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: calc(100% - 72px);
+    overflow: visible;
+    padding-top: 28px; /* status strip clearance; harmless if strip absent */
+    box-sizing: border-box;
+}
 
 /* WINDOW MANAGER CSS */
 .window {
@@ -296,16 +307,80 @@ body {
 /* Terminal */
 .terminal-container { background: rgba(0,0,0,0.8); color: #a78bfa; font-family: 'Fira Code', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace; font-size: 0.9rem; padding: 1rem; border-radius: 8px; }
 
+/* Focused window: light cyan ring so z-order is obvious (QA BUG-8) */
+.window.focused {
+    box-shadow: 0 16px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(58,208,239,0.35);
+}
+.window-controls .win-btn {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 6px;
+    flex-shrink: 0;
+}
+.window-controls .win-btn.close { background: #fb7185 !important; }
+.window-controls .win-btn.close:hover { filter: brightness(1.15); }
+
 /* Forms & Inputs */
 input, textarea { user-select: text; -webkit-user-select: text; }
 .glass-input { background: rgba(0, 0, 0, 0.4); border: 1px solid var(--glass-border); color: var(--text-primary); padding: 0.8rem; border-radius: 8px; width: 100%; outline: none; }
 .glass-input:focus { border-color: var(--accent); }
 .glass-btn { background: var(--accent); color: #000; border: none; padding: 0 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; }
 
-/* Dock Navigation */
-.dock { position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border); backdrop-filter: blur(20px); padding: 0.5rem 1rem; border-radius: 20px; display: flex; gap: 1rem; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 9999; }
-.dock-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; width: 45px; height: 45px; border-radius: 12px; cursor: pointer; font-size: 1.2rem; transition: all 0.2s; }
-.dock-btn:hover { background: rgba(255,255,255,0.2); transform: translateY(-3px); }
+/* Dock Navigation
+   QA BUG-1: centered fixed dock overflowed left/right on narrow viewports so
+   📡 ⚙️ 🧠 had no hit-test coordinates (clipped). Wrap + full-width safe inset. */
+.dock {
+    position: fixed;
+    bottom: 10px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: calc(100vw - 16px);
+    margin: 0 auto;
+    transform: none;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(20px);
+    padding: 0.4rem 0.55rem;
+    border-radius: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 0.4rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    z-index: 10060; /* above status strip (10050) and windows */
+    box-sizing: border-box;
+    pointer-events: auto;
+}
+.dock-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #fff;
+    width: 44px;
+    height: 44px;
+    min-width: 40px;
+    min-height: 40px;
+    flex: 0 0 auto;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 1.15rem;
+    transition: background 0.15s ease, transform 0.15s ease;
+    pointer-events: auto;
+}
+.dock-btn:hover { background: rgba(255,255,255,0.2); transform: translateY(-2px); }
+.dock-btn:focus-visible { outline: 2px solid #3ad0ef; outline-offset: 2px; }
+@media (max-width: 720px) {
+    .dock { gap: 0.3rem; padding: 0.35rem 0.4rem; bottom: 6px; }
+    .dock-btn { width: 38px; height: 38px; font-size: 1.05rem; border-radius: 10px; }
+}
+@media (max-width: 420px) {
+    .dock-btn { width: 34px; height: 34px; font-size: 0.95rem; }
+}
 
 /* ── System Vitals — live subsystem readout (instrument-console look; new bolt-on) ── */
 #win-vitals{
@@ -438,12 +513,15 @@ input, textarea { user-select: text; -webkit-user-select: text; }
 #instr-status-strip {
     position: fixed;
     top: 0; left: 0; right: 0;
-    height: 28px;
+    min-height: 28px;
+    height: auto;
     z-index: 10050;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 14px;
-    padding: 0 14px;
+    gap: 10px 14px;
+    row-gap: 4px;
+    padding: 4px 14px;
     background: rgba(7,10,16,0.92);
     border-bottom: 1px solid var(--instr-line);
     font-family: var(--instr-mono);
@@ -452,6 +530,7 @@ input, textarea { user-select: text; -webkit-user-select: text; }
     color: var(--instr-muted);
     font-variant-numeric: tabular-nums;
     backdrop-filter: blur(10px);
+    box-sizing: border-box;
 }
 #instr-status-strip .strip-item { display: inline-flex; align-items: center; gap: 6px; }
 #instr-status-strip .strip-dot {
@@ -469,7 +548,13 @@ input, textarea { user-select: text; -webkit-user-select: text; }
     border: 1px solid rgba(58,208,239,0.35);
     border-radius: 999px;
     padding: 2px 10px;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: min(42vw, 280px);
 }
 body.has-instr-strip #desktop-root,
 body.has-instr-strip main,

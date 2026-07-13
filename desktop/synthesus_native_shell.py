@@ -187,7 +187,9 @@ def health_proxy():
 def image_proxy():
     """SI Image Studio → runtime POST /api/v1/image (procedural VSA, not diffusion).
 
-    Forwards prompt/style/seed/aspect/resolution. Never invents a PNG if runtime is down.
+    Forwards prompt/style/seed/aspect/resolution and multi-pass knobs.
+    Never invents a PNG if runtime is down. (Was previously a dead-code 500:
+    body built then function returned None before the POST.)
     """
     data = request.get_json(silent=True) or {}
     prompt = (data.get("prompt") or "").strip()
@@ -217,7 +219,41 @@ def image_proxy():
         "orbit_day": data.get("orbit_day", False),
         "orbit_frames": data.get("orbit_frames", 6),
         "async_mode": data.get("async_mode", False),
+        "compile_plan": data.get("compile_plan", True),
+        "return_plan": data.get("return_plan", True),
+        "keep_session": data.get("keep_session", True),
     }
+    # Optional multi-pass / session knobs (only when present)
+    for key in (
+        "seed", "scene_id", "edit_text", "grade", "yaw", "pitch",
+        "pass_id", "construction", "playlist", "finish",
+    ):
+        if key in data and data.get(key) is not None and data.get(key) != "":
+            body[key] = data[key]
+    if data.get("seed") is not None and str(data.get("seed")).strip() != "":
+        try:
+            body["seed"] = int(data["seed"])
+        except (TypeError, ValueError):
+            body.pop("seed", None)
+    try:
+        r = requests.post(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/image",
+            json=body,
+            headers=_runtime_api_headers(),
+            timeout=180,
+        )
+        try:
+            payload = r.json()
+        except Exception:
+            payload = {"ok": False, "error": "bad_runtime_body", "message": (r.text or "")[:400]}
+        return (json.dumps(payload), r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        print(f"[image] runtime unavailable ({e})")
+        return jsonify({
+            "ok": False,
+            "error": "runtime_unavailable",
+            "message": f"runtime unavailable: {e}",
+        }), 503
 
 
 @app.route('/api/v1/image/jobs/<job_id>', methods=['GET'])
@@ -258,6 +294,26 @@ def image_level_proxy():
         return jsonify({"ok": False, "error": "runtime_unavailable", "message": str(e)}), 503
 
 
+@app.route('/api/v1/image/intent', methods=['POST'])
+def image_intent_proxy():
+    """Chat draw-intent classifier → runtime."""
+    data = request.get_json(silent=True) or {}
+    try:
+        r = requests.post(
+            f"{SYNTHESUS_RUNTIME_URL}/api/v1/image/intent",
+            json=data,
+            headers=_runtime_api_headers(),
+            timeout=30,
+        )
+        try:
+            payload = r.json()
+        except Exception:
+            payload = {"ok": False, "error": "bad_runtime_body", "message": (r.text or "")[:400]}
+        return (json.dumps(payload), r.status_code, {"Content-Type": "application/json"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": "runtime_unavailable", "message": str(e)}), 503
+
+
 @app.route('/api/v1/image/presets', methods=['GET'])
 def image_presets_proxy():
     """List cinematic SI scene presets (local catalog)."""
@@ -274,30 +330,6 @@ def image_presets_proxy():
         return jsonify({"ok": True, "presets": sp.list_presets()})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e), "presets": []}), 503
-    if data.get("seed") is not None and str(data.get("seed")).strip() != "":
-        try:
-            body["seed"] = int(data["seed"])
-        except (TypeError, ValueError):
-            pass
-    try:
-        r = requests.post(
-            f"{SYNTHESUS_RUNTIME_URL}/api/v1/image",
-            json=body,
-            headers=_runtime_api_headers(),
-            timeout=120,
-        )
-        try:
-            payload = r.json()
-        except Exception:
-            payload = {"ok": False, "error": "bad_runtime_body", "message": (r.text or "")[:400]}
-        return (json.dumps(payload), r.status_code, {"Content-Type": "application/json"})
-    except Exception as e:
-        print(f"[image] runtime unavailable ({e})")
-        return jsonify({
-            "ok": False,
-            "error": "runtime_unavailable",
-            "message": f"runtime unavailable: {e}",
-        }), 503
 
 @app.route('/api/v1/voice', methods=['POST'])
 def voice_proxy():
