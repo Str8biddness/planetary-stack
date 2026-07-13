@@ -1,0 +1,36 @@
+{
+  "source": "synthesus-ultra- synthetic_data 20260428-032155",
+  "samples_per_file": 20,
+  "files": {
+    "intent": {
+      "source": "intent_20260428-032155.json",
+      "total_in_source": 5600,
+      "smoke_path": "runtime/tests/fixtures/organ_smoke/intent_smoke.json"
+    },
+    "sentiment": {
+      "source": "sentiment_20260428-032155.json",
+      "total_in_source": 2400,
+      "smoke_path": "runtime/tests/fixtures/organ_smoke/sentiment_smoke.json"
+    },
+    "emotion": {
+      "source": "emotion_20260428-032155.json",
+      "total_in_source": 3200,
+      "smoke_path": "runtime/tests/fixtures/organ_smoke/emotion_smoke.json"
+    },
+    "behavior": {
+      "source": "behavior_20260428-032155.json",
+      "total_in_source": 400,
+      "smoke_path": "runtime/tests/fixtures/organ_smoke/behavior_smoke.json"
+    },
+    "dialogue": {
+      "source": "dialogue_20260428-032155.json",
+      "total_in_source": 1600,
+      "smoke_path": "runtime/tests/fixtures/organ_smoke/dialogue_smoke.json"
+    },
+    "loot": {
+      "source": "loot_20260428-032155.json",
+      "total_in_source": 400,
+      "smoke_path": "runtime/tests/fixtures/organ_smoke/loot_smoke.json"
+    }
+  }
+}

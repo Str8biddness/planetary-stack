@@ -42,3 +42,10 @@ its owner.
 higher trust tier is an **external** signal (a user confirmation, or grounding against real
 user sources). A model may never self-promote its own output to "verified." Violating this
 re-introduces model collapse — it is a GATE failure, not a style nit.
+
+## Ultra archive (private seed repo)
+
+- Private monorepo `synthesus-ultra-` is the **historical seed**; launch continues past it.
+- Valuable imports: `benchmarks/fixtures/ultra_si_proof/`, `runtime/tests/fixtures/organ_smoke/`.
+- Full organ training dumps: `./scripts/import_ultra_synthetic.sh` (local only; gitignored).
+- Details: [docs/ULTRA_ARCHIVE.md](docs/ULTRA_ARCHIVE.md).

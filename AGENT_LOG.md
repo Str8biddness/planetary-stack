@@ -1,5 +1,23 @@
 # AGENT_LOG.md — session continuity for memory-provenance build
 
+## 2026-07-13 — feat/ultra-valuable-import: pull real Ultra value (no engine regress)
+
+### What
+- Inventory found Ultra origin/main is an **ancestor** of launch; engines already superseded.
+- Imported **valuable** non-regressive assets only:
+  - `benchmarks/fixtures/ultra_si_proof/` — real SI PNG + early larynx WAV
+  - `runtime/tests/fixtures/organ_smoke/` — small committed slices of organ training JSON
+  - `scripts/import_ultra_synthetic.sh` — full dumps to gitignored `packages/core/synthetic_data/`
+  - `docs/ULTRA_ARCHIVE.md` + AGENTS.md pointer
+  - `runtime/tests/test_organism_conversation_smoke.py`
+
+### Explicitly not imported
+- Thin Ultra `vsa_pipeline_image` (would downgrade public image_service)
+- Multi-cloud SDS / parameter-cloud-required paths as product default
+
+### Branch
+`feat/ultra-valuable-import` — Claude review; do not merge without check.
+
 ## 2026-07-13 — feat/scale-si-hybrid: merge main + Claude review fixes
 
 ### What

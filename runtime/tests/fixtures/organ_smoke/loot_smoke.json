@@ -1,0 +1,142 @@
+[
+  {
+    "player_level": 5,
+    "loyalty": 4,
+    "quest_completions": 0,
+    "tier": "uncommon",
+    "item": "Hunter's Bow"
+  },
+  {
+    "player_level": 11,
+    "loyalty": 2,
+    "quest_completions": 16,
+    "tier": "common",
+    "item": "Clay Pot"
+  },
+  {
+    "player_level": 19,
+    "loyalty": 9,
+    "quest_completions": 9,
+    "tier": "common",
+    "item": "Worn Boots"
+  },
+  {
+    "player_level": 3,
+    "loyalty": 0,
+    "quest_completions": 17,
+    "tier": "common",
+    "item": "Clay Pot"
+  },
+  {
+    "player_level": 26,
+    "loyalty": 1,
+    "quest_completions": 7,
+    "tier": "uncommon",
+    "item": "Steel Dagger"
+  },
+  {
+    "player_level": 23,
+    "loyalty": 1,
+    "quest_completions": 7,
+    "tier": "uncommon",
+    "item": "Steel Dagger"
+  },
+  {
+    "player_level": 27,
+    "loyalty": 5,
+    "quest_completions": 6,
+    "tier": "uncommon",
+    "item": "Hunter's Bow"
+  },
+  {
+    "player_level": 30,
+    "loyalty": 2,
+    "quest_completions": 5,
+    "tier": "rare",
+    "item": "Potion of Greater Healing"
+  },
+  {
+    "player_level": 19,
+    "loyalty": 2,
+    "quest_completions": 0,
+    "tier": "rare",
+    "item": "Arcane Staff"
+  },
+  {
+    "player_level": 10,
+    "loyalty": 1,
+    "quest_completions": 20,
+    "tier": "rare",
+    "item": "Mithril Chain"
+  },
+  {
+    "player_level": 16,
+    "loyalty": 8,
+    "quest_completions": 1,
+    "tier": "rare",
+    "item": "Arcane Staff"
+  },
+  {
+    "player_level": 17,
+    "loyalty": 3,
+    "quest_completions": 0,
+    "tier": "common",
+    "item": "Clay Pot"
+  },
+  {
+    "player_level": 1,
+    "loyalty": 1,
+    "quest_completions": 0,
+    "tier": "rare",
+    "item": "Enchanted Sword"
+  },
+  {
+    "player_level": 20,
+    "loyalty": 4,
+    "quest_completions": 10,
+    "tier": "uncommon",
+    "item": "Steel Dagger"
+  },
+  {
+    "player_level": 20,
+    "loyalty": 5,
+    "quest_completions": 4,
+    "tier": "rare",
+    "item": "Potion of Greater Healing"
+  },
+  {
+    "player_level": 25,
+    "loyalty": 1,
+    "quest_completions": 20,
+    "tier": "uncommon",
+    "item": "Hunter's Bow"
+  },
+  {
+    "player_level": 18,
+    "loyalty": 6,
+    "quest_completions": 14,
+    "tier": "uncommon",
+    "item": "Silver Ring"
+  },
+  {
+    "player_level": 18,
+    "loyalty": 0,
+    "quest_completions": 5,
+    "tier": "common",
+    "item": "Clay Pot"
+  },
+  {
+    "player_level": 22,
+    "loyalty": 8,
+    "quest_completions": 19,
+    "tier": "rare",
+    "item": "Arcane Staff"
+  },
+  {
+    "player_level": 8,
+    "loyalty": 5,
+    "quest_completions": 15,
+    "tier": "epic",
+    "item": "Elixir of Giants"
+  }
+]
