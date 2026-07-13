@@ -744,3 +744,19 @@ curl -s -X POST http://127.0.0.1:5010/api/v1/voice \
 
 ### Branch
 `feat/tier-badges` — do not merge without Claude review.
+---
+
+## 2026-07-12 — feat/loose-ends
+
+### a. image_intent draw triggers
+Widened DRAW routing for "make/create/generate a picture|image|drawing|illustration of X".
+Bare "make coffee" stays talk (not draw).
+Tests: `runtime/tests/test_image_intent_draw.py` 4 passed.
+
+### b. feat/ui-bugfixes
+Rebased onto latest main (`d96ae83`) → tip `6eeb493`. Conflict in `desktop/index.html`
+cache bust only (kept main v=10031→10032). Foreman 404 poller stop still present.
+Left for Claude review; **not merged**.
+
+### Branch
+`feat/loose-ends` — do not merge without Claude review.
