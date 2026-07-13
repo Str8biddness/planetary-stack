@@ -28,6 +28,14 @@ DRAW_PREFIX = re.compile(
     r"^(?:\/draw|draw(?:\s+this)?|imagine|picture|render|paint|illustrate)\s*[:\-]?\s*",
     re.I,
 )
+# "make/create a picture/image/drawing of X" — not bare "make coffee"
+MAKE_DRAW = re.compile(
+    r"^(?:please\s+)?(?:make|create|generate|produce)\s+"
+    r"(?:me\s+)?(?:a|an|the)\s+"
+    r"(?:picture|image|drawing|illustration|render|painting|sketch)"
+    r"(?:\s+of)?\s*[:\-]?\s*(.+)$",
+    re.I,
+)
 FIND_PREFIX = re.compile(
     r"^(?:\/find|find(?:\s+photo)?|search\s+image|show\s+photo|look\s+up\s+image)\s*[:\-]?\s*",
     re.I,
@@ -124,10 +132,16 @@ def classify_intent(
             "alternative": f"draw {q}",
         }
 
-    # Draw mode
+    # Draw mode — explicit draw verbs OR "make a picture of …"
     m_draw = DRAW_PREFIX.match(text)
-    prompt = text[m_draw.end():].strip() if m_draw else text
-    if m_draw or re.search(r"\b(scene|landscape|illustration)\b", text, re.I):
+    m_make = MAKE_DRAW.match(text)
+    if m_draw:
+        prompt = text[m_draw.end():].strip() or text
+    elif m_make:
+        prompt = (m_make.group(1) or "").strip() or text
+    else:
+        prompt = text
+    if m_draw or m_make or re.search(r"\b(scene|landscape|illustration)\b", text, re.I):
         for rx, reason in REFUSE_PATTERNS:
             if rx.search(prompt) or rx.search(text):
                 return {

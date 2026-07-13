@@ -744,3 +744,61 @@ curl -s -X POST http://127.0.0.1:5010/api/v1/voice \
 
 ### Branch
 `feat/tier-badges` — do not merge without Claude review.
+---
+
+## 2026-07-12 — feat/loose-ends
+
+### a. image_intent draw triggers
+Widened DRAW routing for "make/create/generate a picture|image|drawing|illustration of X".
+Bare "make coffee" stays talk (not draw).
+Tests: `runtime/tests/test_image_intent_draw.py` 4 passed.
+
+### b. feat/ui-bugfixes
+Rebased onto latest main (`d96ae83`) → tip `6eeb493`. Conflict in `desktop/index.html`
+cache bust only (kept main v=10031→10032). Foreman 404 poller stop still present.
+Left for Claude review; **not merged**.
+
+### Branch
+`feat/loose-ends` — do not merge without Claude review.
+---
+
+## 2026-07-12 — feat/image-perf (bbox SDF/fill lock)
+
+### What
+BBox-restricted path fill/stroke was already merged via image-opt-enhance
+(`raster_fill_bbox` / `paint_path` crop blend). This branch locks the claim:
+
+### Proof (this machine, look=raw, path_mode, seed=7)
+```
+historical_1024_pre_bbox_s 79.0  # Claude review era
+OK res= 512   0.26s  budget<=5.0
+OK res=1024   0.50s  budget<=10.0
+test_image_roundout.py: 26 passed
+```
+Target 1024 well under 10s: **met (~0.5s)**.
+
+### Added
+- `scripts/image_perf_bench.py` — fails if 1024 > 10s
+
+### Branch
+`feat/image-perf` — no further fill rewrite needed; output-preserving bbox already live.
+---
+
+## 2026-07-12 — feat/path-safety (centralize safe_id)
+
+### What
+- Added `runtime/packages/core/utils/safe_path.py` with `safe_id` / `safe_join`
+  (path-traversal defense for user ids used as filenames).
+- Replaced 4 copy-pasted sanitizers:
+  - `image_session._disk_path`
+  - `formant_session._path`
+  - `production_server._PersistentList`
+  - `state_persistence` NPC char_id
+- Tests: `runtime/tests/test_path_safety.py` (6 passed).
+
+### Proof
+`pytest runtime/tests/test_path_safety.py -v` → 6 passed.
+Crafted ids like `../../../../tmp/evil` resolve inside intended roots only.
+
+### Branch
+`feat/path-safety` — do not merge without Claude review.

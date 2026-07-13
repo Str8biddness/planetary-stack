@@ -666,9 +666,13 @@ class SaveManager:
         if engines:
             for char_id, engine in engines.items():
                 npc_state = CognitiveStateSerializer.extract_state(engine)
-                # char_id derives from the user-supplied `character` field; keep it
-                # filename-safe so it can't escape _npc_dir (path traversal).
-                _safe_char = re.sub(r"[^A-Za-z0-9_-]", "", str(char_id))[:64] or "invalid"
+                # char_id derives from the user-supplied `character` field;
+                # path traversal defense is centralized in core.utils.safe_path.safe_id.
+                try:
+                    from core.utils.safe_path import safe_id as _safe_id
+                except ImportError:
+                    from utils.safe_path import safe_id as _safe_id  # type: ignore
+                _safe_char = _safe_id(str(char_id))
                 npc_path = self._npc_dir / f"{_safe_char}.json"
                 npc_path.write_text(json.dumps(npc_state, indent=2, default=str))
                 saved_npcs.append(char_id)
