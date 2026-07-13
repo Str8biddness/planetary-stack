@@ -3282,6 +3282,8 @@ async function runImageStudio(variations, extra) {
     };
     const gradeEl = document.getElementById('image-grade');
     if (gradeEl && gradeEl.value) body.grade = gradeEl.value;
+    const enhEl = document.getElementById('image-enhance');
+    if (enhEl && enhEl.value) body.enhance = enhEl.value;
     const passText = ((document.getElementById('image-pass-text') || {}).value || '').trim();
     if (passText) body.edit_text = passText;
     _lastStudioYaw = 0;
@@ -3576,10 +3578,17 @@ async function runVoiceSpeak() {
         if (!headers['Content-Type'] && !headers['content-type']) {
             headers['Content-Type'] = 'application/json';
         }
+        const backendEl = document.getElementById('voice-backend');
+        const backend = (backendEl && backendEl.value) || 'formant';
         const res = await fetch('/api/v1/voice', {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify({ text: text, knobs: collectVoiceKnobs(), seed: 25 }),
+            body: JSON.stringify({
+                text: text,
+                knobs: collectVoiceKnobs(),
+                seed: 25,
+                backend: backend,
+            }),
         });
         const data = await res.json().catch(function () { return {}; });
         if (!res.ok || !data.audio_base64) {

@@ -1698,6 +1698,8 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     grade = (getattr(image_req, "grade", None) or "none")
     edit_text = getattr(image_req, "edit_text", None) or ""
     edit_vignette = float(getattr(image_req, "edit_vignette", 0.0) or 0.0)
+    enhance = (getattr(image_req, "enhance", None) or "none")
+    enhance_strength = float(getattr(image_req, "enhance_strength", 0.55) or 0.55)
 
     # Soft-DoS guard: high-res / multi-frame auto-async unless client forces sync
     multi = bool(orbit_day or n_frames > 1 or n_views > 1 or n_var > 1)
@@ -1743,6 +1745,8 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         "grade": grade,
         "edit_text": edit_text,
         "edit_vignette": edit_vignette,
+        "enhance": enhance,
+        "enhance_strength": enhance_strength,
         "playlist": getattr(image_req, "playlist", None),
         "level": getattr(image_req, "level", None),
     }
@@ -1787,9 +1791,27 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
         payload = await run_in_threadpool(execute_image_request, params, None)
     except Exception as e:
         logger.warning("image generation failed: %s", e)
+        msg = str(e)
+        # Honest neural enhance failure (same contract as piper voice)
+        if "realesrgan_unavailable" in msg.lower():
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "error": "realesrgan_unavailable",
+                    "message": msg,
+                    "enhance_requested": "realesrgan",
+                    "enhance_applied": "none",
+                    "note": (
+                        "install onnxruntime + place RealESRGAN x4 ONNX under "
+                        "data/models/ (or set SYNTHESUS_ESRGAN_MODEL). "
+                        "si_detail / si_upscale2 always work without neural weights."
+                    ),
+                    "not_diffusion": True,
+                },
+            )
         raise HTTPException(
             status_code=500,
-            detail={"error": "image_generation_failed", "message": str(e)},
+            detail={"error": "image_generation_failed", "message": msg},
         )
     try:
         ImageResponse(**{k: v for k, v in payload.items() if k in ImageResponse.model_fields})
@@ -1798,13 +1820,26 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     return JSONResponse(content=payload)
 
 
+@app.get("/api/v1/voice/capabilities")
+async def voice_capabilities(auth=Depends(get_auth)):
+    """Honest formant vs optional local neural voice card."""
+    tools_dir = str(PROJ_ROOT / "tools")
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    try:
+        from voice_backends import list_backends
+        return list_backends()
+    except Exception as e:
+        raise HTTPException(503, detail={"error": "voice_capabilities_unavailable", "message": str(e)})
+
+
 @app.post("/api/v1/voice")
 async def generate_voice_endpoint(req: Request, auth=Depends(get_auth)):
-    """SI formant speech synthesis (not neural TTS).
+    """SI formant speech (default) or optional local Piper neural.
 
-    Body: {text, knobs?: {slower,faster,higher,lower,rising_final,f2_stretch,...}}
-    Returns: {ok, audio_base64 (WAV), mime_type, phonemes, utterance_id, engine, not_neural_tts}
-    Degrades LOUDLY with 503 if larynx/formant engine is unavailable.
+    Body: {text, backend?: formant|piper, knobs?: {...}, seed?}
+    Default backend=formant (no neural weights). Piper is opt-in local-only.
+    Degrades LOUDLY with 503 if the selected backend is unavailable — no cloud TTS.
     """
     global _request_count
     _request_count = _request_count + 1
@@ -1824,6 +1859,9 @@ async def generate_voice_endpoint(req: Request, auth=Depends(get_auth)):
     if len(text) > 2000:
         raise HTTPException(400, "text too long (max 2000)")
     knobs = body.get("knobs") if isinstance(body.get("knobs"), dict) else {}
+    backend = (body.get("backend") or body.get("engine") or "formant").lower().strip()
+    if backend not in ("formant", "piper"):
+        raise HTTPException(400, "backend must be formant or piper")
     seed = body.get("seed")
     try:
         seed_i = int(seed) if seed is not None else 25
@@ -1833,7 +1871,6 @@ async def generate_voice_endpoint(req: Request, auth=Depends(get_auth)):
     tools_dir = str(PROJ_ROOT / "tools")
     if tools_dir not in sys.path:
         sys.path.insert(0, tools_dir)
-    # packages on path for formant_plan imports
     pkgs = str(PROJ_ROOT / "packages")
     if pkgs not in sys.path:
         sys.path.insert(0, pkgs)
@@ -1843,53 +1880,43 @@ async def generate_voice_endpoint(req: Request, auth=Depends(get_auth)):
         import io
 
         import numpy as _np
+        from voice_backends import synthesize as _synth_voice
 
-        try:
-            from larynx_vocalizer import LarynxVocalizer
-        except Exception as e:
-            raise RuntimeError(f"larynx_engine_unavailable: {e}") from e
-        try:
-            from formant_plan import apply_pass_knobs, public_plan_view
-        except Exception:
-            apply_pass_knobs = None  # type: ignore
-            public_plan_view = None  # type: ignore
-
-        lar = LarynxVocalizer(sample_rate=16000)
-        plan = lar.compile_plan(text, use_llm=False)
-        if knobs and apply_pass_knobs is not None:
-            plan = apply_pass_knobs(plan, knobs)
-        audio = lar.synthesize_plan(plan, seed=seed_i, keep_session=True)
-        # int16 WAV in memory
+        audio, meta = _synth_voice(
+            text,
+            backend=backend,
+            knobs=knobs,
+            seed=seed_i,
+            sample_rate=16000,
+        )
         pcm = (_np.clip(audio, -1.0, 1.0) * 32767.0).astype(_np.int16)
         buf = io.BytesIO()
-        try:
-            from scipy.io import wavfile as _wf
-            _wf.write(buf, lar.fs, pcm)
-        except Exception:
-            # minimal WAV header if scipy path fails mid-write
-            raise
+        from scipy.io import wavfile as _wf
+        fs = int(meta.get("sample_rate") or 16000)
+        _wf.write(buf, fs, pcm)
         wav_bytes = buf.getvalue()
         if len(wav_bytes) < 12 or wav_bytes[:4] != b"RIFF":
             raise RuntimeError("voice_render_invalid_wav")
         b64 = base64.b64encode(wav_bytes).decode("ascii")
-        plan_view = public_plan_view(plan) if public_plan_view else {}
         return {
             "ok": True,
-            "engine": "si_formant_klatt",
-            "not_neural_tts": True,
-            "honest_target": "intelligible_robotic_formant",
+            "backend": meta.get("backend") or backend,
+            "engine": meta.get("engine") or ("si_formant_klatt" if backend == "formant" else "piper_local"),
+            "not_neural_tts": bool(meta.get("not_neural_tts", backend == "formant")),
+            "neural_local": bool(meta.get("neural_local", False)),
+            "not_cloud": True,
+            "honest_target": meta.get("honest_target"),
             "text": text,
             "audio_base64": b64,
             "mime_type": "audio/wav",
-            "sample_rate": lar.fs,
+            "sample_rate": fs,
             "bytes": len(wav_bytes),
-            "phonemes": lar.last_phonemes,
-            "utterance_id": lar.last_utterance_id,
-            "utterance_plan": plan_view,
+            "phonemes": meta.get("phonemes"),
+            "utterance_id": meta.get("utterance_id"),
+            "utterance_plan": meta.get("utterance_plan"),
             "knobs": knobs or {},
-            "spectral": (lar.last_meta or {}).get("spectral"),
-            "outer_voice": (lar.last_meta or {}).get("outer_voice")
-            or "SI formant speech — not a neural TTS model.",
+            "spectral": meta.get("spectral"),
+            "outer_voice": meta.get("outer_voice"),
         }
 
     try:
@@ -1900,9 +1927,13 @@ async def generate_voice_endpoint(req: Request, auth=Depends(get_auth)):
             status_code=503,
             detail={
                 "error": "voice_engine_unavailable",
+                "backend": backend,
                 "message": str(e),
-                "not_neural_tts": True,
-                "note": "SI formant larynx missing or failed — not falling back to neural TTS",
+                "not_cloud": True,
+                "note": (
+                    "Selected voice backend missing or failed — not falling back to cloud TTS. "
+                    "Try backend=formant (always-on SI) or install Piper for natural local voice."
+                ),
             },
         )
     return JSONResponse(content=payload)
@@ -1921,6 +1952,16 @@ async def image_capabilities(auth=Depends(get_auth)):
         card["looks"] = list(LOOKS)
         card["grades"] = list(GRADES)
         card["playlists"] = list(list_playlists().keys())
+        try:
+            import si_enhance as _enh
+            card["enhance"] = _enh.capability_enhance()
+        except Exception as ee:
+            card["enhance"] = {"error": str(ee), "modes": ["none", "si_detail", "si_upscale2"]}
+        card["honest_ceiling"] = (
+            "SI construction is optimal for diagrams/schematics/stylized. "
+            "Open-domain photoreal needs learned texture priors (realesrgan tier or ControlNet). "
+            "Enhance never invents new entities — scene graph remains SI stock."
+        )
         return card
     except Exception as e:
         raise HTTPException(503, detail={"error": "capabilities_unavailable", "message": str(e)})

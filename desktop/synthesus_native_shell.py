@@ -187,13 +187,12 @@ def health_proxy():
 def image_proxy():
     """SI Image Studio → runtime POST /api/v1/image (procedural VSA, not diffusion).
 
-    Forwards prompt/style/seed/aspect/resolution and multi-pass knobs.
-    Never invents a PNG if runtime is down. (Was previously a dead-code 500:
-    body built then function returned None before the POST.)
+    Forwards knobs including enhance + multi-pass. Never invents a PNG if runtime is down.
+    (Was previously a dead-code 500: body built then function returned None before the POST.)
     """
     data = request.get_json(silent=True) or {}
     prompt = (data.get("prompt") or "").strip()
-    if not prompt:
+    if not prompt and not data.get("scene_id"):
         return jsonify({"ok": False, "error": "prompt_required", "message": "prompt is required"}), 400
     body = {
         "prompt": prompt,
@@ -222,11 +221,17 @@ def image_proxy():
         "compile_plan": data.get("compile_plan", True),
         "return_plan": data.get("return_plan", True),
         "keep_session": data.get("keep_session", True),
+        "enhance": data.get("enhance", "none"),
+        "enhance_strength": data.get("enhance_strength", 0.55),
+        "grade": data.get("grade", "none"),
+        "edit_text": data.get("edit_text"),
+        "scene_id": data.get("scene_id"),
+        "pass_only": data.get("pass_only", False),
     }
     # Optional multi-pass / session knobs (only when present)
     for key in (
         "seed", "scene_id", "edit_text", "grade", "yaw", "pitch",
-        "pass_id", "construction", "playlist", "finish",
+        "pass_id", "construction", "playlist", "finish", "enhance", "enhance_strength",
     ):
         if key in data and data.get(key) is not None and data.get(key) != "":
             body[key] = data[key]
@@ -320,7 +325,6 @@ def image_presets_proxy():
     try:
         import sys
         from pathlib import Path
-        # Prefer runtime package on PYTHONPATH; fallback load from sibling install
         try:
             import scene_presets as sp
         except ImportError:
@@ -350,6 +354,7 @@ def voice_proxy():
     body = {
         "text": text,
         "knobs": data.get("knobs") if isinstance(data.get("knobs"), dict) else {},
+        "backend": (data.get("backend") or data.get("engine") or "formant"),
     }
     if data.get("seed") is not None and str(data.get("seed")).strip() != "":
         try:

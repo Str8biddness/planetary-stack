@@ -1,5 +1,32 @@
 # AGENT_LOG.md — session continuity for memory-provenance build
 
+## 2026-07-13 — feat/scale-si-hybrid: merge main + Claude review fixes
+
+### What
+- Merged `origin/main` (ingest-flush + qa-sev1 wow) into scale branch; both preserved.
+- FIX 1: `_cache_key` includes `enhance` + `enhance_strength` (no wrong-image cache hits).
+- FIX 2: `enhance=realesrgan` unavailable → **503** (same honesty as piper); si_detail/si_upscale2 stay 200.
+
+### Branch
+`feat/scale-si-hybrid` — do not merge without Claude re-review.
+
+## 2026-07-12 — feat/scale-si-hybrid: scale image + voice (no mocks)
+
+### Research brief → shipped tiers
+**Image (Q1)**
+- Pure SI construction remains default stock/master (diagrams moat intact).
+- `enhance=si_detail` — classical multi-scale unsharp (always-on, deterministic).
+- `enhance=si_upscale2` — Lanczos 2× + detail (always-on).
+- `enhance=realesrgan` — optional local ONNX; **loud 503** if model/ORT missing.
+- Capabilities card documents honest photoreal ceiling.
+
+**Voice (Q2)**
+- Formant path: Fujisaki-lite F0 + anticipatory coarticulation + raised-cosine diphone joins.
+- `backend=formant` default; `backend=piper` opt-in — **503** if missing.
+
+### Branch
+`feat/scale-si-hybrid`
+
 ## 2026-07-12 — fix/qa-sev1 wow: full QA close + instrument front-end
 
 ### Fixed
@@ -8,30 +35,20 @@
 - Dock: labeled buttons + active glow; boot opens Chat+Vitals once
 - Login/chat/explorer instrument chrome; boot flash; offline oath on lock screen
 
-### Proof
-- image/chat/voice 200 via shell; paste ingest chunks_added=1; ide read AGENT_LOG.md ok
-
 ### Branch
-`fix/qa-sev1` (not merged)
+`fix/qa-sev1` (merged to main)
 
 ## 2026-07-12 — fix/qa-sev1: QA punch-list SEV-1/2
 
 ### What (from Full QA Report July 12)
-1. **BUG-1 dock clip**: `.dock` no longer `left:50%` centered overflow — full-width wrap inset, all 📡⚙️🧠 hit-testable on narrow viewports.
-2. **BUG-2 image HTTP 500**: shell `image_proxy` was dead code (built body, returned None → Flask 500). Restored real POST to runtime `/api/v1/image`. Also added `/api/v1/image/intent` proxy.
-3. **BUG-3 chat**: `win-chat` already in DOM; was unreachable due to dock clip. `/api/chat` is on **shell** (not FastAPI :5010) — e2e HTTP 200 with `answer_id`.
-4. **BUG-4 voice audio**: hardened SPEAK path — force `audio/wav`, `load()`, `canplay` then play; note autoplay block.
-5. **BUG-5 foreman poll**: removed page-load `startForemanSync()`; only polls while `#win-foreman` open; stops on 404/fail streak.
-6. **Polish**: FOX tooltip; strip offline chip ellipsis; window focus ring; clampIntoView respects strip + shrinks for tiny viewports.
-
-### Proof (local e2e shell :8081 + runtime :5010)
-- `POST /api/v1/image` via shell → HTTP 200, `image_base64` present
-- `POST /api/chat` → HTTP 200, `answer_id` set
-- `POST /api/v1/voice` → HTTP 200, RIFF/WAVE 31984 bytes
-- `startForemanSync` only referenced from `toggleWindow('win-foreman')`
+1. **BUG-1 dock clip**: full-width wrap dock — 📡⚙️🧠 hit-testable
+2. **BUG-2 image HTTP 500**: shell `image_proxy` restored real POST
+3. **BUG-3 chat**: reachable after dock fix; `/api/chat` on shell
+4. **BUG-4 voice audio**: `load()` / `canplay` then play
+5. **BUG-5 foreman poll**: only while `#win-foreman` open
 
 ### Branch
-`fix/qa-sev1` — do not merge without Claude review.
+`fix/qa-sev1` (merged to main)
 
 
 ## 2026-07-11 — SW-1..SW-5 Persona-Clone Expert Swarm

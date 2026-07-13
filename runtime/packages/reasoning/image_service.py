@@ -120,13 +120,28 @@ def _cache_key(
     pitch_deg: float = 0.0,
     time_of_day: Optional[float] = None,
     plan_fp: str = "",
+    enhance: str = "none",
+    enhance_strength: float = 0.55,
 ) -> str:
+    """Hash all knobs that change the PNG bytes (incl. post-raster enhance).
+
+    FIX (Claude review): omitting enhance caused cache collisions — same prompt
+    with enhance=none vs si_detail returned the un-enhanced image on hit.
+    """
     tod = "none" if time_of_day is None else f"{float(time_of_day):.4f}"
+    enh = (enhance or "none").lower().strip() or "none"
+    if enh in ("off", "false", "0"):
+        enh = "none"
+    try:
+        estr = f"{float(enhance_strength):.4f}"
+    except (TypeError, ValueError):
+        estr = "0.5500"
     raw = (
         f"engine={ENGINE_VERSION}|{prompt.strip()}|{res}|{style}|{seed}|"
         f"{aspect:.4f}|{detail}|{look}|path={int(bool(path_mode))}|"
         f"yaw={float(yaw_deg):.3f}|pitch={float(pitch_deg):.3f}|t={tod}|"
-        f"plan={plan_fp or 'none'}"
+        f"plan={plan_fp or 'none'}|"
+        f"enh={enh}|estr={estr}"
     )
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -204,6 +219,8 @@ def generate_image(
     grade: str = "none",
     edit_text: str = "",
     edit_vignette: float = 0.0,
+    enhance: str = "none",
+    enhance_strength: float = 0.55,
 ) -> dict[str, Any]:
     """Reason ``prompt`` into a scene graph and render it to ``out_path`` (PNG).
 
@@ -219,6 +236,8 @@ def generate_image(
     scene_plan: precomputed plan dict (skips compile when provided).
     keep_session: store graph in image_session for multi-pass re-render.
     grade/edit_text/edit_vignette: Photoshop-lite post-raster (picture_edit).
+    enhance: none | si_detail | si_upscale2 | realesrgan — post-raster polish
+      (SI graph remains stock; realesrgan is optional local neural on the raster).
     """
     # Apply cinematic preset pack (fills missing knobs only)
     if preset:
@@ -325,9 +344,35 @@ def generate_image(
             si_prompt = plan.get("si_prompt") or prompt
             plan_fp = "given"
 
+    enhance_norm = (enhance or "none").lower().strip() or "none"
+    if enhance_norm in ("off", "false", "0"):
+        enhance_norm = "none"
+    try:
+        enhance_strength_f = float(enhance_strength if enhance_strength is not None else 0.55)
+    except (TypeError, ValueError):
+        enhance_strength_f = 0.55
+
+    # Fail LOUD before expensive render if neural enhance is requested but missing
+    # (same honesty as piper voice — never return 200 implying realesrgan ran).
+    if enhance_norm == "realesrgan":
+        try:
+            import si_enhance as _enh_pre
+            st = _enh_pre.realesrgan_status()
+            if not st.get("available"):
+                raise RuntimeError(
+                    "realesrgan_unavailable: "
+                    + (st.get("note") or "install onnxruntime + place RealESRGAN x4 ONNX")
+                )
+        except RuntimeError:
+            raise
+        except Exception as e:
+            raise RuntimeError(f"realesrgan_unavailable: {e}") from e
+
     key = _cache_key(
         user_prompt, res, style, seed, aspect, detail, look, path_mode,
         yaw_deg, pitch_deg, time_of_day, plan_fp=plan_fp,
+        enhance=enhance_norm,
+        enhance_strength=enhance_strength_f,
     )
     t0 = time.time()
 
@@ -454,6 +499,39 @@ def generate_image(
         except Exception as pe:
             picture_meta = {"error": str(pe), "construction": "picture_edit"}
 
+    # Post-raster enhance (SI detail / optional local Real-ESRGAN). Graph stock unchanged.
+    enhance_meta = None
+    enhance = enhance_norm
+    enhance_strength = enhance_strength_f
+    if enhance and enhance not in ("none", "off", "false", "0"):
+        try:
+            import si_enhance as _enh
+            enhance_meta = _enh.enhance_file(
+                out_path,
+                mode=enhance,
+                strength=float(enhance_strength),
+            )
+            if isinstance(enhance_meta, dict):
+                enhance_meta.setdefault("enhance_applied", enhance)
+                enhance_meta.setdefault("enhance_requested", enhance)
+                enhance_meta.setdefault("ok", True)
+        except Exception as ee:
+            # realesrgan: never soft-degrade to unenhanced 200 (Claude review FIX 2)
+            if enhance == "realesrgan" or "realesrgan_unavailable" in str(ee):
+                raise RuntimeError(
+                    "realesrgan_unavailable: " + str(ee)
+                ) from ee
+            # si_detail / si_upscale2 unexpected failures: surface in meta, keep SI raster
+            enhance_meta = {
+                "enhance": enhance,
+                "enhance_requested": enhance,
+                "enhance_applied": "none",
+                "enhance_error": str(ee),
+                "error": str(ee),
+                "ok": False,
+                "note": "Enhance failed — SI raster left unenhanced (no silent neural substitute)",
+            }
+
     entities = [
         p.get("entity") for p in doc if isinstance(p, dict) and p.get("entity")
     ]
@@ -516,6 +594,7 @@ def generate_image(
         "not_diffusion": True,
         "stock": "scene_graph",
         "picture_edit": picture_meta,
+        "enhance": enhance_meta,
     }
     if plan and return_plan:
         try:
@@ -1053,6 +1132,8 @@ def apply_scene_pass(
     edit_text: Optional[str] = None,
     edit_vignette: Optional[float] = None,
     style: Optional[str] = None,
+    enhance: Optional[str] = None,
+    enhance_strength: Optional[float] = None,
 ) -> dict[str, Any]:
     """Re-render an existing session graph with new view/ISP/picture-edit knobs.
 
@@ -1089,6 +1170,10 @@ def apply_scene_pass(
         grade=grade if grade is not None else kn.get("grade") or "none",
         edit_text=edit_text if edit_text is not None else "",
         edit_vignette=float(edit_vignette if edit_vignette is not None else 0.0),
+        enhance=enhance if enhance is not None else kn.get("enhance") or "none",
+        enhance_strength=float(
+            enhance_strength if enhance_strength is not None else kn.get("enhance_strength") or 0.55
+        ),
         return_plan=True,
     )
 
@@ -1252,6 +1337,8 @@ def execute_image_request(
     grade = (params.get("grade") or "none")
     edit_text = params.get("edit_text") or ""
     edit_vignette = float(params.get("edit_vignette") or 0.0)
+    enhance = (params.get("enhance") or "none")
+    enhance_strength = float(params.get("enhance_strength") or 0.55)
 
     t0 = _time.time()
     _p("starting", 0.05)
@@ -1391,6 +1478,8 @@ def execute_image_request(
             grade=grade,
             edit_text=edit_text,
             edit_vignette=edit_vignette,
+            enhance=enhance,
+            enhance_strength=enhance_strength,
         )
         with open(out_path, "rb") as f:
             png_b64 = base64.b64encode(f.read()).decode("ascii")
@@ -1443,11 +1532,30 @@ def execute_image_request(
         "lathe_parts": meta.get("lathe_parts"),
         "extrude_parts": meta.get("extrude_parts"),
         "picture_edit": meta.get("picture_edit"),
+        "enhance": meta.get("enhance"),
         "scene_id": meta.get("scene_id"),
         "stock": "scene_graph",
         "not_diffusion": True,
         "engine_version": meta.get("engine_version"),
     }
+    # Top-level enhance honesty (never imply a mode ran if it didn't)
+    em = meta.get("enhance") if isinstance(meta.get("enhance"), dict) else None
+    if em:
+        payload["enhance_requested"] = em.get("enhance_requested") or em.get("enhance") or enhance
+        payload["enhance_applied"] = em.get("enhance_applied") or (
+            em.get("enhance") if em.get("ok") is not False and not em.get("error") else "none"
+        )
+        if em.get("enhance_error") or em.get("error"):
+            payload["enhance_error"] = em.get("enhance_error") or em.get("error")
+        if em.get("width"):
+            payload["width"] = em["width"]
+        if em.get("height"):
+            payload["height"] = em["height"]
+    else:
+        payload["enhance_requested"] = enhance if enhance and enhance not in ("none", "off") else "none"
+        payload["enhance_applied"] = (
+            enhance if enhance and enhance not in ("none", "off", "false", "0") else "none"
+        )
     _p("done", 1.0)
     return payload
 

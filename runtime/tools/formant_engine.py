@@ -494,6 +494,53 @@ def _synth_phone_chunk(
     return y.astype(np.float64)
 
 
+def _fujisaki_f0(
+    t_frac: float,
+    f0_base: float,
+    f0_end: float,
+    accent_peaks: Sequence[float],
+) -> float:
+    """Lightweight Fujisaki-style F0: phrase component + accent pulses.
+
+    Pure DSP. Improves multi-word prosody without neural weights.
+    """
+    # Phrase component: slow fall then optional terminal rise/fall to f0_end
+    phrase = f0_base * (1.0 - 0.08 * t_frac)
+    terminal = (f0_end - f0_base * 0.92) * (max(0.0, t_frac - 0.55) / 0.45) ** 1.3
+    f0 = phrase + terminal
+    # Accent commands: Gaussian bumps at stressed phone positions
+    for ap in accent_peaks:
+        d = t_frac - float(ap)
+        f0 += 12.0 * np.exp(-0.5 * (d / 0.045) ** 2)
+    # Micro-tremor (human-like shimmer of F0, tiny)
+    f0 *= 1.0 + 0.012 * np.sin(2 * np.pi * 4.2 * t_frac * 3.0)
+    return float(np.clip(f0, 70.0, 420.0))
+
+
+def _blend_phone_targets(a: PhoneTarget, b: PhoneTarget, u: float) -> PhoneTarget:
+    """Anticipatory coarticulation: blend formants toward next phone."""
+    u = float(np.clip(u, 0.0, 1.0))
+    # Vowels anticipate more; stops less
+    w = u * (0.55 if a.voice > 0.4 and a.noise < 0.4 else 0.25)
+    return PhoneTarget(
+        name=a.name + "~",
+        f1=a.f1 * (1 - w) + b.f1 * w,
+        f2=a.f2 * (1 - w) + b.f2 * w,
+        f3=a.f3 * (1 - w) + b.f3 * w,
+        bw1=a.bw1 * (1 - w) + b.bw1 * w,
+        bw2=a.bw2 * (1 - w) + b.bw2 * w,
+        bw3=a.bw3 * (1 - w) + b.bw3 * w,
+        dur=a.dur,
+        voice=a.voice * (1 - 0.3 * w) + b.voice * (0.3 * w),
+        noise=a.noise * (1 - 0.2 * w) + b.noise * (0.2 * w),
+        amp=a.amp,
+        fnz=a.fnz,
+        burst_f=a.burst_f,
+        burst_dur=a.burst_dur,
+        silence=0.0,
+    )
+
+
 def phones_to_audio(
     phones: Sequence[str],
     fs: int = 22050,
@@ -502,13 +549,14 @@ def phones_to_audio(
     dur_scale: float = 1.0,
     f2_stretch: float = 1.0,
     amp: float = 1.0,
-    transition: float = 0.035,
+    transition: float = 0.045,
     seed: int = 0,
 ) -> np.ndarray:
     """Render a phoneme list to mono float64 audio -1..1.
 
-    Uses per-phone stationary cascade segments + crossfade coarticulation
-    (clearer than sample-rate track interpolation for intelligibility).
+    Per-phone cascade segments + diphone crossfade + anticipatory formant
+    coarticulation + Fujisaki-lite F0 (multi-word intelligibility focus).
+    Still robotic — not neural naturalness.
     """
     rng = np.random.default_rng(seed)
     seq: List[Tuple[str, PhoneTarget, float]] = []
@@ -563,21 +611,38 @@ def phones_to_audio(
 
     total_dur = sum(s[2] for s in seq)
     f0_end = f0_base if f0_end is None else f0_end
-    xfade = max(1, int(transition * fs))
+    # Longer diphone crossfades for multi-word blend (still pure DSP)
+    xfade = max(1, int(max(transition, 0.04) * fs))
+
+    # Accent peaks at vowel nuclei (~every stressed-ish voiced phone)
+    accent_peaks: List[float] = []
+    t_acc = 0.0
+    for i, (name, tgt, dur) in enumerate(seq):
+        mid = (t_acc + 0.5 * dur) / max(total_dur, 1e-6)
+        if tgt.voice > 0.5 and tgt.noise < 0.35 and name not in ("SIL", "SIL_LONG", "AX"):
+            if i % 2 == 0 or tgt.amp > 0.95:
+                accent_peaks.append(mid)
+        t_acc += dur
+    if not accent_peaks:
+        accent_peaks = [0.35, 0.7]
 
     chunks: List[np.ndarray] = []
     t_pos = 0.0
     for i, (name, tgt, dur) in enumerate(seq):
         n = max(1, int(dur * fs))
-        # F0 contour over utterance
+        # Anticipatory coarticulation toward next phone
+        if i + 1 < len(seq):
+            nxt_tgt = seq[i + 1][1]
+            tgt_use = _blend_phone_targets(tgt, nxt_tgt, 0.35)
+        else:
+            tgt_use = tgt
         t_frac = t_pos / max(total_dur, 1e-6)
-        f0 = f0_base * (1.0 - 0.06 * t_frac) + (f0_end - f0_base * 0.94) * (t_frac ** 1.4)
-        f0 *= 1.0 + 0.01 * np.sin(2 * np.pi * 4.5 * t_pos)
-        chunk = _synth_phone_chunk(tgt, n, fs, float(f0), rng)
+        f0 = _fujisaki_f0(t_frac, f0_base, f0_end, accent_peaks)
+        chunk = _synth_phone_chunk(tgt_use, n, fs, float(f0), rng)
         chunks.append(chunk)
         t_pos += dur
 
-    # Crossfade concatenate
+    # Raised-cosine diphone crossfade concatenate
     out = chunks[0]
     for nxt in chunks[1:]:
         if len(out) == 0:
@@ -589,8 +654,10 @@ def phones_to_audio(
         if xf < 2:
             out = np.concatenate([out, nxt])
             continue
-        fade_out = np.linspace(1, 0, xf)
-        fade_in = np.linspace(0, 1, xf)
+        # raised-cosine equal-power crossfade (smoother joins than linear)
+        t = np.linspace(0, 1, xf)
+        fade_out = 0.5 * (1.0 + np.cos(np.pi * t))
+        fade_in = 0.5 * (1.0 - np.cos(np.pi * t))
         mid = out[-xf:] * fade_out + nxt[:xf] * fade_in
         out = np.concatenate([out[:-xf], mid, nxt[xf:]])
 

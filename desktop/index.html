@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Synthesus Planetary OS Ultra</title>
     <link rel="icon" href="data:,"><!-- silence the browser's automatic /favicon.ico 404 -->
-    <link rel="stylesheet" href="styles.css?v=10060">
+    <link rel="stylesheet" href="styles.css?v=10071">
     <!-- No external font CDN: Synthesus is local-first — nothing leaves the machine and the
          UI must render offline. Uses locally-installed Outfit/Fira Code if present, else a
          native system stack. To pin the exact look later, self-host the woff2 via @font-face. -->
@@ -438,6 +438,15 @@
                         </select>
                     </div>
                     <div>
+                        <label style="color:#94a3b8; font-size:0.75rem;">Enhance (post-SI)</label>
+                        <select id="image-enhance" class="glass-input" style="width:100%;" title="SI graph stays stock. si_detail always-on DSP. realesrgan needs local ONNX.">
+                            <option value="none" selected>none (pure SI raster)</option>
+                            <option value="si_detail">si_detail — multi-scale polish</option>
+                            <option value="si_upscale2">si_upscale2 — 2× Lanczos</option>
+                            <option value="realesrgan">realesrgan — local neural (if installed)</option>
+                        </select>
+                    </div>
+                    <div>
                         <label style="color:#94a3b8; font-size:0.75rem;">Seed (optional)</label>
                         <input type="number" id="image-seed" class="glass-input" style="width:100%; box-sizing:border-box;" placeholder="auto">
                     </div>
@@ -526,7 +535,12 @@
                 </div>
             </div>
             <div class="window-content instr-panel" style="display:flex; flex-direction:column; gap:10px; overflow-y:auto;">
-                <div class="instr-caption">SI formant · no TTS model · intelligible but robotic</div>
+                <div class="instr-caption" id="voice-caption">SI formant default · optional local Piper · nothing leaves this machine</div>
+                <label class="instr-label" for="voice-backend">BACKEND</label>
+                <select id="voice-backend" class="instr-input" title="formant = pure SI Klatt. piper = optional local neural (install required).">
+                    <option value="formant" selected>formant — SI Klatt (robotic, no neural)</option>
+                    <option value="piper">piper — local neural natural (if installed)</option>
+                </select>
                 <label class="instr-label" for="voice-text">UTTERANCE</label>
                 <textarea id="voice-text" class="instr-input" rows="3" placeholder="hello world">hello world</textarea>
                 <div class="instr-knob-row">
@@ -605,7 +619,7 @@
         </button>
     </nav>
 
-    <script src="script.js?v=10060"></script>
+    <script src="script.js?v=10071"></script>
     <script src="hyperspace.js?v=5"></script>
 
     <!-- OTA Update Screen -->
