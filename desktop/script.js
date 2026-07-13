@@ -9,6 +9,10 @@ let offsetX = 0, offsetY = 0;
 
 function toggleWindow(id) {
     const win = document.getElementById(id);
+    if (!win) {
+        console.warn('toggleWindow: missing element', id);
+        return;
+    }
     let displayState = 'none';
     if (win.style.display === 'none') {
         win.style.display = 'flex';
@@ -24,10 +28,17 @@ function toggleWindow(id) {
         if (id === 'win-drive') loadDriveSources();
         if (id === 'win-core') loadLLMSettings();
         if (id === 'win-image') { try { renderImageGallery(); } catch (e) {} }
+        // Foreman poll only while the window is open (QA BUG-5)
+        if (id === 'win-foreman') startForemanSync();
     } else {
         win.style.display = 'none';
         if (id === 'win-twin' && twinInterval) clearInterval(twinInterval);
+        if (id === 'win-foreman' && foremanInterval) {
+            clearInterval(foremanInterval);
+            foremanInterval = null;
+        }
     }
+    try { syncDockActive(); } catch (_) {}
     
     // Broadcast to Grid
     if (window.gridSocket && gridSocket.readyState === WebSocket.OPEN) {
@@ -51,11 +62,26 @@ function focusWindow(win) {
 // positions (or a small/rotated screen) opening a window you can't grab.
 function clampIntoView(win) {
     if (!win) return;
-    const w = win.offsetWidth || 400, h = win.offsetHeight || 300;
+    const stripH = document.getElementById('instr-status-strip') ? 28 : 0;
+    const dockH = 72; // leave room for dock (may wrap on narrow viewports)
+    const vw = window.innerWidth || 800;
+    const vh = window.innerHeight || 600;
+    // Prefer measured size; fall back to CSS width/height if still 0 (display:none→flex race)
+    let w = win.offsetWidth || parseInt(win.style.width, 10) || 400;
+    let h = win.offsetHeight || parseInt(win.style.height, 10) || 300;
+    // Shrink oversized windows so title bar stays reachable on tiny viewports
+    if (w > vw - 8) {
+        w = Math.max(280, vw - 8);
+        win.style.width = w + 'px';
+    }
+    if (h > vh - stripH - dockH) {
+        h = Math.max(200, vh - stripH - dockH);
+        win.style.height = h + 'px';
+    }
     let left = parseInt(win.style.left, 10); if (isNaN(left)) left = win.offsetLeft || 40;
     let top  = parseInt(win.style.top, 10);  if (isNaN(top))  top  = win.offsetTop  || 40;
-    left = Math.max(0, Math.min(left, window.innerWidth  - w));
-    top  = Math.max(0, Math.min(top,  window.innerHeight - h));
+    left = Math.max(0, Math.min(left, Math.max(0, vw - Math.min(w, 100))));
+    top  = Math.max(stripH, Math.min(top, Math.max(stripH, vh - dockH - 40)));
     win.style.left = left + 'px';
     win.style.top  = top + 'px';
 }
@@ -92,8 +118,9 @@ function onMouseMove(e) {
         animationFrameId = requestAnimationFrame(() => {
             if (currentWindow) {
                 // Apply bounded constraints so windows can't be dragged offscreen
+                const stripH = document.getElementById('instr-status-strip') ? 28 : 0;
                 const newLeft = Math.max(0, Math.min(currentMouseX - offsetX, window.innerWidth - 100));
-                const newTop = Math.max(0, Math.min(currentMouseY - offsetY, window.innerHeight - 50));
+                const newTop = Math.max(stripH, Math.min(currentMouseY - offsetY, window.innerHeight - 50));
                 currentWindow.style.left = newLeft + 'px';
                 currentWindow.style.top = newTop + 'px';
                 
@@ -310,30 +337,93 @@ async function fetchOSStatus() {
 }
 
 // ==========================================
-// IDE FILE EXPLORER
+// IDE FILE EXPLORER — real home tree + preview
 // ==========================================
 async function fetchIDEFiles() {
+    const treeEl = document.getElementById('ide-file-tree');
+    if (!treeEl) return;
+    treeEl.innerHTML = '<div class="explorer-loading">Mounting storage array…</div>';
     try {
-        const response = await fetch('http://' + window.location.host + '/api/ide/files');
+        const response = await fetch('/api/ide/files');
+        if (!response.ok) throw new Error('HTTP ' + response.status);
         const treeData = await response.json();
-        document.getElementById('ide-file-tree').innerHTML = '<ul><li><span class="folder" style="color: #38bdf8;">🌐 Storage Array</span>' + buildTreeHTML(treeData) + '</li></ul>';
-    } catch(err) {
-        document.getElementById('ide-file-tree').innerHTML = '<p style="color:red;">Failed to mount.</p>';
+        const nodes = Array.isArray(treeData) ? treeData : [];
+        treeEl.innerHTML = buildTreeHTML(nodes);
+    } catch (err) {
+        treeEl.innerHTML = '<p class="explorer-err">Failed to mount storage array.</p>';
+        console.log('fetchIDEFiles', err);
     }
 }
 
 function buildTreeHTML(nodes) {
-    let html = '<ul>';
-    nodes.forEach(node => {
-        if(node.type === 'dir') html += `<li><span class="folder">📂 ${node.name}</span>${buildTreeHTML(node.children)}</li>`;
-        else html += `<li onclick="openFile('${node.name}')" style="cursor:pointer; padding: 2px 0;">📄 <span style="color: #94a3b8;">${node.name}</span></li>`;
+    if (!Array.isArray(nodes) || !nodes.length) return '<ul class="ide-tree"><li class="ide-empty">Empty</li></ul>';
+    let html = '<ul class="ide-tree">';
+    nodes.forEach(function (node) {
+        if (!node) return;
+        const name = escapeHtml(String(node.name || ''));
+        const path = String(node.path || node.name || '');
+        const pathAttr = escapeHtml(path);
+        if (node.type === 'dir') {
+            const kids = buildTreeHTML(node.children || []);
+            html += '<li class="ide-dir">'
+                + '<span class="folder" onclick="this.parentElement.classList.toggle(\'open\')">📂 ' + name + '</span>'
+                + kids + '</li>';
+        } else {
+            html += '<li class="ide-file" data-path="' + pathAttr + '" onclick="openFileFromEl(this)">'
+                + '<span class="file-ico">📄</span> <span class="file-name">' + name + '</span></li>';
+        }
     });
     return html + '</ul>';
 }
 
-function openFile(filename) {
-    document.getElementById('ide-current-file').innerText = filename;
-    document.getElementById('ide-code-editor').value = `// Secure KVM File Stream: ${filename}\n\n[Content loaded from Storage Array]`;
+function openFileFromEl(el) {
+    if (!el) return;
+    openFile(el.getAttribute('data-path') || '');
+}
+
+async function openFile(relPath) {
+    const nameEl = document.getElementById('ide-current-file');
+    const metaEl = document.getElementById('ide-file-meta');
+    const editor = document.getElementById('ide-code-editor');
+    if (!editor) return;
+    const path = String(relPath || '').trim();
+    if (!path) return;
+    document.querySelectorAll('.ide-file.active').forEach(function (el) { el.classList.remove('active'); });
+    document.querySelectorAll('.ide-file[data-path]').forEach(function (el) {
+        if (el.getAttribute('data-path') === path) el.classList.add('active');
+    });
+    if (nameEl) nameEl.textContent = path.split('/').pop() || path;
+    if (metaEl) metaEl.textContent = 'loading…';
+    editor.textContent = '// Streaming ' + path + ' …';
+    try {
+        const res = await fetch('/api/ide/read?path=' + encodeURIComponent(path));
+        const data = await res.json().catch(function () { return {}; });
+        if (!res.ok || data.ok === false) {
+            const msg = data.message || data.error || ('HTTP ' + res.status);
+            editor.textContent = '// PREVIEW FAILED\n// ' + msg;
+            if (metaEl) metaEl.textContent = String(msg);
+            return;
+        }
+        editor.textContent = data.content != null ? String(data.content) : '';
+        if (metaEl) {
+            metaEl.textContent = (data.bytes != null ? data.bytes + ' B' : '—')
+                + ' · ' + (data.path || path);
+        }
+        if (nameEl) nameEl.textContent = data.name || path;
+    } catch (e) {
+        editor.textContent = '// DEGRADED: ' + (e.message || e);
+        if (metaEl) metaEl.textContent = 'unreachable';
+    }
+}
+
+/** Keep dock buttons lit when their window is open. */
+function syncDockActive() {
+    document.querySelectorAll('.dock-btn[data-win]').forEach(function (btn) {
+        const id = btn.getAttribute('data-win');
+        const win = id && document.getElementById(id);
+        const open = win && win.style.display !== 'none' && win.style.display !== '';
+        btn.classList.toggle('active', !!open);
+    });
 }
 
 // ==========================================
@@ -1288,10 +1378,33 @@ function showTiers() {
 
 // Dismiss the plan picker and boot the desktop on the current plan.
 function enterDesktop() {
-    document.getElementById('login-modal').style.display = 'none';
+    const login = document.getElementById('login-modal');
+    if (login) login.style.display = 'none';
     const tm = document.getElementById('tier-modal');
     if (tm) tm.style.display = 'none';
+    document.body.classList.add('desktop-live');
+    // Boot flash — instrument console coming online
+    const flash = document.createElement('div');
+    flash.className = 'boot-flash';
+    document.body.appendChild(flash);
+    setTimeout(function () { flash.remove(); }, 900);
     try { initGridStateSync(); } catch (e) { console.log(e); }
+    try { startInstrStatusStrip(); } catch (e) {}
+    // First boot: surface the two critical surfaces so the OS feels alive
+    try {
+        if (!sessionStorage.getItem('synthesus_booted_ui')) {
+            sessionStorage.setItem('synthesus_booted_ui', '1');
+            setTimeout(function () {
+                const chat = document.getElementById('win-chat');
+                if (chat && chat.style.display === 'none') toggleWindow('win-chat');
+            }, 280);
+            setTimeout(function () {
+                const vit = document.getElementById('win-vitals');
+                if (vit && vit.style.display === 'none') toggleVitals();
+            }, 520);
+        }
+    } catch (e) {}
+    try { syncDockActive(); } catch (e) {}
 }
 
 // Build the personal greeting (markdown; the name renders bold).
@@ -1752,10 +1865,11 @@ function maximizeWindow(el) {
         win.dataset.oldTop = win.style.top;
         win.dataset.oldLeft = win.style.left;
         
-        win.style.top = '0px';
+        const stripH = document.getElementById('instr-status-strip') ? 28 : 0;
+        win.style.top = stripH + 'px';
         win.style.left = '0px';
         win.style.width = '100vw';
-        win.style.height = 'calc(100vh - 60px)'; // leave room for dock
+        win.style.height = 'calc(100vh - ' + (60 + stripH) + 'px)'; // leave room for dock + strip
         win.dataset.maximized = 'true';
     }
 }
@@ -1842,6 +1956,47 @@ function driveGoStep(n) {
         d.style.color = (parseInt(d.dataset.step) === n) ? '#22d3ee' : '#64748b';
         d.style.fontWeight = (parseInt(d.dataset.step) === n) ? '700' : '400';
     });
+}
+
+/** Paste arbitrary local text → write under ~/.synthesus/local_paste → folder ingest. */
+async function drivePasteLocal() {
+    const ta = document.getElementById('drive-paste-text');
+    const status = document.getElementById('drive-paste-status');
+    const text = (ta && ta.value || '').trim();
+    if (!text) {
+        if (status) status.textContent = 'Paste some text first.';
+        return;
+    }
+    if (status) status.textContent = 'Writing + indexing locally…';
+    try {
+        const res = await fetch('/api/v1/drive/paste', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text, name: 'local-paste' }),
+        });
+        const data = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+            if (status) {
+                status.style.color = '#fb7185';
+                status.textContent = 'Failed: ' + (data.message || data.error || ('HTTP ' + res.status));
+            }
+            return;
+        }
+        if (status) {
+            status.style.color = '#34d399';
+            status.textContent = 'Indexed local paste'
+                + (data.chunks_added != null ? (' · ' + data.chunks_added + ' chunk(s)') : '')
+                + (data.local_file ? (' · ' + data.local_file) : '')
+                + ' · stays on this machine';
+        }
+        if (ta) ta.value = '';
+        try { loadDriveSources(); } catch (_) {}
+    } catch (e) {
+        if (status) {
+            status.style.color = '#fb7185';
+            status.textContent = 'DEGRADED: ' + (e.message || e);
+        }
+    }
 }
 
 function driveSelectSource(key) {
@@ -2379,20 +2534,31 @@ async function saveLLMSettings() {
 }
 
 let foremanInterval;
+let _foremanFailStreak = 0;
 function startForemanSync() {
+    // Only poll while Foreman window is open — never on page load (QA BUG-5).
     if (foremanInterval) clearInterval(foremanInterval);
+    _foremanFailStreak = 0;
+    fetchForemanQueue();
     foremanInterval = setInterval(fetchForemanQueue, 2000);
+}
+
+function stopForemanSync() {
+    if (foremanInterval) { clearInterval(foremanInterval); foremanInterval = null; }
 }
 
 async function fetchForemanQueue() {
     try {
         const res = await fetch('/api/foreman/queue');
         if (!res.ok) {
-            // Foreman is held/unmounted in this build — stop polling so we don't
-            // spam the browser console with a 404 every 2s. Resumes if the route exists.
-            if (res.status === 404 && foremanInterval) { clearInterval(foremanInterval); foremanInterval = null; }
+            // Foreman unmounted / FastAPI 404 detail — stop polling (QA BUG-5).
+            _foremanFailStreak++;
+            if ((res.status === 404 || res.status === 501 || _foremanFailStreak >= 2) && foremanInterval) {
+                stopForemanSync();
+            }
             return;
         }
+        _foremanFailStreak = 0;
         const data = await res.json();
         const listEl = document.getElementById('foreman-queue-list');
         if (!listEl) return;
@@ -2476,7 +2642,7 @@ async function denyForeman(stepId) {
     } catch(e) {}
 }
 
-startForemanSync();
+// Foreman poll is started only when #win-foreman opens (see toggleWindow).
 
 // ==========================================
 // SI IMAGE STUDIO (procedural VSA — not diffusion)
@@ -3285,6 +3451,7 @@ function toggleVitals() {
     const open = win && win.style.display !== 'none';
     if (open) { loadVitals(); if (!_vitalsTimer) _vitalsTimer = setInterval(loadVitals, 4000); }
     else if (_vitalsTimer) { clearInterval(_vitalsTimer); _vitalsTimer = null; }
+    try { syncDockActive(); } catch (_) {}
 }
 async function loadVitals() {
     const rowsEl = document.getElementById('vitals-rows');
@@ -3423,19 +3590,50 @@ async function runVoiceSpeak() {
             }
             return;
         }
-        const mime = data.mime_type || 'audio/wav';
-        const bin = atob(data.audio_base64);
+        // Force WAV MIME — some browsers refuse to decode with a generic type.
+        const mime = 'audio/wav';
+        const b64 = String(data.audio_base64 || '').replace(/\s+/g, '');
+        const bin = atob(b64);
         const bytes = new Uint8Array(bin.length);
         for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
         // RIFF check in browser
         const riffOk = bytes.length >= 12 &&
-            String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) === 'RIFF';
-        const blob = new Blob([bytes], { type: mime });
-        if (_lastVoiceObjectUrl) URL.revokeObjectURL(_lastVoiceObjectUrl);
+            String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) === 'RIFF' &&
+            String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]) === 'WAVE';
+        // Copy into a fresh ArrayBuffer-backed view (avoids detached-buffer edge cases)
+        const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+        const blob = new Blob([ab], { type: mime });
+        if (_lastVoiceObjectUrl) {
+            try { URL.revokeObjectURL(_lastVoiceObjectUrl); } catch (_) {}
+        }
         _lastVoiceObjectUrl = URL.createObjectURL(blob);
         if (audioEl) {
+            audioEl.pause();
+            audioEl.removeAttribute('src');
             audioEl.src = _lastVoiceObjectUrl;
-            audioEl.play().catch(function () {});
+            audioEl.type = mime;
+            // load() is required so duration leaves 0:00/0:00 (QA BUG-4)
+            try { audioEl.load(); } catch (_) {}
+            const tryPlay = function () {
+                const p = audioEl.play();
+                if (p && typeof p.catch === 'function') {
+                    p.catch(function (err) {
+                        if (statusEl) {
+                            statusEl.textContent = (statusEl.textContent || '') +
+                                ' · click ▶ to play (autoplay blocked)';
+                        }
+                        console.log('voice play blocked/failed', err && err.message);
+                    });
+                }
+            };
+            if (audioEl.readyState >= 2) tryPlay();
+            else {
+                audioEl.addEventListener('canplay', tryPlay, { once: true });
+                // Fallback if canplay never fires
+                setTimeout(function () {
+                    if (audioEl.paused) tryPlay();
+                }, 400);
+            }
         }
         if (statusEl) {
             statusEl.style.color = '#8595a9';
