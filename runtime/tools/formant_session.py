@@ -9,13 +9,22 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
 import time
-import re
 import uuid
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Optional
+
+# tools/ may not have packages/ on sys.path when imported standalone
+_PKGS = Path(__file__).resolve().parents[1] / "packages"
+if str(_PKGS) not in sys.path:
+    sys.path.insert(0, str(_PKGS))
+try:
+    from core.utils.safe_path import safe_id
+except ImportError:
+    from utils.safe_path import safe_id  # type: ignore
 
 _LOCK = threading.Lock()
 _MAX = int(os.environ.get("SYNTHESUS_FORMANT_SESSION_MAX", "48"))
@@ -31,17 +40,11 @@ _DISK_ON = os.environ.get("SYNTHESUS_FORMANT_SESSION_DISK_OFF", "").strip().lowe
 )
 
 
-_SID_SANITIZE = re.compile(r"[^A-Za-z0-9_-]")
-
-
-def _safe_sid(sid: str) -> str:
-    # utterance_id is user-supplied and becomes a filename; never let it escape
-    # _DISK_ROOT (path traversal). Keep only filename-safe chars, bound length.
-    return _SID_SANITIZE.sub("", str(sid))[:64] or "invalid"
+# utterance_id is user-supplied and becomes a filename; safe_id closes traversal.
 
 
 def _path(sid: str) -> Path:
-    return _DISK_ROOT / f"{_safe_sid(sid)}.json"
+    return _DISK_ROOT / f"{safe_id(sid)}.json"
 
 
 def _write_disk(sid: str, rec: dict[str, Any]) -> None:
