@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Synthesus Planetary OS Ultra</title>
     <link rel="icon" href="data:,"><!-- silence the browser's automatic /favicon.ico 404 -->
-    <link rel="stylesheet" href="styles.css?v=8">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=9">
+    <!-- No external font CDN: Synthesus is local-first — nothing leaves the machine and the
+         UI must render offline. Uses locally-installed Outfit/Fira Code if present, else a
+         native system stack. To pin the exact look later, self-host the woff2 via @font-face. -->
     <link rel="stylesheet" href="xterm.css" />
     <script src="xterm.js"></script>
     <script src="xterm-addon-fit.js"></script>
@@ -429,7 +431,7 @@
                     </div>
                     <div>
                         <label style="color:#94a3b8; font-size:0.75rem;">Scene stock</label>
-                        <div id="image-scene-id" style="font-size:0.7rem; color:#64748b; font-family:'Fira Code',monospace; padding:6px 4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="scene_id for multi-pass">— generate first —</div>
+                        <div id="image-scene-id" style="font-size:0.7rem; color:#64748b; font-family:'Fira Code', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace; padding:6px 4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="scene_id for multi-pass">— generate first —</div>
                     </div>
                 </div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -458,7 +460,7 @@
                         <div style="flex:1; min-width:0;">
                             <input type="file" id="level-viewer-file" accept="application/json,.json" style="font-size:0.72rem; color:#94a3b8; width:100%;"
                                 onchange="loadLevelViewerFile(event)">
-                            <div id="level-viewer-info" style="font-size:0.72rem; color:#64748b; margin-top:6px; font-family:'Fira Code',monospace;">
+                            <div id="level-viewer-info" style="font-size:0.72rem; color:#64748b; margin-top:6px; font-family:'Fira Code', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;">
                                 Export Level or open a .json to inspect the SI world.
                             </div>
                         </div>
@@ -477,12 +479,12 @@
                 </div>
                 <div id="image-studio-status" style="font-size:0.8rem; color:#94a3b8; min-height:1.2em;"></div>
                 <div id="image-capability-card" style="display:none; font-size:0.72rem; color:#94a3b8; background:rgba(15,23,42,0.6); border:1px solid rgba(56,189,248,0.25); border-radius:8px; padding:8px; margin-bottom:6px;"></div>
-                <div id="image-plan-inspector" style="display:none; font-size:0.72rem; color:#a5b4fc; background:rgba(30,27,75,0.4); border:1px solid rgba(167,139,250,0.3); border-radius:8px; padding:8px; margin-bottom:6px; font-family:'Fira Code',monospace; white-space:pre-wrap; max-height:100px; overflow:auto;"></div>
+                <div id="image-plan-inspector" style="display:none; font-size:0.72rem; color:#a5b4fc; background:rgba(30,27,75,0.4); border:1px solid rgba(167,139,250,0.3); border-radius:8px; padding:8px; margin-bottom:6px; font-family:'Fira Code', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace; white-space:pre-wrap; max-height:100px; overflow:auto;"></div>
                 <div id="image-studio-preview" style="flex:1; min-height:180px; background:rgba(0,0,0,0.35); border-radius:8px; border:1px solid rgba(148,163,184,0.2); display:flex; align-items:center; justify-content:center; overflow:hidden;">
                     <span style="color:#64748b; font-size:0.85rem;">Preview appears here</span>
                 </div>
                 <div id="image-studio-variations" style="display:none; grid-template-columns:1fr 1fr; gap:6px;"></div>
-                <div id="image-studio-meta" style="font-size:0.75rem; color:#64748b; font-family:'Fira Code',monospace;"></div>
+                <div id="image-studio-meta" style="font-size:0.75rem; color:#64748b; font-family:'Fira Code', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;"></div>
                 <div id="image-studio-entities" style="display:flex; flex-wrap:wrap; gap:4px;"></div>
                 <div>
                     <div style="color:#64748b; font-size:0.72rem; margin-bottom:4px;">Recent (this browser)</div>
@@ -505,7 +507,7 @@
         <button onclick="showTiers()" class="dock-btn" title="Unlock Pro — premium personas">⭐</button>
     </nav>
 
-    <script src="script.js?v=10031"></script>
+    <script src="script.js?v=10032"></script>
     <script src="hyperspace.js?v=4"></script>
 
     <!-- OTA Update Screen -->
