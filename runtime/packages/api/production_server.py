@@ -1795,6 +1795,116 @@ async def generate_image_endpoint(req: Request, auth=Depends(get_auth)):
     return JSONResponse(content=payload)
 
 
+@app.post("/api/v1/voice")
+async def generate_voice_endpoint(req: Request, auth=Depends(get_auth)):
+    """SI formant speech synthesis (not neural TTS).
+
+    Body: {text, knobs?: {slower,faster,higher,lower,rising_final,f2_stretch,...}}
+    Returns: {ok, audio_base64 (WAV), mime_type, phonemes, utterance_id, engine, not_neural_tts}
+    Degrades LOUDLY with 503 if larynx/formant engine is unavailable.
+    """
+    global _request_count
+    _request_count = _request_count + 1
+
+    is_auth, rate_key = auth
+    if not await _check_rate_limit(rate_key, AUTH_RATE_LIMIT if is_auth else DEMO_RATE_LIMIT):
+        raise HTTPException(429, "Rate limit exceeded. Add X-API-Key header for higher limits.")
+
+    try:
+        body = await req.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+
+    text = (body.get("text") or body.get("prompt") or "").strip()
+    if not text:
+        raise HTTPException(400, "text is required")
+    if len(text) > 2000:
+        raise HTTPException(400, "text too long (max 2000)")
+    knobs = body.get("knobs") if isinstance(body.get("knobs"), dict) else {}
+    seed = body.get("seed")
+    try:
+        seed_i = int(seed) if seed is not None else 25
+    except (TypeError, ValueError):
+        seed_i = 25
+
+    tools_dir = str(PROJ_ROOT / "tools")
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    # packages on path for formant_plan imports
+    pkgs = str(PROJ_ROOT / "packages")
+    if pkgs not in sys.path:
+        sys.path.insert(0, pkgs)
+
+    def _run_voice() -> dict:
+        import base64
+        import io
+
+        import numpy as _np
+
+        try:
+            from larynx_vocalizer import LarynxVocalizer
+        except Exception as e:
+            raise RuntimeError(f"larynx_engine_unavailable: {e}") from e
+        try:
+            from formant_plan import apply_pass_knobs, public_plan_view
+        except Exception:
+            apply_pass_knobs = None  # type: ignore
+            public_plan_view = None  # type: ignore
+
+        lar = LarynxVocalizer(sample_rate=16000)
+        plan = lar.compile_plan(text, use_llm=False)
+        if knobs and apply_pass_knobs is not None:
+            plan = apply_pass_knobs(plan, knobs)
+        audio = lar.synthesize_plan(plan, seed=seed_i, keep_session=True)
+        # int16 WAV in memory
+        pcm = (_np.clip(audio, -1.0, 1.0) * 32767.0).astype(_np.int16)
+        buf = io.BytesIO()
+        try:
+            from scipy.io import wavfile as _wf
+            _wf.write(buf, lar.fs, pcm)
+        except Exception:
+            # minimal WAV header if scipy path fails mid-write
+            raise
+        wav_bytes = buf.getvalue()
+        if len(wav_bytes) < 12 or wav_bytes[:4] != b"RIFF":
+            raise RuntimeError("voice_render_invalid_wav")
+        b64 = base64.b64encode(wav_bytes).decode("ascii")
+        plan_view = public_plan_view(plan) if public_plan_view else {}
+        return {
+            "ok": True,
+            "engine": "si_formant_klatt",
+            "not_neural_tts": True,
+            "honest_target": "intelligible_robotic_formant",
+            "text": text,
+            "audio_base64": b64,
+            "mime_type": "audio/wav",
+            "sample_rate": lar.fs,
+            "bytes": len(wav_bytes),
+            "phonemes": lar.last_phonemes,
+            "utterance_id": lar.last_utterance_id,
+            "utterance_plan": plan_view,
+            "knobs": knobs or {},
+            "spectral": (lar.last_meta or {}).get("spectral"),
+            "outer_voice": (lar.last_meta or {}).get("outer_voice")
+            or "SI formant speech — not a neural TTS model.",
+        }
+
+    try:
+        payload = await run_in_threadpool(_run_voice)
+    except Exception as e:
+        logger.warning("voice synthesis failed: %s", e)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "voice_engine_unavailable",
+                "message": str(e),
+                "not_neural_tts": True,
+                "note": "SI formant larynx missing or failed — not falling back to neural TTS",
+            },
+        )
+    return JSONResponse(content=payload)
+
+
 @app.get("/api/v1/image/capabilities")
 async def image_capabilities(auth=Depends(get_auth)):
     """Honest can/can't card for SI image engine (not diffusion)."""

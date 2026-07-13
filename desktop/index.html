@@ -493,6 +493,38 @@
             </div>
         </div>
 
+        <!-- SI Voice Studio — formant larynx (not neural TTS) -->
+        <div class="window glass-panel instr-window" id="win-voice" style="top: 80px; left: 200px; width: 440px; height: 520px; display: none;">
+            <div class="window-header" onmousedown="dragWindow(event, 'win-voice')">
+                <span class="window-title instr-title">VOICE · SI FORMANT</span>
+                <div class="window-controls">
+                    <button class="win-btn minimize" onclick="minimizeWindow(this)" style="background: #facc15;"></button>
+                    <button class="win-btn maximize" onclick="maximizeWindow(this)" style="background: #22c55e;"></button>
+                    <button class="win-btn close" onclick="toggleWindow('win-voice')"></button>
+                </div>
+            </div>
+            <div class="window-content instr-panel" style="display:flex; flex-direction:column; gap:10px; overflow-y:auto;">
+                <div class="instr-caption">SI formant · no TTS model · intelligible but robotic</div>
+                <label class="instr-label" for="voice-text">UTTERANCE</label>
+                <textarea id="voice-text" class="instr-input" rows="3" placeholder="hello world">hello world</textarea>
+                <div class="instr-knob-row">
+                    <label class="instr-check"><input type="checkbox" id="voice-knob-slower"> slower</label>
+                    <label class="instr-check"><input type="checkbox" id="voice-knob-faster"> faster</label>
+                    <label class="instr-check"><input type="checkbox" id="voice-knob-higher"> higher</label>
+                    <label class="instr-check"><input type="checkbox" id="voice-knob-lower"> lower</label>
+                    <label class="instr-check"><input type="checkbox" id="voice-knob-rising" checked> rising_final</label>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button class="instr-btn primary" style="flex:1;" onclick="runVoiceSpeak()">SPEAK</button>
+                    <button class="instr-btn" onclick="document.getElementById('voice-text').value='the quick brown fox'">FOX</button>
+                </div>
+                <audio id="voice-audio" controls style="width:100%; margin-top:4px;"></audio>
+                <div class="instr-meta" id="voice-status">ready · local SI larynx</div>
+                <div class="instr-meta" id="voice-phonemes" style="white-space:pre-wrap; word-break:break-word; color:#8595a9;"></div>
+                <div class="instr-meta" id="voice-uid" style="color:#64748b;"></div>
+            </div>
+        </div>
+
     </main>
 
     <!-- System Vitals — live subsystem readout (new bolt-on, reads /api/v1/health) -->
@@ -522,6 +554,7 @@
         <button onclick="toggleWindow('win-core')" class="dock-btn" title="Settings">⚙️</button>
         <button onclick="toggleWindow('win-chat')" class="dock-btn" title="Quadbrain SI">🧠</button>
         <button onclick="toggleWindow('win-image')" class="dock-btn" title="SI Image Studio">🎨</button>
+        <button onclick="toggleWindow('win-voice')" class="dock-btn" title="SI Voice Studio — formant larynx">🔊</button>
         <button onclick="toggleWindow('win-drive')" class="dock-btn" title="Expansion Drive — ground on your sources">💽</button>
         <button onclick="toggleWindow('win-explorer')" class="dock-btn" title="File Explorer">📁</button>
         <button onclick="toggleWindow('win-foreman')" class="dock-btn" title="Foreman Bridge">🛡️</button>
@@ -529,7 +562,7 @@
         <button onclick="showTiers()" class="dock-btn" title="Unlock Pro — premium personas">⭐</button>
     </nav>
 
-    <script src="script.js?v=10042"></script>
+    <script src="script.js?v=10043"></script>
     <script src="hyperspace.js?v=4"></script>
 
     <!-- OTA Update Screen -->

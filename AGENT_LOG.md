@@ -704,3 +704,28 @@ level re-render, Studio inspector/capabilities, bench, Claude review package.
 
 ### Branch
 `feat/status-strip` — do not merge without Claude review.
+## 2026-07-12 — feat/voice-ui: SI Voice Studio + POST /api/v1/voice
+
+### What
+- Backend: `POST /api/v1/voice` in `production_server.py` — formant larynx (`larynx_vocalizer` / `formant_plan`) via `run_in_threadpool`.
+  Returns `{audio_base64 WAV, phonemes, utterance_id, engine: si_formant_klatt, not_neural_tts}`.
+  Rate-limited like `/api/v1/image`. **503 LOUD** if engine missing — no neural TTS fallback.
+- Shell proxy: `POST /api/v1/voice` in `synthesus_native_shell.py` → runtime.
+- Frontend: `#win-voice` instrument window + dock 🔊. Knobs: slower/faster/higher/lower/rising_final.
+  Plays returned WAV; shows phonemes + "SI formant · no TTS model" caption.
+
+### Proof (live curl, runtime :5010)
+```
+curl -s -X POST http://127.0.0.1:5010/api/v1/voice \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"hello world","seed":25,"knobs":{"rising_final":true}}'
+```
+- HTTP 200; `audio_base64` decodes to **RIFF/WAVE** PCM 16-bit mono 16 kHz (31984 bytes).
+- header `RIFF....WAVE`; phonemes `hello:HH EH L OW | world:W ER L D`; engine `si_formant_klatt`.
+- Honest quality: **intelligible-but-robotic** formant speech — not natural TTS.
+
+### Markup
+`#win-voice.instr-window` with `.instr-caption`, knobs, SPEAK, `<audio id="voice-audio">`.
+
+### Branch
+`feat/voice-ui` — do not merge without Claude review.
