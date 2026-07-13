@@ -23,6 +23,7 @@ from typing import Optional, List, Dict, Any, Tuple
 
 import faiss
 import numpy as np
+import threading
 
 from ml.swarm_embedder import SwarmEmbedder
 
@@ -138,6 +139,12 @@ class RAGPipeline:
 
         self._index: Optional[faiss.Index] = None
         self._metadata: List[Dict] = []
+        # FAISS is not thread-safe for concurrent add()/search(); retrieve() runs
+        # _search in a threadpool executor while ingest may add() on another thread.
+        # Serialize index mutation + search so a query during an ingest can't hit a
+        # half-updated index (a source of the transient "freshly-ingested doc missed
+        # on the first query" behaviour). Cheap: adds/searches are already fast.
+        self._index_lock = threading.RLock()
         self._embedder: Optional[SwarmEmbedder] = None
 
         self._load()
@@ -193,8 +200,15 @@ class RAGPipeline:
             self._metadata = []
 
     def _embed(self, texts: List[str]) -> np.ndarray:
-        """Generate normalized embeddings for a list of texts."""
-        return self._embedder.embed_texts(texts)
+        """Generate normalized embeddings for a list of texts.
+
+        FAISS requires a C-contiguous float32 array for both add() and search();
+        a float64 or non-contiguous array makes those raise a cryptic/empty error
+        (the intermittent "FAISS search error" that made a freshly-ingested doc miss
+        on the first query). Normalize here so every add/search is well-formed.
+        """
+        emb = self._embedder.embed_texts(texts)
+        return np.ascontiguousarray(emb, dtype=np.float32)
 
     async def retrieve(
         self,
@@ -264,10 +278,14 @@ class RAGPipeline:
     ) -> List[Tuple[float, Dict]]:
         """Synchronous FAISS search."""
         try:
+            n = self._index.ntotal if self._index is not None else 0
+            if n == 0:
+                return []
             query_emb = self._embed([query])
             # V4: Deeper over-fetch (100x) to ensure character knowledge isn't buried under globally similar patterns
-            search_depth = min(k * 100, self.total_vectors)
-            scores, indices = self._index.search(query_emb, search_depth)  
+            search_depth = max(1, min(k * 100, n))
+            with self._index_lock:
+                scores, indices = self._index.search(query_emb, search_depth)
 
             # Collect candidates above the raw-similarity threshold (calibration
             # stays on unweighted FAISS scores), then re-rank by
@@ -338,7 +356,8 @@ class RAGPipeline:
             texts = [p.get("pattern", "") for p in batch]
             embeddings = self._embed(texts)
 
-            self._index.add(embeddings)
+            with self._index_lock:
+                self._index.add(embeddings)
             for p in batch:
                 meta = _enrich_pattern_metadata(dict(p))
                 if character_id:
@@ -382,7 +401,8 @@ class RAGPipeline:
                     f"Embedding dim {dim} != existing index dim {self._index.d}; "
                     "refusing to append (would corrupt the index)."
                 )
-            self._index.add(embeddings)
+            with self._index_lock:
+                self._index.add(embeddings)
             for p in batch:
                 meta = _enrich_pattern_metadata(dict(p))
                 if character_id:
