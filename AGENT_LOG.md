@@ -688,3 +688,59 @@ level re-render, Studio inspector/capabilities, bench, Claude review package.
 - ENGINE `si-image-v6.1-workshop` · **26 tests passed**
 
 ### Do NOT merge without Claude review of this package.
+
+## 2026-07-12 — feat/status-strip: instrument subsystem strip
+
+### What
+- Always-visible top strip `#instr-status-strip` (instrument tokens, mono, tabular).
+- Polls real `GET /api/v1/health` every 4s: KERNEL status · MODEL · LLM green/red dot · uptime.
+- Fixed chip: `⦸ OFFLINE — nothing leaves this machine` (accent cyan).
+- Degrades to `—` when health unreachable — never fakes numbers.
+- Does not cover dock; `paddingTop` on main for clearance.
+
+### Proof
+- Health sample: `status=online`, `llm.model=llama3.2:3b`, `ollama_reachable` drives dot, `uptime_seconds` real.
+- DOM: body > `#instr-status-strip` with `#strip-kernel`, `#strip-model`, `#strip-llm-dot`, `.strip-offline`.
+
+### Branch
+`feat/status-strip` — do not merge without Claude review.
+## 2026-07-12 — feat/voice-ui: SI Voice Studio + POST /api/v1/voice
+
+### What
+- Backend: `POST /api/v1/voice` in `production_server.py` — formant larynx (`larynx_vocalizer` / `formant_plan`) via `run_in_threadpool`.
+  Returns `{audio_base64 WAV, phonemes, utterance_id, engine: si_formant_klatt, not_neural_tts}`.
+  Rate-limited like `/api/v1/image`. **503 LOUD** if engine missing — no neural TTS fallback.
+- Shell proxy: `POST /api/v1/voice` in `synthesus_native_shell.py` → runtime.
+- Frontend: `#win-voice` instrument window + dock 🔊. Knobs: slower/faster/higher/lower/rising_final.
+  Plays returned WAV; shows phonemes + "SI formant · no TTS model" caption.
+
+### Proof (live curl, runtime :5010)
+```
+curl -s -X POST http://127.0.0.1:5010/api/v1/voice \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"hello world","seed":25,"knobs":{"rising_final":true}}'
+```
+- HTTP 200; `audio_base64` decodes to **RIFF/WAVE** PCM 16-bit mono 16 kHz (31984 bytes).
+- header `RIFF....WAVE`; phonemes `hello:HH EH L OW | world:W ER L D`; engine `si_formant_klatt`.
+- Honest quality: **intelligible-but-robotic** formant speech — not natural TTS.
+
+### Markup
+`#win-voice.instr-window` with `.instr-caption`, knobs, SPEAK, `<audio id="voice-audio">`.
+
+### Branch
+`feat/voice-ui` — do not merge without Claude review.
+## 2026-07-12 — feat/tier-badges: instrument trust chips in real chat
+
+### What
+- Answer-level instrument badges: ✓ Verified / ~ Grounded / • Unverified from real chat payload
+  (`/api/chat` → runtime `/api/v1/query` sources + verification).
+- Citation chips (`.instr-cite-chip`) from `data.sources`.
+- 👍 confirm still mints `/api/human/attestation` then `/api/feedback` → runtime `/api/v1/feedback`.
+  On upgrade: badge flips to ✓ Verified. If human-session secret missing: **fail closed** (stay Grounded).
+
+### Proof
+- Real query path returns `answer_id` + `sources`; UI renders `instr-tier-badge` + citation chips.
+- Confirm path hits shell feedback proxy → `/api/v1/feedback`; without secret stays not upgraded.
+
+### Branch
+`feat/tier-badges` — do not merge without Claude review.

@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Synthesus Planetary OS Ultra</title>
     <link rel="icon" href="data:,"><!-- silence the browser's automatic /favicon.ico 404 -->
-    <link rel="stylesheet" href="styles.css?v=8">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=9">
+    <!-- No external font CDN: Synthesus is local-first — nothing leaves the machine and the
+         UI must render offline. Uses locally-installed Outfit/Fira Code if present, else a
+         native system stack. To pin the exact look later, self-host the woff2 via @font-face. -->
     <link rel="stylesheet" href="xterm.css" />
     <script src="xterm.js"></script>
     <script src="xterm-addon-fit.js"></script>
@@ -429,7 +431,7 @@
                     </div>
                     <div>
                         <label style="color:#94a3b8; font-size:0.75rem;">Scene stock</label>
-                        <div id="image-scene-id" style="font-size:0.7rem; color:#64748b; font-family:'Fira Code',monospace; padding:6px 4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="scene_id for multi-pass">— generate first —</div>
+                        <div id="image-scene-id" style="font-size:0.7rem; color:#64748b; font-family:'Fira Code', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace; padding:6px 4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="scene_id for multi-pass">— generate first —</div>
                     </div>
                 </div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -458,7 +460,7 @@
                         <div style="flex:1; min-width:0;">
                             <input type="file" id="level-viewer-file" accept="application/json,.json" style="font-size:0.72rem; color:#94a3b8; width:100%;"
                                 onchange="loadLevelViewerFile(event)">
-                            <div id="level-viewer-info" style="font-size:0.72rem; color:#64748b; margin-top:6px; font-family:'Fira Code',monospace;">
+                            <div id="level-viewer-info" style="font-size:0.72rem; color:#64748b; margin-top:6px; font-family:'Fira Code', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;">
                                 Export Level or open a .json to inspect the SI world.
                             </div>
                         </div>
@@ -477,12 +479,12 @@
                 </div>
                 <div id="image-studio-status" style="font-size:0.8rem; color:#94a3b8; min-height:1.2em;"></div>
                 <div id="image-capability-card" style="display:none; font-size:0.72rem; color:#94a3b8; background:rgba(15,23,42,0.6); border:1px solid rgba(56,189,248,0.25); border-radius:8px; padding:8px; margin-bottom:6px;"></div>
-                <div id="image-plan-inspector" style="display:none; font-size:0.72rem; color:#a5b4fc; background:rgba(30,27,75,0.4); border:1px solid rgba(167,139,250,0.3); border-radius:8px; padding:8px; margin-bottom:6px; font-family:'Fira Code',monospace; white-space:pre-wrap; max-height:100px; overflow:auto;"></div>
+                <div id="image-plan-inspector" style="display:none; font-size:0.72rem; color:#a5b4fc; background:rgba(30,27,75,0.4); border:1px solid rgba(167,139,250,0.3); border-radius:8px; padding:8px; margin-bottom:6px; font-family:'Fira Code', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace; white-space:pre-wrap; max-height:100px; overflow:auto;"></div>
                 <div id="image-studio-preview" style="flex:1; min-height:180px; background:rgba(0,0,0,0.35); border-radius:8px; border:1px solid rgba(148,163,184,0.2); display:flex; align-items:center; justify-content:center; overflow:hidden;">
                     <span style="color:#64748b; font-size:0.85rem;">Preview appears here</span>
                 </div>
                 <div id="image-studio-variations" style="display:none; grid-template-columns:1fr 1fr; gap:6px;"></div>
-                <div id="image-studio-meta" style="font-size:0.75rem; color:#64748b; font-family:'Fira Code',monospace;"></div>
+                <div id="image-studio-meta" style="font-size:0.75rem; color:#64748b; font-family:'Fira Code', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;"></div>
                 <div id="image-studio-entities" style="display:flex; flex-wrap:wrap; gap:4px;"></div>
                 <div>
                     <div style="color:#64748b; font-size:0.72rem; margin-bottom:4px;">Recent (this browser)</div>
@@ -491,13 +493,68 @@
             </div>
         </div>
 
+        <!-- SI Voice Studio — formant larynx (not neural TTS) -->
+        <div class="window glass-panel instr-window" id="win-voice" style="top: 80px; left: 200px; width: 440px; height: 520px; display: none;">
+            <div class="window-header" onmousedown="dragWindow(event, 'win-voice')">
+                <span class="window-title instr-title">VOICE · SI FORMANT</span>
+                <div class="window-controls">
+                    <button class="win-btn minimize" onclick="minimizeWindow(this)" style="background: #facc15;"></button>
+                    <button class="win-btn maximize" onclick="maximizeWindow(this)" style="background: #22c55e;"></button>
+                    <button class="win-btn close" onclick="toggleWindow('win-voice')"></button>
+                </div>
+            </div>
+            <div class="window-content instr-panel" style="display:flex; flex-direction:column; gap:10px; overflow-y:auto;">
+                <div class="instr-caption">SI formant · no TTS model · intelligible but robotic</div>
+                <label class="instr-label" for="voice-text">UTTERANCE</label>
+                <textarea id="voice-text" class="instr-input" rows="3" placeholder="hello world">hello world</textarea>
+                <div class="instr-knob-row">
+                    <label class="instr-check"><input type="checkbox" id="voice-knob-slower"> slower</label>
+                    <label class="instr-check"><input type="checkbox" id="voice-knob-faster"> faster</label>
+                    <label class="instr-check"><input type="checkbox" id="voice-knob-higher"> higher</label>
+                    <label class="instr-check"><input type="checkbox" id="voice-knob-lower"> lower</label>
+                    <label class="instr-check"><input type="checkbox" id="voice-knob-rising" checked> rising_final</label>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button class="instr-btn primary" style="flex:1;" onclick="runVoiceSpeak()">SPEAK</button>
+                    <button class="instr-btn" onclick="document.getElementById('voice-text').value='the quick brown fox'">FOX</button>
+                </div>
+                <audio id="voice-audio" controls style="width:100%; margin-top:4px;"></audio>
+                <div class="instr-meta" id="voice-status">ready · local SI larynx</div>
+                <div class="instr-meta" id="voice-phonemes" style="white-space:pre-wrap; word-break:break-word; color:#8595a9;"></div>
+                <div class="instr-meta" id="voice-uid" style="color:#64748b;"></div>
+            </div>
+        </div>
+
     </main>
+
+    <!-- System Vitals — live subsystem readout (new bolt-on, reads /api/v1/health) -->
+    <div class="window glass-panel" id="win-vitals" style="top: 110px; left: 560px; width: 380px; height: 470px; display: none;">
+        <div class="window-header" onmousedown="dragWindow(event, 'win-vitals')">
+            <span class="window-title">📡 System Vitals</span>
+            <div class="window-controls"><button class="win-btn minimize" onclick="minimizeWindow(this)" style="background: #facc15;"></button><button class="win-btn maximize" onclick="maximizeWindow(this)" style="background: #22c55e;"></button><button class="win-btn close" onclick="toggleVitals()"></button></div>
+        </div>
+        <div class="window-content" style="display:flex; flex-direction:column;">
+            <div class="vitals-head">
+                <div class="vitals-status" id="vitals-status">— <span class="sub">system status</span></div>
+                <span class="vitals-live"><i></i>LIVE</span>
+            </div>
+            <div class="vitals-rows" id="vitals-rows">
+                <div class="vrow"><span class="vdot acc"></span><span class="vk">Connecting…</span><span class="vv">—</span></div>
+            </div>
+            <div class="vitals-oath">
+                <span class="sig">⦸</span>
+                <p><b>Network — offline</b><br>Nothing you do here leaves this machine. No cloud, no telemetry.</p>
+            </div>
+        </div>
+    </div>
 
     <!-- OS Taskbar (Dock) -->
     <nav class="dock">
+        <button onclick="toggleVitals()" class="dock-btn" title="System Vitals — live subsystem status">📡</button>
         <button onclick="toggleWindow('win-core')" class="dock-btn" title="Settings">⚙️</button>
         <button onclick="toggleWindow('win-chat')" class="dock-btn" title="Quadbrain SI">🧠</button>
         <button onclick="toggleWindow('win-image')" class="dock-btn" title="SI Image Studio">🎨</button>
+        <button onclick="toggleWindow('win-voice')" class="dock-btn" title="SI Voice Studio — formant larynx">🔊</button>
         <button onclick="toggleWindow('win-drive')" class="dock-btn" title="Expansion Drive — ground on your sources">💽</button>
         <button onclick="toggleWindow('win-explorer')" class="dock-btn" title="File Explorer">📁</button>
         <button onclick="toggleWindow('win-foreman')" class="dock-btn" title="Foreman Bridge">🛡️</button>
@@ -505,7 +562,7 @@
         <button onclick="showTiers()" class="dock-btn" title="Unlock Pro — premium personas">⭐</button>
     </nav>
 
-    <script src="script.js?v=10031"></script>
+    <script src="script.js?v=10044"></script>
     <script src="hyperspace.js?v=4"></script>
 
     <!-- OTA Update Screen -->
