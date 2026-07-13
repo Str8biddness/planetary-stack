@@ -688,3 +688,19 @@ level re-render, Studio inspector/capabilities, bench, Claude review package.
 - ENGINE `si-image-v6.1-workshop` · **26 tests passed**
 
 ### Do NOT merge without Claude review of this package.
+
+## 2026-07-12 — feat/status-strip: instrument subsystem strip
+
+### What
+- Always-visible top strip `#instr-status-strip` (instrument tokens, mono, tabular).
+- Polls real `GET /api/v1/health` every 4s: KERNEL status · MODEL · LLM green/red dot · uptime.
+- Fixed chip: `⦸ OFFLINE — nothing leaves this machine` (accent cyan).
+- Degrades to `—` when health unreachable — never fakes numbers.
+- Does not cover dock; `paddingTop` on main for clearance.
+
+### Proof
+- Health sample: `status=online`, `llm.model=llama3.2:3b`, `ollama_reachable` drives dot, `uptime_seconds` real.
+- DOM: body > `#instr-status-strip` with `#strip-kernel`, `#strip-model`, `#strip-llm-dot`, `.strip-offline`.
+
+### Branch
+`feat/status-strip` — do not merge without Claude review.
