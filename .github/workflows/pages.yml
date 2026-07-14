@@ -1,0 +1,70 @@
+name: Deploy site to GitHub Pages
+
+# Publishes the static contents of ./site to GitHub Pages.
+# This is a pure static-file publish: no Node, no build step, no Jekyll.
+#
+# One-time setup required in the repo (see docs/DEPLOY_SITE.md):
+#   Settings -> Pages -> Build and deployment -> Source = "GitHub Actions"
+# Without that, deploy-pages fails with a "Pages site not found" style error.
+
+on:
+  push:
+    branches: [main]
+    # Only rebuild when the site or this workflow actually changes.
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
+  # Lets you re-run a deploy by hand from the Actions tab (no code change needed).
+  workflow_dispatch:
+
+permissions:
+  contents: read        # checkout
+  pages: write          # create a Pages deployment
+  id-token: write       # OIDC token that deploy-pages exchanges for auth
+
+# Never let two deploys race. Queue a new one behind an in-flight one rather
+# than cancelling it, so a half-finished deploy is never left live.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # DEGRADE LOUDLY: if the site is missing, fail here with a clear message
+      # rather than silently publishing an empty site over a working one.
+      - name: Verify site/ exists
+        run: |
+          if [ ! -f site/index.html ]; then
+            echo "::error::site/index.html not found. Nothing to publish."
+            exit 1
+          fi
+          echo "Publishing these files:"
+          find site -type f | sort
+
+      # Defense in depth. Artifacts uploaded via upload-pages-artifact are served
+      # as-is and are NOT run through Jekyll, so files/dirs beginning with an
+      # underscore already survive. .nojekyll makes that guarantee explicit and
+      # survives any future change in how the artifact is served. Created at
+      # deploy time only -- nothing is committed back to the repo.
+      - name: Disable Jekyll processing
+        run: touch site/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site/ as a Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
