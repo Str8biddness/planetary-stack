@@ -871,3 +871,57 @@ Crafted ids like `../../../../tmp/evil` resolve inside intended roots only.
 
 ### Branch
 `feat/path-safety` — do not merge without Claude review.
+
+---
+
+## 2026-07-13 — feat/model-fetchers (optional local neural rails)
+
+### What
+- Added opt-in-only installers:
+  - `scripts/fetch_realesrgan.sh`
+  - `scripts/fetch_piper_voice.sh`
+- Added `docs/OPTIONAL_NEURAL.md` with enable/disable/remove steps and license/source notes.
+- No runtime endpoint or 503 behavior changes.
+- Real-ESRGAN source note: upstream xinntao publishes official x4 PyTorch weights, not an official prebuilt x4 ONNX asset. The fetcher refuses third-party ONNX mirrors, verifies the official weights, and exports a local ONNX.
+
+### Proof
+Piper fetcher:
+```text
+checksum PASS: piper_linux_x86_64.tar.gz
+checksum PASS: en_US-lessac-low.onnx
+checksum PASS: en_US-lessac-low.onnx.json
+Installed Piper CLI and voice:
+/home/dakin/.local/share/synthesus/bin/piper
+/home/dakin/.local/share/synthesus/voices/en_US-lessac-low.onnx
+/home/dakin/.local/share/synthesus/voices/en_US-lessac-low.onnx.json
+```
+
+Real-ESRGAN fetcher:
+```text
+checksum PASS: RealESRGAN_x4plus.pth
+ONNX export wrote /tmp/.../realesrgan-x4.onnx (68366684 bytes)
+onnxruntime load PASS: inputs=1 outputs=1
+Installed Real-ESRGAN ONNX:
+/home/dakin/synthesus/runtime/data/models/realesrgan-x4.onnx
+```
+
+Without optional artifacts present:
+```text
+clean image_realesrgan_available= False model= None
+clean voice_piper_available= False bin= None model= None
+clean POST /api/v1/voice status= 503 error= voice_engine_unavailable
+clean POST /api/v1/image status= 503 error= realesrgan_unavailable
+```
+
+After opt-in install:
+```text
+GET /api/v1/image/capabilities realesrgan.available= True model= /home/dakin/synthesus/runtime/data/models/realesrgan-x4.onnx
+GET /api/v1/voice/capabilities piper.available= True bin= /home/dakin/.local/share/synthesus/bin/piper model= /home/dakin/.local/share/synthesus/voices/en_US-lessac-low.onnx
+POST /api/v1/voice status= 200
+voice wav header= b'RIFF' bytes= 48940 channels= 1 rate= 16000 frames= 24448
+POST /api/v1/image status= 200
+image png format= PNG size= (512, 512) bytes= 251376 engine= synthesus_vsa_geometric+plan_composite enhance= realesrgan
+```
+
+### Branch
+`feat/model-fetchers` — do not merge without Claude review.
