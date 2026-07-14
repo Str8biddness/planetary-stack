@@ -1,0 +1,7 @@
+# Synthesus — robots.txt
+# Allow all crawlers, full access.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://str8biddness.github.io/synthesus/sitemap.xml
