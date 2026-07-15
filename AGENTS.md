@@ -1,10 +1,10 @@
 # Synthesus Knowledge Cloud Repository
 
 ## Purpose
-This repository is the standalone public data-plane and rebuild pipeline for the Synthesus Knowledge Cloud. In the Synthesus 4.1 CHAL line, it is treated as **mounted cognitive hardware**: part ROM cloud, part parameter disk, part cache substrate, part provenance-backed rebuild plane. It is not the Synthesus runtime itself; it carries the immutable runtime artifacts, integrity manifests, source declarations, grounding corpora, pattern banks, synthetic lore generation scripts, and lightweight client tooling needed by local Synthesus installs.
+This repository is the standalone public data-plane and rebuild pipeline for the Synthesus Knowledge Cloud. In the Synthesus 5 CHAL line, it is treated as **mounted cognitive hardware**: part ROM cloud, part parameter disk, part cache substrate, part provenance-backed rebuild plane. It is not the Synthesus runtime itself; it carries the immutable runtime artifacts, integrity manifests, source declarations, grounding corpora, pattern banks, synthetic lore generation scripts, and lightweight client tooling needed by local Synthesus installs.
 
 ## Operating Rules
-- CHAL priority: expand this repo as a partitioned cognitive hardware substrate for `/home/workspace/Synthesus_4.0`, not as a passive retrieval dump.
+- CHAL priority: expand this repo as a partitioned Synthesus 5 cognitive hardware substrate for `/home/workspace/Synthesus_4.0`, not as a passive retrieval dump.
 - Flood useful public knowledge responsibly across domains: science, engineering, computing, security, law/civics summaries, history, geography, standards/specs, NPC/social simulation, hardware blueprints, and emulation. Preserve licensing and provenance; do not import redistributability-unclear archives.
 - Keep `artifacts/manifest.json` as the runtime artifact integrity source of truth.
 - Keep `manifests/source_manifest.json` current when changing source/pipeline/pattern/synthetic/support planes.
@@ -28,7 +28,7 @@ python scripts/sync_knowledge_cloud.py --dest /tmp/synthesus-kc-smoke --base-url
 ## Architecture Boundary
 The artifact repo owns the data supply chain. The Synthesus runtime repo should consume the cloud through manifest-verified sync and should not be the only place where rebuild logic/data exists.
 
-## Synthesus 4.1 CHAL Contract
+## Synthesus 5 CHAL Contract
 - Expose Knowledge Cloud content as clean partitions: ROM, parameters, cache seeds, grounding corpus, behavioral priors, hardware/emulation profiles, and validation metadata.
 - Every new source plane needs a manifest entry, provenance, rebuild route, validation path, and license/distribution note.
 - Runtime artifacts should be rebuilt by pipeline and verified, not manually edited.
