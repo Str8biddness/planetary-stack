@@ -30,5 +30,8 @@ jobs:
           make doctor PYTHON=python
           make status
 
+      - name: Hydrate Knowledge Cloud source fixtures
+        run: git lfs pull --include='knowledge/knowledge-cloud/patterns/characters/**'
+
       - name: Validate Knowledge Cloud source plane
         run: make test-knowledge-source PYTHON=python
