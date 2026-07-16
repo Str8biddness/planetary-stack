@@ -82,6 +82,34 @@ exist only to prevent a crash — they are **not** the product, and you shouldn'
 ~/.local/bin/synthesus         # or click "Synthesus" in your app menu
 ```
 
+**Optional agentic elevation:**
+
+Standard Synthesus remains unprivileged. To let development agents use audited
+`sudo` commands without repeated prompts during one desktop session, install
+the short-lived timestamp policy once:
+
+```bash
+sudo ~/.local/share/synthesus/tools/configure_agentic_elevation.sh --install "$USER"
+```
+
+Then launch the separate **Synthesus Agentic** menu entry or run:
+
+```bash
+~/.local/bin/synthesus --agentic
+```
+
+Agentic mode invalidates any old sudo ticket, asks for your password once
+before the desktop opens, validates the authorization from a separate PTY,
+refreshes it only while Synthesus is running, and revokes it on exit. It does
+not install `NOPASSWD` rules. If the launcher crashes, the ticket expires
+within one minute.
+
+To remove the cross-PTY timestamp policy:
+
+```bash
+sudo ~/.local/share/synthesus/tools/configure_agentic_elevation.sh --remove "$USER"
+```
+
 **Headless (no display / server):**
 ```bash
 SYNTHESUS_HEADLESS=1 ~/.local/bin/synthesus     # then open http://localhost:8081
@@ -121,6 +149,7 @@ with an `[AUTONOMIC REFLEX]` message, the runtime didn't answer in time — see 
 | **Very slow replies** | Underpowered CPU. Add a GPU (§8), use a smaller/faster model, or a faster backend. Not a bug. |
 | **`pygobject` / GTK build error** | Handled — the installer pins `pygobject<3.52` for Debian 12. If it still fails, `sudo apt install -y libgirepository1.0-dev gir1.2-gtk-3.0`. |
 | **Port already in use (5010/8081/8082)** | Another instance is running. `pkill -f production_server.py; pkill -f synthesus_native_shell.py` and relaunch. |
+| **Agentic launch says the policy is not configured** | Run the one-time `configure_agentic_elevation.sh --install "$USER"` command above. The policy shares a one-minute sudo timestamp across local PTYs but grants no passwordless commands. |
 | **Can't reach it from another machine** | Don't expose the ports — **SSH-tunnel** them. See [`desktop/docs/HEADLESS.md`](desktop/docs/HEADLESS.md). Port `:8082` is a real shell; never expose it. |
 | **WSL2: GUI won't open** | Expected — use **headless mode** and open `http://localhost:8081` in your Windows browser (WSL forwards localhost automatically). |
 

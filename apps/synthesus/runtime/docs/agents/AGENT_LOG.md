@@ -90,3 +90,55 @@ Keep entries chronological. Do not rewrite history; append new sessions.
 1. Review and merge Knowledge Cloud draft PR `#1`, synchronize its artifacts to `zo.pub`, and validate the public mirror.
 2. Rerun `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --require-clean-worktree --candidate-tag synthesus5-rc1 --fail-on-blocker` against the merged and mirrored bundle before tagging.
 3. No release tag or destructive artifact cleanup was performed in this session.
+
+## Current Session — 2026-07-16 (Agentic Desktop Elevation)
+
+### 📝 Summary
+- Added separate standard and agentic desktop launch modes through
+  `launch.sh`; standard mode remains an ordinary user session.
+- Added an explicit one-time setup policy that changes only sudo timestamp
+  sharing for the selected account: `timestamp_type=global` with a one-minute
+  timeout. It grants no new `NOPASSWD` command.
+- Agentic launch now invalidates inherited tickets, asks for the account
+  password once, proves the ticket from a separate PTY, refreshes it every
+  30 seconds only while the desktop lives, and revokes it on exit.
+- Added graphical Zenity askpass support, installer/menu integration, a
+  separate `Synthesus Agentic` desktop entry, and terminal health visibility.
+- Preserved the terminal's localhost-only user-shell architecture; the
+  terminal server itself is not converted into a root network service.
+- Advanced the Synthesus 5 Phase 10 hardening item for explicit,
+  session-scoped local development elevation.
+
+### ✅ Verified
+- `bash -n launch.sh install.sh tools/sudo_askpass.sh tools/configure_agentic_elevation.sh`
+- `python -m py_compile desktop/terminal_server.py`
+- Rendered sudo policy parsed successfully with `visudo`; the full
+  `/etc/sudoers` configuration parsed successfully after local installation.
+- `sudo -n -l` reports `timestamp_type=global, timestamp_timeout=1` and no new
+  Synthesus `NOPASSWD` rule.
+- Live terminal health reports
+  `agentic_elevation=true` and
+  `terminal_root=/home/dakin/planetary-stack`.
+- A fresh real WebSocket PTY returned
+  `PWD=/home/dakin/planetary-stack` and `sudo -n id -u` returned `0` without a
+  second password prompt.
+- Live Synthesus 5 health remained online with the cognitive engine, ML swarm,
+  RAG layer, and Ollama reachable.
+
+### 🚧 Left Off / Next Steps
+- The local Agentic session is intentionally active; closing Synthesus should
+  revoke its ticket, while a hard crash leaves at most the one-minute timeout.
+- Before exposing desktop services beyond loopback, add authenticated IPC or
+  an authenticated reverse proxy. Never expose the terminal WebSocket while an
+  agentic ticket is active.
+- Continue the existing release queue: merge and mirror the repaired
+  Knowledge Cloud bundle before tagging Synthesus 5 RC1.
+
+### 💡 Architectural Notes
+- Passwordless repetition is implemented through a short audited sudo
+  timestamp, not by running the WebSocket shell as root and not by authorizing
+  blanket passwordless commands.
+- While Agentic mode is active, any process already running as the same local
+  user may potentially reuse the global sudo ticket. This is an explicit,
+  documented trusted-workstation tradeoff and is why the mode is opt-in,
+  loopback-only, short-lived, and revoked on exit.

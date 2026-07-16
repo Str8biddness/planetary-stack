@@ -198,6 +198,8 @@ Legend:
 
 - [x]  Add full focused test suite for Synthesus 5 path. Session log: 2026-05-31 Agent 1 focused release suite; 2026-07-15 launch/full-suite hardening restored legacy import compatibility, isolated async execution and ASGI tests from restricted-sandbox cross-thread wakeups, made production background-task shutdown explicit, removed order-dependent semantic matcher state, and completed the full runtime suite with 1705 passed, 49 skipped, and 3 expected failures.
 
+- [x] Add explicit session-scoped agentic elevation for the local development desktop. Session log: 2026-07-16 Agentic Desktop Elevation added separate standard/agentic launch modes, one-time prelaunch authentication, cross-PTY sudo validation, a 30-second keepalive with one-minute crash expiry, exit-time revocation, installer/menu integration, and live WebSocket PTY proof without adding a Synthesus `NOPASSWD` rule.
+
 - [x]  Add smoke command that runs an end-to-end Synthesus 5 conversation. Session log: 2026-05-31 Agent 1 CHAL API smoke command.
 
 - [x]  Add performance baseline and regression guard. Session log: 2026-05-31 Agent 3 Phase 8 latency regression guard.

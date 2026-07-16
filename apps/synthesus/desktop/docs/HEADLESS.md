@@ -8,6 +8,7 @@ opened for you.
 |---|---|---|
 | **Graphical** (default) | `synthesus` | A machine with a display — opens the frameless desktop window. |
 | **Headless** | `SYNTHESUS_HEADLESS=1 synthesus` | A server / homelab box with no display (or no GTK/WebKit). No window — you open it in a browser. |
+| **Agentic elevation** | `synthesus --agentic` | Explicit local development mode; asks once before launch and revokes sudo authorization on exit. |
 
 If pywebview has no display backend, Synthesus **falls back to headless automatically** and prints the URL.
 
@@ -65,6 +66,10 @@ public IP without a proper authenticating reverse proxy. Here's why, specificall
   over a WebSocket. Bound to localhost it's fine; reachable from a network it is an
   **unauthenticated remote shell** — anyone who can reach the port gets a terminal on
   your machine. Internet-facing, it will be found by automated scanners and abused.
+- Agentic elevation intentionally makes the current user's short sudo timestamp
+  available to all local PTYs while that desktop session is active. Any process
+  already running as that user can potentially use the same ticket. Enable it only
+  on a trusted workstation, and never combine it with network-exposed Synthesus ports.
 - `:8081` (UI + proxied APIs) and `:5010` (the runtime) are also built for a trusted
   local environment, not the open network.
 

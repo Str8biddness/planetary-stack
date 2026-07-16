@@ -259,6 +259,7 @@ async def resize(req: ResizeReq):
 async def health():
     return {
         "ok": True,
+        "agentic_elevation": os.environ.get("SYNTHESUS_AGENTIC_ELEVATION") == "1",
         "terminal_root": str(terminal_root()),
         "sessions": list(SESSIONS.keys()),
     }
