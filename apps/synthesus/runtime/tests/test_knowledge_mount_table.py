@@ -1,0 +1,590 @@
+from __future__ import annotations
+
+import hashlib
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "packages"))
+
+interfaces_path = ROOT / "packages" / "core" / "chal" / "interfaces.py"
+spec = importlib.util.spec_from_file_location("_test_chal_interfaces", interfaces_path)
+assert spec is not None and spec.loader is not None
+interfaces = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = interfaces
+spec.loader.exec_module(interfaces)
+Checkpoint = interfaces.Checkpoint
+CognitiveTask = interfaces.CognitiveTask
+ExecutionPlan = interfaces.ExecutionPlan
+ModuleMessage = interfaces.ModuleMessage
+TelemetryRecord = interfaces.TelemetryRecord
+from knowledge.kal_adapter import CHALMemoryController
+from knowledge.mount_table import COLD_START_REQUIRED_MOUNTS, KnowledgeCloudMountTable, MountType
+
+
+def _write_artifact(root: Path, relative_path: str, content: bytes) -> dict:
+    path = root / relative_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
+    return {
+        "path": relative_path,
+        "size": len(content),
+        "sha256": hashlib.sha256(content).hexdigest(),
+    }
+
+
+def _record_existing_artifact(root: Path, relative_path: str) -> dict:
+    path = root / relative_path
+    content = path.read_bytes()
+    return {
+        "path": relative_path,
+        "size": len(content),
+        "sha256": hashlib.sha256(content).hexdigest(),
+    }
+
+
+def _write_manifest(
+    root: Path,
+    artifacts: list[dict],
+    *,
+    profile_embedder_dim: int | None = None,
+    source_manifest: dict | None = None,
+) -> None:
+    manifest = {
+        "version": "1",
+        "generated_at": "2026-05-28T00:00:00+00:00",
+        "artifacts": artifacts,
+    }
+    if profile_embedder_dim is not None or source_manifest is not None:
+        manifest["build"] = {
+            "profile": "test-profile",
+        }
+        if profile_embedder_dim is not None:
+            manifest["build"]["extra"] = {"embed_dim": profile_embedder_dim}
+        if source_manifest is not None:
+            manifest["build"]["source_manifest"] = source_manifest
+    (root / "manifest.json").write_text(
+        json.dumps(manifest),
+        encoding="utf-8",
+    )
+
+
+def _source_manifest_fingerprint() -> dict:
+    return {
+        "path": "manifests/source_manifest.json",
+        "sha256": "a" * 64,
+        "size": 1234,
+        "kind": "synthesus-knowledge-source-plane",
+        "generated_at": "2026-06-06T00:00:00+00:00",
+        "roots": ["sources", "pipelines", "patterns"],
+        "artifact_count": 42,
+    }
+
+
+def _write_required_bundle_with_retrieval_semantics(
+    root: Path,
+    *,
+    faiss_dim: int = 3,
+    embedder_dim: int = 3,
+    metadata_records: int = 2,
+    profile_embedder_dim: int | None = 3,
+) -> None:
+    import faiss
+    import joblib
+
+    artifacts = [
+        _write_artifact(root, "knowledge_cloud/world_lore.json", b'{"lore": []}\n'),
+        _write_artifact(root, "knowledge_cloud/transitions.json", b'{"edges": []}\n'),
+        _write_artifact(root, "knowledge_cloud/chaining_patterns.json", b'{"patterns": []}\n'),
+        _write_artifact(root, "knowledge_cloud/learned_transitions.json", b'{"learned_transitions": {}}\n'),
+        _write_artifact(root, "knowledge.kndb", b"kndb-bytes"),
+        _write_artifact(root, "knowledge.kndb.meta.db", b"metadata-bytes"),
+        _write_artifact(root, "knowledge.meta.db", b"knowledge-metadata-bytes"),
+    ]
+
+    model_path = root / "models" / "swarm_embedder.pkl"
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump({"dim": embedder_dim}, model_path)
+
+    index = faiss.IndexFlatIP(faiss_dim)
+    vectors = np.zeros((metadata_records, faiss_dim), dtype=np.float32)
+    if metadata_records:
+        vectors[:, 0] = 1.0
+        index.add(vectors)
+    faiss.write_index(index, str(root / "faiss.index"))
+
+    (root / "faiss_metadata.json").write_text(
+        json.dumps([{"id": f"node-{idx}"} for idx in range(metadata_records)]),
+        encoding="utf-8",
+    )
+
+    artifacts.extend(
+        [
+            _record_existing_artifact(root, "models/swarm_embedder.pkl"),
+            _record_existing_artifact(root, "faiss.index"),
+            _record_existing_artifact(root, "faiss_metadata.json"),
+        ]
+    )
+    _write_manifest(root, artifacts, profile_embedder_dim=profile_embedder_dim)
+
+
+def test_mount_table_boots_manifest_artifacts_as_chal_mounts(tmp_path: Path):
+    artifacts = [
+        _write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n'),
+        _write_artifact(tmp_path, "faiss.index", b"index-bytes"),
+        _write_artifact(tmp_path, "faiss_metadata.json", b'{"sources": []}\n'),
+    ]
+    _write_manifest(tmp_path, artifacts)
+
+    report = KnowledgeCloudMountTable().boot(tmp_path, strict=True)
+    mounts = {mount.mount_path: mount for mount in report.mounts}
+
+    assert report.ok is True
+    assert mounts["/mnt/rom/world_lore"].mount_type == MountType.ROM
+    assert mounts["/mnt/corpus/faiss"].mount_type == MountType.GROUNDING_CORPUS
+    assert mounts["/mnt/provenance/faiss_metadata"].mount_type == MountType.SOURCE_PROVENANCE
+    assert mounts["/mnt/rom/world_lore"].partition.metadata["integrity_ok"] is True
+    assert mounts["/mnt/cache/hot_context"].mount_type == MountType.CACHE_SEED
+    assert mounts["/mnt/mem/writeback"].mount_type == MountType.WRITEBACK_MEMORY
+    assert mounts["/mnt/cache/hot_context"].partition.metadata["artifact_backed"] is False
+    assert mounts["/mnt/mem/writeback"].partition.is_read_only is False
+    assert report.coverage is not None
+    assert report.coverage.complete is False
+    assert "knowledge_cloud/evolution.json" in report.coverage.missing_artifacts
+    assert "/mnt/rom/evolution" in report.missing_known_mount_paths
+
+
+def test_mount_table_reports_complete_known_manifest_coverage(tmp_path: Path):
+    artifacts = [
+        _write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n'),
+        _write_artifact(tmp_path, "knowledge_cloud/evolution.json", b'{"evolution": []}\n'),
+        _write_artifact(tmp_path, "knowledge_cloud/transitions.json", b'{"edges": []}\n'),
+        _write_artifact(tmp_path, "knowledge_cloud/chaining_patterns.json", b'{"patterns": []}\n'),
+        _write_artifact(tmp_path, "knowledge_cloud/learned_transitions.json", b'{"learned_transitions": {}}\n'),
+        _write_artifact(tmp_path, "models/swarm_embedder.pkl", b"model-bytes"),
+        _write_artifact(tmp_path, "faiss.index", b"index-bytes"),
+        _write_artifact(tmp_path, "faiss_metadata.json", b'{"sources": []}\n'),
+        _write_artifact(tmp_path, "knowledge.kndb", b"kndb-bytes"),
+        _write_artifact(tmp_path, "knowledge.kndb.meta.db", b"metadata-bytes"),
+        _write_artifact(tmp_path, "knowledge.meta.db", b"knowledge-metadata-bytes"),
+    ]
+    _write_manifest(tmp_path, artifacts)
+
+    report = KnowledgeCloudMountTable().boot(tmp_path, strict=True)
+
+    assert report.coverage is not None
+    assert report.coverage.complete is True
+    assert report.coverage.missing_artifacts == ()
+    assert report.missing_known_mount_paths == ()
+    assert report.coverage.as_metadata()["coverage_complete"] is True
+
+
+def test_legacy_chal_interface_frames_carry_trace_and_budget_metadata():
+    task = CognitiveTask(
+        task_id="task-1",
+        domain="knowledge",
+        budget_ms=25,
+        deadline=1000.0,
+        payload={"query": "ground this"},
+    )
+    plan = ExecutionPlan(plan_id="plan-1", tasks=[task], fallback_strategy="degrade")
+    message = ModuleMessage(
+        message_id="msg-1",
+        sender="chal://knowledge/controller",
+        receiver="chal://cgpu/render",
+        payload={"evidence": []},
+        trace_id=task.trace_id,
+        timestamp=1000.0,
+        budgets=task.budgets,
+    )
+    checkpoint = Checkpoint(
+        checkpoint_id="ckpt-1",
+        trace_id=task.trace_id,
+        fluid_state_hash="state-hash",
+        active_mounts=["/mnt/rom/world_lore"],
+        timestamp=1000.0,
+        budgets=task.budgets,
+    )
+    telemetry = TelemetryRecord(
+        operation_id="kc_lookup",
+        latency_ms=1.0,
+        cache_hit=False,
+        confidence=0.8,
+        source="rom",
+        trace_id=task.trace_id,
+        budgets=task.budgets,
+    )
+
+    assert task.trace_id.startswith("task-")
+    assert task.budgets["latency_ms"] == 25.0
+    assert plan.trace_id.startswith("plan-")
+    assert plan.budgets["latency_ms"] == 25.0
+    assert plan.budgets["task_count"] == 1.0
+    assert message.trace_id == task.trace_id
+    assert message.budgets == task.budgets
+    assert checkpoint.trace_id == task.trace_id
+    assert checkpoint.budgets == task.budgets
+    assert telemetry.trace_id == task.trace_id
+    assert telemetry.budgets["latency_ms"] == 25.0
+
+
+def test_mount_table_deactivates_failed_integrity_without_strict_mode(tmp_path: Path):
+    item = _write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n')
+    item["sha256"] = "0" * 64
+    _write_manifest(tmp_path, [item])
+
+    report = KnowledgeCloudMountTable().boot(tmp_path)
+    mount = report.mounts[0]
+
+    assert report.ok is False
+    assert mount.is_active is False
+    assert mount.trust_level == 0.0
+    assert mount.partition.metadata["sha256_ok"] is False
+
+
+def test_mount_table_strict_mode_rejects_failed_integrity(tmp_path: Path):
+    item = _write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n')
+    item["size"] = 999
+    _write_manifest(tmp_path, [item])
+
+    with pytest.raises(ValueError):
+        KnowledgeCloudMountTable().boot(tmp_path, strict=True)
+
+
+def test_mount_table_strict_mode_rejects_duplicate_mounted_artifacts(tmp_path: Path):
+    item = _write_artifact(tmp_path, "faiss.index", b"index-bytes")
+    duplicate = dict(item)
+    _write_manifest(tmp_path, [item, duplicate])
+
+    with pytest.raises(
+        ValueError,
+        match="Duplicate Knowledge Cloud artifact mount entry: faiss.index",
+    ):
+        KnowledgeCloudMountTable().boot(tmp_path, strict=True)
+
+
+def test_mount_table_ignores_duplicate_mounted_artifacts_without_strict_mode(tmp_path: Path):
+    item = _write_artifact(tmp_path, "faiss.index", b"index-bytes")
+    duplicate = dict(item)
+    duplicate["sha256"] = "0" * 64
+    _write_manifest(tmp_path, [item, duplicate])
+
+    report = KnowledgeCloudMountTable().boot(tmp_path, strict=False)
+    faiss_mounts = [
+        mount for mount in report.mounts if mount.mount_path == "/mnt/corpus/faiss"
+    ]
+
+    assert report.ok is True
+    assert len(faiss_mounts) == 1
+    assert faiss_mounts[0].is_active is True
+    assert faiss_mounts[0].partition.metadata["actual_sha256"] == item["sha256"]
+
+
+def test_mount_table_validates_cold_start_required_mounts(tmp_path: Path):
+    artifacts = [
+        _write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n'),
+        _write_artifact(tmp_path, "knowledge_cloud/transitions.json", b'{"edges": []}\n'),
+        _write_artifact(tmp_path, "knowledge_cloud/chaining_patterns.json", b'{"patterns": []}\n'),
+        _write_artifact(tmp_path, "knowledge_cloud/learned_transitions.json", b'{"learned_transitions": {}}\n'),
+        _write_artifact(tmp_path, "models/swarm_embedder.pkl", b"model-bytes"),
+        _write_artifact(tmp_path, "faiss.index", b"index-bytes"),
+        _write_artifact(tmp_path, "faiss_metadata.json", b'{"sources": []}\n'),
+        _write_artifact(tmp_path, "knowledge.kndb", b"kndb-bytes"),
+        _write_artifact(tmp_path, "knowledge.kndb.meta.db", b"metadata-bytes"),
+        _write_artifact(tmp_path, "knowledge.meta.db", b"knowledge-metadata-bytes"),
+    ]
+    _write_manifest(tmp_path, artifacts)
+
+    report = KnowledgeCloudMountTable().validate_cold_start_bundle(tmp_path)
+    mounts = {mount.mount_path: mount for mount in report.mounts}
+
+    assert report.ok is True
+    assert report.missing_active_mounts(COLD_START_REQUIRED_MOUNTS) == ()
+    assert mounts["/mnt/params/learned_transitions"].mount_type == MountType.PARAMETER_DISK
+    assert mounts["/mnt/provenance/knowledge_metadata"].mount_type == MountType.SOURCE_PROVENANCE
+    assert mounts["/mnt/params/learned_transitions"].partition.metadata["relative_path"] == "knowledge_cloud/learned_transitions.json"
+    assert mounts["/mnt/provenance/knowledge_metadata"].partition.metadata["relative_path"] == "knowledge.meta.db"
+    assert mounts["/mnt/cache/hot_context"].partition.metadata["volatile"] is True
+    assert mounts["/mnt/mem/writeback"].partition.metadata["volatile"] is True
+
+
+def test_mount_table_cold_start_rejects_missing_required_mount(tmp_path: Path):
+    artifacts = [
+        _write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n'),
+        _write_artifact(tmp_path, "knowledge_cloud/transitions.json", b'{"edges": []}\n'),
+    ]
+    _write_manifest(tmp_path, artifacts)
+
+    with pytest.raises(ValueError, match="/mnt/params/chaining_patterns"):
+        KnowledgeCloudMountTable().validate_cold_start_bundle(tmp_path)
+
+
+def test_mount_table_validates_retrieval_semantic_integrity(tmp_path: Path):
+    _write_required_bundle_with_retrieval_semantics(tmp_path)
+
+    report = KnowledgeCloudMountTable().validate_cold_start_bundle(
+        tmp_path,
+        validate_retrieval_semantics=True,
+    )
+
+    assert report.ok is True
+    assert report.retrieval_semantics is not None
+    assert report.retrieval_semantics.faiss_vectors == 2
+    assert report.retrieval_semantics.metadata_records == 2
+    assert report.retrieval_semantics.faiss_dim == 3
+    assert report.retrieval_semantics.embedder_dim == 3
+    assert report.retrieval_semantics.profile_embedder_dim == 3
+    assert report.retrieval_semantics.as_metadata()["profile_embedder_dim"] == 3
+    assert report.retrieval_semantics.errors == ()
+    assert report.coverage is not None
+    assert "/mnt/rom/evolution" in report.coverage.missing_mount_paths
+
+
+def test_mount_table_rejects_retrieval_semantic_dimension_mismatch(tmp_path: Path):
+    _write_required_bundle_with_retrieval_semantics(
+        tmp_path,
+        faiss_dim=3,
+        embedder_dim=2,
+    )
+
+    with pytest.raises(ValueError, match="FAISS/embedder dim mismatch: faiss=3, embedder=2"):
+        KnowledgeCloudMountTable().validate_cold_start_bundle(
+            tmp_path,
+            validate_retrieval_semantics=True,
+        )
+
+
+def test_mount_table_rejects_retrieval_semantic_profile_dimension_mismatch(tmp_path: Path):
+    _write_required_bundle_with_retrieval_semantics(
+        tmp_path,
+        faiss_dim=3,
+        embedder_dim=3,
+        profile_embedder_dim=2,
+    )
+
+    with pytest.raises(ValueError, match="FAISS/profile dim mismatch: faiss=3, profile=2"):
+        KnowledgeCloudMountTable().validate_cold_start_bundle(
+            tmp_path,
+            validate_retrieval_semantics=True,
+        )
+
+
+def test_mount_table_requires_source_manifest_provenance_when_validating_cold_start(
+    tmp_path: Path,
+):
+    _write_required_bundle_with_retrieval_semantics(tmp_path)
+
+    with pytest.raises(
+        ValueError,
+        match="manifest build.source_manifest fingerprint is missing",
+    ):
+        KnowledgeCloudMountTable().validate_cold_start_bundle(
+            tmp_path,
+            validate_source_manifest_provenance=True,
+        )
+
+
+def test_mount_table_validates_source_manifest_provenance_fingerprint(tmp_path: Path):
+    _write_required_bundle_with_retrieval_semantics(tmp_path)
+    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    manifest.setdefault("build", {})["source_manifest"] = _source_manifest_fingerprint()
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    report = KnowledgeCloudMountTable().validate_cold_start_bundle(
+        tmp_path,
+        validate_retrieval_semantics=True,
+        validate_source_manifest_provenance=True,
+    )
+
+    assert report.ok is True
+    assert report.source_manifest_provenance is not None
+    assert report.source_manifest_provenance.path == "manifests/source_manifest.json"
+    assert report.source_manifest_provenance.artifact_count == 42
+    assert report.source_manifest_provenance.as_metadata()["source_manifest_provenance_ok"] is True
+
+
+def test_mount_table_propagates_source_manifest_provenance_to_mount_metadata(
+    tmp_path: Path,
+):
+    artifacts = [
+        _write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n'),
+        _write_artifact(tmp_path, "faiss_metadata.json", b'{"sources": []}\n'),
+    ]
+    _write_manifest(
+        tmp_path,
+        artifacts,
+        source_manifest=_source_manifest_fingerprint(),
+    )
+
+    report = KnowledgeCloudMountTable().boot(tmp_path, strict=True)
+    mounts = {mount.mount_path: mount for mount in report.mounts}
+    world_lore = mounts["/mnt/rom/world_lore"].partition.metadata
+    faiss_metadata = mounts["/mnt/provenance/faiss_metadata"].partition.metadata
+
+    assert world_lore["source_manifest_provenance"]["path"] == "manifests/source_manifest.json"
+    assert world_lore["source_manifest_provenance"]["sha256"] == "a" * 64
+    assert world_lore["source_manifest_provenance"]["source_manifest_provenance_ok"] is True
+    assert faiss_metadata["source_manifest_provenance"] == world_lore["source_manifest_provenance"]
+
+
+def test_mount_table_does_not_trust_invalid_source_manifest_metadata(
+    tmp_path: Path,
+):
+    artifacts = [
+        _write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n'),
+    ]
+    source_manifest = _source_manifest_fingerprint()
+    source_manifest["sha256"] = "not-a-sha"
+    _write_manifest(
+        tmp_path,
+        artifacts,
+        source_manifest=source_manifest,
+    )
+
+    report = KnowledgeCloudMountTable().boot(tmp_path, strict=True)
+    mounts = {mount.mount_path: mount for mount in report.mounts}
+    metadata = mounts["/mnt/rom/world_lore"].partition.metadata
+
+    assert "source_manifest_provenance" not in metadata
+    assert metadata["source_manifest_provenance_ok"] is False
+    assert metadata["source_manifest_provenance_errors"] == [
+        "manifest build.source_manifest.sha256 must be a 64-character hex digest"
+    ]
+
+
+def test_mount_table_reports_retrieval_and_source_manifest_blockers_together(
+    tmp_path: Path,
+):
+    _write_required_bundle_with_retrieval_semantics(
+        tmp_path,
+        faiss_dim=3,
+        embedder_dim=2,
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        KnowledgeCloudMountTable().validate_cold_start_bundle(
+            tmp_path,
+            validate_retrieval_semantics=True,
+            validate_source_manifest_provenance=True,
+        )
+
+    message = str(exc_info.value)
+    assert "FAISS/embedder dim mismatch: faiss=3, embedder=2" in message
+    assert "manifest build.source_manifest fingerprint is missing" in message
+
+
+def test_kal_controller_boots_from_manifest_before_default_mounts(tmp_path: Path):
+    artifacts = [
+        _write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n'),
+        _write_artifact(tmp_path, "models/swarm_embedder.pkl", b"model-bytes"),
+    ]
+    _write_manifest(tmp_path, artifacts)
+
+    controller = CHALMemoryController(knowledge_root=tmp_path, strict_mount_integrity=True)
+    report = controller.get_mount_boot_report()
+    mounts = {mount.mount_path: mount for mount in controller.get_mounts()}
+
+    assert report is not None
+    assert report.ok is True
+    assert "/mnt/rom/world_lore" in mounts
+    assert "/mnt/params/swarm_embedder" in mounts
+    assert "/mnt/cache/hot_context" in mounts
+    assert "/mnt/mem/writeback" in mounts
+    assert "/mnt/rom/lore" not in mounts
+
+
+def test_kal_hot_context_serves_repeated_mounted_queries(tmp_path: Path):
+    _write_manifest(
+        tmp_path,
+        [_write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n')],
+        source_manifest=_source_manifest_fingerprint(),
+    )
+
+    class FakeKnowledgeCloud:
+        def __init__(self):
+            self.calls = 0
+
+        def lookup(self, text: str, trust: float):
+            self.calls += 1
+            return {
+                "response": f"grounded:{text}:{trust:.0f}",
+                "confidence": 0.86,
+                "source": "fake-rom",
+            }
+
+    controller = CHALMemoryController(
+        knowledge_root=tmp_path,
+        strict_mount_integrity=True,
+        hot_context_limit=2,
+    )
+    fake_cloud = FakeKnowledgeCloud()
+    controller._knowledge_cloud = fake_cloud
+    controller._runtime = None
+
+    first_response, first_telemetry = controller.query(" Where is the lore? ")
+    second_response, second_telemetry = controller.query("where   is the lore?")
+    stats = controller.get_hot_context_stats()
+
+    assert first_response == second_response
+    assert fake_cloud.calls == 1
+    assert first_telemetry.operation_id == "kc_lookup"
+    assert first_telemetry.trace_id.startswith("telemetry-")
+    assert first_telemetry.budgets["latency_ms"] == 5.0
+    assert first_telemetry.cache_hit is False
+    assert first_telemetry.metadata["hot_context"] is False
+    assert first_telemetry.metadata["mounts"][0]["mount_path"] == "/mnt/rom/world_lore"
+    assert first_telemetry.metadata["mounts"][0]["artifact"]["relative_path"] == "knowledge_cloud/world_lore.json"
+    assert first_telemetry.metadata["mounts"][0]["artifact"]["integrity_ok"] is True
+    assert (
+        first_telemetry.metadata["mounts"][0]["artifact"]["source_manifest_provenance"]["path"]
+        == "manifests/source_manifest.json"
+    )
+    assert second_telemetry.operation_id == "hot_context_hit"
+    assert second_telemetry.trace_id.startswith("telemetry-")
+    assert second_telemetry.budgets["latency_ms"] == 5.0
+    assert second_telemetry.cache_hit is True
+    assert second_telemetry.metadata["hot_context"] is True
+    assert (
+        second_telemetry.metadata["mounts"][0]["artifact"]["source_manifest_provenance"]["sha256"]
+        == "a" * 64
+    )
+    assert stats["entries"] == 1
+    assert stats["hits"] == 1
+    assert stats["misses"] == 1
+
+
+def test_kal_hot_context_lru_eviction(tmp_path: Path):
+    _write_manifest(
+        tmp_path,
+        [_write_artifact(tmp_path, "knowledge_cloud/world_lore.json", b'{"lore": []}\n')],
+    )
+
+    class FakeKnowledgeCloud:
+        def __init__(self):
+            self.calls: list[str] = []
+
+        def lookup(self, text: str, trust: float):
+            self.calls.append(text)
+            return {"response": text.upper(), "confidence": 0.75}
+
+    controller = CHALMemoryController(
+        knowledge_root=tmp_path,
+        strict_mount_integrity=True,
+        hot_context_limit=1,
+    )
+    fake_cloud = FakeKnowledgeCloud()
+    controller._knowledge_cloud = fake_cloud
+    controller._runtime = None
+
+    controller.query("alpha")
+    controller.query("beta")
+    _, telemetry = controller.query("alpha")
+
+    assert fake_cloud.calls == ["alpha", "beta", "alpha"]
+    assert telemetry.operation_id == "kc_lookup"
+    assert controller.get_hot_context_stats()["entries"] == 1

@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "synthesus-monorepo"
+version = "4.0.0"
+description = "Synthesus 4.0 - Sovereign Intelligence Monorepo"
+
+[tool.setuptools.packages.find]
+where = ["packages", "apps"]
+include = ["*"]

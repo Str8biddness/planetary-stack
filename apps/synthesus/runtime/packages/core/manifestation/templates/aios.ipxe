@@ -1,0 +1,26 @@
+#!ipxe
+
+# Synthesus AIOS - UEFI PXE Boot Script
+# Primary: IPv4 Cluster Spine
+# Mesh: IPv6 Knowledge Cloud
+
+echo Starting Synthesus AIOS UEFI PXE Boot...
+
+# Initialize Network
+:retry_dhcp
+dhcp || goto retry_dhcp
+
+# Set Kernel Parameters for AIVM
+# console=ttyS0: For SerialConsole (0x3F8)
+# aivm.mode=production: Force hardware isolation
+# aivm.net=pxe_ipv4: Prioritize local cluster spine
+set boot_params console=tty0 console=ttyS0,115200 aivm.mode=production aivm.net=pxe_ipv4
+
+# Load Kernel and Initrd from the Boot Server
+echo Loading AIVM Kernel (UEFI)...
+kernel http://${next-server}/boot/vmlinuz-linux ${boot_params}
+echo Loading AIVM Initramfs...
+initrd http://${next-server}/boot/initramfs-linux.img
+
+echo Booting Sovereign Intelligence Node...
+boot

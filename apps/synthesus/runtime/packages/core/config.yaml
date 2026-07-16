@@ -1,0 +1,31 @@
+# Synthesus Configuration
+
+generation:
+  decoder_mode: stochastic      # stochastic | deterministic | template+slots
+  temperature: 1.0              # 0.1 to 1.4
+  top_k: 50                     # restrict vocab to top-k
+  top_p: 1.0                    # nucleus sampling threshold
+  max_tokens: 128               # hard cap on length
+  repetition_penalty: 1.1       # discourages repeating prior tokens
+  num_candidates: 1             # parallel decodes for risk evaluation
+  backend: native               # native | openai (native is default)
+
+# Knowledge Abstraction Layer (V4)
+kal:
+  enabled: true
+  backend_type: faiss             # faiss | faiss_ivf
+  default_domains: ["general"]
+  default_top_k: 8
+  use_for_retrieval: true         # false = bypass KAL, use legacy RAGPipeline
+  cache_size: 1024                # L1 LRU cache entries for exact_match mode
+  ivf_nlist: 100                  # Voronoi cells for IVFFlat backend
+  left_hemisphere_latency_ms: 0.5
+  right_hemisphere_latency_ms: 5.0
+
+# Core Cloud Parameters (Required for Synthesus operation)
+cloud_parameters:
+  cloud_endpoint: "http://localhost:5010/parameter-cloud"   # Required: Cloud parameter endpoint
+  api_key: ""                                              # Required: API key for authentication
+  cache_duration_ms: 30000                                 # Cache duration in milliseconds (30s default)
+  update_interval_ms: 60000                                # Parameter update interval (60s default)
+  local_fallback_enabled: true                             # Enable local fallback if cloud unavailable

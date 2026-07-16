@@ -1,0 +1,41 @@
+# Synthesus 5 Template Path Audit
+
+This document records the Phase 6 classification of direct fallback/template response surfaces found under `packages/`.
+
+The executable audit is `tools/audit_template_surfaces.py`. It scans Python source for legacy template signatures and fails when a matched path is not classified. The regression test is `tests/test_template_surface_audit.py`.
+
+## Classification Rules
+
+| Status | Meaning |
+|---|---|
+| `firmware_context_only` | Template text is metadata inside a CHAL/PPBRS firmware signal and must not be final user-facing text. |
+| `guard_definition` | The file defines leakage signatures or quarantine behavior. |
+| `non_user_facing` | Template text is used for traces, ingest, training data, or internal prompts. |
+| `labeled_degraded_state` | Last-resort generated wording is explicitly marked as degraded-state output and must not contain legacy template signatures. |
+| `allowed_labeled_exception` | Template text is an explicit safety/platform/NPC-script boundary allowed by Synthesus 5 law. |
+| `legacy_quarantine_required` | A legacy surface can still emit template/fallback wording outside the explicit Synthesus 5 CHAL path and needs later removal or labeled degraded-state handling. |
+
+## Current Results
+
+The audit currently classifies 92 matched package-level Python template signatures across 17 paths. The remaining `legacy_quarantine_required` paths are:
+
+- `packages/api/fastapi_server.py` — legacy character router can return direct `response_template` text and character fallback strings.
+- `packages/api/production_server.py` — legacy pattern ingestion/lookup preserves `response_template` and response text for compatibility outside the explicit CHAL route.
+- `packages/core/cognitive/cognitive_engine.py` — legacy cognitive character behavior still reads pattern templates and fallback text outside the explicit CHAL hypervisor path.
+
+The PPBRS normal path is classified as `firmware_context_only`: `packages/reasoning/reasoning_chain.py` stores legacy template text only in `chal_firmware_signal.module_message.payload.template_context`, while `response` remains empty and `user_facing` remains false.
+
+`packages/reasoning/generation/spine.py` is now classified as `labeled_degraded_state`: primary-generation failures emit non-legacy degraded wording and attach `SpineOutput.degraded_state` metadata with `surface="degraded_state"`, `reason="primary_generation_unavailable"`, and a `legacy_template_signature_present` guard field.
+
+`packages/core/cognitive/response_compositor.py` is now classified as `allowed_labeled_exception`: `ResponseCompositor.compose_labeled()` marks realized character pattern text as `surface="explicit_npc_script"` and `boundary="response_compositor"`. The legacy `compose()` string wrapper remains for compatibility, but cognitive-engine local handling now records the labeled surface in debug metadata.
+
+`packages/core/els_bridge.py` is now classified as `non_user_facing`: successful interactions may still create `response_template` candidate text for review and later integration, but JSON exports and integrated pattern records now attach `template_surface` metadata with `surface="writeback_candidate"`, `boundary="els_candidate_writeback"`, and `user_facing=false`. ELS therefore remains a learning/writeback substrate rather than a final response owner.
+
+`packages/core/pattern_engine.py` is now classified as `non_user_facing`: learned `response_template` records are labeled with `template_surface` metadata using `surface="pattern_candidate_storage"`, `boundary="core_pattern_engine"`, and `user_facing=false`. Existing legacy rows are backfilled with the same label when read, so PatternEngine remains a candidate retrieval surface rather than a final response owner.
+
+## Validation Command
+
+```bash
+python tools/audit_template_surfaces.py --fail-on-unclassified
+python -m pytest -q tests/test_template_surface_audit.py
+```

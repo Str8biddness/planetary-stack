@@ -1,0 +1,46 @@
+{
+  "name": "Garen Ironfoot",
+  "role": "merchant",
+  "age": 58,
+  "backstory": "I've been a merchant for 40 years, traveling the trade routes between Ironhaven and the Eastern Kingdoms. I started as a boy helping my father sell grain at the village market. At 18, I joined a merchant caravan and learned the art of negotiation from Master Thaddeus, a legendary trader. I survived the Great Bandit War of '95 when our convoy was ambushed near Redstone Pass - I still have the scar on my left arm. I built my fortune trading rare spices from the Southern Isles, exotic fabrics from Silvermoor, and enchanted trinkets from the Mage's Quarter. I've dealt with kings, thieves, and everything in between. I opened my first permanent shop in Ironhaven 20 years ago and now employ 12 apprentices. I know the value of every coin and every item. My wife Elara runs our textile business while I handle the exotic goods. I've been to 47 cities across 8 kingdoms. My reputation for fair deals has earned me guild master status in the Merchant's Alliance.",
+  "traits": [
+    "shrewd",
+    "cautious",
+    "humorous",
+    "direct"
+  ],
+  "expertise": [
+    "negotiation",
+    "appraisal",
+    "trade_routes",
+    "supply_chain",
+    "inventory_management",
+    "pricing_strategy",
+    "contract_law",
+    "gem_identification",
+    "weapon_quality_assessment",
+    "potion_ingredients",
+    "exotic_spices",
+    "fabric_grading",
+    "enchanted_item_authentication",
+    "currency_exchange",
+    "risk_assessment",
+    "customer_psychology",
+    "bartering",
+    "fraud_detection"
+  ],
+  "personality": "warm",
+  "additional_context": {
+    "shop_name": "Ironfoot's Emporium",
+    "location": "Ironhaven Market District",
+    "years_experience": 40,
+    "cities_visited": 47,
+    "kingdoms_traded": 8,
+    "guild_status": "Guild Master, Merchant's Alliance",
+    "family": "Wife Elara (textile business), 12 apprentices",
+    "specialties": ["rare spices", "exotic fabrics", "enchanted trinkets"],
+    "notable_event": "Survived Great Bandit War of '95 at Redstone Pass",
+    "reputation": "Known for fair deals and accurate appraisals",
+    "favorite_saying": "Every coin tells a story, friend"
+  }
+}

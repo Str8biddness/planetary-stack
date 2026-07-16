@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+"""Unit smoke for SI formant larynx (no ASR dependency)."""
+from __future__ import annotations
+
+import os
+import sys
+import tempfile
+
+import numpy as np
+from scipy.io import wavfile
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from formant_g2p import text_to_phonemes, word_to_phonemes
+from formant_engine import spectral_formant_summary, phones_to_audio
+from larynx_vocalizer import LarynxVocalizer, _self_check_imports
+
+
+def test_g2p_hello_world():
+    assert word_to_phonemes("hello") == ["HH", "EH", "L", "OW"]
+    assert "W" in word_to_phonemes("world")
+    parts = text_to_phonemes("hello world")
+    assert len(parts) == 2
+
+
+def test_formant_not_tone():
+    x = phones_to_audio(["HH", "EH", "L", "OW"], fs=16000, f0_base=150, dur_scale=1.2, seed=25)
+    spec = spectral_formant_summary(x, 16000)
+    assert spec["peak_mean_ratio"] < 80
+    assert spec["band_energy"]["F1_200_900"] > 0
+
+
+def test_larynx_int16_and_accent_wired():
+    _self_check_imports()
+    lar = LarynxVocalizer(sample_rate=16000)
+    # accent keys must affect prosody (not dead)
+    assert "wide_vowels" in lar.accent_profile
+    assert "legato_bias" in lar.accent_profile
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "out.wav")
+        lar.speak("hello world", path)
+        sr, data = wavfile.read(path)
+        assert sr == 16000
+        assert data.dtype == np.int16
+        assert len(data) > sr // 4
+        audio = data.astype(np.float64) / 32768.0
+        spec = spectral_formant_summary(audio, sr)
+        assert spec["peak_mean_ratio"] < 80
+        assert lar.last_meta.get("engine") == "si_formant_klatt"
+        assert lar.last_meta.get("not_neural_tts") is True
+
+
+def test_empty_raises_loud():
+    lar = LarynxVocalizer(16000)
+    a = lar.synthesize("hello")
+    assert a.std() > 0.01
+
+
+def test_utterance_plan_and_multipass():
+    import formant_session as usess
+    from formant_plan import compile_utterance_plan, apply_pass_knobs, classify_speech_pass
+
+    usess.clear_sessions(disk=True)
+    plan = compile_utterance_plan("hello world", use_llm=False)
+    assert plan["not_neural_tts"] is True
+    assert len(plan["words"]) == 2
+    assert plan["words"][0]["phones"][0] == "HH"
+
+    kn = classify_speech_pass("say it slower and higher")
+    assert kn and kn.get("slower") and kn.get("higher")
+    p2 = apply_pass_knobs(plan, kn)
+    assert p2["rate"] < plan["rate"]
+    assert p2["f0_base_hz"] > plan["f0_base_hz"]
+
+    lar = LarynxVocalizer(16000)
+    a = lar.synthesize("hello world", seed=25, use_llm=False, keep_session=True)
+    assert a.std() > 0.01
+    uid = lar.last_utterance_id
+    assert uid
+    r = lar.apply_pass(uid, {"slower": True, "rising_final": True})
+    assert r["audio"].std() > 0.01
+    assert r["meta"].get("utterance_id") == uid
+    # disk reload
+    with usess._LOCK:
+        usess._SESSIONS.clear()
+    assert usess.get_session(uid) is not None
+
+
+if __name__ == "__main__":
+    test_g2p_hello_world()
+    test_formant_not_tone()
+    test_larynx_int16_and_accent_wired()
+    test_empty_raises_loud()
+    test_utterance_plan_and_multipass()
+    print("test_formant_larynx: OK")

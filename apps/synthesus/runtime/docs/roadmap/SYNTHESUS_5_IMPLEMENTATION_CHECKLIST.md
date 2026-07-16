@@ -1,0 +1,217 @@
+# Synthesus 5 Implementation Checklist
+
+This is the live implementation ledger for the Synthesus 5 CHAL blueprint. Every agent session must update this file before ending.
+
+Rules:
+
+- Mark an item only when source/docs/tests validate the work.
+- Add the commit hash or session log reference when possible.
+- Do not mark aspirational architecture as complete unless there is runnable implementation, a test, or a durable artifact.
+- If a session cannot complete an item, add a blocker note under the relevant phase.
+
+Legend:
+
+- `[ ]` not started
+- `[~]` in progress
+- `[x]` implemented and validated
+
+## Phase 0: Freeze The Target Contract
+
+- [x]  Create Synthesus 5 CHAL blueprint with architecture, diagrams, terminology, and start-to-finish implementation plan.
+
+- [x]  Promote Synthesus 5 as the README-level active target.
+
+- [x]  Add root `file AGENTS.md` so agent bootstrapping starts from Synthesus 5 law.
+
+- [x]  Update agent operating contract to make the blueprint non-negotiable.
+
+- [x]  Update handover protocol so every session reads the blueprint and checklist first.
+
+- [x]  Create this implementation checklist as the cross-agent progress ledger. Session log: 2026-06-03 Weekly Heavy Maintenance normalized malformed blank/escaped checklist markers after drift scan.
+
+- [x]  Validate 5-axis Geometric Prediction logic (C++ Kernel Engine). Session log: 2026-06-14 Ported MD5-based deterministic hashing and resonance logic to C++ kernel; verified with unit tests; exposed via pybind11.
+
+- [x]  Implement Automated Multi-Category Live Ingestion & Categorical Sharding. Session log: 2026-06-14 Added `LiveIngestor` (News, Weather, Stocks, Sports, Technical/arXiv, Regulatory, Crypto, GitHub) and refactored refinery to produce isolated `.kn` shards for the Distributed Knowledge Cloud.
+
+- [x]  Ensure all scheduled automations are retargeted from Synthesus 4.1 to Synthesus 5 and restricted to Codex-class or Google/Gemini CLI/CML models.
+
+- [x]  Commit and push Phase 0 control-plane files to GitHub.
+
+## Phase 1: CHAL Frame Contract
+
+
+- [x]  Define reusable CHAL task, plan, module message, checkpoint, telemetry, and firmware signal objects. Session log: 2026-05-30 Agent 6 PPBRS CHAL serialization.
+
+- [x]  Consolidate CHAL frame definitions into a stable package boundary shared by `packages/core`, `packages/reasoning`, and `packages/knowledge`. Session log: 2026-05-31 Agent 4 canonical `core.chal.frames` boundary.
+
+- [x]  Add serialization/deserialization tests for CHAL frames. Session log: 2026-05-30 Agent 6 PPBRS CHAL serialization.
+
+- [x]  Add trace IDs and budget fields to every CHAL frame. Session log: 2026-05-31 Agent 6 CHAL interface trace/budget metadata.
+
+- [x]  Document CHAL frame schemas in `docs/modules/`. Session log: 2026-05-30 Agent 6 documented the PPBRS firmware-signal frame schema and round-trip validation; 2026-05-31 Agent 4 moved firmware frames to the shared `core.chal.frames` package boundary; 2026-05-31 Agent 6 documented the remaining core/KAL interface trace and budget metadata.
+
+## Phase 2: Cognitive Hypervisor MVP
+
+- [x]  Implement `CognitiveHypervisor` as the central scheduler/control layer.
+
+- [x]  Add route modes: fast path, grounded path, deep reasoning path, Quad Brain path, safety path.
+
+- [x]  Add budget control for latency, retrieval depth, candidate count, and critic passes. Session log: 2026-06-06 Agent 4 exposed reranker retrieval-budget truncation and verifier revision-budget exhaustion as CHAL telemetry without granting either device final-language ownership.
+
+- [x]  Add per-device isolation and timeout handling. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation.
+
+- [x]  Emit trace records for route decisions and budget exhaustion. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation; 2026-06-05 Agent 4 added CHAL verifier/reranker telemetry so route traces expose grounded-context selection, verifier status, and critic-budget revision pressure; 2026-06-06 Agent 4 added explicit reranker and verifier budget records for retrieval-depth truncation and exhausted critic revision budgets; 2026-06-11 Agent 4 added verifier revision route hints so exhausted critic-budget pressure names a bounded follow-up route without giving verifier/reranker devices final-language ownership; 2026-06-12 Agent 4 added bounded `reasoning_revision` trace consumption so active-budget verifier pressure routes through CGPU/critic revision and re-verification while exhausted-budget routes remain scheduler hints; 2026-06-13 Agent 4 added `reasoning_revision_audit` telemetry so active CGPU/critic revisions preserve the initial verifier pressure, final verifier pass, budgets, and scheduler-only route hint after re-verification.
+
+- [x]  Add focused tests for route selection and timeout degradation. Session log: 2026-05-27 Agent 8 AIVM hypervisor isolation.
+
+## Phase 3: Quad Brain MVP
+
+- [x]  Implement Brain 1: Knowledge / Grounding as a CHAL device consumer. Session log: 2026-05-28 Agent 7 Quad Brain arbiter added `chal://knowledge/grounding` output frames inside serialized arbitration; 2026-05-31 Agent 7 added per-role Quad Brain state transitions that expose Knowledge/Grounding inputs and outputs in trace metadata.
+
+- [x]  Implement Brain 2: Executive Reasoning as planner/constraint controller. Session log: 2026-05-28 Agent 7 Quad Brain arbiter added `chal://reasoning/executive` plan frames; 2026-05-31 Agent 7 added trace-verified `executive.response_plan` and constraint state outputs.
+
+- [x]  Implement Brain 3: CGPU Simulation / Rendering as candidate generator. Session log: 2026-05-28 Agent 7 Quad Brain arbiter now invokes `CGPURenderer` from the Quad Brain path; 2026-05-31 Agent 7 added trace-verified `cgpu.candidates` and `cgpu.selected_candidate` state outputs.
+
+- [x]  Implement Brain 4: Critic / Safety / Metacognition as evaluator/rewrite trigger. Session log: 2026-05-28 Agent 7 Quad Brain arbiter added critic/metacognition template-guard arbitration; 2026-05-31 Agent 7 added trace-verified `critic.selected_response` and `critic.template_guard` final-output contract.
+
+- [x]  Add serialized arbiter that merges four brain outputs into a single response frame. Session log: 2026-05-28 Agent 7 Quad Brain arbiter; 2026-06-01 Agent 7 added critic handoff proof tying `cgpu.selected_candidate` to `critic.selected_response` in inspectable trace metadata; 2026-06-02 Agent 7 added state-contract integrity checks for role completeness, serial ordering, transition mirroring, critic handoff, and final-output ownership; 2026-06-11 Agent 7 added a compact `arbitration_steps` ledger to Quad Brain state contracts and replay records so trace consumers can inspect the four serialized handoffs without inferring execution order from full output payloads; 2026-06-12 Agent 7 added an `arbitration_steps_mirror_transitions` integrity check so compact replay/storage ledgers fail if step refs, devices, confidence, or warnings drift from the serialized brain output and state-transition chain.
+
+- [x]  Mirror serialized Quad Brain arbitration telemetry in OpenAPI/API schema docs as `QuadBrainArbitration` under `CognitiveHypervisorTrace.quad_brain`. Session log: 2026-05-31 Agent 10 Quad Brain trace schema; 2026-06-01 Agent 10 typed `QuadBrainStateTransition` and the required final-output state contract fields.
+
+- [x]  Add tests showing four-brain dispatch improves or preserves output quality over legacy dual-hemi path. Session log: 2026-05-30 Agent 7 Quad Brain quality-preservation regression.
+
+## Phase 4: CGPU Render Accelerator
+
+- [x]  Define `CGPUFrame` input/output contract. Session log: 2026-05-28 Agent 9 CGPU frame contract.
+
+- [x]  Generate multiple candidate phrasings from grounded state. Session log: 2026-05-28 Agent 9 CGPU frame contract.
+
+- [x]  Add persona/NPC behavior rendering mode. Session log: 2026-05-28 Agent 9 CGPU frame contract.
+
+- [x]  Add business-bot concise answer rendering mode. Session log: 2026-05-28 Agent 9 CGPU frame contract.
+
+- [x]  Add critic feedback loop for rewrite. Session log: 2026-05-28 Agent 9 CGPU frame contract.
+
+- [x]  Ensure CGPU candidates never bypass grounding/safety arbitration. Session log: 2026-05-28 Agent 9 CGPU frame contract.
+
+- [x]  Mirror `CGPUFrame` and `CGPUOutputFrame` in OpenAPI/API schema docs without claiming `/api/v1/query` emits them yet. Session log: 2026-05-28 Agent 10 API schema alignment.
+
+## Phase 5: Knowledge Cloud Hardware Mount
+
+
+- [x]  Define CHAL mount and partition interfaces for ROM, parameter disk, grounding corpus, provenance, cache, and writeback memory. Session log: 2026-05-31 Knowledge Hardware Complete Mount Interface; 2026-06-01 Agent 5 added artifact-free volatile cache/writeback mounts to manifest-backed boot.
+- [x]  Upgrade KAL into a CHAL memory controller. Session log: 2026-05-28 Knowledge Cloud mount table.
+
+- [x]  Add mount table boot sequence. Session log: 2026-05-28 Knowledge Cloud mount table; 2026-06-01 Agent 5 extended manifest-backed boot with `/mnt/cache/hot_context` and `/mnt/mem/writeback` CHAL boundaries; 2026-06-02 Agent 5 added manifest coverage reporting for known-but-absent Knowledge Cloud hardware partitions.
+
+- [x]  Add partition integrity checks against Knowledge Cloud manifests. Session log: 2026-05-28 Knowledge Cloud mount table added runtime manifest SHA-256/size verification; 2026-05-28 Daily Knowledge Hardware Health Check tracked a current standalone artifact FAISS/embedder dim mismatch separately; 2026-06-01 Agent 5 added runtime cold-start retrieval-semantic integrity checks for FAISS/metadata counts and FAISS/embedder dimensions; 2026-06-04 Agent 5 added duplicate mounted-artifact rejection so strict cold-start boot refuses ambiguous manifest records for the same CHAL partition; 2026-06-05 Agent 5 added runtime profile-dimension validation so mounted FAISS/embedder hardware must also match `build.extra.embed_dim` when the Knowledge Cloud manifest declares it.
+
+- [x]  Add cache locality and hot-context retrieval. Session log: 2026-05-30 Knowledge Hardware Hot-Context Validation.
+
+- [x]  Add provenance traces to final response metadata. Session log: 2026-05-31 Knowledge Hardware Provenance Trace; 2026-06-13 Agent 5 propagated `build.source_manifest` fingerprints into artifact-backed mount partition metadata and preserved that provenance through KAL lookup/hot-context telemetry; 2026-06-13 Agent 5 hardened mount-table boot so malformed source-manifest fingerprints stay diagnostic-only and cannot appear as trusted `source_manifest_provenance` in KAL/hot-context telemetry.
+
+- [x]  Add tests for mounted Knowledge Cloud partitions. Session log: 2026-05-28 Knowledge Cloud mount table; 2026-06-01 Agent 5 validated volatile cache/writeback boundaries stay active and artifact-free; 2026-06-02 Agent 5 validated manifest coverage telemetry for missing optional and complete known artifact partitions; 2026-06-04 Agent 5 added focused duplicate-manifest partition identity tests for strict and non-strict boot; 2026-06-13 Agent 5 added focused mount-table/KAL tests proving source-manifest provenance is attached to mounted partitions and retained on hot-context cache hits; 2026-06-13 Agent 5 added a focused invalid-source-manifest regression so malformed fingerprints expose errors without becoming trusted mounted provenance.
+
+- [x]  Add source-plane license/provenance validation for Knowledge Cloud hardware manifests before public sources can be treated as mounted CHAL substrate. Session log: 2026-06-01 Knowledge Cloud Source Provenance Gate; 2026-06-02 Knowledge Hardware Source-Manifest Fingerprint added `build.source_manifest` provenance fingerprints so stamped runtime bundles point back to the exact source-plane hash set; 2026-06-02 Knowledge Hardware Profile-Dim Gate made profile-aware build/stamp refuse internally aligned retrieval bundles whose persisted embedder dimension disagrees with the selected build profile; 2026-06-04 Knowledge Hardware Source-Manifest Freshness Gate made build/stamp refuse stale source-plane manifests before provenance can be attached to mounted hardware artifacts; 2026-06-04 Knowledge Hardware Manifest Duplicate Path Gate made runtime artifact and source manifests reject duplicate `artifacts[].path` records before provenance can be treated as mounted CHAL hardware identity; 2026-06-05 Knowledge Hardware Pending-License Notes Gate made planned Kaggle/Hugging Face pending entries require non-empty `license.notes` before future public datasets can enter the source-plane rebuild substrate; 2026-06-05 Knowledge Hardware Pending-License Notes Validator aligned the standalone source-plane validator, planned Kaggle manifest, docs, regression test, and regenerated source manifest so pending public datasets cannot pass provenance validation with SPDX-only license declarations; 2026-06-06 Knowledge Hardware Pending-ID Collision Gate made standalone source-plane validation reject duplicate `pending[].id` values across planned public-source manifests before future datasets can become mounted CHAL rebuild substrate; 2026-06-06 Knowledge Hardware Pending-Rebuild Command Gate made pending public-source manifests require a non-empty `rebuild_command`, aligned planned Kaggle/Hugging Face entries and source docs, and regenerated the source-plane manifest fingerprint; 2026-06-06 Knowledge Hardware Source-Manifest Validation Gate made standalone production artifact validation reject `synthesus-knowledge-artifacts` bundles without a valid `build.source_manifest` fingerprint before they can pass as mounted CHAL hardware; 2026-06-06 Knowledge Hardware Pending-Locator Gate made pending public-source entries require a pinned upstream locator and expanded the source-manifest hash set to cover validator package code plus provenance docs; 2026-06-11 Knowledge Hardware Source-ID Collision Gate made standalone source-plane validation reject duplicate top-level source manifest IDs across non-aggregate `sources/*.yaml` files and regenerated the source-manifest fingerprint; 2026-06-11 Knowledge Hardware Aggregate Public-Source Gate made `sources/datasets.yaml` public-source IDs require unique backing non-aggregate manifests with validated license/loader/upstream metadata and regenerated the source-manifest fingerprint; 2026-06-11 Knowledge Hardware Unified Source Identity Gate made standalone source-plane validation reject collisions between admitted source manifest IDs and planned `pending[]` IDs before future datasets can be promoted into mounted CHAL provenance; 2026-06-11 Knowledge Hardware Aggregate Catalog Drift Gate made aggregate public-source catalog entries reject repeated `loader` or `default_enabled` values that drift from their backed concrete source manifests and regenerated the source-manifest fingerprint; 2026-06-12 Knowledge Hardware Aggregate Type Drift Gate made aggregate public-source catalog entries reject repeated `type` values that drift from their backed concrete `source_type`, aligned ConceptNet source identity, and regenerated the source-manifest fingerprint; 2026-06-12 Knowledge Hardware Aggregate Upstream Drift Gate made aggregate public-source catalog `upstream` locators reject stale URLs/repositories/docs not declared by their backed concrete source manifests and regenerated the source-manifest fingerprint; 2026-06-12 Knowledge Hardware Aggregate License Drift Gate made aggregate public-source catalog `license.spdx` and `license.notes` reject stale values that differ from their backed concrete source manifests and regenerated the source-manifest fingerprint; 2026-06-12 Knowledge Hardware Aggregate Local-Cache Drift Gate made aggregate public-source catalog `local_cache.files` reject cache targets not declared as backed concrete source-manifest `cache_path` values and regenerated the source-manifest fingerprint; 2026-06-13 Knowledge Hardware Aggregate Filter Drift Gate made aggregate public-source catalog `filters` reject stale retrieval-scope metadata that differs from backed concrete source manifests, moved ConceptNet relation filters into the concrete source identity, and regenerated the source-manifest fingerprint; 2026-06-13 Knowledge Hardware Aggregate Output-Schema Drift Gate made aggregate public-source catalog `output_schema` reject stale node-shape metadata that differs from backed concrete source manifests, moved Jeopardy/ConceptNet output schemas into the concrete source identities, and regenerated the source-manifest fingerprint.
+
+## Phase 6: Legacy Template Path Removal
+
+
+- [~] Convert PPBRS normal-path output into non-user-facing firmware signals. Session log: 2026-06-01 Agent 6 added fanout-aware PPBRS pattern candidate pruning so shared broad tokens no longer expand normal firmware matching to full-corpus scoring while preserving broad-token-only fallback behavior; 2026-06-03 Agent 6 added trigger-key/value rule indexes so PPBRS rule/action evaluators skip unrelated conditions before firmware scoring; 2026-06-04 Agent 4 added weighted top-rule short-circuiting so single-winner PPBRS firmware paths stop after the highest-weight threshold-qualified match while preserving full fanout evaluation semantics; 2026-06-04 Agent 6 added priority/upper-bound single-action short-circuiting to `RuleToActionMapper.map_to_action()` so action firmware executes the best action without evaluating full fanout; 2026-06-05 Agent 6 tightened confidence scoring with single-pass accumulation and benchmark coverage while preserving PPBRS firmware signal output contracts; 2026-06-06 Agent 6 added cached exact-match token-form scoring and template-leak regression coverage so common PPBRS pattern matches avoid fuzzy distance work while legacy signatures remain non-user-facing firmware context; 2026-06-11 Agent 6 added direct indexed rule-candidate materialization so PPBRS rule/action firmware no longer scans the full registry after tag/trigger indexes have selected a bounded candidate set; 2026-06-12 Agent 4 consumed verifier rewrite pressure through CGPU/critic `reasoning_revision` telemetry while preserving verifier/reranker/PPBRS signal-only final-language boundaries; 2026-06-12 Agent 6 added a versioned reasoning-graph shortest-path cache so repeated PPBRS graph firmware queries reuse bounded paths until graph mutation invalidates them.
+
+- [x]  Search and classify every direct fallback/template response path. Session log: 2026-05-31 Agent 6 template surface audit.
+
+- [x]  Delete or convert unused legacy response emitters. Session log: 2026-06-02 Agent 6 converted the remaining legacy API emitters into labeled explicit NPC-script/non-user-facing storage boundaries and removed visible `[FALLBACK]` normal-path signatures from the FastAPI fallback stream.
+
+- [x]  Quarantine safety/platform/explicit NPC-script templates behind labeled interfaces. Session log: 2026-05-28 Agent 4 template guard added `TemplateSurface` labels and hypervisor telemetry; 2026-06-01 generation spine fallback is now labeled as an explicit degraded state with non-legacy wording; 2026-06-01 Agent 4 labeled `ResponseCompositor` output as an explicit NPC-script surface with cognitive-engine debug metadata; 2026-06-02 Knowledge Hardware Hygiene run labeled `ELSBridge` candidate exports and integrations as non-user-facing `els_candidate_writeback` substrate; 2026-06-02 Agent 1 labeled `PatternEngine` learned templates as non-user-facing candidate storage with read-time backfill for legacy rows; 2026-06-02 Agent 4 labeled terminal `CognitiveEngine` character fallback and escalation-stall output as explicit NPC-script surfaces; 2026-06-02 Agent 6 labeled the remaining FastAPI and production API pattern/fallback surfaces as explicit NPC-script or non-user-facing storage boundaries, leaving 0 `legacy_quarantine_required` audit paths.
+
+- [x]  Add regression tests that fail on normal-path template leakage. Session log: 2026-05-28 Agent 4 template guard.
+
+- [x]  Update module docs with the safety/template exception boundary. Session log: 2026-05-28 Agent 4 template guard; 2026-06-02 Agent 10 mirrored legacy API `debug.template_surface` exceptions as the reusable `TemplateSurface` OpenAPI/API schema contract.
+
+## Phase 7: Memory And Cache Hierarchy
+
+- [x]  Define L1 turn cache, L2 session cache, L3 project/user cache, and L4 Knowledge Cloud cache. Session log: 2026-06-03 Knowledge Hardware Memory Policy added CHAL tier policies with mount paths, TTLs, provenance requirements, and focused tests.
+
+- [~]  Add writeback rules from reasoning traces into episodic/crystallized memory. Session log: 2026-06-03 Knowledge Hardware Memory Policy added critic/provenance admission rules targeting `/mnt/mem/writeback`; 2026-06-03 Agent 4 added a focused CHAL memory writeback bridge that converts accepted hypervisor traces into provenance-bearing candidates, writes admitted episodic/semantic/procedural/working records through the memory store, and stages/adjoins crystallized candidates through `ConsciousState`; 2026-06-03 Agent 5 wired explicit CHAL/business-bot API calls to invoke the bridge after final Cognitive Hypervisor arbitration, emit typed `memory_writeback` telemetry, and reject degraded/template-rewritten traces before storage; remaining work is selecting non-API and crystallized-state production call sites for automatic bridge invocation.
+
+- [x]  Add memory provenance and TTL policy. Session log: 2026-06-03 Knowledge Hardware Memory Policy added typed `MemoryProvenanceRef`, L1-L4 TTL policy, and writeback rejection reasons for missing/low-confidence provenance.
+
+- [~]  Add replayable trace storage for comparison harnesses. Session log: 2026-05-30 Agent 9 added deterministic organ-training trace replay metadata and scorecard coverage; 2026-05-31 Agent 9 added an organ-evaluation quality gate for replay coverage, numeric consistency, and missing trained models; 2026-06-01 Agent 3 added compact Phase 8 runtime conversation replay JSONL records for the legacy-vs-Synthesus-5 harness; 2026-06-02 Agent 9 added CHAL accelerator frame metadata and coverage gating for current organ-training traces; 2026-06-02 Agent 9 added `organ-triad-replay-v3` candidate refs, selected-candidate refs, critic feedback refs, and a strict evaluator/selfImprove coverage gate; 2026-06-04 Agent 7 added compact Quad Brain replay records to Cognitive Hypervisor telemetry, preserving serialized role order, state transitions, critic handoff, integrity checks, and a response hash without storing full response text; 2026-06-05 Agent 9 added compact hash-verified `organ_training_replay.v1` identity records and a strict evaluator/selfImprove replay-identity coverage gate for organ traces; 2026-06-05 Agent 10 mirrored Quad Brain replay telemetry as `QuadBrainReplayRecord` in the OpenAPI/API schema debug contract; 2026-06-05 Agent 3 added hash-stable Phase 8 replay trace records and a replay-integrity scorecard gate for single-turn and continuity comparison traces; 2026-06-05 Agent 7 added a canonical `record_hash` seal to runtime Quad Brain replay records so serialized arbitration traces can be stored and tamper-checked without raw response text; 2026-06-05 Agent 8 added a canonical `record_hash` seal to AIVM snapshot replay traces and restore-time tamper rejection for replay metadata; 2026-06-05 Agent 9 added compact `synthesus.organ_replay_trace.v1` JSONL storage plus an organ replay-integrity scorecard/fail gate so CHAL organ training traces can persist source hashes, frame refs, candidate refs, and critic refs without raw feature vectors; 2026-06-06 Agent 3 added prompt-scrubbed Phase 8 replay storage records plus a storage completeness scorecard/fail gate for persistent runtime comparison trace batches; 2026-06-06 Agent 7 added a mounted Quad Brain replay trace-storage sink to CognitiveHypervisor with skipped/stored/fault telemetry, record_hash handoff, no-raw-prompt/no-raw-response assertions, and recorder-fault isolation from critic-owned final output; 2026-06-07 Agent 9 added `organ-triad-replay-v4` shared-backbone contract metadata to organ replay records and CHAL frames, plus evaluator/storage integrity checks that preserve the backbone contract hash without raw feature vectors; 2026-06-11 Agent 8 bound AIVM snapshot replay traces to the sealed device manifest hash and added restore-time mismatch rejection so replay identity proves the mounted CHAL device set; 2026-06-11 Agent 9 tightened compact organ replay storage so `synthesus.organ_replay_trace.v1` records preserve full shared-backbone identity fields and strict evaluator gates validate 100% replay/CHAL/candidate/critic coverage across all nine organ slices; 2026-06-12 Agent 8 added prompt/input/detail scrub hashes and restore-time raw-field rejection to AIVM snapshot replay records; 2026-06-13 Agent 9 added record/CHAL mirror-integrity gating so compact organ replay storage refuses candidate, selected-candidate, critic, or shared-backbone drift between `replay.record` and `replay.chal`; 2026-06-13 Agent 10 mirrored `synthesus.organ_replay_trace.v1` as `OrganReplayTrace` in the OpenAPI/API schema mirrors while documenting it as a tooling replay artifact, not a `/api/v1/query` response. Broader non-Quad-Brain production trace-store write-path selection remains.
+
+- [~] Add save/load tests across CHAL memory partitions. Session log: 2026-05-27 Agent 8 AIVM snapshot integrity added default VMD snapshot/restore parity and tamper rejection; 2026-05-31 Agent 8 added per-device fingerprint manifests and restore verification across mounted AIVM devices; 2026-06-01 Agent 8 added explicit AIVM cache/writeback partition devices with snapshot restore parity and tamper rejection; 2026-06-02 Agent 8 added VQD knowledge-scope/policy lookup-trace snapshot restore and tamper rejection; 2026-06-04 Agent 8 added compact AIVM snapshot replay-trace records with restore-time event-hash verification and focused save/load tests; 2026-06-05 Agent 8 added replay record-hash save/load coverage so event-preserving replay metadata tampering is rejected before NPC admission; 2026-06-06 Agent 8 added a sealed `aivm.device_manifest.v1` manifest so restore rejects validly resealed snapshots that drop mounted devices or alter the expected per-device fingerprint table before NPC admission; 2026-06-11 Agent 8 added save/load coverage for replay-trace device-manifest binding and validly resealed mismatch rejection; 2026-06-12 Agent 8 added save/load coverage proving raw prompt-bearing replay fields are scrubbed at capture and rejected even when replay hashes and the outer seal are recomputed; broader persistent runtime trace storage remains.
+
+## Phase 8: GPT-4-Class Evaluation Harness
+
+
+- [x]  Add legacy-vs-CHAL conversation comparison harness. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
+
+- [x]  Add Synthesus 5 vs legacy comparison mode. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
+
+- [x]  Add cross-domain reasoning prompts. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
+
+- [x]  Add grounded retrieval prompts. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
+
+- [x]  Add NPC/persona behavior prompts. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
+
+- [x]  Add business-bot task prompts. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
+
+- [x]  Add scoring for usefulness, grounding, naturalness, latency, template leakage, and safety. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
+
+- [x]  Add a runnable latency baseline and regression guard for the legacy-vs-Synthesus-5 harness. Session log: 2026-05-31 Agent 3 Phase 8 latency regression guard.
+
+- [x]  Store benchmark summaries in ignored artifacts and commit only harness source/docs. Session log: 2026-05-28 Agent 3 Phase 8 evaluation harness.
+
+- [x]  Add compact replay trace records and explicit business-bot preset coverage to the legacy-vs-Synthesus-5 comparison harness. Session log: 2026-06-01 Agent 3 Phase 8 replay trace and business preset harness.
+
+- [x]  Add a deterministic GPT-4-class reference expectation scorecard gate for the legacy-vs-Synthesus-5 comparison harness. Session log: 2026-06-02 Agent 3 Phase 8 reference scorecard gate.
+
+- [x]  Add a per-case axis-improvement gate so the legacy-vs-Synthesus-5 harness fails when an individual case regresses on grounding, naturalness, safety, template leakage, or overall score even if aggregate metrics still pass. Session log: 2026-06-03 Agent 3 Phase 8 axis-improvement scorecard gate.
+
+- [x]  Add a multi-turn continuity scorecard gate for NPC/persona, business-bot follow-up, and safety follow-up sequences so legacy-vs-Synthesus-5 comparison fails on continuity-term loss, route drift, runtime-preset drift, Quad Brain role loss, template leakage, or missing continuity-category coverage. Session log: 2026-06-04 Agent 3 Phase 8 multi-turn continuity scorecard gate; 2026-06-12 Agent 3 Phase 8 continuity category-balance gate.
+
+- [x]  Add a compact replay-integrity scorecard gate so legacy-vs-Synthesus-5 comparison traces carry response hashes, per-record hashes, route/trace identity, and no raw response text. Session log: 2026-06-05 Agent 3 Phase 8 replay integrity gate.
+
+- [x]  Add a prompt-scrubbed persistent trace-storage scorecard gate so legacy-vs-Synthesus-5 runtime comparison batches carry prompt hashes, response hashes, source replay hashes, route/trace identity, category/continuity coverage, and no raw prompt or response text. Session log: 2026-06-06 Agent 3 Phase 8 trace storage gate.
+
+- [x]  Add a required-category balance gate to the GPT-4-class reference scorecard so the legacy-vs-Synthesus-5 harness fails when conversation quality, cross-domain reasoning, grounded retrieval, NPC/persona behavior, business-bot, or safety coverage silently drops out. Session log: 2026-06-11 Agent 3 Phase 8 category-balance scorecard gate.
+
+- [x]  Add a CHAL trace-schema completeness gate so legacy-vs-Synthesus-5 comparison batches fail when route identity, trace IDs, runtime presets, bridge results, latency, decision fields, Quad Brain roles, or grounded/QuadBrain/safety route coverage silently drift out of benchmark rows. Session log: 2026-06-13 Agent 3 Phase 8 trace schema completeness gate.
+
+- [x]  Add a route-semantics scorecard gate so legacy-vs-Synthesus-5 comparison batches fail when route names are present but budget shape, critic/verifier firmware ownership, CGPU revision ownership, reranker final-language boundaries, safety guard surface, device isolation, or Quad Brain arbitration semantics drift. Session log: 2026-06-13 Agent 3 Phase 8 route semantics scorecard gate.
+
+## Phase 9: Product Runtime Polish
+
+- [~] Wire Synthesus 5 path into API entrypoints. Session log: 2026-05-28 Agent 1 API CHAL mode added explicit `/api/v1/query` `mode="chal"` routing through `CognitiveHypervisor`; default `auto` cutover remains.
+
+- [x]  Document the current `/api/v1/query` `mode="chal"` debug contract as `CognitiveHypervisorTrace` in OpenAPI/schema mirrors. Session log: 2026-05-29 Agent 10 hypervisor trace schema; 2026-06-02 Agent 10 documented the `business_bot` preset and canonical runtime-preset normalization in API/schema mirrors; 2026-06-04 Agent 10 mirrored API CHAL memory-writeback telemetry as `CHALMemoryWritebackResult` and `CHALMemoryWritebackDecision`; 2026-06-05 Agent 10 mirrored CHAL verifier/reranker hypervisor telemetry as `CHALReasoningQualityTrace` and `CHALGroundingRerankerTrace`; 2026-06-12 Agent 10 documented Quad Brain `state_contract.arbitration_steps` as the compact ordered ledger inside `QuadBrainArbitration` and `QuadBrainReplayRecord` API-facing docs.
+
+- [x]  Add frontend control/trace view for CHAL route decisions. Session log: 2026-06-04 Agent 1 frontend CHAL trace view added selectable Synthesus 5 CHAL/business-bot modes and an expandable route-decision telemetry panel for Cognitive Hypervisor responses.
+
+- [x]  Add NPC runtime toggle for Synthesus 5 path. Session log: 2026-06-04 Agent 1 frontend NPC Synthesus 5 runtime toggle.
+
+- [x]  Add business-bot preset path. Session log: 2026-06-01 Agent 1 business-bot CHAL preset path.
+
+- [x]  Add graceful degraded-state messaging without legacy templates. Session log: 2026-06-03 Agent 1 typed CHAL degraded-state contract.
+
+## Phase 10: Hardening And Release
+
+- [x]  Add full focused test suite for Synthesus 5 path. Session log: 2026-05-31 Agent 1 focused release suite; 2026-07-15 launch/full-suite hardening restored legacy import compatibility, isolated async execution and ASGI tests from restricted-sandbox cross-thread wakeups, made production background-task shutdown explicit, removed order-dependent semantic matcher state, and completed the full runtime suite with 1705 passed, 49 skipped, and 3 expected failures.
+
+- [x]  Add smoke command that runs an end-to-end Synthesus 5 conversation. Session log: 2026-05-31 Agent 1 CHAL API smoke command.
+
+- [x]  Add performance baseline and regression guard. Session log: 2026-05-31 Agent 3 Phase 8 latency regression guard.
+
+- [x]  Validate Knowledge Cloud bundle integrity from cold start. Session log: 2026-05-31 Agent 5 Knowledge Cloud cold-start integrity gate.
+
+- [~]  Restore Knowledge Cloud golden-query health after artifact rebuild. Blocker note: 2026-06-01 Daily Knowledge Hardware Health Check confirmed manifest/source/bootstrap/cold-start mount validation passes, but golden-query retrieval fails because the current `synthesus-knowledge-cloud/artifacts/faiss.index` is 384-dimensional while `artifacts/models/swarm_embedder.pkl` persists `dim=128`; fix requires regenerating aligned generated artifacts, not a runtime source edit. Session log: 2026-06-01 Knowledge Cloud Provenance Stamp Guard added a source-only hardening gate so `synthesus-kc build --execute` and `synthesus-kc stamp-manifest` refuse to stamp provenance over that semantic mismatch; 2026-06-01 Agent 5 upgraded the Synthesus runtime cold-start gate to fail the same mismatch before declaring mounted Knowledge Cloud hardware ready; 2026-06-02 Daily Knowledge Hardware Health Check aligned the fast health check with the mount-table semantic gate so golden queries are skipped until FAISS/embedder dimensions match; 2026-06-03 Daily Knowledge Hardware Health Check reconfirmed source validation and KAL/mount health pass, while bundle/golden-query health remains blocked by the same FAISS/embedder mismatch and the live artifact manifest is not yet re-stamped with `build.source_manifest`; 2026-06-04 Daily Knowledge Hardware Health Check reconfirmed source-plane validation, source-manifest verification, manifest hashes, FAISS/metadata count alignment, cold-start semantic gate, KAL mount health, and fast health reporting; 2026-06-05 Knowledge Hardware Release Queue Hygiene reconfirmed the runtime release gate still passes CHAL smoke while cold-start integrity is blocked only by `FAISS/embedder dim mismatch: faiss=384, embedder=128`; 2026-06-05 Agent 5 profile-dimension validation reconfirmed the generated bundle also violates the manifest profile contract with `FAISS/profile dim mismatch: faiss=384, profile=128`; 2026-06-06 Daily Knowledge Hardware Health Check fixed a core `ml.swarm_embedder` compatibility stub so KAL runtime bootstrap can instantiate the real Knowledge Cloud embedder, while source validation, source-manifest verification, sampled manifest hashes, FAISS/metadata count alignment, KAL smoke, and CHAL smoke pass; golden queries remain intentionally skipped because retrieval semantics still fail with `faiss=384`, `embedder=128`, `profile=128`, and the artifact manifest still lacks `build.source_manifest`. 2026-06-06 Agent 1 added a source-manifest provenance release-admission check so cold-start/runtime release gates now report both generated-bundle blockers together: FAISS/embedder/profile mismatch and missing `build.source_manifest`. 2026-06-11 Daily Knowledge Hardware Health Check reconfirmed source-plane validation, source-manifest verification, sampled manifest hashes, FAISS/metadata count alignment, KAL mount health, and CHAL smoke pass; golden queries and cold-start release admission remain blocked only by the generated bundle mismatch (`faiss=384`, `embedder=128`, `profile=128`) plus missing `build.source_manifest`. 2026-06-12 Daily Knowledge Hardware Health Check reconfirmed source-plane validation, source-manifest verification, sampled manifest hashes, manifest kind/count, KAL mount health, and CHAL smoke pass; golden queries remain intentionally skipped because the generated bundle still reports `faiss=384`, `embedder=128`, `profile=128`, and missing `build.source_manifest`. 2026-06-13 Daily Knowledge Hardware Health Check reconfirmed source-plane validation, source-manifest verification, full manifest hash coverage for 10 artifacts, FAISS/metadata count alignment at 501819 records, runtime mount bootstrap with 12 active mounts, KAL mount health, and the focused health-check tests; golden queries remain intentionally skipped because retrieval semantics still fail with `faiss=384`, `embedder=128`, `profile=128`, and missing `build.source_manifest`. 2026-07-15 Knowledge Cloud Bundle Repair rebuilt the companion bundle as an aligned 501,819-vector IVF index at 128 dimensions, stamped source-manifest provenance, passed cold-start and runtime health with 12 mounts and 30.3 ms average golden-query latency, and published draft PR `Str8biddness/synthesus-knowledge-cloud#1`; completion awaits PR merge and `zo.pub` mirror synchronization.
+
+- [x]  Publish release notes describing Synthesus 5 behavior and limitations. Session log: 2026-06-03 Commercial Release Packaging Gate added RC1 release notes, commercial packaging docs, package scripts, and a runtime release gate that separates demo/private-beta readiness from paid-launch blockers; 2026-06-05 Agent 1 hardened the runtime release gate so focused-suite evidence is an explicit critical check before RC tagging.
+
+- [ ]  Tag a Synthesus 5 release candidate. Session log: 2026-06-11 Agent 1 added an opt-in `--require-clean-worktree` critical release-gate check so RC tagging can be blocked on uncommitted source/docs drift in addition to the focused suite, CHAL smoke, and Knowledge Cloud cold-start blockers; 2026-06-12 Agent 1 added structured Knowledge Cloud cold-start diagnostics to the release-gate JSON so RC tooling reports exact FAISS/embedder/profile dimensions, vector/metadata counts, mount coverage, integrity failures, and source-manifest provenance blockers; 2026-06-13 Agent 1 added an opt-in `--candidate-tag` release-gate check so RC tooling validates tag format plus local and remote tag availability before tagging.
+
+## Current Priority Queue
+
+1. Review and merge Knowledge Cloud draft PR `Str8biddness/synthesus-knowledge-cloud#1`, synchronize its artifacts to `zo.pub`, and validate the public mirror.
+2. Prepare a taggable Synthesus 5 release candidate only after the merged bundle passes `python tools/synthesus5_release_gate.py --run-focused-suite --run-runtime --require-clean-worktree --candidate-tag synthesus5-rc1 --fail-on-blocker`.
+3. Keep commercial packaging limited to bounded NPC, business-bot, managed Knowledge Cloud, and enterprise AIVM surfaces until paid-launch blockers are cleared.

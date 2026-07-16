@@ -1,0 +1,382 @@
+[
+  {
+    "query": "good day",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "hello shopkeeper",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "hi",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "greetings",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "good day",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "hi",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "hello shopkeeper",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "hi",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "hello shopkeeper",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "hello shopkeeper",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "hello shopkeeper",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "good day",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "good day",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "greetings",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "good day",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "hello shopkeeper",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "hey there",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "good day",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "greetings",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  },
+  {
+    "query": "good day",
+    "candidates": [
+      "Greetings, traveler. What brings you to our humble shop?",
+      "Hey. Whaddaya want?",
+      "Welcome, friend! Feel free to look around.",
+      "Oh, a customer. What do you need?",
+      "Good day to you! How can I assist?",
+      "Yo, welcome in!"
+    ],
+    "ideal_ranks": [
+      2,
+      0,
+      3,
+      4,
+      1,
+      5
+    ]
+  }
+]
