@@ -1,7 +1,7 @@
 {
   "version": "1",
   "kind": "synthesus-knowledge-source-plane",
-  "generated_at": "2026-06-13T18:04:41.051387+00:00",
+  "generated_at": "2026-07-16T05:12:03.264989+00:00",
   "roots": [
     "sources",
     "synthesus_knowledge_cloud",
@@ -56,13 +56,18 @@
     },
     {
       "path": "synthesus_knowledge_cloud/build.py",
-      "size": 9804,
-      "sha256": "c41a013872fcb4ca207a6aefc735d8950d71edf2f18fd81736c51bcb0e02a95b"
+      "size": 11050,
+      "sha256": "4017b7d40574a3412f492c0389468906c02f3f008a6d09697a357a72a394bfb2"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/json_stream.py",
+      "size": 2961,
+      "sha256": "d6a90110288cc7300545d2093a0707a9379f82027f2ed60b5e36b2b455e4a303"
     },
     {
       "path": "synthesus_knowledge_cloud/manifest.py",
-      "size": 10345,
-      "sha256": "69d0436ee9d4b6e25312e7fd5edf62a66e215f917835e2efa79e53bbba440f79"
+      "size": 10279,
+      "sha256": "8d9fe17febaac286289589a32d42a2d68fffb0f24ccc05677e0e895457899d76"
     },
     {
       "path": "synthesus_knowledge_cloud/mirrors.py",
@@ -111,13 +116,18 @@
     },
     {
       "path": "pipelines/build/kn_populator.py",
-      "size": 18321,
-      "sha256": "beb16a1553e2ac34ea34b46adf08ec4c813fb3fcbe008e65318945e45c210ab6"
+      "size": 21036,
+      "sha256": "e9848a085e7cf2f8b7b20ae0e880b62100dcfaa5632e0bf44cc908ab364f569d"
+    },
+    {
+      "path": "pipelines/build/reindex_bundle.py",
+      "size": 3787,
+      "sha256": "fc4bc934c8039a3fa8b2c9dd37e46fab25277b64b624f4cf87243ff7c6eb48d4"
     },
     {
       "path": "pipelines/build/run_population.py",
-      "size": 5001,
-      "sha256": "2bd490374850fb8c853c1c70a37aa31c83569493b39d082a464164bc1d0529c5"
+      "size": 5848,
+      "sha256": "dd32cf9304be3fab73d328ee3b2a78af03b19ff2ffc8e9f59b80d55c7905d723"
     },
     {
       "path": "pipelines/build/swarm_embedder.py",
@@ -186,8 +196,8 @@
     },
     {
       "path": "docs/BUILD.md",
-      "size": 2745,
-      "sha256": "14e439a0e98e3bcae5d64c52bcc82a03d8589449f2bf9dbbf905337e110970c5"
+      "size": 3355,
+      "sha256": "268bcdbc957f90f6f81e2637479a75e2aef544c67f487fd389b7990da0d35fba"
     },
     {
       "path": "docs/DATA_MODEL.md",

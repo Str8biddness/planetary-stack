@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -58,6 +59,12 @@ def main() -> None:
     parser.add_argument("--kn-db",      default="./data/knowledge.kndb")
     parser.add_argument("--faiss",      default="./data/knowledge.faiss")
     parser.add_argument("--model-dir",  default="./data/embedder")
+    parser.add_argument(
+        "--artifact-root",
+        default=None,
+        help="Write the canonical publishable bundle layout under this directory",
+    )
+    parser.add_argument("--metadata-json", default=None)
     parser.add_argument("--max",        type=int, default=None, help="Max total entries")
     parser.add_argument("--sample-jeopardy",  type=int, default=None, help="Jeopardy sample size")
     parser.add_argument("--sample-conceptnet", type=int, default=None, help="ConceptNet sample size")
@@ -65,6 +72,15 @@ def main() -> None:
     parser.add_argument("--skip-test",  action="store_true", help="Skip semantic search test")
     parser.add_argument("--dim",       type=int, default=128, help="Embedding dimension")
     args = parser.parse_args()
+
+    if args.artifact_root:
+        artifact_root = Path(args.artifact_root).resolve()
+        args.kn_db = str(artifact_root / "knowledge.kndb")
+        args.faiss = str(artifact_root / "faiss.index")
+        args.model_dir = str(artifact_root / "models")
+        args.metadata_json = str(artifact_root / "faiss_metadata.json")
+    else:
+        artifact_root = None
 
     # Ensure dirs
     Path(args.cache_dir).mkdir(parents=True, exist_ok=True)
@@ -85,6 +101,7 @@ def main() -> None:
         faiss_path=args.faiss,
         embedder=embedder,
         batch_size=args.batch_size,
+        metadata_json_path=args.metadata_json,
     )
 
     # Load entries
@@ -98,6 +115,9 @@ def main() -> None:
     # Populate
     t0 = time.time()
     result = pop.populate(entries, max_entries=args.max)
+    if artifact_root is not None:
+        # Preserve both historical sidecar names in the public artifact contract.
+        shutil.copy2(pop.meta_db.path, artifact_root / "knowledge.kndb.meta.db")
     elapsed = time.time() - t0
 
     logger.info("=" * 60)

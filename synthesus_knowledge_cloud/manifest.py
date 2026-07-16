@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Sequence
 
+from .json_stream import count_json_array
+
 DEFAULT_SOURCE_ROOTS = [
     "sources",
     "synthesus_knowledge_cloud",
@@ -218,8 +220,7 @@ def _validate_runtime_bundle_semantics(root: Path, *, expected_embed_dim: int | 
 
         if metadata_path.exists():
             try:
-                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-                metadata_count = len(metadata) if isinstance(metadata, (list, dict)) else -1
+                metadata_count = count_json_array(metadata_path)
             except Exception as exc:
                 failures.append(f"faiss_metadata.json unreadable: {exc}")
             else:

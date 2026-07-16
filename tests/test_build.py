@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from synthesus_knowledge_cloud.__main__ import main
-from synthesus_knowledge_cloud.build import plan_build, run_build, stamp_existing_manifest
+from synthesus_knowledge_cloud.build import _run_pipeline, plan_build, run_build, stamp_existing_manifest
 from synthesus_knowledge_cloud.manifest import build_manifest, verify_source_manifest, write_manifest
 
 
@@ -36,6 +36,48 @@ def test_run_build_dry_run() -> None:
     assert not report.executed
     assert report.exit_code is None
     assert report.ok  # dry-run is always "ok" if source planes validate
+
+
+def test_run_pipeline_stages_and_atomically_installs_canonical_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    (artifacts / "faiss.index").write_bytes(b"old-index")
+    expected = {
+        "faiss.index",
+        "faiss_metadata.json",
+        "knowledge.kndb",
+        "knowledge.kndb.meta.db",
+        "knowledge.meta.db",
+        "models/swarm_embedder.pkl",
+    }
+
+    def fake_run(command, **_kwargs):
+        assert "--artifact-root" in command
+        assert "--data-dir" not in command
+        staging = Path(command[command.index("--artifact-root") + 1])
+        for rel in expected:
+            path = staging / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(f"new:{rel}".encode())
+        return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+
+    monkeypatch.setattr("synthesus_knowledge_cloud.build.subprocess.run", fake_run)
+    plan = SimpleNamespace(
+        artifact_root=artifacts,
+        repo_root=tmp_path,
+        embed_dim=128,
+        sample_jeopardy=10,
+        sample_conceptnet=20,
+    )
+
+    exit_code, stdout, stderr = _run_pipeline(plan)
+
+    assert (exit_code, stdout, stderr) == (0, "ok", "")
+    for rel in expected:
+        assert (artifacts / rel).read_bytes() == f"new:{rel}".encode()
 
 
 def test_stamp_manifest_rejects_runtime_semantic_mismatch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

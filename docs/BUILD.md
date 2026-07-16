@@ -37,10 +37,22 @@ synthesus-kc build profiles/public-base.yaml --execute
 Steps:
 
 1. Validate source planes (`pipelines/*`, `sources/*`, `patterns/*`, `synthetic/*`, `grounding_corpus/*`, `support_models/*`).
-2. Shell out to `python -m pipelines.build.run_population` with the derived sample sizes and embed dim.
+2. Shell out to `python -m pipelines.build.run_population` with the derived sample sizes and embed dim, building canonical outputs in a temporary staging directory.
 3. Validate runtime bundle semantics before stamping, including FAISS vector count versus metadata records, FAISS dimension versus the persisted swarm embedder dimension, and persisted swarm embedder dimension versus the profile's declared `embedding.dim`.
-4. Walk `artifacts/` and regenerate `artifacts/manifest.json` from real file hashes.
-5. Capture provenance (profile, git sha, embedder fingerprint, dataset versions, host) and stamp it into the manifest's `build` block.
+4. Atomically replace the generated FAISS, metadata, KNDB, SQLite, and embedder artifacts only after the complete staged build succeeds.
+5. Walk `artifacts/` and regenerate `artifacts/manifest.json` from real file hashes.
+6. Capture provenance (profile, git sha, embedder fingerprint, source-manifest fingerprint, dataset versions, and host) and stamp it into the manifest's `build` block.
+
+For a dimension-only repair where the vector-aligned metadata and persisted
+embedder are already trusted and hash-verified, rebuild the FAISS artifact
+without re-downloading the source corpus:
+
+```bash
+python -m pipelines.build.reindex_bundle \
+  --metadata artifacts/faiss_metadata.json \
+  --embedder artifacts/models/swarm_embedder.pkl \
+  --output artifacts/faiss.index
+```
 
 ## Stamp without rebuilding
 

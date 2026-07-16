@@ -13,8 +13,10 @@ arguments, source validation, and manifest stamping.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -194,27 +196,57 @@ def stamp_existing_manifest(
 
 
 def _run_pipeline(plan: BuildPlan) -> tuple[int, str, str]:
-    cmd = [
-        sys.executable,
-        "-m",
-        "pipelines.build.run_population",
-        "--data-dir",
-        str(plan.artifact_root),
-        "--dim",
-        str(plan.embed_dim),
-    ]
-    if plan.sample_jeopardy is not None:
-        cmd += ["--sample-jeopardy", str(plan.sample_jeopardy)]
-    if plan.sample_conceptnet is not None:
-        cmd += ["--sample-conceptnet", str(plan.sample_conceptnet)]
-    proc = subprocess.run(
-        cmd,
-        cwd=str(plan.repo_root),
-        capture_output=True,
-        text=True,
-        check=False,
+    plan.artifact_root.parent.mkdir(parents=True, exist_ok=True)
+    generated_paths = (
+        "faiss.index",
+        "faiss_metadata.json",
+        "knowledge.kndb",
+        "knowledge.kndb.meta.db",
+        "knowledge.meta.db",
+        "models/swarm_embedder.pkl",
     )
-    return proc.returncode, proc.stdout, proc.stderr
+    with tempfile.TemporaryDirectory(
+        prefix=".synthesus-kc-build-",
+        dir=plan.artifact_root.parent,
+    ) as temporary:
+        staging = Path(temporary)
+        cmd = [
+            sys.executable,
+            "-m",
+            "pipelines.build.run_population",
+            "--artifact-root",
+            str(staging),
+            "--cache-dir",
+            str(plan.repo_root / "downloads"),
+            "--skip-test",
+            "--dim",
+            str(plan.embed_dim),
+        ]
+        if plan.sample_jeopardy is not None:
+            cmd += ["--sample-jeopardy", str(plan.sample_jeopardy)]
+        if plan.sample_conceptnet is not None:
+            cmd += ["--sample-conceptnet", str(plan.sample_conceptnet)]
+        proc = subprocess.run(
+            cmd,
+            cwd=str(plan.repo_root),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode != 0:
+            return proc.returncode, proc.stdout, proc.stderr
+
+        missing = [rel for rel in generated_paths if not (staging / rel).is_file()]
+        if missing:
+            error = f"build pipeline did not produce required artifacts: {', '.join(missing)}"
+            return 1, proc.stdout, f"{proc.stderr}\n{error}".strip()
+
+        for rel in generated_paths:
+            source = staging / rel
+            destination = plan.artifact_root / rel
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(source, destination)
+        return proc.returncode, proc.stdout, proc.stderr
 
 
 def run_build(

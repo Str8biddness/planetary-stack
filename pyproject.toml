@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "synthesus-knowledge-cloud"
-version = "0.1.0"
+version = "0.3.0"
 description = "Standalone utilities and artifact manifests for the Synthesus Knowledge Cloud."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,6 +15,17 @@ authors = [
 dependencies = [
   "requests>=2.31.0",
   "PyYAML>=6.0.1"
+]
+
+[project.optional-dependencies]
+build = [
+  "faiss-cpu>=1.8.0",
+  "joblib>=1.3.0",
+  "numpy>=1.26.0",
+  "scikit-learn>=1.8,<1.9"
+]
+test = [
+  "pytest>=8.0"
 ]
 
 [project.scripts]

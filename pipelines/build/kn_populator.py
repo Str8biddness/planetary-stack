@@ -219,7 +219,7 @@ class KNPopulator:
 
     Pipeline:
         KnowledgeEntry
-          → text_blob = f"{question} | {answer} | {category}"
+          → query-side question text
           → embed via SwarmEmbedder  (TF-IDF + SVD, <1ms)
           → insert into KNDatabase   (binary, keyed by question[:64])
           → add to FAISS index       (flat IP, cosine sim)
@@ -233,6 +233,7 @@ class KNPopulator:
         embedder,          # SwarmEmbedder instance
         meta_db: Optional[MetadataDB] = None,
         batch_size: int = 1000,
+        metadata_json_path: str | Path | None = None,
     ):
         """Initializes the KNPopulator.
 
@@ -242,16 +243,68 @@ class KNPopulator:
             embedder: SwarmEmbedder instance for generating embeddings.
             meta_db: Optional MetadataDB instance. If None, one is created at kn_path.
             batch_size: Number of entries to process in each batch.
+            metadata_json_path: Optional vector-aligned runtime metadata output.
         """
         self.kn_path    = _ensure_parent_dir(kn_path)
         self.faiss_path = _ensure_parent_dir(faiss_path)
         self.embedder   = embedder
         self.meta_db    = meta_db or MetadataDB(self.kn_path)
         self.batch_size = batch_size
+        self.metadata_json_path = Path(metadata_json_path) if metadata_json_path else None
         self._kn_writer  = KNBinaryWriter(str(kn_path))
         self._buffer_texts: List[str]    = []
         self._buffer_meta:  List[Dict[str, Any]] = []
         self._faiss_index: Any = None
+        self._metadata_json_handle = None
+        self._metadata_json_temporary: Optional[Path] = None
+        self._metadata_json_first = True
+
+    def _begin_metadata_json(self) -> None:
+        if self.metadata_json_path is None:
+            return
+        self.metadata_json_path.parent.mkdir(parents=True, exist_ok=True)
+        self._metadata_json_temporary = self.metadata_json_path.with_name(
+            f".{self.metadata_json_path.name}.tmp"
+        )
+        self._metadata_json_temporary.unlink(missing_ok=True)
+        self._metadata_json_handle = self._metadata_json_temporary.open("w", encoding="utf-8")
+        self._metadata_json_handle.write("[")
+        self._metadata_json_first = True
+
+    def _write_metadata_json(self, records: List[Dict]) -> None:
+        if self._metadata_json_handle is None:
+            return
+        for record in records:
+            runtime_record = {
+                "pattern": record["question"],
+                "response": record["answer"],
+                "source": record["source"],
+                "domain": record["category"],
+                "namespace": "knowledge_cloud",
+                "key": record["key"],
+                "value": record["value"],
+                "row_index": record["row_index"],
+            }
+            if not self._metadata_json_first:
+                self._metadata_json_handle.write(",")
+            json.dump(runtime_record, self._metadata_json_handle, ensure_ascii=False)
+            self._metadata_json_first = False
+
+    def _finish_metadata_json(self, *, success: bool) -> None:
+        if self._metadata_json_handle is None:
+            return
+        if success:
+            self._metadata_json_handle.write("]\n")
+        self._metadata_json_handle.close()
+        self._metadata_json_handle = None
+        temporary = self._metadata_json_temporary
+        self._metadata_json_temporary = None
+        if temporary is None:
+            return
+        if success and self.metadata_json_path is not None:
+            os.replace(temporary, self.metadata_json_path)
+        else:
+            temporary.unlink(missing_ok=True)
 
     # ------------------------------------------------------------------
     # FAISS helpers
@@ -306,45 +359,52 @@ class KNPopulator:
         t0     = start
 
         self._load_existing_faiss()
+        self._begin_metadata_json()
 
         texts_buf: List[str]    = []
         meta_buf:  List[Dict]   = []
         kn_ids:    List[int]    = []
 
-        for entry in entries:
-            if max_entries is not None and (total + len(texts_buf)) >= max_entries:
-                break
-            # Combine question + answer + category into searchable text blob
-            blob = f"{entry.question} | {entry.answer} | {entry.category}"
-            texts_buf.append(blob)
-            meta_buf.append({
-                "key":      entry.key,
-                "question": entry.question,
-                "answer":   entry.answer,
-                "category": entry.category,
-                "value":    entry.value,
-                "source":   entry.source,
-                "row_index": entry.row_index,
-            })
-
-            if len(texts_buf) >= self.batch_size:
-                inserted = self._flush_batch(texts_buf, meta_buf, kn_ids)
-                total += inserted
-                texts_buf, meta_buf, kn_ids = [], [], []
-                elapsed = time.time() - t0
-                logger.info(f"  flushed batch ({inserted}), total={total}, {elapsed:.1f}s")
-                if max_entries and total >= max_entries:
+        try:
+            for entry in entries:
+                if max_entries is not None and (total + len(texts_buf)) >= max_entries:
                     break
+                # Query-side text is the runtime retrieval contract. Answers stay
+                # in aligned metadata and are not allowed to dominate similarity.
+                texts_buf.append(entry.question)
+                meta_buf.append({
+                    "key":      entry.key,
+                    "question": entry.question,
+                    "answer":   entry.answer,
+                    "category": entry.category,
+                    "value":    entry.value,
+                    "source":   entry.source,
+                    "row_index": entry.row_index,
+                })
 
-        # Flush remainder
-        if texts_buf:
-            total += self._flush_batch(texts_buf, meta_buf, kn_ids)
+                if len(texts_buf) >= self.batch_size:
+                    inserted = self._flush_batch(texts_buf, meta_buf, kn_ids)
+                    total += inserted
+                    texts_buf, meta_buf, kn_ids = [], [], []
+                    elapsed = time.time() - t0
+                    logger.info(f"  flushed batch ({inserted}), total={total}, {elapsed:.1f}s")
+                    if max_entries and total >= max_entries:
+                        break
 
-        # Persist FAISS index
-        if self._faiss_index is not None:
-            import faiss
-            faiss.write_index(self._faiss_index, str(self.faiss_path))
-            logger.info(f"FAISS index saved to {self.faiss_path} ({self._faiss_index.ntotal} vectors)")
+            # Flush remainder
+            if texts_buf:
+                total += self._flush_batch(texts_buf, meta_buf, kn_ids)
+
+            # Persist FAISS index
+            if self._faiss_index is not None:
+                import faiss
+                faiss.write_index(self._faiss_index, str(self.faiss_path))
+                logger.info(f"FAISS index saved to {self.faiss_path} ({self._faiss_index.ntotal} vectors)")
+        except BaseException:
+            self._finish_metadata_json(success=False)
+            raise
+        else:
+            self._finish_metadata_json(success=True)
 
         duration = time.time() - start
         kn_size  = self._kn_writer.size()
@@ -393,6 +453,7 @@ class KNPopulator:
                 value=m["value"], source=m["source"], row_index=m["row_index"],
             )
         self.meta_db.commit()
+        self._write_metadata_json(meta)
 
         return len(texts)
 
