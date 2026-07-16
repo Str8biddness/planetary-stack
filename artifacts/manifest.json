@@ -1,15 +1,15 @@
 {
   "version": "1",
   "kind": "synthesus-knowledge-artifacts",
-  "generated_at": "2026-04-24T01:07:13.812860+00:00",
+  "generated_at": "2026-07-16T05:15:28.520129+00:00",
   "roots": [
     "."
   ],
   "artifacts": [
     {
       "path": "faiss.index",
-      "size": 770794029,
-      "sha256": "600f9e6827cc698ebdd9f31153d61c408ec9d5d3431ef1dab2e822bf51503615"
+      "size": 261212259,
+      "sha256": "2ed3fd628412dc92a57580fce2f4eaffd1ac9da4212b98cad48ba61f9c03fd0c"
     },
     {
       "path": "faiss_metadata.json",
@@ -61,24 +61,43 @@
     "package_version": "0.3.0",
     "generated_by": "synthesus-kc build",
     "profile": "public-base",
-    "git_commit": "1f5a3bde3cf23a622553df45a0e297c527e6f23b",
-    "git_short_commit": "1f5a3bd",
-    "git_branch": "main",
+    "git_commit": "346d5c25474e366d88d9f13f0a69981c558ae1a5",
+    "git_short_commit": "346d5c2",
+    "git_branch": "agent/repair-knowledge-cloud-bundle",
     "git_dirty": false,
-    "python_version": "3.12.1",
-    "platform": "Linux-4.4.0-x86_64-with-glibc2.36",
-    "host": "modal",
+    "python_version": "3.12.3",
+    "platform": "Linux-6.17.0-40-generic-x86_64-with-glibc2.39",
+    "host": "dakin-chronos",
     "embedder": {
       "path": "models/swarm_embedder.pkl",
       "sha256": "b0489baaf1d0ee71a301f9c80dc09f0edc9cfa73f3f6c2bac6eaf346b26039a7",
       "size": 4443817
+    },
+    "source_manifest": {
+      "path": "manifests/source_manifest.json",
+      "sha256": "058dedea55e0855dcc99b4e9a562c57381e7e3c3409c005e1ed9023f85fca349",
+      "size": 27113,
+      "kind": "synthesus-knowledge-source-plane",
+      "generated_at": "2026-07-16T05:25:53.981277+00:00",
+      "roots": [
+        "sources",
+        "synthesus_knowledge_cloud",
+        "pipelines",
+        "docs",
+        "patterns",
+        "synthetic",
+        "grounding_corpus",
+        "support_models",
+        "corpus"
+      ],
+      "artifact_count": 153
     },
     "datasets": {
       "conceptnet": {
         "version": "1",
         "id": "conceptnet5_assertions",
         "name": "ConceptNet 5.7 assertions",
-        "source_type": "gzip_tsv",
+        "source_type": "public_gzip_csv",
         "license": ""
       },
       "huggingface": {
@@ -122,5 +141,5 @@
       ]
     }
   },
-  "manifest_revised_at": "2026-05-27T14:10:16.860117+00:00"
+  "manifest_revised_at": "2026-07-16T05:29:10.737419+00:00"
 }
