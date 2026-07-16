@@ -28,6 +28,13 @@ class TestHealthE2E:
         assert resp.status_code == 200
         data = resp.json()
         assert "status" in data
+        knowledge = data["knowledge_cloud"]
+        assert knowledge["mounted"] is True
+        assert knowledge["integrity_ok"] is True
+        assert len(knowledge["active_mounts"]) == 12
+        assert knowledge["retrieval_semantics"]["faiss_vectors"] == 501819
+        assert knowledge["retrieval_semantics"]["faiss_dim"] == 128
+        assert knowledge["base_read_only"] is True
 
     def test_root_endpoint(self, client):
         resp = client.get("/")

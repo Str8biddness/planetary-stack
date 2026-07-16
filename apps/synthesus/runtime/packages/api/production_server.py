@@ -487,9 +487,15 @@ except Exception as e:
 # Import Knowledge Cloud core module
 try:
     from core.knowledge_cloud import KnowledgeCloud  # type: ignore
+    from knowledge.runtime_mount import (  # type: ignore
+        resolve_knowledge_root,
+        validate_runtime_knowledge_root,
+    )
     HAS_KNOWLEDGE_CLOUD = True
 except ImportError:
     KnowledgeCloud = None  # type: ignore
+    resolve_knowledge_root = None  # type: ignore
+    validate_runtime_knowledge_root = None  # type: ignore
     HAS_KNOWLEDGE_CLOUD = False
     logger.warning("KnowledgeCloud module not available.")
 
@@ -585,7 +591,24 @@ _request_count = 0
 _start_time = time.time()
 _substrate: Optional[UniversalSubstrate] = None
 _knowledge_cloud: Optional[KnowledgeCloud] = None
+_knowledge_controller: Optional[Any] = None
+_knowledge_mount_root: Optional[Path] = None
+_knowledge_mount_error: Optional[str] = None
 _ingest_jobs: Dict[str, Dict[str, Any]] = {}
+
+
+class _UnavailableKnowledgeController:
+    """Fail-closed controller used when manifest admission cannot complete."""
+
+    def __init__(self, reason: str):
+        self.reason = reason
+
+    def query(self, _text: str, trust_available: float = 1.0):
+        del trust_available
+        raise RuntimeError(self.reason)
+
+    def get_mount_boot_report(self):
+        return None
 
 API_PATTERN_STORAGE_SURFACE = {
     "surface": "production_api_pattern_storage",
@@ -704,8 +727,54 @@ def _get_cognitive_hypervisor() -> Optional[Any]:
             # and degrades to Python if absent (never force a missing PROJ_ROOT/zo_kernel).
             return cast(Any, HemisphereBridge)()
 
-        _cognitive_hypervisor = cast(Any, CognitiveHypervisor)(bridge_factory=_bridge_factory)
+        _cognitive_hypervisor = cast(Any, CognitiveHypervisor)(
+            bridge_factory=_bridge_factory,
+            knowledge_controller=_knowledge_controller,
+        )
     return _cognitive_hypervisor
+
+
+def _knowledge_mount_health() -> Dict[str, Any]:
+    report = None
+    if _knowledge_controller is not None:
+        getter = getattr(_knowledge_controller, "get_mount_boot_report", None)
+        if callable(getter):
+            report = getter()
+
+    if report is None:
+        return {
+            "status": "degraded",
+            "mounted": False,
+            "artifact_root": str(_knowledge_mount_root) if _knowledge_mount_root else None,
+            "error": _knowledge_mount_error or "Knowledge Cloud mount is unavailable",
+            "active_mounts": [],
+        }
+
+    retrieval = (
+        report.retrieval_semantics.as_metadata()
+        if report.retrieval_semantics is not None
+        else None
+    )
+    provenance = (
+        report.source_manifest_provenance.as_metadata()
+        if report.source_manifest_provenance is not None
+        else None
+    )
+    cloud_stats = _knowledge_cloud.get_stats() if _knowledge_cloud is not None else {}
+    return {
+        "status": "mounted" if report.ok else "degraded",
+        "mounted": bool(report.ok),
+        "artifact_root": str(_knowledge_mount_root) if _knowledge_mount_root else None,
+        "manifest": report.manifest_path,
+        "manifest_version": report.manifest_version,
+        "active_mounts": list(report.active_mount_paths),
+        "integrity_ok": all(item.ok for item in report.integrity),
+        "retrieval_semantics": retrieval,
+        "source_manifest_provenance": provenance,
+        "entries": cloud_stats.get("total_entries", 0),
+        "writeback_path": cloud_stats.get("evolution_path"),
+        "base_read_only": cloud_stats.get("read_only_base", False),
+    }
 
 
 def _get_chal_memory_store() -> Optional[Any]:
@@ -867,6 +936,7 @@ async def startup():
     global ENABLE_ACCELERATION_LAYER
     global _substrate
     global _knowledge_cloud
+    global _knowledge_controller, _knowledge_mount_root, _knowledge_mount_error
     logger.info("Starting Synthesus 3.0 Production Server...")
     
     # Initialize Universal Substrate
@@ -881,10 +951,39 @@ async def startup():
     # Initialize Knowledge Cloud
     if HAS_KNOWLEDGE_CLOUD:
         try:
-            _knowledge_cloud = KnowledgeCloud(
-                data_dir=str(DATA_DIR / "knowledge_cloud"),
-                similarity_floor=0.30,
+            from knowledge.kal_adapter import CHALMemoryController  # type: ignore
+
+            if (
+                resolve_knowledge_root is None
+                or validate_runtime_knowledge_root is None
+            ):
+                raise RuntimeError("Knowledge Cloud mount integration is unavailable")
+            _knowledge_mount_root = resolve_knowledge_root(PROJ_ROOT, required=True)
+            os.environ.setdefault(
+                "SYNTHESUS_KNOWLEDGE_ROOT",
+                str(_knowledge_mount_root),
             )
+            mount_report = validate_runtime_knowledge_root(_knowledge_mount_root)
+            evolution_path = Path(
+                os.environ.get(
+                    "SYNTHESUS_KNOWLEDGE_EVOLUTION_PATH",
+                    str(DATA_DIR / "knowledge_cloud" / "evolution.json"),
+                )
+            )
+            _knowledge_cloud = KnowledgeCloud(
+                data_dir=_knowledge_mount_root / "knowledge_cloud",
+                similarity_floor=0.30,
+                evolution_path=evolution_path,
+                read_only_base=True,
+            )
+            _knowledge_controller = CHALMemoryController(
+                knowledge_root=_knowledge_mount_root,
+                strict_mount_integrity=True,
+                knowledge_cloud=_knowledge_cloud,
+                writeback_root=evolution_path.parent,
+                mount_boot_report=mount_report,
+            )
+            _knowledge_mount_error = None
             # Wire to REST API router
             if HAS_KNOWLEDGE_CLOUD_ROUTER and set_knowledge_cloud:
                 set_knowledge_cloud(_knowledge_cloud)
@@ -892,11 +991,21 @@ async def startup():
             logger.info(
                 f"Knowledge Cloud initialized: {cloud_stats['total_entries']} entries, "
                 f"{cloud_stats['total_aliases']} aliases, "
-                f"built in {cloud_stats['build_time_ms']:.0f}ms"
+                f"built in {cloud_stats['build_time_ms']:.0f}ms; "
+                f"{len(mount_report.active_mount_paths)} verified CHAL mounts"
             )
         except Exception as e:
-            logger.error(f"Knowledge Cloud failed to initialize: {e}")
+            _knowledge_mount_error = str(e)
+            logger.error(f"Knowledge Cloud mount DEGRADED: {e}")
             _knowledge_cloud = None
+            _knowledge_controller = _UnavailableKnowledgeController(
+                _knowledge_mount_error
+            )
+    else:
+        _knowledge_mount_error = "Knowledge Cloud modules are unavailable"
+        _knowledge_controller = _UnavailableKnowledgeController(
+            _knowledge_mount_error
+        )
     
     # Initialize Database
     try:
@@ -3033,11 +3142,15 @@ def get_health() -> HealthResponse:
     return HealthResponse(
         status="online",
         version="5.0.0",
+        subsystems={
+            "knowledge_cloud": _knowledge_mount_health()["status"],
+        },
         ml_swarm_active=HAS_ML_SWARM,
         ml_models_loaded=ml_status,
         llm={"realizer": os.environ.get("SYNTHESUS_REALIZER", "llm"), "model": os.environ.get("SYNTHESUS_MODEL", "llama3.2:3b"), "ollama_reachable": ollama_reachable},
         cognitive_engine_active=HAS_COGNITIVE,
         rag_active=(_rag is not None),
+        knowledge_cloud=_knowledge_mount_health(),
         uptime_seconds=time.time() - _start_time,
         active_sessions=len(_conversations),
         total_requests=_request_count
@@ -3399,6 +3512,7 @@ async def health():
             "enabled": _rag is not None,
             "vectors": _rag.total_vectors if _rag else 0,
         },
+        "knowledge_cloud": _knowledge_mount_health(),
         "llm": {
             "realizer": os.environ.get("SYNTHESUS_REALIZER", "llm"),
             "model": os.environ.get("OLLAMA_MODEL", "llama3"),

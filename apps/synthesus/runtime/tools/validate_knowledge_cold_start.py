@@ -20,20 +20,11 @@ from knowledge.mount_table import (
     KnowledgeCloudMountTable,
     MountTableBootReport,
 )
+from knowledge.runtime_mount import resolve_knowledge_root
 
 
 def _default_root() -> Path:
-    configured = os.environ.get("SYNTHESUS_KNOWLEDGE_ROOT")
-    if configured:
-        return Path(configured)
-    companion_roots = (
-        ROOT.parent.parent / "synthesus-knowledge-cloud" / "artifacts",
-        ROOT.parent / "synthesus-knowledge-cloud" / "artifacts",
-    )
-    for companion_artifacts in companion_roots:
-        if companion_artifacts.exists():
-            return companion_artifacts
-    return ROOT / "data"
+    return resolve_knowledge_root(ROOT, required=False) or ROOT / "data"
 
 
 def _cold_start_summary(report: MountTableBootReport) -> dict:

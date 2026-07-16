@@ -324,6 +324,22 @@ class CognitiveEngine:
             cloud_results = [cloud_results]
 
         ml_context = ml_context or {}
+        focused_facts = self._query_focused_knowledge_facts(
+            cloud_results,
+            query,
+            limit=2,
+        )
+
+        def preserve_grounded_evidence(text: str) -> str:
+            rendered = text.strip()
+            rendered_lower = rendered.lower()
+            for fact in focused_facts:
+                clean_fact = fact.strip().rstrip(".")
+                if not clean_fact or clean_fact.lower() in rendered_lower:
+                    continue
+                rendered = f"{rendered} {clean_fact}.".strip()
+                rendered_lower = rendered.lower()
+            return rendered
 
         # ── NEW: SequenceLinker + SlotFiller Integration ─────────────────────
         try:
@@ -389,7 +405,9 @@ class CognitiveEngine:
                     prefix_list = prefixes.get(max_depth, prefixes["acquainted"])
                     prefix = random.choice(prefix_list)
 
-                    return f"{prefix} {composed_response}"
+                    return preserve_grounded_evidence(
+                        f"{prefix} {composed_response}"
+                    )
 
         except Exception as e:
             # Log but don't fail — fall through to legacy synthesis
@@ -466,7 +484,7 @@ class CognitiveEngine:
             )
 
             if synthesized and len(synthesized.split()) > 4:
-                return f"{prefix} {synthesized}"
+                return preserve_grounded_evidence(f"{prefix} {synthesized}")
         except Exception as e:
             import logging
             logging.getLogger(__name__).warning(f"Knowledge Synthesis failed: {e}")
@@ -480,7 +498,88 @@ class CognitiveEngine:
         synthesized = re.sub(r"\[\?[^\]]+\]", "", synthesized)  # Optional tags
         synthesized = re.sub(r"\[[^\]]+\]", "", synthesized)     # Required tags
         synthesized = re.sub(r"\s+", " ", synthesized).strip()
-        return f"{prefix} {synthesized}" if synthesized else prefix
+        fallback = f"{prefix} {synthesized}" if synthesized else prefix
+        return preserve_grounded_evidence(fallback)
+
+    @staticmethod
+    def _query_focused_knowledge_facts(
+        cloud_results: List[Dict[str, Any]],
+        query: str,
+        *,
+        limit: int = 2,
+    ) -> List[str]:
+        """Select grounded facts whose topic terms are most relevant to the query."""
+
+        def terms(text: str) -> set[str]:
+            raw = {
+                term
+                for term in re.findall(r"[a-z]+", text.lower())
+                if len(term) > 1
+            }
+            normalized: set[str] = set()
+            for term in raw:
+                normalized.add(term)
+                if len(term) > 4 and term.endswith("ies"):
+                    normalized.add(term[:-3] + "y")
+                elif len(term) > 4 and term.endswith("s") and not term.endswith("ss"):
+                    normalized.add(term[:-1])
+            return normalized
+
+        stop_words = {
+            "a", "an", "and", "about", "at", "do", "for", "in", "is", "know",
+            "me", "of", "on", "the", "to", "what", "with", "you",
+        }
+        query_terms = terms(query) - stop_words
+        all_identity_terms: set[str] = set()
+        for result in cloud_results:
+            all_identity_terms.update(
+                terms(
+                    " ".join(
+                        [
+                            str(result.get("entity_id", "")).replace("_", " "),
+                            str(result.get("entity_name", "")),
+                            *[str(alias) for alias in result.get("aliases", [])],
+                        ]
+                    )
+                )
+            )
+        topic_terms = query_terms - all_identity_terms
+        ranked: List[tuple[int, int, int, int, str]] = []
+
+        for result_index, result in enumerate(cloud_results):
+            for fact_index, fact_value in enumerate(result.get("facts", [])):
+                fact = str(fact_value).strip()
+                if not fact:
+                    continue
+                fact_terms = terms(fact)
+                topic_overlap = len(topic_terms & fact_terms)
+                total_overlap = len(query_terms & fact_terms)
+                if topic_terms and topic_overlap == 0:
+                    continue
+                if not topic_terms and total_overlap < 2:
+                    continue
+                ranked.append(
+                    (
+                        topic_overlap,
+                        total_overlap,
+                        -result_index,
+                        fact_index,
+                        fact,
+                    )
+                )
+
+        ranked.sort(reverse=True)
+        selected: List[str] = []
+        seen: set[str] = set()
+        for _topic, _total, _result_index, _fact_index, fact in ranked:
+            key = fact.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            selected.append(fact)
+            if len(selected) >= max(0, limit):
+                break
+        return selected
 
     def _load_knowledge(self, bio: Dict, character_id: str) -> Dict:
         """Load knowledge graph from character's knowledge.json file.

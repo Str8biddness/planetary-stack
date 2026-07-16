@@ -51,8 +51,11 @@ Acceptance gate: one clone contains every canonical source boundary and
   retirement note; do not silently delete unique work.
 - [ ] Move architecture-only vSource and Unisync material into versioned
   cross-component specifications.
-- [ ] Fix the mounted Knowledge Cloud evolution regression exposed by
+- [x] Fix the mounted Knowledge Cloud evolution regression exposed by
   `tests/test_knowledge_evolution.py::test_knowledge_evolution_propagation`.
+  Evidence: 2026-07-16 query-focused grounded-fact retention preserves newly
+  witnessed facts across shared NPC clouds while the immutable artifact base
+  writes only to the runtime evolution overlay.
 - [ ] Replace internal imports that depend on former repository roots.
 - [ ] Add compatibility shims only where a dated removal issue exists.
 
@@ -87,7 +90,13 @@ changed-component test matrix from documented commands.
 - [ ] Define Unisync backends for local memory/PCIe, trusted LAN, and Internet
   task/object transport.
 - [ ] Define AIVM workload and artifact manifests.
-- [ ] Mount the Knowledge Cloud through a versioned manifest-verified client.
+- [x] Mount the Knowledge Cloud through a versioned manifest-verified client.
+  Evidence: 2026-07-16 production startup resolves the monorepo/standalone
+  artifact root, validates hashes, 501,819-vector retrieval semantics,
+  source-manifest provenance, and 12 required CHAL mounts, then shares the
+  admitted controller with the Cognitive Hypervisor. A live desktop request
+  completed through `mode="chal"` with mounted `/mnt/rom/world_lore`
+  provenance and `final_language_owner="cgpu_llm"`.
 
 Acceptance gate: the desktop can launch one real local workload through
 desktop → controller → CHAL → vSource → AIVM and retrieve a verified Knowledge
