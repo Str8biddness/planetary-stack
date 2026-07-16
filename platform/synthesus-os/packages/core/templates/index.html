@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synthesus Query Interface</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Synthesus Query Interface</h1>
+
+        <form method="post" action="/query">
+            <textarea name="prompt" rows="4" cols="80" placeholder="Enter your query here..."></textarea>
+
+            <label for="domain">Mode:</label>
+            <select name="domain" id="domain">
+                <option value="sysops" selected>SysOps</option>
+                <option value="gm">Game Master</option>
+                <option value="assistant">Assistant</option>
+                <option value="legal">Legal</option>
+            </select>
+
+            <button type="submit">Send</button>
+        </form>
+
+        {% if show_answer %}
+        <h2>Answer</h2>
+        <pre>{{ answer }}</pre>
+
+        <form method="post" action="/feedback">
+            <input type="hidden" name="event_id" value="{{ event_id }}">
+            <button name="feedback_type" value="correct">👍 Helpful</button>
+            <button name="feedback_type" value="incorrect">👎 Not helpful</button>
+        </form>
+
+        <details>
+            <summary>Show reasoning details</summary>
+            <p><strong>Role:</strong> {{ role }} | <strong>Tone:</strong> {{ tone }}</p>
+            <p><strong>Engines used:</strong> {{ engines_used }}</p>
+
+            {% if explanations %}
+                <h3>Key explanations</h3>
+                <ul>
+                    {% for e in explanations %}
+                        <li>{{ e }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+
+            {% if actions_taken %}
+                <h3>Actions taken</h3>
+                <ul>
+                    {% for a in actions_taken %}
+                        <li>{{ a }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </details>
+        {% endif %}
+
+        {% if domain == 'sysops' %}
+        <div class="warning">
+            SysOps mode: This system only recommends actions. Kernel modifications are disabled in this environment.
+        </div>
+        {% endif %}
+
+        <div class="status">
+            <p><strong>Trainer Status:</strong></p>
+            <p>Last Batch: {% if trainer_status.last_batch_time > 0 %}{{ trainer_status.last_batch_time | strftime('%Y-%m-%d %H:%M:%S') }}{% else %}Never{% endif %}</p>
+            <p>Learned Rules: {{ trainer_status.learned_rules }}</p>
+            <p>Sandbox Mode: {% if trainer_status.sandbox_mode %}Yes{% else %}No{% endif %}</p>
+            {% if kernel_enabled %}
+            <p>Kernel actions: {% if kernel_enabled %}enabled{% else %}disabled{% endif %}</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

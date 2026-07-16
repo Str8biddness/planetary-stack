@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYNTHESUS -- by AIVM</title>
+    <!-- Professional Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Orbitron:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+
+    <!-- Hyperspace Warp-Speed Background -->
+    <div class="hyperspace-bg">
+        <!-- Twinkling Starfield -->
+        <div class="starfield" id="starfield"></div>
+
+        <!-- Streaking Stars -->
+        <div class="warp-stars" id="warpStars"></div>
+
+        <!-- Chemical Asteroids (Orange/Pink Trails) -->
+        <div class="chemical-asteroids" id="asteroids"></div>
+
+        <!-- Animated Planets -->
+        <div class="animated-planets">
+            <div class="planet planet-1"></div>
+            <div class="planet planet-2"></div>
+            <div class="planet planet-3"></div>
+        </div>
+
+        <!-- Warp Flash Effect -->
+        <div class="warp-flash" id="warpFlash"></div>
+    </div>
+
+    <div class="app-container">
+
+        <!-- TOP HEADER -->
+        <header class="top-header glass-panel">
+            <div class="brand">
+                <div class="logo-mark"><i class="fa-solid fa-galaxy"></i></div>
+                <div class="brand-text">
+                    <h1>SYNTHESUS <span class="version">3.0</span></h1>
+                    <p>Advanced AI Character Intelligence Platform</p>
+                </div>
+            </div>
+
+            <div class="system-stats">
+                <div class="stat-box">
+                    <span class="stat-label">KAL VECTORS</span>
+                    <span class="stat-value" id="kalCount">--</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">WORLD ENTITIES</span>
+                    <span class="stat-value" id="entityCount">--</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">CONVERSATIONS</span>
+                    <span class="stat-value" id="convCount">--</span>
+                </div>
+                <div class="health-status">
+                    <div class="pulse-ring">
+                        <div class="pulse-dot" id="statusDot"></div>
+                    </div>
+                    <span id="statusText">INITIALIZING</span>
+                </div>
+                <div class="nav-links" style="margin-left: 20px;">
+                    <a href="/static/control-plane.html" id="controlPlaneLink" style="color: #ff8c00; text-decoration: none; display: none;"><i class="fa-solid fa-rocket"></i> Portal Control</a>
+                </div>
+            </div>
+        </header>
+
+        <div class="glass-panel" style="margin-top: 12px; padding: 12px 16px; display:flex; align-items:center; justify-content:space-between; gap: 12px;">
+            <div style="display:flex; align-items:center; gap: 10px;">
+                <span style="font-size: 12px; color: rgba(255,255,255,0.7);">World State</span>
+                <span id="worldStatus" style="font-size: 12px; color: rgba(255,255,255,0.7);">Active</span>
+            </div>
+            <div style="display:flex; align-items:center; gap: 8px; flex-wrap: wrap;">
+                <input id="authIdentifier" type="text" placeholder="user identity" style="padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.25); color: rgba(255,255,255,0.9);" />
+                <input id="authPassword" type="password" placeholder="access code" style="padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.25); color: rgba(255,255,255,0.9);" />
+                <button class="btn btn-outline" id="loginBtn"><i class="fa-solid fa-right-to-bracket"></i> Initialize</button>
+                <button class="btn btn-outline" id="registerBtn"><i class="fa-solid fa-user-plus"></i> Register Entity</button>
+                <button class="btn btn-outline" id="logoutBtn" style="display:none;"><i class="fa-solid fa-right-from-bracket"></i> Disconnect</button>
+            </div>
+        </div>
+
+        <main class="main-layout">
+
+            <!-- LEFT PANEL: AGENT ROSTER -->
+            <aside class="left-panel glass-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-rocket"></i> Agent Directory</h2>
+                </div>
+                <div class="character-list" id="charList">
+                    <!-- Loaded via JS -->
+                    <div class="loading-state"><i class="fa-solid fa-circle-notch fa-spin"></i> Scanning for Agents...</div>
+                </div>
+
+                <div class="panel-footer setting-group">
+                    <label>Consciousness Mode</label>
+                    <div class="custom-select">
+                        <select id="modeSelect">
+                            <option value="auto">Unified C(t)→C(t+1)</option>
+                            <option value="world">World-Core Focus</option>
+                            <option value="agent">Agent-Core Focus</option>
+                        </select>
+                        <i class="fa-solid fa-chevron-down select-icon"></i>
+                    </div>
+                    <button class="btn btn-outline" id="clearBtn"><i class="fa-solid fa-trash-can"></i> Clear Memory Matrix</button>
+                </div>
+            </aside>
+
+            <!-- CENTER PANEL: HYPERSPACE INTERFACE -->
+            <section class="center-panel glass-panel">
+                <div class="chat-header">
+                    <div class="active-char-avatar"><i class="fa-solid fa-atom"></i></div>
+                    <div class="active-char-info">
+                        <h2 id="chatCharName">Select Neural Entity</h2>
+                        <span id="chatCharRole">Awaiting Consciousness Link</span>
+                    </div>
+                </div>
+
+                <div class="chat-messages" id="messages">
+                    <div class="empty-state">
+                        <i class="fa-solid fa-rocket"></i>
+                        <p>Consciousness bridge established. Initiate hyperspace transmission.</p>
+                    </div>
+                </div>
+
+                <div class="chat-input-area">
+                    <div class="input-wrapper">
+                        <input type="text" id="queryInput" placeholder="Transmit neural pattern..." autocomplete="off">
+                        <button id="sendBtn" class="btn btn-primary"><i class="fa-solid fa-bolt"></i> WARP</button>
+                    </div>
+                </div>
+            </section>
+
+            <aside class="right-panel glass-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-satellite"></i> World Telemetry</h2>
+                    <span class="live-badge">LIVE</span>
+                </div>
+
+                <div class="telemetry-content" id="telemetryContent">
+                    <div class="empty-telemetry">
+                        <i class="fa-solid fa-wave-square"></i>
+                        <p>Scanning for World State Data...</p>
+                    </div>
+                    <!-- Telemetry Modules will be injected here by JS -->
+                </div>
+
+                <!-- Portal Adapters Section -->
+                <div class="labs-section" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                    <h3 style="color: #ff8c00; font-size: 14px; margin-bottom: 10px;"><i class="fa-solid fa-portal-enter"></i> Portal Adapters</h3>
+                    <div class="setting-group">
+                        <label>World Architecture</label>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="enableWorldArch" checked>
+                            <label for="enableWorldArch" class="toggle-slider"></label>
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <label>Multi-Character Mode</label>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="allowMultiChar">
+                            <label for="allowMultiChar" class="toggle-slider"></label>
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <label>KAL Parameter Cloud</label>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="enableKAL" checked>
+                            <label for="enableKAL" class="toggle-slider"></label>
+                        </div>
+                    </div>
+                    <div class="labs-status" style="margin-top: 10px; font-size: 12px; color: rgba(255,255,255,0.7);">
+                        <div>World Core: <span id="worldCoreStatus">Active</span></div>
+                        <div>Agent Core: <span id="agentCoreStatus">Active</span></div>
+                        <div>Portal Adapters: <span id="portalStatus">Active</span></div>
+                        <div>KAL Episodes: <span id="kalEpisodes">--</span></div>
+                        <a href="/console/README.md" target="_blank" style="color: #ff8c00; text-decoration: none;"><i class="fa-solid fa-terminal"></i> System Console</a>
+                    </div>
+                </div>
+            </aside>
+
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

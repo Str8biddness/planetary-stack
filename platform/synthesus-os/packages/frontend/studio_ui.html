@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIVM Character Studio</title>
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --surface2: #1a1a26;
+  --border: #2a2a3a;
+  --text: #e8e8f0;
+  --text-dim: #8888aa;
+  --gold: #f0a030;
+  --orange: #e06820;
+  --pink: #d04080;
+  --accent: linear-gradient(135deg, #f0a030, #e06820, #d04080);
+  --success: #40c060;
+  --error: #e04040;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+header h1 {
+  font-size: 20px;
+  background: var(--accent);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 700;
+}
+header .subtitle { color: var(--text-dim); font-size: 13px; }
+.container {
+  display: grid;
+  grid-template-columns: 340px 1fr 380px;
+  gap: 1px;
+  background: var(--border);
+  min-height: calc(100vh - 56px);
+}
+.panel {
+  background: var(--surface);
+  padding: 20px;
+  overflow-y: auto;
+}
+.panel h2 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold);
+  margin-bottom: 16px;
+}
+.field { margin-bottom: 14px; }
+.field label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.field input, .field textarea, .field select {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.field input:focus, .field textarea:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+.field textarea { resize: vertical; min-height: 60px; }
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.slider-row label {
+  width: 100px;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.slider-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--gold);
+  height: 4px;
+}
+.slider-row .val {
+  width: 36px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--gold);
+  font-family: monospace;
+}
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-secondary {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { border-color: var(--gold); }
+.btn-group { display: flex; gap: 8px; margin-top: 16px; }
+
+/* Chat Panel */
+.chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 300px;
+  max-height: calc(100vh - 200px);
+}
+.msg {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.msg.user {
+  align-self: flex-end;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+.msg.npc {
+  align-self: flex-start;
+  background: linear-gradient(135deg, rgba(240,160,48,0.15), rgba(208,64,128,0.15));
+  border: 1px solid rgba(240,160,48,0.3);
+}
+.msg .meta {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+.chat-input {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+.chat-input input {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.chat-input input:focus { outline: none; border-color: var(--gold); }
+
+/* Debug Panel */
+.debug-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.debug-card h3 {
+  font-size: 12px;
+  color: var(--gold);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.debug-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 3px 0;
+}
+.debug-row .label { color: var(--text-dim); }
+.debug-row .value { color: var(--text); font-family: monospace; }
+.status-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+.status-dot.active { background: var(--success); }
+.status-dot.inactive { background: var(--error); }
+#no-session {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-dim);
+  font-size: 14px;
+  text-align: center;
+  padding: 40px;
+}
+.export-json {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AIVM Character Studio</h1>
+  <span class="subtitle">Build, test, and export NPC characters</span>
+</header>
+
+<div class="container">
+  <!-- Left: Genome Editor -->
+  <div class="panel" id="editor-panel">
+    <h2>Character Genome</h2>
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="char-name" value="New Character" />
+    </div>
+    <div class="field">
+      <label>Role</label>
+      <input type="text" id="char-role" value="merchant" />
+    </div>
+    <div class="field">
+      <label>Greeting</label>
+      <textarea id="char-greeting">Hello there, traveler.</textarea>
+    </div>
+    <div class="field">
+      <label>Backstory</label>
+      <textarea id="char-backstory" rows="3"></textarea>
+    </div>
+    <div class="field">
+      <label>Knowledge Domain</label>
+      <input type="text" id="char-domain" placeholder="e.g. herbalism, blacksmithing" />
+    </div>
+
+    <h2 style="margin-top:20px">Personality Traits</h2>
+    <div id="trait-sliders">
+      <!-- Generated by JS -->
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="createSession()">Create / Reset</button>
+      <button class="btn btn-secondary" onclick="updateGenome()">Apply Changes</button>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="exportCharacter()">Export JSON</button>
+      <button class="btn btn-secondary" onclick="saveCharacter()">Save to Disk</button>
+    </div>
+    <div id="export-output" style="margin-top:12px;display:none">
+      <div class="export-json" id="export-json"></div>
+    </div>
+  </div>
+
+  <!-- Center: Chat Preview -->
+  <div class="panel chat-area" id="chat-panel">
+    <h2>Conversation Preview</h2>
+    <div id="no-session">
+      <p>Click "Create / Reset" to start a character session,<br>then chat here to preview your NPC.</p>
+    </div>
+    <div class="chat-messages" id="chat-messages" style="display:none"></div>
+    <div class="chat-input" id="chat-input" style="display:none">
+      <input type="text" id="msg-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMessage()" />
+      <button class="btn btn-primary" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <!-- Right: Debug Info -->
+  <div class="panel" id="debug-panel">
+    <h2>Debug Info</h2>
+    <div class="debug-card">
+      <h3>Session</h3>
+      <div class="debug-row">
+        <span class="label">Status</span>
+        <span class="value" id="dbg-status"><span class="status-dot inactive"></span>No session</span>
+      </div>
+      <div class="debug-row">
+        <span class="label">Session ID</span>
+        <span class="value" id="dbg-session-id">—</span>
+      </div>
+      <div class="debug-row">
+        <span class="label">Character ID</span>
+        <span class="value" id="dbg-char-id">—</span>
+      </div>
+      <div class="debug-row">
+        <span class="label">Patterns</span>
+        <span class="value" id="dbg-patterns">0</span>
+      </div>
+    </div>
+    <div class="debug-card">
+      <h3>Last Response</h3>
+      <div class="debug-row">
+        <span class="label">Source</span>
+        <span class="value" id="dbg-source">—</span>
+      </div>
+      <div class="debug-row">
+        <span class="label">Confidence</span>
+        <span class="value" id="dbg-confidence">—</span>
+      </div>
+      <div class="debug-row">
+        <span class="label">Emotion</span>
+        <span class="value" id="dbg-emotion">—</span>
+      </div>
+      <div class="debug-row">
+        <span class="label">Match Score</span>
+        <span class="value" id="dbg-match">—</span>
+      </div>
+      <div class="debug-row">
+        <span class="label">Latency</span>
+        <span class="value" id="dbg-latency">—</span>
+      </div>
+    </div>
+    <div class="debug-card">
+      <h3>Characters on Disk</h3>
+      <div id="char-list" style="font-size:12px;color:var(--text-dim)">Loading...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';  // Same origin
+let sessionId = null;
+let characterId = null;
+
+const TRAITS = [
+  { key: 'chattiness', label: 'Chattiness', default: 0.5 },
+  { key: 'friendliness', label: 'Friendliness', default: 0.5 },
+  { key: 'formality', label: 'Formality', default: 0.5 },
+  { key: 'humor', label: 'Humor', default: 0.3 },
+  { key: 'aggression', label: 'Aggression', default: 0.1 },
+  { key: 'curiosity', label: 'Curiosity', default: 0.5 },
+];
+
+// Initialize trait sliders
+function initSliders() {
+  const container = document.getElementById('trait-sliders');
+  container.innerHTML = '';
+  TRAITS.forEach(t => {
+    const row = document.createElement('div');
+    row.className = 'slider-row';
+    row.innerHTML = `
+      <label>${t.label}</label>
+      <input type="range" min="0" max="100" value="${t.default*100}" 
+             id="trait-${t.key}" oninput="updateSliderVal('${t.key}')">
+      <span class="val" id="val-${t.key}">${t.default.toFixed(2)}</span>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function updateSliderVal(key) {
+  const v = document.getElementById('trait-'+key).value / 100;
+  document.getElementById('val-'+key).textContent = v.toFixed(2);
+}
+
+function getPersonality() {
+  const p = {};
+  TRAITS.forEach(t => {
+    p[t.key] = document.getElementById('trait-'+t.key).value / 100;
+  });
+  return p;
+}
+
+async function createSession() {
+  const body = {
+    name: document.getElementById('char-name').value,
+    role: document.getElementById('char-role').value,
+    greeting: document.getElementById('char-greeting').value,
+    backstory: document.getElementById('char-backstory').value,
+    knowledge_domain: document.getElementById('char-domain').value,
+    personality: getPersonality(),
+  };
+  const res = await fetch(API + '/api/session/create', {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  sessionId = data.session_id;
+  characterId = data.character_id;
+  
+  document.getElementById('dbg-status').innerHTML = '<span class="status-dot active"></span>Active';
+  document.getElementById('dbg-session-id').textContent = sessionId.slice(0,16) + '...';
+  document.getElementById('dbg-char-id').textContent = characterId;
+  document.getElementById('dbg-patterns').textContent = data.pattern_count;
+  
+  document.getElementById('no-session').style.display = 'none';
+  document.getElementById('chat-messages').style.display = 'flex';
+  document.getElementById('chat-input').style.display = 'flex';
+  document.getElementById('chat-messages').innerHTML = '';
+  document.getElementById('export-output').style.display = 'none';
+  
+  addMessage('npc', `[Session created] ${data.bio.name} is ready to chat.`);
+  loadCharacters();
+}
+
+async function updateGenome() {
+  if (!sessionId) { alert('Create a session first'); return; }
+  const body = {
+    name: document.getElementById('char-name').value,
+    role: document.getElementById('char-role').value,
+    greeting: document.getElementById('char-greeting').value,
+    backstory: document.getElementById('char-backstory').value,
+    knowledge_domain: document.getElementById('char-domain').value,
+    personality: getPersonality(),
+  };
+  const res = await fetch(API + `/api/session/${sessionId}/genome`, {
+    method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  document.getElementById('dbg-patterns').textContent = data.pattern_count;
+  addMessage('npc', `[Genome updated] Patterns regenerated (${data.pattern_count} patterns).`);
+}
+
+async function sendMessage() {
+  if (!sessionId) return;
+  const input = document.getElementById('msg-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  
+  addMessage('user', msg);
+  
+  const res = await fetch(API + `/api/session/${sessionId}/chat`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ message: msg })
+  });
+  const data = await res.json();
+  
+  addMessage('npc', data.response, data);
+  
+  // Update debug
+  document.getElementById('dbg-source').textContent = data.source;
+  document.getElementById('dbg-confidence').textContent = data.confidence?.toFixed(3) || '—';
+  document.getElementById('dbg-emotion').textContent = data.emotion || '—';
+  document.getElementById('dbg-match').textContent = data.debug?.match_score?.toFixed(3) || '—';
+  document.getElementById('dbg-latency').textContent = (data.debug?.latency_ms?.toFixed(1) || '—') + 'ms';
+}
+
+function addMessage(type, text, data) {
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = `msg ${type}`;
+  let meta = '';
+  if (type === 'npc' && data && data.confidence) {
+    meta = `<div class="meta">${data.source} · ${(data.confidence*100).toFixed(0)}% · ${data.emotion}</div>`;
+  }
+  div.innerHTML = text + meta;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+async function exportCharacter() {
+  if (!sessionId) { alert('Create a session first'); return; }
+  const res = await fetch(API + `/api/session/${sessionId}/export`);
+  const data = await res.json();
+  const el = document.getElementById('export-json');
+  el.textContent = JSON.stringify(data, null, 2);
+  document.getElementById('export-output').style.display = 'block';
+}
+
+async function saveCharacter() {
+  if (!sessionId) { alert('Create a session first'); return; }
+  const res = await fetch(API + `/api/session/${sessionId}/save`, { method: 'POST' });
+  const data = await res.json();
+  addMessage('npc', `[Saved] Character written to ${data.saved_to}`);
+  loadCharacters();
+}
+
+async function loadCharacters() {
+  try {
+    const res = await fetch(API + '/api/characters');
+    const data = await res.json();
+    const el = document.getElementById('char-list');
+    if (data.characters.length === 0) {
+      el.textContent = 'No characters saved yet.';
+    } else {
+      el.innerHTML = data.characters.map(c => 
+        `<div style="padding:3px 0">${c.name} <span style="color:var(--text-dim)">(${c.role})</span></div>`
+      ).join('');
+    }
+  } catch(e) {
+    document.getElementById('char-list').textContent = 'Could not load.';
+  }
+}
+
+// Init
+initSliders();
+loadCharacters();
+</script>
+</body>
+</html>

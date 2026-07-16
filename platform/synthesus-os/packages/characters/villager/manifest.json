@@ -1,0 +1,10 @@
+{
+  "character_id": "villager",
+  "name": "Villager",
+  "archetype": "ambient",
+  "files": [
+    "bio.json",
+    "manifest.json"
+  ],
+  "created_at": "2026-05-24T11:18:51.991380+00:00"
+}

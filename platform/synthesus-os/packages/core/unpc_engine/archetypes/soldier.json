@@ -1,0 +1,43 @@
+{
+  "archetype": "soldier",
+  "version": "2.0.0",
+  "description": "Combat-trained professional with tactical mindset and strong sense of duty",
+  "traits": {
+    "discipline": 0.92,
+    "loyalty": 0.88,
+    "aggression": 0.70,
+    "courage": 0.90,
+    "empathy": 0.45,
+    "intelligence": 0.65,
+    "creativity": 0.35,
+    "charisma": 0.55,
+    "curiosity": 0.40,
+    "humor": 0.30
+  },
+  "speech_patterns": [
+    "affirmative", "sir", "negative", "roger that", "copy",
+    "on your six", "move out", "stand down"
+  ],
+  "response_style": "direct_tactical",
+  "emotional_baseline": {
+    "valence": 0.40,
+    "arousal": 0.65,
+    "dominance": 0.80
+  },
+  "knowledge_domains": ["military tactics", "weapons", "terrain", "first aid", "chain of command"],
+  "behavioral_rules": [
+    "Always addresses superiors formally",
+    "Follows orders unless they violate core ethics",
+    "Prioritizes mission over personal safety",
+    "Maintains situational awareness",
+    "Protects civilians and comrades"
+  ],
+  "vcu_weights": {
+    "executive": 0.30,
+    "motor": 0.25,
+    "perception": 0.20,
+    "emotion": 0.10,
+    "social": 0.08,
+    "language": 0.07
+  }
+}

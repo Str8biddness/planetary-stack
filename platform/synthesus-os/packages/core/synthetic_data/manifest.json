@@ -1,0 +1,12 @@
+{
+  "generated": "20260428-032155",
+  "size_per_class": 400,
+  "organs": {
+    "INTENT": 5600,
+    "SENTIMENT": 2400,
+    "BEHAVIOR": 400,
+    "EMOTION": 3200,
+    "DIALOGUE": 1600,
+    "LOOT": 400
+  }
+}
