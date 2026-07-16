@@ -6,7 +6,7 @@ as each subtree is imported.
 | Monorepo path | Source | Branch | Imported commit | State |
 | --- | --- | --- | --- | --- |
 | `apps/synthesus/` | `git@github.com:Str8biddness/synthesus.git` | `fix/launch-async-guard` | `407fd40` | Imported with history |
-| `knowledge/knowledge-cloud/` | `git@github.com:Str8biddness/synthesus-knowledge-cloud.git` | `agent/repair-knowledge-cloud-bundle` | `ab549df` | Imported with history and LFS pointers |
+| `knowledge/knowledge-cloud/` | `git@github.com:Str8biddness/synthesus-knowledge-cloud.git` | `agent/repair-knowledge-cloud-bundle` | `ab549df` | Imported with history; one obsolete derived LFS pointer normalized for publication |
 | `platform/planetary-os/` | `git@github.com:Str8biddness/aivm-planetary-os.git` | `main` | `11209e9` | Imported with history |
 | `platform/synthesus-os/` | `git@github.com:reality-core-systems/synthesus-os.git` | `main` | `db72d05` | Imported with history |
 | `research/synthetic-intelligence-network/` | `git@github.com:Str8biddness/synthetic-intelligence-neural-network.git` | `main` | `3f5afc3` | Imported with history |
@@ -24,6 +24,15 @@ Each source was imported as a Git subtree without squashing. This retains the
 available commit graph and provides a route for emergency synchronization
 while canonical ownership is moved into the monorepo. The source clones were
 unshallowed before import where necessary.
+
+GitHub publication required a narrow rewrite of the Knowledge Cloud import:
+the initial bundle's superseded 770 MB FAISS LFS pointer was replaced with the
+repaired 261 MB pointer already present in the imported branch. Commit count,
+messages, authorship, timestamps, source code, and the current tree were
+preserved. Historical manifests still record the original derived build for
+provenance, and the exact source commit remains available at the source remote.
+Monorepo commit IDs at and after that historical pointer therefore differ from
+the original import IDs.
 
 ## Security scan state
 

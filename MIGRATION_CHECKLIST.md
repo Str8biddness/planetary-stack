@@ -29,8 +29,10 @@ and secret-scan result recorded in `docs/REPOSITORY_MAP.md`.
 - [x] Import Synthetic Intelligence Network into
   `research/synthetic-intelligence-network/`.
 - [x] Record source remote and commit metadata.
+- [x] Publish the private integration repository as
+  `Str8biddness/planetary-stack`.
 - [x] Add root diagnostics and run them from the integrated checkout.
-- [ ] Verify root diagnostics from a fresh clone after the GitHub repository
+- [x] Verify root diagnostics from a fresh clone after the GitHub repository
   exists.
 
 Acceptance gate: one clone contains every canonical source boundary and

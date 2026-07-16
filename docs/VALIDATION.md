@@ -75,7 +75,30 @@ the full suite can be declared green.
 
 ## GitHub publication
 
-Publication is currently blocked because the local GitHub CLI credential for
-`Str8biddness` is expired or invalid. The local repository and commits remain
-intact. Re-authentication is required before creating and pushing
-`Str8biddness/planetary-stack`.
+The private repository is published at
+`git@github.com:Str8biddness/planetary-stack.git`.
+
+Git LFS accepted all 25 objects required by `main`:
+
+```text
+Uploading LFS objects: 100% (25/25), 615 MB
+```
+
+The source history contained a superseded 770 MB FAISS object whose
+non-resumable upload repeatedly restarted. Before publication, a complete
+backup bundle was verified and the monorepo history was normalized to replace
+only that old LFS pointer with the repaired 261 MB pointer already present in
+the imported Knowledge Cloud branch. The rewrite retained all 398 commits and
+left the current repository tree unchanged.
+
+A fresh clone of published commit `19c43ce` verified:
+
+```text
+SUMMARY required_missing=0 optional_missing=6
+```
+
+The sixth degraded item was intentional because the verification clone skipped
+large LFS smudging. The doctor was corrected to distinguish pointer-only files
+from hydrated objects. A separate LFS pull retrieved
+`artifacts/knowledge.kndb` at 38,500 bytes with the expected SHA-256
+`35aa50935f05151801e1c0b5473b9d6706ed0f212c78a9d1aae9cb22673b4627`.

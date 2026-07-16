@@ -60,11 +60,21 @@ check_path platform/planetary-os
 check_path platform/synthesus-os
 check_path research/synthetic-intelligence-network
 
-if git lfs ls-files knowledge/knowledge-cloud 2>/dev/null | grep -q ' - '; then
-    printf 'DEGRADED Knowledge Cloud LFS objects are not hydrated\n'
-    optional_missing=$((optional_missing + 1))
+if command -v git-lfs >/dev/null 2>&1; then
+    lfs_listing="$(
+        git lfs ls-files --include='knowledge/knowledge-cloud/**' 2>/dev/null
+    )"
+    if grep -q ' - ' <<<"$lfs_listing"; then
+        printf 'DEGRADED Knowledge Cloud LFS objects are not fully hydrated\n'
+        optional_missing=$((optional_missing + 1))
+    elif grep -q ' \* ' <<<"$lfs_listing"; then
+        printf 'PASS Knowledge Cloud LFS objects are hydrated\n'
+    else
+        printf 'DEGRADED Knowledge Cloud LFS tracking state is unavailable\n'
+        optional_missing=$((optional_missing + 1))
+    fi
 else
-    printf 'PASS Knowledge Cloud LFS objects are hydrated\n'
+    printf 'DEGRADED Knowledge Cloud LFS hydration cannot be inspected\n'
 fi
 
 printf 'SUMMARY required_missing=%d optional_missing=%d\n' \
