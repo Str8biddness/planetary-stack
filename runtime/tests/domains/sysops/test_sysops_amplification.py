@@ -1,7 +1,7 @@
 import pytest
 import asyncio
 from unittest.mock import patch, MagicMock
-from fastapi.testclient import TestClient
+import httpx
 
 from api.production_server import app, _character_cache
 from amplification_wrapper import AmplificationPlane
@@ -25,8 +25,6 @@ mock_call_ts = MagicMock(return_value={
 })
 api.production_server._amplification_plane._call_ts = mock_call_ts
 
-client = TestClient(app)
-
 @pytest.fixture(autouse=True)
 def setup_teardown():
     # Inject a SysOps character
@@ -41,7 +39,8 @@ def setup_teardown():
     if "sysops-bot" in _character_cache:
         del _character_cache["sysops-bot"]
 
-def test_sysops_query_triggers_correct_candidate_actions():
+@pytest.mark.asyncio
+async def test_sysops_query_triggers_correct_candidate_actions():
     """
     Test that a query to a sysops character routes to amplify_planning
     with the correct sysops candidate actions.
@@ -53,7 +52,12 @@ def test_sysops_query_triggers_correct_candidate_actions():
         "mode": "cognitive"
     }
     
-    response = client.post("/api/v1/query", json=payload)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="http://synthesus.local",
+    ) as client:
+        response = await client.post("/api/v1/query", json=payload)
     assert response.status_code == 200
     
     # Verify Amplification Plane was called

@@ -511,9 +511,20 @@ def local_inference_func(prompt: str, **kwargs) -> str:
 # ─── Global State ────────────────────────────────────────────────────
 _rag: Optional[RAGPipeline] = None
 _security_agent_instance = None  # SecurityAgent for cybersecurity operations
+_background_tasks: set[asyncio.Task[Any]] = set()
 _character_cache: Dict[str, Dict[str, Any]] = {}
 _cognitive_engines: Dict[str, Optional[CognitiveEngine]] = {}
 MAX_ENGINES = 50
+
+
+def _start_background_task(coroutine: Any) -> asyncio.Task[Any]:
+    """Start and retain a server-owned task until it completes."""
+    task = asyncio.create_task(coroutine)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
+
+
 class _PersistentList(list):
     def __init__(self, data_dir, sid):
         super().__init__()
@@ -1051,7 +1062,7 @@ async def startup():
                 logger.warning(f"Failed to instantiate CharacterEvolutionEngine: {e}")
 
     # ── Start Autonomous Lifecycle ──
-    asyncio.create_task(character_lifecycle_loop())
+    _start_background_task(character_lifecycle_loop())
 
     # ── Initialize History Store ──
     if ENABLE_CONTROL_PLANE:
@@ -1117,10 +1128,10 @@ async def startup():
     logger.info(f"Loaded {len(_character_cache)} characters")
     
     # Start WebSocket broadcaster
-    asyncio.create_task(_broadcast_dashboard_loop())
+    _start_background_task(_broadcast_dashboard_loop())
     
     # Start Database Metrics Persister
-    asyncio.create_task(_persist_metrics_loop())
+    _start_background_task(_persist_metrics_loop())
     
     # ── Initialize Cybersecurity Agent ──
     global _security_agent_instance
@@ -1178,15 +1189,33 @@ async def _persist_metrics_loop():
 
 @app.on_event("shutdown")
 async def shutdown():
-    global _veai_trainer, _hemisphere_bridge
+    global _veai_trainer, _hemisphere_bridge, _security_agent_instance
+
+    tasks = list(_background_tasks)
+    for task in tasks:
+        task.cancel()
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+    _background_tasks.clear()
+
+    if _security_agent_instance:
+        logger.info("Stopping Cybersecurity Agent...")
+        _security_agent_instance.stop()
+        _security_agent_instance = None
+        if set_security_agent:
+            set_security_agent(None)
+        logger.info("Cybersecurity Agent stopped.")
+
     if _veai_trainer:
         logger.info("Stopping VEAI Trainer...")
         _veai_trainer.stop()
+        _veai_trainer = None
         logger.info("VEAI Trainer stopped.")
     
     if _hemisphere_bridge:
         logger.info("Stopping Hemisphere Bridge (C++ Kernel)...")
         _hemisphere_bridge.stop()
+        _hemisphere_bridge = None
         logger.info("Hemisphere Bridge stopped.")
 
 
@@ -1562,13 +1591,16 @@ async def drive_preview(req: Request, auth=Depends(get_auth)):
     if not rag or not hasattr(rag, "_index") or rag._index is None or rag._index.ntotal == 0:
         return {"chunks": []}
         
-    # Run synchronous search in executor
-    loop = asyncio.get_event_loop()
+    # Run synchronous search outside the event loop without owning its default
+    # executor; short-lived desktop/API loops must still shut down cleanly.
     namespaces_arg = [namespace] if namespace else None
     
     try:
-        results = await loop.run_in_executor(
-            None,
+        try:
+            from aivm.isolation.async_utils import run_sync_isolated
+        except ModuleNotFoundError:  # pragma: no cover - repo-root compatibility path
+            from packages.aivm.isolation.async_utils import run_sync_isolated
+        results = await run_sync_isolated(
             lambda: rag._search(query, character_id=None, namespaces=namespaces_arg, k=5, threshold=0.0)
         )
     except Exception as e:

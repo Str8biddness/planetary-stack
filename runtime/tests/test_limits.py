@@ -2,9 +2,13 @@ import asyncio
 import os
 import sys
 
+import pytest
+
 # Ensure synthesus_framework is in the path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 SYNTH_BASE = os.path.join(current_dir, "synthesus_framework")
+if not os.path.isdir(SYNTH_BASE):
+    pytest.skip("legacy synthesus_framework fixture is not present", allow_module_level=True)
 if SYNTH_BASE not in sys.path:
     sys.path.insert(0, SYNTH_BASE)
 

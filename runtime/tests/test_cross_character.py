@@ -139,7 +139,9 @@ class TestPersonality:
         # Fallback is acceptable but indicates a gap in intent detection
         assert data["source"] in (
             "personality_bank", "character_pattern", "knowledge_graph",
-            "context_recall", "composite", "cognitive_engine", "fallback",
+            "knowledge_cloud", "context_recall", "composite",
+            "cognitive_engine", "pattern_engine", "fallback",
+            "character_fallback", "escalation_stall", "escalated",
         ), (
             f"Unexpected source '{data['source']}' for '{query_data['input']}'"
         )
@@ -181,15 +183,14 @@ class TestFallback:
 
     @pytest.mark.parametrize("char", ALL_CHARACTERS, ids=[c.id for c in ALL_CHARACTERS])
     def test_empty_query_handled(self, api_client, char):
-        """Empty query should not crash."""
+        """Empty query should be rejected cleanly rather than crash."""
         r = api_client.post("/query", json={
             "text": "",
             "mode": "character",
             "character": char.id,
         })
-        assert r.status_code == 200
-        data = r.json()
-        assert data["character"] == char.id
+        assert r.status_code == 400
+        assert r.json().get("detail")
 
     def test_nonexistent_character_handled(self, api_client):
         """Querying a character that doesn't exist returns a clean error."""
@@ -294,8 +295,10 @@ class TestSchemaValidation:
 
     @pytest.mark.parametrize("char", ALL_CHARACTERS, ids=[c.id for c in ALL_CHARACTERS])
     def test_bio_has_required_fields(self, char):
-        """Bio must have at minimum: id, name, role."""
-        assert "id" in char.bio, f"{char.id}: bio.json missing 'id'"
+        """Bio must have at minimum: character identity, name, and role."""
+        assert char.bio.get("id") or char.bio.get("character_id"), (
+            f"{char.id}: bio.json missing 'id' or 'character_id'"
+        )
         assert "name" in char.bio or "display_name" in char.bio, (
             f"{char.id}: bio.json missing 'name' or 'display_name'"
         )

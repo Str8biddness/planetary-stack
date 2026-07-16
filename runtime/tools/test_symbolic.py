@@ -1,3 +1,7 @@
+if __name__ != "__main__":
+    import pytest
+    pytest.skip("manual symbolic-core smoke script", allow_module_level=True)
+
 from synthetic_core import SymbolicCore
 
 def test_symbolic():

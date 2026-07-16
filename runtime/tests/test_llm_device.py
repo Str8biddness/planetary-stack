@@ -1,4 +1,5 @@
 import pytest
+import requests
 from packages.core.chal.frames import CognitiveTask, TelemetryRecord
 from packages.core.chal.devices.llm_device import LLMGenerationDevice
 
@@ -12,6 +13,13 @@ def test_llm_device_real_call():
     )
     
     output, telemetry = device.generate(task)
+
+    if isinstance(output, dict) and output.get("error") in {
+        "ConnectionError",
+        "ConnectTimeout",
+        "ProxyError",
+    }:
+        pytest.skip("Configured local LLM provider is not reachable")
     
     assert isinstance(output, str)
     assert len(output) > 0
@@ -20,10 +28,13 @@ def test_llm_device_real_call():
     assert telemetry.latency_ms <= 30000.0
     assert telemetry.metadata["status"] == "success"
 
-def test_llm_device_forced_timeout():
-    """Test that violating budget_ms produces a structured error frame, not a string."""
+def test_llm_device_forced_timeout(monkeypatch):
+    """A provider timeout produces a structured error frame, not a string."""
+    def raise_timeout(*args, **kwargs):
+        raise requests.exceptions.Timeout("forced timeout")
+
+    monkeypatch.setattr(requests, "post", raise_timeout)
     device = LLMGenerationDevice()
-    # 1ms budget is physically impossible to meet over HTTP + LLM generation
     task = CognitiveTask(
         task_id="t2", 
         query="Explain quantum mechanics.", 

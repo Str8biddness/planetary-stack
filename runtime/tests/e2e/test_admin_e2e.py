@@ -4,7 +4,20 @@ E2E Tests — Admin & Infrastructure Endpoints
 Validates health checks, character CRUD, monitoring dashboard,
 amplification status, and knowledge API endpoints.
 """
+import os
+import shutil
+from pathlib import Path
+
 import pytest
+
+
+CHARACTERS_DIR = Path(__file__).resolve().parents[2] / "packages" / "characters"
+PARAMETER_CLOUD_STATS = (
+    Path(__file__).resolve().parents[2]
+    / "packages"
+    / "data"
+    / "parameter_cloud_v2_stats.json"
+)
 
 
 class TestHealthE2E:
@@ -43,9 +56,19 @@ class TestCharacterEndpoints:
             "backstory": "An automated test character.",
             "traits": ["analytical", "curious"],
         }
-        resp = client.post("/api/v1/characters", json=payload)
-        # Might be 200 or 201 on success, or 422 if schema mismatch
-        assert resp.status_code in (200, 201, 422)
+        char_dir = CHARACTERS_DIR / payload["id"]
+        registry_path = CHARACTERS_DIR / "registry.json"
+        previous_registry = registry_path.read_bytes() if registry_path.exists() else None
+        try:
+            resp = client.post("/api/v1/characters", json=payload)
+            # Might be 200 or 201 on success, or 422 if schema mismatch
+            assert resp.status_code in (200, 201, 422)
+        finally:
+            shutil.rmtree(char_dir, ignore_errors=True)
+            if previous_registry is None:
+                registry_path.unlink(missing_ok=True)
+            else:
+                registry_path.write_bytes(previous_registry)
 
     def test_get_character_by_id(self, client):
         resp = client.get("/api/v1/characters/synthesus")
@@ -147,6 +170,10 @@ class TestParameterCloudEndpoints:
     a separate service. If the backing service isn't running, we skip.
     """
 
+    @pytest.mark.skipif(
+        not os.environ.get("DATABASE_URL") and not PARAMETER_CLOUD_STATS.exists(),
+        reason="Parameter Cloud database and static statistics are unavailable",
+    )
     def test_parameter_cloud_stats(self, client):
         try:
             resp = client.get("/parameter-cloud/v2/stats")
@@ -161,6 +188,10 @@ class TestParameterCloudEndpoints:
         except (ConnectionError, OSError):
             pytest.skip("Parameter Cloud service not available")
 
+    @pytest.mark.skipif(
+        not os.environ.get("DATABASE_URL"),
+        reason="Parameter Cloud database is not configured",
+    )
     def test_parameter_cloud_query(self, client):
         try:
             payload = {"query": "test"}

@@ -998,6 +998,7 @@ def _row_route_semantics_checks(row: dict[str, Any]) -> dict[str, bool]:
     requires_grounding = route in {"grounded_path", "safety_path"}
     requires_quad_brain = route == "quad_brain_path"
     requires_safety = route == "safety_path"
+    fast_mode = "fast_mode" in decision.get("reasons", [])
     reranker_budget = reranker.get("budget", {}) if isinstance(reranker, dict) else {}
 
     checks = {
@@ -1042,19 +1043,26 @@ def _row_route_semantics_checks(row: dict[str, Any]) -> dict[str, bool]:
         )
         if requires_safety
         else template_guard.get("surface") == "normal",
+        "fast_mode_contract": (
+            decision_budget.get("candidate_count") == 1
+            and decision_budget.get("critic_passes") == 0
+            and decision.get("hemisphere_mode") == "auto"
+        )
+        if fast_mode and not requires_safety
+        else True,
     }
 
     if route == "grounded_path":
         checks["route_budget_shape"] = (
             decision_budget.get("retrieval_depth", 0) >= 4
-            and decision_budget.get("candidate_count", 0) >= 2
-            and decision_budget.get("critic_passes", 0) >= 1
+            and decision_budget.get("candidate_count", 0) >= (1 if fast_mode else 2)
+            and decision_budget.get("critic_passes", 0) >= (0 if fast_mode else 1)
             and "ground_response_in_mounted_knowledge" in decision.get("constraints", [])
         )
     elif route == "quad_brain_path":
         checks["route_budget_shape"] = (
-            decision_budget.get("candidate_count", 0) >= 2
-            and decision_budget.get("critic_passes", 0) >= 1
+            decision_budget.get("candidate_count", 0) >= (1 if fast_mode else 2)
+            and decision_budget.get("critic_passes", 0) >= (0 if fast_mode else 1)
             and "serialize_arbitration_after_parallel_dispatch" in decision.get("constraints", [])
         )
     elif route == "safety_path":

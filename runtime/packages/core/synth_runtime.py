@@ -41,7 +41,10 @@ from vpu_coordinator import VpuCoordinator
 from sllm_coordinator import SllmCoordinator
 from hybrid_transformer_coordinator import HybridTransformerCoordinator
 from computress.coordinator import ComputressCoordinator
-from kernel.mirror_sync_bridge import MirrorSyncBridge
+# ``packages/aivm`` is also on ``sys.path`` and exposes its own top-level
+# ``kernel`` package.  Import this bridge from the explicitly-added legacy
+# kernel module path to avoid resolving the AIVM kernel by accident.
+from mirror_sync_bridge import MirrorSyncBridge
 
 
 # AIVM Kernel imports
@@ -344,6 +347,24 @@ class SynthRuntime:
                 substrate=self._substrate,
                 memory_store=self._memory_store,
             )
+
+        memory_context = self._build_memory_context(character_id, user_input)
+        merged_context = "\n\n".join(
+            part for part in (context, memory_context) if part and part.strip()
+        ) or None
+
+        # Compatibility for lightweight embeddings that construct SynthRuntime
+        # without the formal AIVM kernel.  The production path below remains the
+        # canonical scheduled 12-step tick.
+        if not hasattr(self, "_aivm_kernel"):
+            result = core.reason(user_input, context=merged_context, session_id=session_id)
+            self._memory_store.store_episodic(
+                character_id,
+                f"User: {user_input}\nAssistant: {result.final_response}",
+                importance=0.5,
+                tags=["conversation"],
+            )
+            return result
         
         # Ensure NPC is spawned in kernel
         if character_id not in self._aivm_kernel._npcs:
@@ -353,7 +374,7 @@ class SynthRuntime:
         kernel_res = await self._aivm_kernel.tick_scheduled(character_id, {
             "user_input": user_input,
             "session_id": session_id,
-            "context": context
+            "context": merged_context,
         })
 
         # Map kernel result back to ReasoningResult for UI compatibility
@@ -383,6 +404,28 @@ class SynthRuntime:
     # ------------------------------------------------------------------
     # Memory (Delegates to formal VMD if possible)
     # ------------------------------------------------------------------
+
+    def _build_memory_context(self, character_id: str, query: str) -> str:
+        """Recall and label each memory tier for bounded prompt context."""
+        layers = (
+            ("Semantic memory", "recall_semantic"),
+            ("Episodic memory", "recall_episodic"),
+            ("Procedural memory", "recall_procedural"),
+            ("Working memory", "recall_working"),
+        )
+        sections: List[str] = []
+        for label, method_name in layers:
+            recall = getattr(self._memory_store, method_name, None)
+            if not callable(recall):
+                continue
+            try:
+                texts = self._memory_texts(recall(character_id, query, top_k=5))
+            except Exception as exc:
+                logger.warning("%s recall unavailable for %s: %s", label, character_id, exc)
+                continue
+            if texts:
+                sections.append(f"{label}:\n" + "\n".join(f"- {text}" for text in texts))
+        return "\n\n".join(sections)
 
     def remember(
         self,

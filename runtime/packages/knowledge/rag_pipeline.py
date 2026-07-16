@@ -13,17 +13,22 @@ Embedding provided by SwarmEmbedder (lightweight TF-IDF + SVD),
 no sentence-transformers or PyTorch required.
 """
 
-import asyncio
 import json
 import logging
 import os
 import time
+from functools import partial
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 
 import faiss
 import numpy as np
 import threading
+
+try:
+    from aivm.isolation.async_utils import run_sync_isolated
+except ModuleNotFoundError:  # pragma: no cover - repo-root compatibility path
+    from packages.aivm.isolation.async_utils import run_sync_isolated
 
 from ml.swarm_embedder import SwarmEmbedder
 
@@ -228,11 +233,10 @@ class RAGPipeline:
         k = top_k or self.top_k
         threshold = score_threshold if score_threshold is not None else self.score_threshold
 
-        # Run blocking embedding + search in executor
-        loop = asyncio.get_event_loop()
-        results = await loop.run_in_executor(
-            None,
-            lambda: self._search(query, character_id, namespaces, k, threshold)
+        # Keep blocking embedding/search off the event loop without registering
+        # the loop's default executor (short-lived API loops must shut down cleanly).
+        results = await run_sync_isolated(
+            partial(self._search, query, character_id, namespaces, k, threshold)
         )
 
         if not results:

@@ -15,6 +15,8 @@ from typing import Any
 
 import numpy as np
 
+from knowledge.artifact_utils import count_json_collection
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ARTIFACT_ROOT = REPO_ROOT.parent / "synthesus-knowledge-cloud" / "artifacts"
 
@@ -70,24 +72,13 @@ def _verify_manifest_hashes(artifact_root: Path) -> list[str]:
 def _metadata_count(artifact_root: Path) -> int:
     metadata_path = artifact_root / "faiss_metadata.json"
     if metadata_path.exists():
-        metadata = _load_json(metadata_path)
-        if isinstance(metadata, list):
-            return len(metadata)
-        if isinstance(metadata, dict):
-            return len(metadata)
+        return count_json_collection(metadata_path)
 
     sqlite_path = artifact_root / "knowledge.kndb.meta.db"
     if sqlite_path.exists():
         with sqlite3.connect(sqlite_path) as conn:
             return int(conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0])
     return 0
-
-
-def _load_metadata_records(artifact_root: Path) -> list[dict[str, Any]]:
-    metadata = _load_json(artifact_root / "faiss_metadata.json")
-    if not isinstance(metadata, list):
-        raise ValueError("faiss_metadata.json must be a list for golden-query search")
-    return metadata
 
 
 def _load_embedder(artifact_root: Path):
@@ -122,7 +113,7 @@ def _run_golden_queries(artifact_root: Path, top_k: int = 5) -> tuple[list[float
     import faiss
 
     index = faiss.read_index(str(artifact_root / "faiss.index"))
-    metadata = _load_metadata_records(artifact_root)
+    metadata_count = _metadata_count(artifact_root)
     embedder = _load_embedder(artifact_root)
     errors: list[str] = []
     latencies: list[float] = []
@@ -136,7 +127,7 @@ def _run_golden_queries(artifact_root: Path, top_k: int = 5) -> tuple[list[float
         scores, indices = index.search(vector, top_k)
         latency_ms = (time.perf_counter() - start) * 1000.0
         latencies.append(latency_ms)
-        hits = [idx for idx in indices[0] if 0 <= idx < len(metadata)]
+        hits = [idx for idx in indices[0] if 0 <= idx < metadata_count]
         if not hits:
             errors.append(f"empty metadata-backed results for golden query: {query}")
         elif not any(float(score) > 0 for score in scores[0]):

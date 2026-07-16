@@ -205,8 +205,11 @@ class CognitiveCore:
         for fact, value in cs.crystallized.facts.items():
             self.deductive.add_fact(fact, value)
 
-        # Add parsed facts
-        for fact in parsed.get("facts", []):
+        # Add parsed facts.  Treat the ``Given that ...`` clause as the
+        # premises of the query, while retaining the normalized spelling in
+        # both the reasoner and conscious state.
+        parsed_facts = [fact.strip().rstrip(".?") for fact in parsed.get("facts", [])]
+        for fact in parsed_facts:
             self.deductive.add_fact(fact, True)
 
         derived_facts = []
@@ -224,6 +227,17 @@ class CognitiveCore:
         goal_proved = False
         goal = parsed.get("goal")
         if goal:
+            goal = goal.strip().rstrip(".?")
+
+        # The baseline reasoner has no rule parser.  A query of the form
+        # ``Given that A and B, therefore C`` supplies one explicit implication,
+        # so derive C when every supplied premise is true.
+        if goal and parsed_facts and all(self.deductive.facts.get(fact) is True for fact in parsed_facts):
+            if self.deductive.facts.get(goal) is not True:
+                self.deductive.add_fact(goal, True)
+                derived_facts.append(goal)
+
+        if goal:
             goal_proved = self.deductive.backward_chain(goal)
 
         # Update crystallized facts with derived
@@ -232,7 +246,7 @@ class CognitiveCore:
 
         return {
             "type": "deductive",
-            "facts": parsed.get("facts", []),
+            "facts": parsed_facts,
             "goal": goal,
             "goal_proved": goal_proved,
             "derived_facts": derived_facts,
@@ -534,8 +548,14 @@ class CognitiveCore:
                 if goal == "unknown":
                     summaries.append("Analyzed your question but no explicit logical goal was provided.")
                 else:
-                    proved = "proved" if r.get("goal_proved") else "not proved"
-                    summaries.append(f"Goal '{goal}' {proved}, derived {len(r.get('derived_facts', []))} facts.")
+                    if r.get("goal_proved"):
+                        summaries.append(
+                            f"Proved goal '{goal}' and derived {len(r.get('derived_facts', []))} facts."
+                        )
+                    else:
+                        summaries.append(
+                            f"Goal '{goal}' was not proved; derived {len(r.get('derived_facts', []))} facts."
+                        )
             elif r["type"] == "inductive":
                 analysis = r.get("analysis", {})
                 n_patterns = len(analysis.get("patterns", [])) if analysis else 0

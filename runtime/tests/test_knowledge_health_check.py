@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
+from knowledge.artifact_utils import count_json_collection
 from knowledge.health_check import run_health_check
 
 
@@ -26,6 +27,16 @@ def _write_artifact(root: Path, relative_path: str, content: bytes) -> dict:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(content)
     return _record_artifact(root, relative_path)
+
+
+def test_count_json_collection_streams_arrays_and_objects(tmp_path: Path):
+    array_path = tmp_path / "array.json"
+    array_path.write_text('[{"value":"one"},{"value":"two"},{"value":"three"}]', encoding="utf-8")
+    object_path = tmp_path / "object.json"
+    object_path.write_text('{"one":{"v":1},"two":[2,3]}', encoding="utf-8")
+
+    assert count_json_collection(array_path, chunk_size=7) == 3
+    assert count_json_collection(object_path, chunk_size=5) == 2
 
 
 def test_health_check_reports_semantic_mismatch_before_golden_queries(

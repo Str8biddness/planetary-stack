@@ -155,7 +155,7 @@ fi
 # flask-cors (shell CORS) and PyJWT (accounts.py) are HARD boot requirements — a fresh
 # install without them dies with ModuleNotFoundError before the app can start.
 "$VPIP" install --quiet faiss-cpu fastembed fastapi "uvicorn[standard]" flask flask-cors PyJWT requests \
-        websockets pywebview "pygobject<3.52" numpy pydantic sqlalchemy httpx onnxruntime \
+        websockets pywebview "pygobject<3.52" numpy Pillow pydantic sqlalchemy asyncpg httpx onnxruntime \
         "scikit-learn==1.8.0"
 ok "environment ready (scikit-learn pinned 1.8.0 for SwarmEmbedder pickle compat)"
 
@@ -179,6 +179,9 @@ cat > "$SYNTHESUS_HOME/synthesus.env" <<ENV
 SYNTHESUS_API_KEY=$KEY
 SYNTHESUS_MODEL=$SYNTHESUS_MODEL
 SYNTHESUS_HOST=127.0.0.1
+# The current published Knowledge Cloud bundle is not release-valid. Keep
+# network bootstrap opt-in until a dimension-consistent signed bundle ships.
+SYNTHESUS_KNOWLEDGE_SYNC_MODE=off
 # Memory-verification human proof (desktop shell → runtime mint). Local only.
 SYNTHESUS_HUMAN_SESSION_SECRET=$HUMAN_SESSION_SECRET
 # Optional: absolute path to C++ kernel IPC binary (zo_kernel)

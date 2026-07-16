@@ -19,6 +19,7 @@ scipy>=1.11.0
 # Pin exact version: SwarmEmbedder pickles (data/models/swarm_embedder.pkl) are
 # sensitive to sklearn version skew (InconsistentVersionWarning → invalid results).
 scikit-learn==1.8.0
+Pillow>=10.0
 faiss-cpu>=1.7.4
 torch>=2.1.0
 qiskit>=0.45.0  # For VQD simulation
@@ -27,6 +28,7 @@ pybind11>=2.12.0  # For native kernel bridge builds
 # --- Web Ingress & Cluster Sync ---
 beautifulsoup4>=4.12.0
 apscheduler>=3.10.0  # For Mirror Sync Daemon
+asyncpg>=0.29.0  # Parameter Cloud V2 PostgreSQL client
 
 # --- System & Deployment ---
 # (External system dependencies)

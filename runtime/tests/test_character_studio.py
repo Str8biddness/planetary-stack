@@ -1,10 +1,15 @@
 import pytest
-from fastapi.testclient import TestClient
-from api.production_server import app
+import shutil
 
-client = TestClient(app)
+from api.production_server import CHARACTERS_DIR, app
+from tests.asgi_client import MainThreadASGIClient
+
+client = MainThreadASGIClient(app)
 
 def test_create_character():
+    char_dir = CHARACTERS_DIR / "testbot"
+    registry_path = CHARACTERS_DIR / "registry.json"
+    registry_before = registry_path.read_bytes() if registry_path.exists() else None
     payload = {
         "name": "TestBot",
         "id": "testbot",
@@ -20,22 +25,23 @@ def test_create_character():
         "inventory_desc": "logs and metrics"
     }
 
-    response = client.post("/api/v1/characters", json=payload)
-    
-    # Check if the endpoint responds correctly
-    assert response.status_code == 200, response.text
-    data = response.json()
-    assert data["character_id"] == "testbot"
-    assert data["name"] == "TestBot"
-    assert data["archetype"] == "scholar"
-    
-    # Check if files were created
-    import os
-    char_dir = os.path.join("characters", "testbot")
-    assert os.path.exists(char_dir)
-    assert os.path.exists(os.path.join(char_dir, "bio.json"))
-    assert os.path.exists(os.path.join(char_dir, "patterns.json"))
-    
-    # Clean up test artifact
-    import shutil
-    shutil.rmtree(char_dir)
+    try:
+        response = client.post("/api/v1/characters", json=payload)
+
+        # Check if the endpoint responds correctly
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["character_id"] == "testbot"
+        assert data["name"] == "TestBot"
+        assert data["archetype"] == "scholar"
+
+        # CharacterFactory writes into the production server's configured root.
+        assert char_dir.exists()
+        assert (char_dir / "bio.json").exists()
+        assert (char_dir / "patterns.json").exists()
+    finally:
+        shutil.rmtree(char_dir, ignore_errors=True)
+        if registry_before is None:
+            registry_path.unlink(missing_ok=True)
+        else:
+            registry_path.write_bytes(registry_before)

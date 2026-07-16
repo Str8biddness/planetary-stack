@@ -6,8 +6,14 @@ import subprocess
 import json
 import os
 import logging
+from functools import partial
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
+
+try:
+    from aivm.isolation.async_utils import run_sync_isolated
+except ModuleNotFoundError:  # pragma: no cover - repo-root compatibility path
+    from packages.aivm.isolation.async_utils import run_sync_isolated
 
 logger = logging.getLogger(__name__)
 
@@ -149,8 +155,7 @@ class AmplificationPlane:
             return IntakeResult()
 
     async def amplify_intake_async(self, ctx: AmplificationContext, world_state: Dict, raw_input: Any) -> IntakeResult:
-        import asyncio
-        return await asyncio.to_thread(self.amplify_intake, ctx, world_state, raw_input)
+        return await run_sync_isolated(partial(self.amplify_intake, ctx, world_state, raw_input))
 
     def amplify_planning(self, ctx: AmplificationContext, world_state: Dict, candidate_actions: List[Dict]) -> PlanningResult:
         """
@@ -177,8 +182,9 @@ class AmplificationPlane:
             return PlanningResult()
 
     async def amplify_planning_async(self, ctx: AmplificationContext, world_state: Dict, candidate_actions: List[Dict]) -> PlanningResult:
-        import asyncio
-        return await asyncio.to_thread(self.amplify_planning, ctx, world_state, candidate_actions)
+        return await run_sync_isolated(
+            partial(self.amplify_planning, ctx, world_state, candidate_actions)
+        )
 
     def amplify_output(self, ctx: AmplificationContext, chosen_action: Dict, updated_world: Dict, generation_trace: Optional[Any] = None) -> OutputResult:
         """
@@ -218,8 +224,9 @@ class AmplificationPlane:
             )
 
     async def amplify_output_async(self, ctx: AmplificationContext, chosen_action: Dict, updated_world: Dict, generation_trace: Optional[Any] = None) -> OutputResult:
-        import asyncio
-        return await asyncio.to_thread(self.amplify_output, ctx, chosen_action, updated_world, generation_trace)
+        return await run_sync_isolated(
+            partial(self.amplify_output, ctx, chosen_action, updated_world, generation_trace)
+        )
 
 # Singleton instance for convenience
 _default_plane: Optional[AmplificationPlane] = None

@@ -173,6 +173,20 @@ CLASSIFICATIONS: dict[str, SurfaceClassification] = {
         boundary="generation_spine_degraded_state",
         notes="Last-resort generation wording now carries explicit degraded-state metadata and avoids legacy template signatures.",
     ),
+    "packages/reasoning/generation/output_screen.py": SurfaceClassification(
+        path="packages/reasoning/generation/output_screen.py",
+        surface="critic_output_leakage_signatures",
+        status="guard_definition",
+        boundary="critic_output_screen",
+        notes="The critic output screen lists legacy leakage signatures so it can block them before user-facing emission.",
+    ),
+    "packages/reasoning/generation/tests/test_output_screen.py": SurfaceClassification(
+        path="packages/reasoning/generation/tests/test_output_screen.py",
+        surface="critic_output_screen_test_fixtures",
+        status="test_fixture",
+        boundary="critic_output_screen",
+        notes="Adversarial test strings exercise the critic output screen and are never runtime response candidates.",
+    ),
     "packages/reasoning/generation/template_guard.py": SurfaceClassification(
         path="packages/reasoning/generation/template_guard.py",
         surface="template_guard_signature_registry",
@@ -221,6 +235,13 @@ CLASSIFICATIONS: dict[str, SurfaceClassification] = {
         status="non_user_facing",
         boundary="training_data_augmentation",
         notes="Templates create sentiment training variants and are not final responses.",
+    ),
+    "packages/swarm/arbiter.py": SurfaceClassification(
+        path="packages/swarm/arbiter.py",
+        surface="swarm_template_leakage_guard",
+        status="guard_definition",
+        boundary="swarm_user_facing_guard",
+        notes="The arbiter lists legacy template signatures to reject CGPU trace text before selecting a user-facing response.",
     ),
     "packages/knowledge/kaggle_loader.py": SurfaceClassification(
         path="packages/knowledge/kaggle_loader.py",

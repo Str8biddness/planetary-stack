@@ -108,6 +108,13 @@ class VEAITrainer:
         if belief_deltas:
             self.metrics.avg_belief_delta = sum(belief_deltas) / len(belief_deltas)
 
+        return {
+            "status": "ok",
+            "events": len(events),
+            "belief_updates": len(belief_deltas),
+            "inductive_models_trained": self.metrics.inductive_models_trained,
+        }
+
     def _propose_rule_from_hypothesis(self, cs, hypothesis: str):
         import re
         # Simple pattern: "If feature=value, then likely outcome ..."

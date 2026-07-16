@@ -3,10 +3,10 @@ import importlib
 import inspect
 
 import pytest
-from fastapi.testclient import TestClient
 
 from core.generation import decoder
 from core.generation.spine import GenerationSpine, SpineInput
+from tests.asgi_client import MainThreadASGIClient
 
 
 def _import_production_server():
@@ -120,7 +120,7 @@ def test_amplification_metrics_endpoint_contract():
 
     ps.HAS_GENERATION_SPINE = True
     ps._generation_spine = FakeSpine()
-    client = TestClient(ps.app)
+    client = MainThreadASGIClient(ps.app)
     res = client.get("/api/v1/amplification/metrics")
     assert res.status_code == 200
     payload = res.json()

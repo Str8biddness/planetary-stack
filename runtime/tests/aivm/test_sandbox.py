@@ -1,7 +1,7 @@
 """Tests for AIVM sandbox crash protection."""
 import pytest
 import time
-from aivm.sandbox import ModelSandbox, SandboxConfig, SandboxManager, IsolationLevel
+from core.aivm.sandbox import ModelSandbox, SandboxConfig, SandboxManager, IsolationLevel
 
 
 def test_sandbox_execute_timeout():

@@ -12,6 +12,7 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field, replace
 from enum import Enum
+from functools import partial
 from typing import Any, Callable, Mapping
 
 try:
@@ -269,7 +270,8 @@ class CognitiveHypervisor:
         bridge = self._get_bridge()
         guarded = await self._execution_guard.run(
             "chal://hypervisor/hemisphere_bridge",
-            lambda: bridge.route_query(
+            partial(
+                bridge.route_query,
                 query,
                 hemisphere=decision.hemisphere_mode,
                 character_context=character_context,

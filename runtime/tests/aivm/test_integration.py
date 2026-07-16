@@ -2,10 +2,10 @@
 import pytest
 import threading
 import time
-from aivm import AIVMOrchestrator
-from aivm.dispatcher import InstructionDispatcher, Instruction, InstructionType, Priority
-from aivm.inference_scheduler import InferencePriority, InferenceRequest
-from aivm.sandbox import SandboxManager, SandboxConfig, ModelSandbox
+from core.aivm import AIVMOrchestrator
+from core.aivm.execution_engine import InstructionType, VMInstruction
+from core.aivm.inference_scheduler import InferencePriority, InferenceRequest
+from core.aivm.sandbox import SandboxManager, SandboxConfig, ModelSandbox
 
 
 def test_orchestrator_lifecycle():
@@ -24,23 +24,20 @@ def test_dispatcher_works():
 
     results = []
 
-    def handler(instruction):
-        results.append(instruction.priority.value)
+    def handler(payload):
+        results.append(payload["priority"])
         return {"success": True}
 
     o._dispatcher.register_handler(InstructionType.HEALTH_CHECK, handler)
-    
-    o._dispatcher.dispatch(Instruction(
-        id="1", type=InstructionType.HEALTH_CHECK, payload={},
-        priority=Priority.NORMAL, model_id="test_model"
+
+    result = o._dispatcher.dispatch(VMInstruction(
+        instruction_id="sync1",
+        instruction_type=InstructionType.HEALTH_CHECK,
+        payload={"priority": "normal"},
     ))
-    
-    result = o._dispatcher.dispatch_now(Instruction(
-        id="sync1", type=InstructionType.HEALTH_CHECK, payload={},
-        priority=Priority.NORMAL, model_id="test_model"
-    ))
-    
-    assert result is not None
+
+    assert result.success is True
+    assert results == ["normal"]
     o.shutdown()
 
 
@@ -81,31 +78,24 @@ def test_concurrent_inference_registration():
 
 
 def test_resource_allocation_tracking():
-    """Test resource allocation per model."""
+    """Test memory allocation tracking in the orchestrator resource pool."""
     o = AIVMOrchestrator()
     o.initialize()
 
-    from aivm.resource_manager import ResourceType
-    
-    success, alloc_id = o._resource_allocator.allocate(
-        "test_model", ResourceType.MEMORY, 256.0
+    allocation = o._resource_allocator.allocate_memory(
+        "test_model",
+        256 * 1024 * 1024,
     )
-    assert success
+    assert allocation.granted is True
+    assert o._resource_allocator.stats()["active_allocations"] == 1
+    assert o._resource_allocator.release_memory(allocation.allocation_id) is True
 
-    success, alloc_id = o._resource_allocator.allocate(
-        "test_model", ResourceType.CPU, 50.0
-    )
-    assert success
-
-    allocs = o._resource_allocator.get_model_allocations("test_model")
-    assert len(allocs) == 2
-    
     o.shutdown()
 
 
 def test_circuit_breaker_rejects_on_open():
     """Test circuit breaker rejects requests when open."""
-    from aivm.error_recovery import CircuitState
+    from core.aivm.error_recovery import CircuitState
     
     o = AIVMOrchestrator()
     o.initialize()

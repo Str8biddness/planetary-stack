@@ -11,6 +11,13 @@ option(BUILD_KERNEL "Build standalone C++ kernel binary" ON)
 option(BUILD_TESTS  "Build C++ unit tests" OFF)
 option(ENABLE_ONNX  "Enable ONNX Runtime support" OFF)
 
+# Compile options must be registered before targets are created. In particular,
+# geometric_engine.cpp uses SSE3 horizontal-add intrinsics that are enabled by
+# -march=native on supported consumer CPUs.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-O3 -march=native -Wall -Wextra)
+endif()
+
 # ── Find packages ──
 find_package(Threads REQUIRED)
 
@@ -183,11 +190,6 @@ if(BUILD_PYBIND AND pybind11_FOUND)
     
     # Install to Python site-packages
     install(TARGETS _synthesus_kernel LIBRARY DESTINATION .)
-endif()
-
-# ── Compile flags ──
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    add_compile_options(-O3 -march=native -Wall -Wextra)
 endif()
 
 message(STATUS "")

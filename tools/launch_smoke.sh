@@ -84,10 +84,10 @@ fi
 
 # 5) sklearn pin (local)
 if [ -x "$PY" ]; then
-  if "$PY" -c "
-import warnings, sys
+  if SYNTHESUS_SMOKE_ROOT="$ROOT" "$PY" -c "
+import os, warnings, sys
 from pathlib import Path
-root = Path.home() / 'synthesus'
+root = Path(os.environ['SYNTHESUS_SMOKE_ROOT'])
 sys.path[:0] = [str(root/'runtime/packages/knowledge'), str(root/'runtime/packages'), str(root/'runtime')]
 warnings.simplefilter('always')
 caught = []
@@ -132,10 +132,11 @@ else
 fi
 
 # 8) Human session secret documented in install
-if grep -q 'SYNTHESUS_HUMAN_SESSION_SECRET' "$ROOT/install.sh" 2>/dev/null; then
-  ok "install.sh generates SYNTHESUS_HUMAN_SESSION_SECRET"
+if grep -q '^SYNTHESUS_HUMAN_SESSION_SECRET=' "$ROOT/synthesus.env" 2>/dev/null \
+   || grep -q 'SYNTHESUS_HUMAN_SESSION_SECRET' "$ROOT/install.sh" 2>/dev/null; then
+  ok "human session secret is configured"
 else
-  bad "install.sh missing human session secret"
+  bad "human session secret is not configured"
 fi
 
 echo

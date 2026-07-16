@@ -449,6 +449,7 @@ def test_phase8_comparison_harness_builds_route_semantics_scorecard():
     assert business_case["route"] == "quad_brain_path"
     assert business_case["checks"]["quad_brain_arbitration"] is True
     assert business_case["checks"]["grounding_reranker_boundary"] is True
+    assert business_case["checks"]["fast_mode_contract"] is True
 
 
 def test_phase8_route_semantics_scorecard_reports_critic_boundary_drift():

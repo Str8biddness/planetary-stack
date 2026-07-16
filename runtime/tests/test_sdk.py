@@ -11,7 +11,10 @@ from unittest.mock import patch, MagicMock
 
 # Import SDK
 import sys
-sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent / "sdk" / "python"))
+sys.path.insert(0, str(
+    __import__('pathlib').Path(__file__).parent.parent
+    / "packages" / "core" / "sdk" / "python"
+))
 from synthesus_sdk import (
     SynthesusClient,
     NPCResponse,

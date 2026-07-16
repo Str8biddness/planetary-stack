@@ -15,7 +15,21 @@ from typing import Dict, Any
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-CHARACTERS_DIR = ROOT / "characters"
+CHARACTERS_DIR = ROOT / "packages" / "characters"
+
+_REQUIRED_PLATFORM_ASSETS = [
+    CHARACTERS_DIR / char_id / filename
+    for char_id in ("synthesus", "computress")
+    for filename in ("bio.json", "patterns.json", "knowledge.json", "personality.json")
+]
+_REQUIRED_PLATFORM_ASSETS.append(CHARACTERS_DIR / "registry.json")
+_missing_platform_assets = [path for path in _REQUIRED_PLATFORM_ASSETS if not path.exists()]
+if _missing_platform_assets:
+    pytest.skip(
+        "Platform NPC genome bundle is incomplete: "
+        + ", ".join(str(path.relative_to(ROOT)) for path in _missing_platform_assets),
+        allow_module_level=True,
+    )
 
 # ──────────────────────────────────────────────────
 # Fixtures

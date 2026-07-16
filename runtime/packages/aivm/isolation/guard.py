@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional
 from ..kernel.npc import NPC
+from .async_utils import run_sync_isolated
 
 logger = logging.getLogger("aivm.isolation")
 
@@ -79,10 +80,21 @@ class AIVMExecutionGuard:
             )
 
     async def _invoke(self, operation: Callable[[], Any]) -> Any:
-        result = await asyncio.to_thread(operation)
+        if self._is_async_callable(operation):
+            return await operation()
+
+        result = await run_sync_isolated(operation)
         if inspect.isawaitable(result):
             return await result
         return result
+
+    @staticmethod
+    def _is_async_callable(operation: Callable[[], Any]) -> bool:
+        """Recognize async functions, partials, and async callable objects."""
+        if inspect.iscoroutinefunction(operation):
+            return True
+        call = getattr(operation, "__call__", None)
+        return call is not None and inspect.iscoroutinefunction(call)
 
 class FaultGuard:
     """

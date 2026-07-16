@@ -127,7 +127,10 @@ class MemoryPatternMatcher:
             id="use_after_free_pattern",
             name="Potential Use-After-Free pattern",
             vuln_type=VulnType.USE_AFTER_FREE,
-            patterns=[r"free\s*\([^)]+\).*\1", r"\bfree\b.*\n.*\b\w+\[.*\]"],
+            patterns=[
+                r"(?s)\bfree\s*\(\s*(\w+)\s*\).*?\b\1\b",
+                r"\bfree\b.*\n.*\b\w+\[.*\]",
+            ],
             description="Code pattern suggests potential use-after-free vulnerability",
             severity="critical",
         ))
@@ -136,7 +139,7 @@ class MemoryPatternMatcher:
             id="double_free",
             name="Potential Double-Free",
             vuln_type=VulnType.MEMORY_LEAK,
-            patterns=[r"\bfree\s*\([^)]+\).*\bfree\s*\(\s*\1\s*\)"],
+            patterns=[r"(?s)\bfree\s*\(\s*(\w+)\s*\).*?\bfree\s*\(\s*\1\s*\)"],
             description="Same memory region freed twice, indicating double-free vulnerability",
             severity="critical",
         ))

@@ -33,23 +33,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Lazy-loaded global (shared across all NPC instances)
-_embedder = None
-_embedder_load_time = 0.0
-
-
-def _get_embedder():
-    """Lazy-load the SwarmEmbedder (shared singleton)."""
-    global _embedder, _embedder_load_time
-    if _embedder is None:
-        start = time.time()
-        from ml.swarm_embedder import SwarmEmbedder
-        _embedder = SwarmEmbedder(dim=128)
-        _embedder_load_time = (time.time() - start) * 1000
-        logger.info(f"SemanticMatcher: SwarmEmbedder ready in {_embedder_load_time:.0f}ms")
-    return _embedder
-
-
 class SemanticMatcher:
     """
     FAISS-backed semantic similarity matcher for pattern triggers.
@@ -77,7 +60,9 @@ class SemanticMatcher:
         self._trigger_is_generic: List[bool] = [] # Parallel array: generic flag
         self._n_triggers = 0
         self._build_time_ms = 0.0
+        self._model_load_time_ms = 0.0
         self._enabled = True
+        self._embedder = None
 
     def build_index(
         self,
@@ -103,7 +88,6 @@ class SemanticMatcher:
             return
 
         start = time.time()
-        embedder = _get_embedder()
 
         # Collect all (trigger_text, pattern_dict, is_generic) triples
         trigger_data = []
@@ -132,9 +116,16 @@ class SemanticMatcher:
         self._trigger_is_generic = [td[2] for td in trigger_data]
         self._n_triggers = len(trigger_data)
 
-        # Fit the embedder on the trigger corpus, then encode
-        if not embedder.is_fitted:
-            embedder.fit(self._trigger_texts)
+        # Each index owns the embedder fitted on the exact corpus used to build
+        # it.  Sharing a process-global fitted model made results depend on
+        # whichever character happened to initialize first and could make an
+        # existing FAISS index incompatible after another corpus was fitted.
+        load_started = time.time()
+        from ml.swarm_embedder import SwarmEmbedder
+        embedder = SwarmEmbedder(dim=128)
+        self._model_load_time_ms = (time.time() - load_started) * 1000
+        embedder.fit(self._trigger_texts)
+        self._embedder = embedder
 
         embeddings = embedder.embed_texts(self._trigger_texts)
         embeddings = np.array(embeddings, dtype=np.float32)
@@ -165,7 +156,9 @@ class SemanticMatcher:
         if not self._enabled or self._index is None:
             return []
 
-        embedder = _get_embedder()
+        embedder = self._embedder
+        if embedder is None:
+            return []
 
         # Encode query
         q_emb = embedder.embed_texts([query])
@@ -213,7 +206,7 @@ class SemanticMatcher:
             "enabled": self._enabled,
             "n_triggers": self._n_triggers,
             "build_time_ms": round(self._build_time_ms, 1),
-            "model_load_time_ms": round(_embedder_load_time, 1),
+            "model_load_time_ms": round(self._model_load_time_ms, 1),
             "similarity_floor": self.similarity_floor,
             "index_memory_kb": (
                 self._n_triggers * dim * 4 / 1024  # float32 vectors

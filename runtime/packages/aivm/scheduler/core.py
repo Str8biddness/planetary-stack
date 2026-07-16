@@ -34,11 +34,18 @@ class AIVMScheduler:
         self._is_active = False
         self._worker_task: Optional[asyncio.Task] = None
 
-    def start(self):
-        if not self._is_active:
-            self._is_active = True
-            self._worker_task = asyncio.create_task(self._scheduler_loop())
-            logger.info(f"AIVM Scheduler started (concurrency={self._concurrency_limit})")
+    def start(self) -> bool:
+        if self._is_active:
+            return True
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            logger.debug("AIVM Scheduler deferred until an event loop is running")
+            return False
+        self._is_active = True
+        self._worker_task = loop.create_task(self._scheduler_loop())
+        logger.info(f"AIVM Scheduler started (concurrency={self._concurrency_limit})")
+        return True
 
     def stop(self):
         self._is_active = False
@@ -48,6 +55,7 @@ class AIVMScheduler:
 
     async def schedule_tick(self, npc_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Add a tick request to the priority queue and await result."""
+        self.start()
         npc = self._kernel._npcs.get(npc_id)
         if not npc:
             raise ValueError(f"NPC {npc_id} not found in kernel.")

@@ -1,9 +1,6 @@
-"""Back-compat: PatternLM implementation lives in ml/__init__.py (historical layout)."""
+"""Back-compat: :class:`PatternLM` lives in :mod:`core.ml`."""
 from __future__ import annotations
 
-import importlib
-
-# ml package __init__ defines the real PatternLM class.
-PatternLM = importlib.import_module("ml").PatternLM  # type: ignore
+from core.ml import PatternLM
 
 __all__ = ["PatternLM"]

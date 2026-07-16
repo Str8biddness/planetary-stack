@@ -1,4 +1,7 @@
-"""Re-export real IntentClassifier from reasoning/ (core/ml was a pass stub)."""
-from reasoning.intent_classifier import IntentClassifier  # noqa: F401
+"""Re-export the canonical intent classifier and training-data helper."""
+from reasoning.intent_classifier import (  # noqa: F401
+    IntentClassifier,
+    build_training_data_from_character,
+)
 
-__all__ = ["IntentClassifier"]
+__all__ = ["IntentClassifier", "build_training_data_from_character"]

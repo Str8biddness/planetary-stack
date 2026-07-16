@@ -41,11 +41,13 @@ class CredentialPressureConfig:
     follow_redirects: bool = False
     track_responses: bool = True
     stop_on_success: bool = False
+    _uses_default_passwords: bool = field(init=False, default=False, repr=False)
     
     def __post_init__(self):
         if not self.user_list:
             self.user_list = ["admin", "root", "user", "test", "guest"]
         if not self.password_list:
+            self._uses_default_passwords = True
             self.password_list = self._load_default_passwords()
     
     def _load_default_passwords(self) -> List[str]:
@@ -136,11 +138,12 @@ class TrafficGenerator:
     def _load_wordlists(self):
         """Load extended wordlists based on pattern."""
         if self.config.pattern == AttackPattern.DICTIONARY:
-            # Extended dictionary
-            self.passwords = self.config.password_list + [
-                "dragon", "master", "monkey", "shadow", "sunshine",
-                "princess", "football", "baseball", "iloveyou", "trustno1",
-            ]
+            self.passwords = list(self.config.password_list)
+            if self.config._uses_default_passwords:
+                self.passwords.extend([
+                    "dragon", "master", "monkey", "shadow", "sunshine",
+                    "princess", "football", "baseball", "iloveyou", "trustno1",
+                ])
         elif self.config.pattern == AttackPattern.SMART_GUESSING:
             # Pattern-based: seasons, years, company names
             years = [str(y) for y in range(2020, 2026)]
@@ -251,6 +254,8 @@ class BruteForceSimulator:
     Generates high-volume credential pressure against authentication endpoints
     to train the ImmuneSystem in detecting timing attacks and patterns.
     """
+
+    SimulationResult = SimulationResult
     
     def __init__(self, emulation_tool=None):
         self.emulation = emulation_tool

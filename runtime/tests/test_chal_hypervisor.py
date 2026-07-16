@@ -2,8 +2,16 @@ import asyncio
 import time
 from dataclasses import dataclass
 
+import pytest
+
 from core.chal.hypervisor import CognitiveHypervisor, HypervisorRoute
 from core.chal.quad_brain import QuadBrainArbitration, QuadBrainOutput, QuadBrainRole
+
+
+@pytest.fixture(autouse=True)
+def full_hypervisor_mode(monkeypatch):
+    """Keep deep-route contract tests independent from the production fast default."""
+    monkeypatch.setenv("SYNTHESUS_FAST_MODE", "0")
 
 
 class StubBridge:

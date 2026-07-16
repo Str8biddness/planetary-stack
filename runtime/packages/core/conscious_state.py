@@ -23,6 +23,10 @@ class FluidState:
     risk_outcome: float = 0.1
     attention: float = 0.5
     current_domain: str = "sysops"
+    observations: List[Any] = field(default_factory=list)
+    predictions: Dict[str, Any] = field(default_factory=dict)
+    anomalies: List[Any] = field(default_factory=list)
+    current_goals: List[Any] = field(default_factory=list)
     
     # Transformer attention fields (from ConsciousLlmAi integration)
     attention_maps: List[Any] = field(default_factory=list)
@@ -68,6 +72,11 @@ class CrystallizedState:
     # Legacy fields
     facts: Dict[str, bool] = field(default_factory=dict)
     candidate_rules: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    rules: List[Any] = field(default_factory=list)
+    causal_relations: List[Any] = field(default_factory=list)
+    user_traits: Dict[str, Any] = field(default_factory=dict)
+    models_metadata: Dict[str, Any] = field(default_factory=dict)
+    system_logs: List[Any] = field(default_factory=list)
 
     def to_dict(self):
         return {
@@ -100,6 +109,7 @@ class NarrativeState:
     
     # Legacy fields
     timeline: List[Any] = field(default_factory=list)
+    current_emotional_tone: str = "neutral"
 
     def to_dict(self):
         return {
@@ -198,3 +208,7 @@ class ConsciousState:
             "n_events": len(self.narrative.timeline),
             "beliefs": self.fluid.belief_scores
         }
+
+
+# Historical name retained for state-persistence and SDK compatibility.
+CrystallizedMemory = CrystallizedState

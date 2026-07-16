@@ -28,13 +28,13 @@ for _path in (
     if _value not in sys.path:
         sys.path.insert(0, _value)
 
-CHARACTERS_DIR = ROOT / "characters"
+CHARACTERS_DIR = ROOT / "packages" / "characters"
 
 
 def _build_api_client(server_url: str):
     """Create an HTTP client, preferring a reachable configured server.
 
-    Falls back to an in-process FastAPI TestClient so the suite can run
+    Falls back to an in-process ASGI client so the suite can run
     without a separately launched Synthesus server.
     """
     import httpx
@@ -51,8 +51,9 @@ def _build_api_client(server_url: str):
             pass
 
     try:
-        from fastapi.testclient import TestClient
-        server_path = ROOT / "api" / "fastapi_server.py"
+        from tests.asgi_client import MainThreadASGIClient
+
+        server_path = ROOT / "packages" / "api" / "fastapi_server.py"
         spec = importlib.util.spec_from_file_location("_synthesus_fastapi_server_test_app", server_path)
         if spec is None or spec.loader is None:
             raise RuntimeError(f"Unable to load test app from {server_path}")
@@ -67,7 +68,7 @@ def _build_api_client(server_url: str):
             module.ADMIN_KEY = test_key
         if hasattr(module, "AUTH_RATE_LIMIT"):
             module.AUTH_RATE_LIMIT = 10_000_000
-        return TestClient(app, headers={"X-API-Key": test_key})
+        return MainThreadASGIClient(app, headers={"X-API-Key": test_key})
     except Exception as exc:
         raise RuntimeError(f"Unable to build API client for tests: {exc}") from exc
 

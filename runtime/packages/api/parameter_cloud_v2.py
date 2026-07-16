@@ -25,10 +25,14 @@ async def get_db_pool() -> asyncpg.Pool:
             "DATABASE_URL",
             "postgresql://synthesus:synthesus@localhost:5432/synthesus_params"
         )
+        connect_timeout = float(
+            os.environ.get("PARAMETER_CLOUD_DB_CONNECT_TIMEOUT", "2.0")
+        )
         _pool = await asyncpg.create_pool(
             dsn=dsn,
             min_size=5,
             max_size=50,
+            timeout=connect_timeout,
             command_timeout=60
         )
     return _pool

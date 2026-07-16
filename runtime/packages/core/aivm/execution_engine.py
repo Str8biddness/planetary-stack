@@ -108,7 +108,9 @@ class ResourcePool:
         self.max_memory_bytes = max_memory_mb * 1024 * 1024
         self.max_threads = max_threads
         self._memory_used = 0
-        self._lock = threading.Lock()
+        # Stats and allocation diagnostics call lock-protected properties while
+        # already holding the pool lock, so this boundary must be re-entrant.
+        self._lock = threading.RLock()
         self._allocations: Dict[str, ResourceAllocation] = {}
         self._thread_usage = 0
 

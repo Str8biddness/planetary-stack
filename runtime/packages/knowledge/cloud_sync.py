@@ -140,6 +140,23 @@ def _download_file(url: str, dest: Path, expected_sha256: str | None = None, exp
         raise
 
 
+def _write_cached_manifest(path: Path, manifest: dict) -> None:
+    """Persist the exact verified manifest beside its downloaded artifacts."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
+    os.close(tmp_fd)
+    tmp_path = Path(tmp_name)
+    try:
+        tmp_path.write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(tmp_path, path)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
 def build_manifest(root_dir: str | Path, artifacts: Sequence[str]) -> dict:
     root = Path(root_dir)
     items = []
@@ -228,8 +245,10 @@ def sync_artifacts(
         expected_sha = remote_item.get("sha256") if remote_item else None
 
         if local_path.exists() and expected_size is not None and local_path.stat().st_size == expected_size:
-            report["skipped"].append(rel)
-            continue
+            if expected_sha is None or _sha256_file(local_path) == expected_sha:
+                report["skipped"].append(rel)
+                continue
+            logger.warning("Synthesus cloud sync: local hash mismatch for %s; downloading again", rel)
 
         if remote_item is None:
             if artifact.required:
@@ -240,6 +259,8 @@ def sync_artifacts(
         logger.info("Synthesus cloud sync: downloading %s", rel)
         _download_file(remote_url, local_path, expected_sha256=expected_sha, expected_size=expected_size)
         report["downloaded"].append(rel)
+
+    _write_cached_manifest(local_root / manifest_name, manifest)
 
     return report
 

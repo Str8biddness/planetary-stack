@@ -1,7 +1,7 @@
 """Tests for ONNX integration hooks."""
 import pytest
 import numpy as np
-from onnx_bridge.aivm_onnx_hooks import (
+from aivm_onnx_hooks import (
     ONNX_AVAILABLE,
     ONNXIntegrationHooks,
     ONNXModelConfig,
@@ -29,7 +29,7 @@ class TestONNXIntegrationHooks:
 @pytest.mark.skipif(ONNX_AVAILABLE, reason="ONNX Runtime available - skipping unavailable test")
 def test_onnx_not_available_behavior():
     """Test behavior when ONNX is not installed."""
-    from onnx_bridge.aivm_onnx_hooks import ONNX_AVAILABLE
+    from aivm_onnx_hooks import ONNX_AVAILABLE
     assert not ONNX_AVAILABLE
     
     hooks = ONNXIntegrationHooks()

@@ -1,4 +1,9 @@
 import asyncio
+
+if __name__ != "__main__":
+    import pytest
+    pytest.skip("manual network smoke script", allow_module_level=True)
+
 from core.synthesus_master import SynthesusMaster
 
 async def test_agent_dispatcher():

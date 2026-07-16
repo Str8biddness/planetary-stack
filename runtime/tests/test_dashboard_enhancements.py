@@ -1,9 +1,9 @@
 import pytest
 import logging
-from fastapi.testclient import TestClient
 from api.production_server import app, logger
+from tests.asgi_client import MainThreadASGIClient
 
-client = TestClient(app)
+client = MainThreadASGIClient(app)
 
 def test_monitoring_dashboard_enhancements():
     # Trigger a warning log to see if it gets captured by MemoryLogHandler

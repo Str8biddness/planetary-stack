@@ -1,4 +1,7 @@
-"""Re-export real SentimentAnalyzer from reasoning/ (core/ml was a pass stub)."""
-from reasoning.sentiment_analyzer import SentimentAnalyzer  # noqa: F401
+"""Re-export the canonical sentiment analyzer and emotion mapping."""
+from reasoning.sentiment_analyzer import (  # noqa: F401
+    SENTIMENT_TO_EMOTION,
+    SentimentAnalyzer,
+)
 
-__all__ = ["SentimentAnalyzer"]
+__all__ = ["SENTIMENT_TO_EMOTION", "SentimentAnalyzer"]

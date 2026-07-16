@@ -30,7 +30,7 @@ for path in (
 os.environ.setdefault("SYNTHESUS_KNOWLEDGE_SYNC_MODE", "off")
 os.environ.setdefault("SYNTHESUS_API_KEY", "synthesus5-smoke-local")
 
-from fastapi.testclient import TestClient  # noqa: E402
+import httpx  # noqa: E402
 from core.chal.hypervisor import CognitiveHypervisor  # noqa: E402
 from reasoning.generation.template_guard import LEGACY_TEMPLATE_SIGNATURES  # noqa: E402
 
@@ -92,83 +92,88 @@ def _find_template_leaks(text: str) -> list[str]:
 
 
 def run_smoke(*, verbose: bool = False) -> dict[str, Any]:
+    return asyncio.run(_run_smoke_async(verbose=verbose))
+
+
+async def _run_smoke_async(*, verbose: bool = False) -> dict[str, Any]:
     production_server.DEMO_RATE_LIMIT = 1_000_000
     production_server.AUTH_RATE_LIMIT = 1_000_000
     production_server._rate_limits.clear()
 
-    client = TestClient(production_server.app)
     session_id = "synthesus5-chal-smoke"
     results: list[dict[str, Any]] = []
-
-    for turn in TURNS:
-        payload = {
-            "query": turn.query,
-            "character": turn.character,
-            "session_id": session_id,
-            "mode": "business_bot" if turn.label == "business_bot_preset" else "chal",
-            "include_debug": True,
-        }
-        response = client.post(
-            "/api/v1/query",
-            json=payload,
-            headers={"X-API-Key": os.environ["SYNTHESUS_API_KEY"]},
-        )
-        _assert(response.status_code == 200, f"{turn.label}: HTTP {response.status_code}: {response.text}")
-        data = response.json()
-        text = data.get("response", "")
-        debug = data.get("debug", {})
-        trace = debug.get("cognitive_hypervisor", {})
-        leaks = _find_template_leaks(text)
-
-        _assert(data.get("source") == "cognitive_hypervisor", f"{turn.label}: wrong source {data.get('source')!r}")
-        _assert(isinstance(text, str) and text.strip(), f"{turn.label}: empty response")
-        _assert(trace.get("schema") == "synthesus.chal.hypervisor_trace.v1", f"{turn.label}: missing trace schema")
-        _assert(trace.get("route") == turn.expected_route, f"{turn.label}: route {trace.get('route')!r}")
-        _assert(not trace.get("budget_exhausted"), f"{turn.label}: budget exhausted")
-        _assert(not trace.get("degraded"), f"{turn.label}: degraded trace")
-        _assert(not leaks, f"{turn.label}: leaked legacy template signatures {leaks}")
-
-        if turn.expected_route == "quad_brain_path":
-            quad_brain = trace.get("quad_brain")
-            _assert(isinstance(quad_brain, dict), f"{turn.label}: missing quad brain trace")
-            _assert(
-                quad_brain.get("serial_order") == [
-                    "knowledge_grounding",
-                    "executive_reasoning",
-                    "cgpu_rendering",
-                    "critic_metacognition",
-                ],
-                f"{turn.label}: unexpected quad brain serial order",
-            )
-            if turn.label == "business_bot_preset":
-                cgpu_output = quad_brain["outputs"][2]
-                _assert(
-                    trace.get("runtime_preset") == "business_bot",
-                    f"{turn.label}: missing runtime preset",
+    transport = httpx.ASGITransport(app=production_server.app)
+    async with production_server.app.router.lifespan_context(production_server.app):
+        async with httpx.AsyncClient(transport=transport, base_url="http://synthesus.local") as client:
+            for turn in TURNS:
+                payload = {
+                    "query": turn.query,
+                    "character": turn.character,
+                    "session_id": session_id,
+                    "mode": "business_bot" if turn.label == "business_bot_preset" else "chal",
+                    "include_debug": True,
+                }
+                response = await client.post(
+                    "/api/v1/query",
+                    json=payload,
+                    headers={"X-API-Key": os.environ["SYNTHESUS_API_KEY"]},
                 )
-                _assert(
-                    cgpu_output["content"]["trace"]["mode"] == "business_bot",
-                    f"{turn.label}: CGPU mode was not business_bot",
-                )
-                _assert(
-                    text.startswith(("Direct answer:", "Recommended next step:")),
-                    f"{turn.label}: response was not concise business surface",
-                )
+                _assert(response.status_code == 200, f"{turn.label}: HTTP {response.status_code}: {response.text}")
+                data = response.json()
+                text = data.get("response", "")
+                debug = data.get("debug", {})
+                trace = debug.get("cognitive_hypervisor", {})
+                leaks = _find_template_leaks(text)
 
-        result = {
-            "label": turn.label,
-            "route": trace.get("route"),
-            "latency_ms": round(float(data.get("latency_ms", 0.0)), 3),
-            "response_chars": len(text),
-            "template_leaks": leaks,
-        }
-        results.append(result)
-        if verbose:
-            print(f"[{turn.label}] route={result['route']} latency={result['latency_ms']}ms")
-            print(text)
-            print()
+                _assert(data.get("source") == "cognitive_hypervisor", f"{turn.label}: wrong source {data.get('source')!r}")
+                _assert(isinstance(text, str) and text.strip(), f"{turn.label}: empty response")
+                _assert(trace.get("schema") == "synthesus.chal.hypervisor_trace.v1", f"{turn.label}: missing trace schema")
+                _assert(trace.get("route") == turn.expected_route, f"{turn.label}: route {trace.get('route')!r}")
+                _assert(not trace.get("budget_exhausted"), f"{turn.label}: budget exhausted")
+                _assert(not trace.get("degraded"), f"{turn.label}: degraded trace")
+                _assert(not leaks, f"{turn.label}: leaked legacy template signatures {leaks}")
 
-    degraded = _run_degraded_state_smoke()
+                if turn.expected_route == "quad_brain_path":
+                    quad_brain = trace.get("quad_brain")
+                    _assert(isinstance(quad_brain, dict), f"{turn.label}: missing quad brain trace")
+                    _assert(
+                        quad_brain.get("serial_order") == [
+                            "knowledge_grounding",
+                            "executive_reasoning",
+                            "cgpu_rendering",
+                            "critic_metacognition",
+                        ],
+                        f"{turn.label}: unexpected quad brain serial order",
+                    )
+                    if turn.label == "business_bot_preset":
+                        cgpu_output = quad_brain["outputs"][2]
+                        _assert(
+                            trace.get("runtime_preset") == "business_bot",
+                            f"{turn.label}: missing runtime preset",
+                        )
+                        _assert(
+                            cgpu_output["content"]["trace"]["mode"] == "business_bot",
+                            f"{turn.label}: CGPU mode was not business_bot",
+                        )
+                        _assert(
+                            text.startswith(("Direct answer:", "Recommended next step:")),
+                            f"{turn.label}: response was not concise business surface",
+                        )
+
+                result = {
+                    "label": turn.label,
+                    "route": trace.get("route"),
+                    "latency_ms": round(float(data.get("latency_ms", 0.0)), 3),
+                    "response_chars": len(text),
+                    "template_leaks": leaks,
+                }
+                results.append(result)
+                if verbose:
+                    print(f"[{turn.label}] route={result['route']} latency={result['latency_ms']}ms")
+                    print(text)
+                    print()
+
+    degraded = await _run_degraded_state_smoke()
 
     return {
         "status": "passed",
@@ -178,9 +183,9 @@ def run_smoke(*, verbose: bool = False) -> dict[str, Any]:
     }
 
 
-def _run_degraded_state_smoke() -> dict[str, Any]:
+async def _run_degraded_state_smoke() -> dict[str, Any]:
     hypervisor = CognitiveHypervisor(bridge_factory=lambda: SlowBridge())
-    result = asyncio.run(hypervisor.process_query("simple degraded smoke"))
+    result = await hypervisor.process_query("simple degraded smoke")
     degraded_state = result.telemetry.get("degraded_state") or {}
     leaks = _find_template_leaks(result.response)
 

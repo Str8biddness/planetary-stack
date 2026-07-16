@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+import shutil
 from pathlib import Path
 from core.knowledge_cloud import KnowledgeCloud
 from cognitive.cognitive_engine import CognitiveEngine
@@ -7,14 +8,14 @@ from cognitive.cognitive_engine import CognitiveEngine
 PROJ_ROOT = Path(__file__).parent.parent
 
 @pytest.fixture
-def shared_cloud():
+def shared_cloud(tmp_path):
     """Load the world_lore.json into a shared cloud instance."""
-    data_dir = PROJ_ROOT / "data" / "knowledge_cloud"
-    # Ensure a fresh evolution file for testing
-    evo_path = Path(data_dir) / "evolution.json"
-    if evo_path.exists():
-        evo_path.unlink()
-        
+    source = PROJ_ROOT / "data" / "knowledge_cloud" / "world_lore.json"
+    if not source.exists():
+        pytest.skip("Knowledge Cloud world_lore artifact is not mounted")
+    data_dir = tmp_path / "knowledge_cloud"
+    data_dir.mkdir()
+    shutil.copy2(source, data_dir / source.name)
     return KnowledgeCloud(data_dir=str(data_dir))
 
 @pytest.fixture
@@ -55,7 +56,3 @@ async def test_knowledge_evolution_propagation(shared_cloud, char_a, char_b):
     # 4. Persistence Check: Verify evolution.json was created
     evo_path = Path(shared_cloud.data_dir) / "evolution.json"
     assert evo_path.exists()
-    
-    # Clean up
-    if evo_path.exists():
-        evo_path.unlink()

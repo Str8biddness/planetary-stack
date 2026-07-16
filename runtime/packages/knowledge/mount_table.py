@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from knowledge.artifact_utils import count_json_collection
+
 try:
     from core.chal.interfaces import Mount, MountType, Partition
 except ImportError:
@@ -553,13 +555,7 @@ class KnowledgeCloudMountTable:
             errors.append(f"FAISS load failed: {exc}")
 
         try:
-            metadata = json.loads((root / "faiss_metadata.json").read_text(encoding="utf-8"))
-            if isinstance(metadata, list):
-                metadata_records = len(metadata)
-            elif isinstance(metadata, dict):
-                metadata_records = len(metadata)
-            else:
-                errors.append("faiss_metadata.json must be a list or object")
+            metadata_records = count_json_collection(root / "faiss_metadata.json")
         except Exception as exc:
             errors.append(f"FAISS metadata load failed: {exc}")
 

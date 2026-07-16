@@ -8,6 +8,10 @@ import sys
 import os
 import json
 
+if __name__ != "__main__":
+    import pytest
+    pytest.skip("manual live-server smoke script", allow_module_level=True)
+
 try:
     import httpx
 except ImportError:

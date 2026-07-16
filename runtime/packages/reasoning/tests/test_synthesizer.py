@@ -11,12 +11,11 @@ class TestSynthesizer(unittest.TestCase):
             "world": ["The capital of France is Paris.", "Paris is the largest city in France."],
             "general": ["The capital of France is Paris."]
         }
-        merged = self.synthesizer.merge_domain_contexts(domain_contexts)
-        # Should have at least 2 unique facts
-        self.assertGreaterEqual(len(merged), 2)
-        # Check that one "Paris is the capital" was likely deduplicated
-        texts = [m[0] for m in merged]
-        self.assertIn("The capital of France is Paris.", texts)
+        result = self.synthesizer.synthesize(domain_contexts, "Tell me about Paris")
+        # The duplicate capital fact should appear once while the distinct city
+        # fact remains in the formatted response.
+        self.assertEqual(result.count("The capital of France is Paris."), 1)
+        self.assertIn("Paris is the largest city in France.", result)
 
     def test_synthesize(self):
         domain_contexts = {

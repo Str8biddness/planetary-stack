@@ -5,6 +5,10 @@ import httpx
 import websockets
 import time
 
+if __name__ != "__main__":
+    import pytest
+    pytest.skip("manual live-server and WebSocket smoke script", allow_module_level=True)
+
 SERVER_URL = "http://127.0.0.1:8000"
 WS_URL = "ws://127.0.0.1:8000/api/v1/monitoring/ws"
 

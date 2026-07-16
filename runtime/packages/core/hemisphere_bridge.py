@@ -14,6 +14,7 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from enum import Enum
+from functools import partial
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, Optional
 
@@ -25,6 +26,10 @@ try:
     from reasoning.chal import build_ppbrs_firmware_signal
 except ModuleNotFoundError:  # pragma: no cover - repo-root compatibility path
     from packages.reasoning.chal import build_ppbrs_firmware_signal
+try:
+    from aivm.isolation.async_utils import run_sync_isolated
+except ModuleNotFoundError:  # pragma: no cover - repo-root compatibility path
+    from packages.aivm.isolation.async_utils import run_sync_isolated
 
 logger = logging.getLogger(__name__)
 
@@ -990,7 +995,9 @@ class HemisphereBridge:
 
         if mode in (HemisphereMode.BOTH, HemisphereMode.AUTO):
             right_context = self._build_right_context(query, parallel_seed)
-            left_task = asyncio.to_thread(self._query_kernel, query, character_id, rag_context)
+            left_task = run_sync_isolated(
+                partial(self._query_kernel, query, character_id, rag_context)
+            )
             right_task = self._resolve_right_result_async(query, right_context)
             left_raw, right_raw = await asyncio.gather(left_task, right_task, return_exceptions=True)
 

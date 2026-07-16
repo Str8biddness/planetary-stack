@@ -179,22 +179,31 @@ class SynthesusMaster:
         """
         params = params or {}
 
+        supported_actions = {"analyze", "autonomous_takeover"}
+        if action not in supported_actions:
+            return {"error": f"Unknown kernel action '{action}'."}
+
         # Environment flag check
         if not self.allow_kernel_actions and action != "analyze":
             return {"error": "Kernel actions disabled in this environment."}
 
+        # Read-only analysis remains available when kernel actions are globally
+        # disabled.  Enabling kernel actions opts into the authorization and
+        # justification gates below for every operation, including analysis.
+        if not self.allow_kernel_actions:
+            return self.kernel_tool.analyze()
+
         # 1. Deductive security check: are we in an authorized context?
-        # Map current conscious state into security facts.
-        facts = {
-            "user_authenticated": self.state.crystallized.facts.get("user_authenticated", False),
-            "admin_privileges_granted": self.state.crystallized.facts.get("admin_privileges_granted", False),
-        }
-        # Ask the deductive engine to re-evaluate; this updates its KB.
-        await self.think(
-            "Given that user_authenticated and admin_privileges_granted, therefore system_access_allowed?"
+        # Read authorization only from trusted conscious state.  Do not feed a
+        # prompt containing affirmative premises into the general query parser:
+        # those words are assertions, not evidence of an authenticated session.
+        authorized = (
+            self.state.crystallized.facts.get("user_authenticated") is True
+            and self.state.crystallized.facts.get("admin_privileges_granted") is True
         )
-        if not self.state.crystallized.facts.get("system_access_allowed", False):
+        if not authorized:
             return {"error": "Security preconditions not met; kernel action denied."}
+        self.state.crystallized.facts["system_access_allowed"] = True
 
         # 2. Abductive justification
         justification_query = f"Why should I perform kernel action {action}?"
@@ -213,9 +222,6 @@ class SynthesusMaster:
         elif action == "autonomous_takeover":
             target = params.get("target_device")
             result = self.kernel_tool.autonomous_takeover(target)
-        else:
-            return {"error": f"Unknown kernel action '{action}'."}
-
         # 4. Log in narrative
         if self.state.narrative.timeline:
             self.state.narrative.timeline[-1].actions_taken.append({

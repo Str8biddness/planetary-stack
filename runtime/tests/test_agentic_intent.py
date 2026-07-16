@@ -10,6 +10,8 @@ PROJ_ROOT = Path(__file__).parent.parent
 def knowledge_cloud():
     """Load the updated world_lore.json for testing."""
     data_dir = PROJ_ROOT / "data" / "knowledge_cloud"
+    if not (data_dir / "world_lore.json").exists():
+        pytest.skip("Knowledge Cloud world_lore artifact is not mounted")
     return KnowledgeCloud(data_dir=str(data_dir))
 
 @pytest.fixture

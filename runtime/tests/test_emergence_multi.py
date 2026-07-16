@@ -5,7 +5,7 @@ from typing import Dict, Any
 from core.reasoning_core import ReasoningCore
 from cognitive.social_fabric import SocialFabric
 
-async def test_character(char_id: str, traits: Dict[str, float], disposition: float, query: str):
+async def _run_character(char_id: str, traits: Dict[str, float], disposition: float, query: str):
     print(f"\n--- Testing Character: {char_id.upper()} ---")
     print(f"Traits: {traits}")
     print(f"Disposition: {disposition}")
@@ -31,7 +31,7 @@ async def test_character(char_id: str, traits: Dict[str, float], disposition: fl
 
 async def main():
     # 1. GAREN - High Honor, Low Greed
-    await test_character(
+    await _run_character(
         "garen", 
         {"honor": 0.9, "greed": 0.1, "curiosity": 0.3}, 
         0.8, # Friendly
@@ -39,7 +39,7 @@ async def main():
     )
     
     # 2. LEXIS - High Greed, Low Honor
-    await test_character(
+    await _run_character(
         "lexis", 
         {"honor": 0.1, "greed": 0.9, "curiosity": 0.4}, 
         -0.2, # Guarded/Suspicious
@@ -47,7 +47,7 @@ async def main():
     )
     
     # 3. COMPUTRESS - High Curiosity
-    await test_character(
+    await _run_character(
         "computress", 
         {"honor": 0.5, "greed": 0.2, "curiosity": 0.9}, 
         0.5, # Neutral/Curious

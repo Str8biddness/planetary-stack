@@ -1,4 +1,9 @@
 import asyncio
+
+if __name__ != "__main__":
+    import pytest
+    pytest.skip("manual feedback wiring script", allow_module_level=True)
+
 from core.synthesus_master import SynthesusMaster
 from core.conscious_state import NarrativeEvent
 

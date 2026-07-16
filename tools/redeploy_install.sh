@@ -46,6 +46,7 @@ if [ ! -f "$DEST/synthesus.env" ]; then
 SYNTHESUS_API_KEY=$KEY
 SYNTHESUS_MODEL=${SYNTHESUS_MODEL:-llama3.2:3b}
 SYNTHESUS_HOST=127.0.0.1
+SYNTHESUS_KNOWLEDGE_SYNC_MODE=off
 SYNTHESUS_HUMAN_SESSION_SECRET=$HSEC
 ENV
   chmod 600 "$DEST/synthesus.env"
@@ -57,6 +58,10 @@ else
     ok "appended SYNTHESUS_HUMAN_SESSION_SECRET to existing synthesus.env"
   else
     ok "synthesus.env preserved (includes human session secret)"
+  fi
+  if ! grep -q '^SYNTHESUS_KNOWLEDGE_SYNC_MODE=' "$DEST/synthesus.env" 2>/dev/null; then
+    echo "SYNTHESUS_KNOWLEDGE_SYNC_MODE=off" >> "$DEST/synthesus.env"
+    ok "disabled automatic Knowledge Cloud sync until a valid bundle is published"
   fi
 fi
 
