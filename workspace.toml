@@ -1,0 +1,28 @@
+schema_version = 1
+name = "planetary-stack"
+
+[[components]]
+name = "synthesus"
+path = "apps/synthesus"
+role = "desktop-and-cognitive-runtime"
+
+[[components]]
+name = "knowledge-cloud"
+path = "knowledge/knowledge-cloud"
+role = "knowledge-artifact-and-rebuild-plane"
+
+[[components]]
+name = "planetary-os"
+path = "platform/planetary-os"
+role = "kernel-desktop-and-unisync-seed"
+
+[[components]]
+name = "synthesus-os"
+path = "platform/synthesus-os"
+role = "chal-aivm-hypervisor-and-vsource-seed"
+
+[[components]]
+name = "synthetic-intelligence-network"
+path = "research/synthetic-intelligence-network"
+role = "research"
+

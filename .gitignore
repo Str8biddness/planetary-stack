@@ -1,0 +1,26 @@
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+node_modules/
+dist/
+build/
+coverage/
+
+*.log
+.DS_Store
+
+# Runtime state and downloaded models belong outside source control.
+.planetary/
+var/
+models/
+downloads/
+
