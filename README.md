@@ -60,6 +60,14 @@ make test-knowledge-source
 make test-synthesus
 ```
 
+If dependencies live in a virtual environment, select it without changing the
+repository:
+
+```bash
+make doctor PYTHON=/path/to/.venv/bin/python
+make test PYTHON=/path/to/.venv/bin/python
+```
+
 The full consolidation and launch sequence is in
 [`MIGRATION_CHECKLIST.md`](MIGRATION_CHECKLIST.md).
 
@@ -69,4 +77,3 @@ This is currently a mixed-license repository. Synthesus is AGPL-3.0; several
 platform, research, and Knowledge Cloud components are MIT. See
 [`LICENSES.md`](LICENSES.md) and the license file within each imported
 component.
-

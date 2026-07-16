@@ -21,28 +21,36 @@ and secret-scan result recorded in `docs/REPOSITORY_MAP.md`.
 ## Phase 1 — history-preserving monorepo bootstrap
 
 - [x] Initialize the root repository and integration documentation.
-- [ ] Import Synthesus from `fix/launch-async-guard` into `apps/synthesus/`.
-- [ ] Import Knowledge Cloud from `agent/repair-knowledge-cloud-bundle` into
+- [x] Import Synthesus from `fix/launch-async-guard` into `apps/synthesus/`.
+- [x] Import Knowledge Cloud from `agent/repair-knowledge-cloud-bundle` into
   `knowledge/knowledge-cloud/`, retaining Git LFS pointers.
-- [ ] Import AIVM Planetary OS into `platform/planetary-os/`.
-- [ ] Import Synthesus OS/CHAL seed into `platform/synthesus-os/`.
-- [ ] Import Synthetic Intelligence Network into
+- [x] Import AIVM Planetary OS into `platform/planetary-os/`.
+- [x] Import Synthesus OS/CHAL seed into `platform/synthesus-os/`.
+- [x] Import Synthetic Intelligence Network into
   `research/synthetic-intelligence-network/`.
-- [ ] Record source remote and commit metadata.
-- [ ] Add root diagnostics and run them from a clean checkout.
+- [x] Record source remote and commit metadata.
+- [x] Add root diagnostics and run them from the integrated checkout.
+- [ ] Verify root diagnostics from a fresh clone after the GitHub repository
+  exists.
 
 Acceptance gate: one clone contains every canonical source boundary and
 `make doctor` identifies every required or optional dependency accurately.
 
 ## Phase 2 — establish canonical ownership
 
-- [ ] Diff `apps/synthesus/runtime/` against `platform/synthesus-os/`.
+- [x] Diff `apps/synthesus/runtime/` against `platform/synthesus-os/`.
+- [x] Declare `apps/synthesus/runtime/` as the provisional canonical product
+  runtime and `platform/synthesus-os/` as a read-only extraction seed.
+- [x] Stop tracking imported Planetary kernel build products and validate the
+  kernel from an isolated temporary build directory.
 - [ ] Declare one canonical implementation for CHAL, Cognitive Hypervisor,
   AIVM, knowledge integration, API, frontend, and desktop.
 - [ ] Quarantine duplicate or historical trees under `archive/` with a
   retirement note; do not silently delete unique work.
 - [ ] Move architecture-only vSource and Unisync material into versioned
   cross-component specifications.
+- [ ] Fix the mounted Knowledge Cloud evolution regression exposed by
+  `tests/test_knowledge_evolution.py::test_knowledge_evolution_propagation`.
 - [ ] Replace internal imports that depend on former repository roots.
 - [ ] Add compatibility shims only where a dated removal issue exists.
 
@@ -54,7 +62,9 @@ trees fail a repository audit.
 - [ ] Create one bootstrap command for Python, Node/Bun, C++, and optional GPU
   dependencies.
 - [ ] Pin supported Python, Node/Bun, compiler, Ollama, and CUDA versions.
-- [ ] Add path-filtered CI for desktop, runtime, kernel, and knowledge planes.
+- [x] Add an initial root CI smoke workflow.
+- [ ] Expand CI into path-filtered desktop, runtime, kernel, and knowledge
+  planes.
 - [ ] Add formatting, linting, type checking, unit, integration, and security
   commands.
 - [ ] Add a reproducible development container or Nix/devcontainer equivalent.
@@ -165,4 +175,3 @@ customer revenue, maintains target gross margin, and meets its published SLOs.
 - Unit economics: revenue minus contributor credits, power subsidies, artifact
   storage, bandwidth, verification, payments, and support.
 - Safety: confirmed isolation, privacy, abuse, and metering incidents.
-
