@@ -109,7 +109,7 @@ def rebuild_index(
             texts.append(record_to_text(record))
             if len(texts) >= batch_size:
                 flush()
-                if count % 50_000 < batch_size:
+                if count and count % 50_000 < batch_size:
                     print(f"indexed {count:,} records", flush=True)
         flush()
         if index_kind == "ivf" and index is None:
