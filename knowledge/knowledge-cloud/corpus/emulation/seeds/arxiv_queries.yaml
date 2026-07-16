@@ -1,0 +1,40 @@
+version: "1"
+description: >
+  arXiv search queries for the emulation research corpus. Each entry produces
+  an arXiv export feed query and the top-N results are persisted as
+  research_paper entries.
+
+max_results_per_query: 40
+sort_by: relevance
+
+queries:
+  - "binary translation virtual machine"
+  - "dynamic recompilation emulator"
+  - "hardware-assisted virtualization"
+  - "hypervisor security isolation"
+  - "nested virtualization performance"
+  - "IOMMU virtualization"
+  - "GPU virtualization passthrough"
+  - "container vs virtual machine performance"
+  - "live migration virtual machine"
+  - "para-virtualization x86"
+  - "ARM virtualization extensions"
+  - "RISC-V hypervisor"
+  - "QEMU TCG JIT"
+  - "memory deduplication virtualization"
+  - "side-channel attack hypervisor"
+  - "Spectre Meltdown virtualization"
+  - "confidential computing TEE"
+  - "AMD SEV-SNP"
+  - "Intel TDX"
+  - "unikernel performance"
+  - "microVM Firecracker"
+  - "Kata containers sandbox"
+  - "gVisor kernel sandbox"
+  - "trap-and-emulate full virtualization"
+  - "instruction set emulation"
+  - "cycle-accurate simulator"
+  - "FPGA emulation processor"
+  - "transactional memory virtualization"
+  - "OS virtualization performance"
+  - "Xen Project paravirtualization"

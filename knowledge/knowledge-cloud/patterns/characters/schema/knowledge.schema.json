@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "synthesus://character/knowledge.schema.json",
+  "title": "Synthesus Character Knowledge Graph",
+  "description": "Entity knowledge base. Defines what the character KNOWS about the world — people, places, items, factions, events.",
+  "type": "object",
+  "required": ["entities"],
+  "properties": {
+    "character_id": {
+      "type": "string",
+      "description": "Must match parent directory name."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "entities": {
+      "type": "object",
+      "description": "Map of entity_id → entity definition.",
+      "additionalProperties": { "$ref": "#/$defs/entity" }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "entity": {
+      "type": "object",
+      "required": ["entity_type", "display_name", "description"],
+      "properties": {
+        "entity_type": {
+          "type": "string",
+          "enum": ["person", "place", "item", "faction", "event", "concept"],
+          "description": "What kind of thing this entity is."
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "How the NPC refers to this entity (e.g., 'Tomás', 'The Northern Road')."
+        },
+        "depth": {
+          "type": "string",
+          "enum": ["intimate", "familiar", "acquainted", "rumor", "unknown"],
+          "default": "acquainted",
+          "description": "How well the NPC knows this entity. Affects confidence: intimate=0.95, familiar=0.85, acquainted=0.75, rumor=0.60, unknown=0.30."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10,
+          "description": "What the NPC says when asked about this entity. Written in first person, in-character."
+        },
+        "relationship_to_npc": {
+          "type": "string",
+          "description": "How the NPC relates to this entity (e.g., 'my driver', 'a rival', 'my home city')."
+        },
+        "emotion_variants": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Emotion → alternate description. Keys are emotion names (afraid, friendly, sad, etc.)."
+        },
+        "related_entities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "IDs of related entities for multi-hop queries."
+        },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Alternate names/phrases that should match this entity (e.g., 'your driver', 'the blacksmith')."
+        },
+        "topics": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Topic tags this entity is relevant to (e.g., 'quest', 'world_info', 'shopping')."
+        },
+        "secret_description": {
+          "type": "string",
+          "description": "Trust-gated knowledge. Only shared when player trust >= trust_threshold."
+        },
+        "trust_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 70.0,
+          "description": "Trust score required to unlock secret_description."
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

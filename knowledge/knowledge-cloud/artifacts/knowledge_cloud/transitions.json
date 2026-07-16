@@ -1,0 +1,127 @@
+{
+  "transitions": {
+    "cloud_greeting": {
+      "cloud_dragon": {
+        "weight": 0.7,
+        "context_buckets": ["inquiry", "narrative"]
+      },
+      "cloud_quest": {
+        "weight": 0.6,
+        "context_buckets": ["narrative"]
+      },
+      "cloud_combat": {
+        "weight": 0.5,
+        "context_buckets": ["combat"]
+      }
+    },
+    "cloud_dragon": {
+      "cloud_castle": {
+        "weight": 0.8,
+        "context_buckets": ["lore", "narrative"]
+      },
+      "cloud_treasure": {
+        "weight": 0.7,
+        "context_buckets": ["commerce", "lore"]
+      },
+      "cloud_fire_magic": {
+        "weight": 0.6,
+        "context_buckets": ["combat", "lore"]
+      },
+      "cloud_danger": {
+        "weight": 0.75,
+        "context_buckets": ["combat", "tense"]
+      }
+    },
+    "cloud_castle": {
+      "cloud_ruler": {
+        "weight": 0.9,
+        "context_buckets": ["lore", "social"]
+      },
+      "cloud_dungeon": {
+        "weight": 0.7,
+        "context_buckets": ["lore", "narrative"]
+      },
+      "cloud_guard": {
+        "weight": 0.65,
+        "context_buckets": ["combat", "lore"]
+      }
+    },
+    "cloud_quest": {
+      "cloud_reward": {
+        "weight": 0.8,
+        "context_buckets": ["commerce", "narrative"]
+      },
+      "cloud_danger": {
+        "weight": 0.7,
+        "context_buckets": ["combat", "narrative"]
+      },
+      "cloud_location": {
+        "weight": 0.6,
+        "context_buckets": ["lore", "narrative"]
+      }
+    },
+    "cloud_ruler": {
+      "cloud_quest": {
+        "weight": 0.7,
+        "context_buckets": ["narrative", "social"]
+      },
+      "cloud_faction": {
+        "weight": 0.6,
+        "context_buckets": ["lore", "social"]
+      }
+    },
+    "cloud_combat": {
+      "cloud_danger": {
+        "weight": 0.85,
+        "context_buckets": ["combat", "tense"]
+      },
+      "cloud_weapon": {
+        "weight": 0.7,
+        "context_buckets": ["combat", "commerce"]
+      }
+    },
+    "cloud_treasure": {
+      "cloud_reward": {
+        "weight": 0.8,
+        "context_buckets": ["commerce"]
+      },
+      "cloud_commerce": {
+        "weight": 0.75,
+        "context_buckets": ["commerce"]
+      }
+    },
+    "cloud_danger": {
+      "cloud_combat": {
+        "weight": 0.8,
+        "context_buckets": ["combat", "tense"]
+      },
+      "cloud_weapon": {
+        "weight": 0.7,
+        "context_buckets": ["combat"]
+      }
+    }
+  },
+  "metadata": {
+    "version": "MVP-1.0",
+    "description": "Hand-curated transitions for hypothesis testing. These edges enable multi-pattern chaining for common RPG scenarios.",
+    "created": "2026-04-02",
+    "num_edges": 25,
+    "context_buckets": [
+      "inquiry",
+      "social",
+      "combat",
+      "commerce",
+      "narrative",
+      "tense",
+      "empathy",
+      "general"
+    ],
+    "notes": [
+      "Transitions are directional: from_pattern -> to_pattern",
+      "Weights are 0.0-1.0, higher = more likely transition",
+      "Context buckets filter transitions by ML Swarm signals",
+      "If no transition exists, SequenceLinker uses uniform fallback (0.5)",
+      "Add new transitions by adding entries to this JSON file"
+    ]
+  }
+}

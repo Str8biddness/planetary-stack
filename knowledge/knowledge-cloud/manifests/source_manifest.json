@@ -1,0 +1,783 @@
+{
+  "version": "1",
+  "kind": "synthesus-knowledge-source-plane",
+  "generated_at": "2026-07-16T05:25:53.981277+00:00",
+  "roots": [
+    "sources",
+    "synthesus_knowledge_cloud",
+    "pipelines",
+    "docs",
+    "patterns",
+    "synthetic",
+    "grounding_corpus",
+    "support_models",
+    "corpus"
+  ],
+  "artifacts": [
+    {
+      "path": "sources/conceptnet.yaml",
+      "size": 1124,
+      "sha256": "3422be68e2c6bf458cd465843e981e2aa0283209ab427f5f725de7f359412974"
+    },
+    {
+      "path": "sources/datasets.yaml",
+      "size": 5092,
+      "sha256": "7562d99f263bb4efa31373af2b8a1eb053677892c08a3f90242177cc6822b5bc"
+    },
+    {
+      "path": "sources/huggingface.yaml",
+      "size": 1101,
+      "sha256": "70e492671df769affa23b6e66a898f4626064308252c61747a5621ad67dab601"
+    },
+    {
+      "path": "sources/jeopardy.yaml",
+      "size": 1076,
+      "sha256": "5ca5e2c41ea0384dbef4ffe8cf463f402e69523b60176163ca08c38666544628"
+    },
+    {
+      "path": "sources/kaggle.yaml",
+      "size": 883,
+      "sha256": "98665d819bcc983ab2d29828b3cd8c9f23495bf3a684f92bb8ca4849da1364ee"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/__init__.py",
+      "size": 752,
+      "sha256": "8b39ffa876310b43abc7cc85a15e9802a224b124151cad04b2eb34e57887da24"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/__main__.py",
+      "size": 12554,
+      "sha256": "b6fb7d16b6ba18f3a0e5ffa6e66bebaf432da6d92ac257cdd6f001a43f2d7e9a"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/bootstrap.py",
+      "size": 3069,
+      "sha256": "b96558d789b01ead7af20313b2536dc5cf88110fe111a629c3397a5a05e7c1af"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/build.py",
+      "size": 11050,
+      "sha256": "4017b7d40574a3412f492c0389468906c02f3f008a6d09697a357a72a394bfb2"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/json_stream.py",
+      "size": 2961,
+      "sha256": "d6a90110288cc7300545d2093a0707a9379f82027f2ed60b5e36b2b455e4a303"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/manifest.py",
+      "size": 10279,
+      "sha256": "8d9fe17febaac286289589a32d42a2d68fffb0f24ccc05677e0e895457899d76"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/mirrors.py",
+      "size": 2314,
+      "sha256": "edf6a687e61a34f93ed15e18fd8493c50cc300582ca01cd8b72752ef7740a4a7"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/profiles.py",
+      "size": 852,
+      "sha256": "68ad0e351fca41b9451a0c2c4b53550c0048b86e1d6879b4fb87207a4882f8de"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/provenance.py",
+      "size": 6335,
+      "sha256": "a01ee92555a4d461b5ee0b6ffcce473e8ce1bf3a3a8b202ce23457c64a0dc81a"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/serve.py",
+      "size": 1092,
+      "sha256": "1d7ee4b2623685fd31103139f93200333e8cd0fcb6ba1bd1d18cc1761ff452c0"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/source_planes.py",
+      "size": 20481,
+      "sha256": "22bfd804c10e20e2cf385d8c17c57470b576badac79a22cbe9ac7942a2e0bd91"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/status.py",
+      "size": 4952,
+      "sha256": "5dfd7cfd003853f09f0bd0177b957915d69caee5fb23412cc06b4a802db7c61d"
+    },
+    {
+      "path": "synthesus_knowledge_cloud/sync.py",
+      "size": 10543,
+      "sha256": "08efc128f4711cbd0da52e11e793147d5b9b2f32d5faa74b9a0c85f45c69aea7"
+    },
+    {
+      "path": "pipelines/__init__.py",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pipelines/build/__init__.py",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pipelines/build/kn_populator.py",
+      "size": 21036,
+      "sha256": "e9848a085e7cf2f8b7b20ae0e880b62100dcfaa5632e0bf44cc908ab364f569d"
+    },
+    {
+      "path": "pipelines/build/reindex_bundle.py",
+      "size": 6235,
+      "sha256": "0f06f2580af9d2c776d511eca3744f2e95ce947b2586e23336d4352f4ad81899"
+    },
+    {
+      "path": "pipelines/build/run_population.py",
+      "size": 5848,
+      "sha256": "dd32cf9304be3fab73d328ee3b2a78af03b19ff2ffc8e9f59b80d55c7905d723"
+    },
+    {
+      "path": "pipelines/build/swarm_embedder.py",
+      "size": 6704,
+      "sha256": "a8510066e7c2f0001b4ab233b6ab54b6013110d5d817685cf413835e2d14685d"
+    },
+    {
+      "path": "pipelines/ingest/__init__.py",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pipelines/ingest/kaggle_loader.py",
+      "size": 14704,
+      "sha256": "af8507cbf17d713e85c0ad1cef48ed85775344675c57dc0a3d00e95da0f08c87"
+    },
+    {
+      "path": "pipelines/ingest_corpus/__init__.py",
+      "size": 62,
+      "sha256": "db762ccfae94a09d0788cec1237060da0bedff877ede63af2dbc78c31fdab247"
+    },
+    {
+      "path": "pipelines/ingest_corpus/arxiv_fetcher.py",
+      "size": 5931,
+      "sha256": "e67c8a854a60fe67bf3116d88f9d836fa1780ddd46f8e3062af1caf8db3dd338"
+    },
+    {
+      "path": "pipelines/ingest_corpus/corpus_loader.py",
+      "size": 4810,
+      "sha256": "e7376b19e5005f8987d107e7b6f8c732ae37a1f7e205023777177e3397c9fb1c"
+    },
+    {
+      "path": "pipelines/ingest_corpus/papers_fetcher.py",
+      "size": 5994,
+      "sha256": "153f521262af9edf52e30d6e006e51cc92612456ce6e7ff9d48dac278707d9f4"
+    },
+    {
+      "path": "pipelines/ingest_corpus/wikipedia_fetcher.py",
+      "size": 6609,
+      "sha256": "01a4addd874823b153c10207103624ec1dba845462faed8f5a72755ae1991bbb"
+    },
+    {
+      "path": "pipelines/publish/__init__.py",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pipelines/publish/cloud_sync.py",
+      "size": 14234,
+      "sha256": "911e9514d56bf3f8bc22660a6ef2d1e42d6c828f81d974122d5ae8cc96a7f898"
+    },
+    {
+      "path": "pipelines/publish/health_check.py",
+      "size": 4434,
+      "sha256": "7d2560de1f5b6266b5619d90e00d39776eded2e32d13b21c59cc8e303790f691"
+    },
+    {
+      "path": "pipelines/publish/manifest_manager.py",
+      "size": 3267,
+      "sha256": "3dea969f013253fe9734ff07e37fea660588181a3cd61c10b586cb475e8b5803"
+    },
+    {
+      "path": "docs/BOOTSTRAP.md",
+      "size": 1607,
+      "sha256": "75a20584fbdb1754929d47a84710dfd137d95e6efb196631bf100683cbe5eff9"
+    },
+    {
+      "path": "docs/BUILD.md",
+      "size": 3649,
+      "sha256": "2d86f2bb36fdb0069324bc75abc0f8f08ce3452cf6dcc7a27121c977d57773bb"
+    },
+    {
+      "path": "docs/DATA_MODEL.md",
+      "size": 3786,
+      "sha256": "8af61a59062de610e88eada9da8b87e29173d32107ba581b26fc969d14617938"
+    },
+    {
+      "path": "docs/INTEGRATION.md",
+      "size": 1609,
+      "sha256": "e5c0d27cf3c19958433a6da763fa8d708dc18973d32e632ef59bfa6aafea62ae"
+    },
+    {
+      "path": "docs/MIRRORS.md",
+      "size": 1723,
+      "sha256": "16f3a71b2728481aaf7c942b2977ff32a9d3c1309d8ee2aac25447ad8ce96266"
+    },
+    {
+      "path": "docs/PACKAGE_CLI.md",
+      "size": 1075,
+      "sha256": "0be6f92d0a018494df652af9c927e2279473f1277977c4a538d451cf04577fef"
+    },
+    {
+      "path": "docs/PIPELINE_ROADMAP.md",
+      "size": 1109,
+      "sha256": "ac16f158c7f9a12e9b8ab333c29dc2c9f4b5fcd001d93a8b25f4a6a6507462d6"
+    },
+    {
+      "path": "docs/PROVENANCE.md",
+      "size": 5404,
+      "sha256": "965be706249d7636314e35902a49bca2ac6b1e6f4f8df9a5e3cd84e224a4ee8d"
+    },
+    {
+      "path": "docs/REBUILDING.md",
+      "size": 1774,
+      "sha256": "47a0d0586920143c3632ae6ff6de240376edfe0db8bb9977732ef00259df2ae2"
+    },
+    {
+      "path": "docs/SOURCES.md",
+      "size": 3761,
+      "sha256": "e805e88008e5837cfc427192e7ef2875319555cd4fca375c694fcd4fd1c75478"
+    },
+    {
+      "path": "patterns/characters/computress/bio.json",
+      "size": 5868,
+      "sha256": "7cc040f5436efb319a24a28c9ba9d633a50cf8ae71498c3c82954164518bd8e0"
+    },
+    {
+      "path": "patterns/characters/computress/knowledge.json",
+      "size": 20615,
+      "sha256": "ed0a01dd96f45d64a47a4b6bb2c93abef84ab9f0bb3155b7f1d61b97b7f1ab42"
+    },
+    {
+      "path": "patterns/characters/computress/patterns.json",
+      "size": 5586574,
+      "sha256": "50c50db24c12298b1a95e084deb3d6ad78e47becfb7c963227e049d9c6b2abb1"
+    },
+    {
+      "path": "patterns/characters/computress/personality.json",
+      "size": 12605,
+      "sha256": "14a7a0434693ca0495b4058f3662a068d2b41e1036b9d655010a72da82c67317"
+    },
+    {
+      "path": "patterns/characters/garen/bio.json",
+      "size": 1607,
+      "sha256": "dafaab280a09845401fe81286ed79fc560b1970da3c9209871e0111e194c1be6"
+    },
+    {
+      "path": "patterns/characters/garen/knowledge.json",
+      "size": 16439,
+      "sha256": "9093a8659f67eb7f9a93d63988c4b781059bdddde03afda935a0748747c775a4"
+    },
+    {
+      "path": "patterns/characters/garen/patterns.json",
+      "size": 5187454,
+      "sha256": "1d6ee049f12f54bc38ff766a190e2edab2e7b0621b60ffcd1bc05d40a6c32aa5"
+    },
+    {
+      "path": "patterns/characters/garen/personality.json",
+      "size": 10388,
+      "sha256": "7b90ff261f6efff5a0c17c0daae9d24b1d5fe86b22a1ea7346b460ba4a49d095"
+    },
+    {
+      "path": "patterns/characters/ghostkey/bio.json",
+      "size": 2091,
+      "sha256": "5a283150c99d80ea6e176f5e30b0d9f6dbf363ec7c693f5ac4cb56da04535eef"
+    },
+    {
+      "path": "patterns/characters/ghostkey/knowledge.json",
+      "size": 3607,
+      "sha256": "e40dba7f48af9f332b6d033084a954f7a2b0e9124536f6cd811cf455b226700d"
+    },
+    {
+      "path": "patterns/characters/haven/bio.json",
+      "size": 1951,
+      "sha256": "4df0d84be54ee3e169926f664b6b5f7f793fdc38d215a83740d50bef700250e3"
+    },
+    {
+      "path": "patterns/characters/haven/knowledge.json",
+      "size": 12253,
+      "sha256": "c5e581d1360a4f75bf92daaab724ce9ab4440cf914c932f6cf84a55a34ae5f29"
+    },
+    {
+      "path": "patterns/characters/haven/patterns.json",
+      "size": 5378325,
+      "sha256": "7959cd7d1f7f669606b40e1f93a92e387a75acd65070960904c32d73d1b94b07"
+    },
+    {
+      "path": "patterns/characters/haven/personality.json",
+      "size": 7930,
+      "sha256": "0758d9d15f129dc73dbf6838c017c669b4535d6c190849ccb0af8cf9d1c9371f"
+    },
+    {
+      "path": "patterns/characters/lexis/bio.json",
+      "size": 2270,
+      "sha256": "f70e71a2d172d3971da04f2b1658fda2ae2b2c44716bdab3b170f6153bdcf08b"
+    },
+    {
+      "path": "patterns/characters/lexis/knowledge.json",
+      "size": 16717,
+      "sha256": "262a5490c0d89e1b5c72f04f0e974f2bb768fba45309cd6e4e76157befbe8b66"
+    },
+    {
+      "path": "patterns/characters/lexis/patterns.json",
+      "size": 5233671,
+      "sha256": "93450b49685959137daa41bf87a26dcb62fac120eeb72230bc3cab8d0e56908d"
+    },
+    {
+      "path": "patterns/characters/lexis/personality.json",
+      "size": 11020,
+      "sha256": "baf6c72eecb01cb366dc18c7abd6e827ae327916bedb3487f1f5d2dfa9759d96"
+    },
+    {
+      "path": "patterns/characters/registry.json",
+      "size": 6349,
+      "sha256": "2643fd806ad239c4e3ee0cf2f84e3ffa98350010529eb9ca8b86dbb154676209"
+    },
+    {
+      "path": "patterns/characters/schema/bio.json",
+      "size": 5804,
+      "sha256": "a1103b9eea33e0c838850d872837d61f3cdb6e0d5c7b7bb6da4e2fdbe8b08baa"
+    },
+    {
+      "path": "patterns/characters/schema/bio.schema.json",
+      "size": 5516,
+      "sha256": "76eaa302ffd977b8ac92e780e17e1e1582a415103f75bb7752c3dc87b1479ed9"
+    },
+    {
+      "path": "patterns/characters/schema/knowledge.json",
+      "size": 3682,
+      "sha256": "b2f3ae81a10397396c080adb235ee1d90f074cee451efb2b1b2f8b313bcb4fe6"
+    },
+    {
+      "path": "patterns/characters/schema/knowledge.schema.json",
+      "size": 3330,
+      "sha256": "a445fcde4c655a1caeb311fd8ee768779ddd471805ba03a4af92f2a828160ec4"
+    },
+    {
+      "path": "patterns/characters/schema/patterns.json",
+      "size": 3595,
+      "sha256": "7f28dc102e8ac23f91b32f736ffbfb5abcdea80ab0fed92f9276219672a810a1"
+    },
+    {
+      "path": "patterns/characters/schema/patterns.schema.json",
+      "size": 3401,
+      "sha256": "4196c25820209d9d0ad04e6f18a5e78512d74517fba6e5480864646e317bfa13"
+    },
+    {
+      "path": "patterns/characters/schema/personality.json",
+      "size": 2756,
+      "sha256": "2819dad4a60fa45eaacc5a035a6ae7e9704d0daac0d380bcbf4e9b1297834027"
+    },
+    {
+      "path": "patterns/characters/schema/personality.schema.json",
+      "size": 2559,
+      "sha256": "81b72e95e0c31ed52bb1715d79792b8977fe6e6ba98d6afd558c3cb6fb720c67"
+    },
+    {
+      "path": "patterns/characters/synth/bio.json",
+      "size": 2226,
+      "sha256": "ffd76e02856c9f2aea5a46ade46644054b36645cd99470b5aa967a9a5dd7856d"
+    },
+    {
+      "path": "patterns/characters/synth/knowledge.json",
+      "size": 18769,
+      "sha256": "f9158facda999662b4e064d6ae2f8b93ca66da4bbfcd7594d27bd8f22750d96b"
+    },
+    {
+      "path": "patterns/characters/synth/patterns.json",
+      "size": 5535468,
+      "sha256": "92eeca60fd0baa994b15fdeaf516f873ac2b0723a2b0c8c07c09456c15f793db"
+    },
+    {
+      "path": "patterns/characters/synth/personality.json",
+      "size": 13552,
+      "sha256": "fe85b881fccf5ee4ee08a005c0af113a901661b0146db5b8ae8c79756431a667"
+    },
+    {
+      "path": "patterns/characters/synthesus/bio.json",
+      "size": 5925,
+      "sha256": "0814b996cd275de13fc351c874bcf2729af44c20bfeee7ef563bb881e5626570"
+    },
+    {
+      "path": "patterns/characters/synthesus/knowledge.json",
+      "size": 15841,
+      "sha256": "58615085781ca8ea0ea00ccd3804603f400efc1e05b9e45e1662a3ae081f2351"
+    },
+    {
+      "path": "patterns/characters/synthesus/patterns.json",
+      "size": 78313,
+      "sha256": "92c9d91789cff192ca1d980cca7a93358c2f634a3bb261bffe3032be016c8d99"
+    },
+    {
+      "path": "patterns/characters/synthesus/personality.json",
+      "size": 10827,
+      "sha256": "0dfb964d33f2d07b3c1db2871740e7e5ead417119fce279b62dfcb2c58b0d238"
+    },
+    {
+      "path": "patterns/global/initial_patterns.json",
+      "size": 1297,
+      "sha256": "85a40c9d0c6a7f6574983a738b511bf9a31553030d9c62966854cbe60ac63cf6"
+    },
+    {
+      "path": "synthetic/generation_scripts/add_slots_to_cloud.py",
+      "size": 10712,
+      "sha256": "c3966640f2e6a95b0a38fd6480b0f8363134c471b648bd0f90f446f945e7dbd7"
+    },
+    {
+      "path": "synthetic/generation_scripts/generate_bulk_patterns.py",
+      "size": 4327,
+      "sha256": "ab31d5697bfdb0047572ffd79924b866e91657751bcac5b586f1775b184e3fc6"
+    },
+    {
+      "path": "synthetic/generation_scripts/ingest_pattern_lm.py",
+      "size": 3672,
+      "sha256": "7199aba9c0da8e6d2e4ec358596bedcc12d990b6a98ccf0b8f16048b08f57904"
+    },
+    {
+      "path": "synthetic/generation_scripts/learn_transitions.py",
+      "size": 8368,
+      "sha256": "f379cfe3f7417594a3622168e2312121dfd9bfb7ab3b862b232f1881f0d445dc"
+    },
+    {
+      "path": "synthetic/generation_scripts/mass_generate_entries.py",
+      "size": 10641,
+      "sha256": "7fb07d687837a142155e18b5e8d24a3a1cf766d5f2949eebc2aa5905977ec24b"
+    },
+    {
+      "path": "synthetic/generation_scripts/seed_patterns.py",
+      "size": 1000,
+      "sha256": "641e58c5cdf4f1bfac87a21092e8aab86d9364095ef260e9793d3b13ffc111d9"
+    },
+    {
+      "path": "synthetic/lore_forge/lore_forge.py",
+      "size": 22601,
+      "sha256": "b04623a61321011ec770e7f7757834917cb22c9f5fd719bf737c9a8a46949733"
+    },
+    {
+      "path": "grounding_corpus/agent_abilities_v1.txt",
+      "size": 7645,
+      "sha256": "cedcd2d9efa288759657b94c8df5fd17e85a40caccfd2ff03d6ca19eeb810f42"
+    },
+    {
+      "path": "grounding_corpus/aivm_compendium.txt",
+      "size": 2607,
+      "sha256": "84279e8c86f608001d9cb7b99cb91ef439b9d9c0fceec8998472f2f5fe588e0e"
+    },
+    {
+      "path": "grounding_corpus/kaggle_grounding_v1.txt",
+      "size": 3188335,
+      "sha256": "0cbd23e23dcddd9420408d7d51b28aabb984893538644ce0f86fb7c6ee74f29c"
+    },
+    {
+      "path": "grounding_corpus/massive_coding_v1.txt",
+      "size": 2480298,
+      "sha256": "50023b73ec6cad64bde6b2d25cd07c8a2b182c58c7eade62d8bb16fe83e0c4e6"
+    },
+    {
+      "path": "grounding_corpus/massive_grounding_v1.txt",
+      "size": 2269171,
+      "sha256": "f1a39385b6cfdbe963e903e6c5cf5c02080937ddedc46f6e46f5b46b0789233d"
+    },
+    {
+      "path": "grounding_corpus/samsung_firmware_notes.txt",
+      "size": 864,
+      "sha256": "c2f9c6200bee187b2591c2f56b4790f9ef85f94d9befbb2b08d9b6a1d0e849e0"
+    },
+    {
+      "path": "grounding_corpus/unified_grounding_v1.txt",
+      "size": 474637,
+      "sha256": "338c2a922dc5c6242cd10d533aea72696b2d580ca31d18261873d6b999af7c1f"
+    },
+    {
+      "path": "grounding_corpus/world_building_v1.txt",
+      "size": 3980809,
+      "sha256": "872cc3c251280b9c3c56e85f014094f798b44759ba21c2e9212412dfacfa25f4"
+    },
+    {
+      "path": "support_models/chat_policy_prior.pkl",
+      "size": 49137,
+      "sha256": "c1f05b7fd29afb2ab9262ef2f37494711781c251a393925bfcc8bc3e5e96dc66"
+    },
+    {
+      "path": "support_models/enrichment_r2_checkpoint.json",
+      "size": 363,
+      "sha256": "2a686a08aad9f2dfd4cd7e4a342a6746e89b458f5591f0a16ee81125d18ffa18"
+    },
+    {
+      "path": "support_models/migration_checkpoint.json",
+      "size": 821,
+      "sha256": "6e3809c8b66df6c27664d96dde6370cc70958f5dde1c0ef80bcf2febf006d9ec"
+    },
+    {
+      "path": "support_models/parameter_cloud.json",
+      "size": 89,
+      "sha256": "09eda26dd59160133f2704eeb84ccbf4c168ff6bf87112292b8a0313b49f2fcd"
+    },
+    {
+      "path": "support_models/parameter_cloud_v2_stats.json",
+      "size": 470,
+      "sha256": "8b1e54e453be45fba1fc118f0657f23252f41f43369932a8ad456e79d5368138"
+    },
+    {
+      "path": "support_models/vocab_general.pkl",
+      "size": 455323,
+      "sha256": "7d0381edd35e89d4e095467cf5fb86855543ba399e290800416f13ccc95b203d"
+    },
+    {
+      "path": "support_models/vocab_gm_dialogue.pkl",
+      "size": 1311106,
+      "sha256": "afda0e45186ac35e2575742bde2e56a498685f8adb55e1cc58cb679614c6cb89"
+    },
+    {
+      "path": "support_models/vocab_sysops.pkl",
+      "size": 1023433,
+      "sha256": "848c9eee6d7a2a1ff0cfb5d0008ab1042be8d836cda0aab25af8ebd5c5a4dd1f"
+    },
+    {
+      "path": "corpus/emulation/INDEX.md",
+      "size": 1909,
+      "sha256": "affec263a9ed8bce0537f4c8d794b837d0a91fb4571bfef9dcae7ae75f99972e"
+    },
+    {
+      "path": "corpus/emulation/entries/concept_io_virtualization.jsonl",
+      "size": 15538,
+      "sha256": "1902c08974d44e441a224cc9501e655b96148df67d6036bd69f385da58c8642d"
+    },
+    {
+      "path": "corpus/emulation/entries/concept_isolation.jsonl",
+      "size": 31676,
+      "sha256": "4450f3b9988cc837b041a59fec19656b951bc1136d09ba2e9a482a522709c413"
+    },
+    {
+      "path": "corpus/emulation/entries/concept_translation.jsonl",
+      "size": 46787,
+      "sha256": "e5e17f1af9f797bd63969416f8705190ef175eb36b7cd534b4277666a37cdc74"
+    },
+    {
+      "path": "corpus/emulation/entries/concept_virtualization.jsonl",
+      "size": 97982,
+      "sha256": "a7a7e570d8652713919b41de8f4d020d7eb2e10de9ae8e28e50b5fac31e0e18f"
+    },
+    {
+      "path": "corpus/emulation/entries/container_runtime.jsonl",
+      "size": 28890,
+      "sha256": "8f74ab38d20ff3a46977adac9672d0ec89bd6b1c2113b89e3a1e6ddefa1442d1"
+    },
+    {
+      "path": "corpus/emulation/entries/emulator_arcade.jsonl",
+      "size": 8622,
+      "sha256": "feaa0f12cc0ec7bac847544143888961218cf5350beddbd4a87b2468f394cd41"
+    },
+    {
+      "path": "corpus/emulation/entries/emulator_console.jsonl",
+      "size": 64892,
+      "sha256": "229bf180f382f4964d4eb9b35c8e782b89f3670a5ec2e99cf7468ad8ce8625ac"
+    },
+    {
+      "path": "corpus/emulation/entries/emulator_handheld.jsonl",
+      "size": 10032,
+      "sha256": "a416309a32ab0e48485ce75fd67a4dc6e787f699f4df43ae4ab723aeb6ea4213"
+    },
+    {
+      "path": "corpus/emulation/entries/emulator_mainframe_retro.jsonl",
+      "size": 14177,
+      "sha256": "4130a18f718126a2f95bc5389e0585cf386ea871e223b78973a3a9f5ffa87b65"
+    },
+    {
+      "path": "corpus/emulation/entries/emulator_mobile.jsonl",
+      "size": 8922,
+      "sha256": "d98816e296fc08bbdaca59795d4ca3e42727415982eaaab1b2008b893e3b4cdf"
+    },
+    {
+      "path": "corpus/emulation/entries/emulator_pc.jsonl",
+      "size": 41735,
+      "sha256": "dee805546f2e0902e5ea5ee70f6ce7de83795a19611e349b703081f321aabc16"
+    },
+    {
+      "path": "corpus/emulation/entries/foundational_pointers.jsonl",
+      "size": 8828,
+      "sha256": "feb311ac96a9596d520acb22aa746434f3089dd1205b17d2fcb072b4e97e9883"
+    },
+    {
+      "path": "corpus/emulation/entries/hypervisor_type1.jsonl",
+      "size": 41938,
+      "sha256": "a0e3c3f8f44463511a55c2c0995bcbdfed62e733383154e32f93ba785fab29a2"
+    },
+    {
+      "path": "corpus/emulation/entries/hypervisor_type2.jsonl",
+      "size": 28062,
+      "sha256": "97eda93ef268a8f508ecbdf5570486f9c0dc7b9b1f22be625010a5439d2f08e3"
+    },
+    {
+      "path": "corpus/emulation/entries/research_paper.jsonl",
+      "size": 1209359,
+      "sha256": "dbabee8857024384522d7d50988ec806ea2486caf70bd844c7bff4b839bc9f7b"
+    },
+    {
+      "path": "corpus/emulation/schema.json",
+      "size": 1154,
+      "sha256": "8c2939fd9dd9e36a6faf033b34aec60814eb9b802ecf6679d41e58601135f6b9"
+    },
+    {
+      "path": "corpus/emulation/seeds/arxiv_queries.yaml",
+      "size": 1254,
+      "sha256": "7f22cd98c25686d216de86a127c69b71fdb2aa53cf702e82714796d8424439aa"
+    },
+    {
+      "path": "corpus/emulation/seeds/wikipedia_seeds.yaml",
+      "size": 2239,
+      "sha256": "eddc42dc824a56b46adbd6a46f6b30c1ddef0dc91a20ee02532f0c8b706efc53"
+    },
+    {
+      "path": "corpus/hardware_blueprints/INDEX.md",
+      "size": 2434,
+      "sha256": "b26151e224a7cd57cb26f80667480fb250d9b0e5f9b398cb50c192f169931292"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/cpu_arm.jsonl",
+      "size": 146434,
+      "sha256": "c3aa37e32925a70f9a54ac923050d4e9efa2fa126fbbbf32fc4f09239bd6df4e"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/cpu_other.jsonl",
+      "size": 41553,
+      "sha256": "c8e8b52142418b00641b362f5c259c7c7c18091cd5b96ba265b60ab7e64c1ffb"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/cpu_riscv.jsonl",
+      "size": 24848,
+      "sha256": "e9583f1017937439f67952d4c0185612ec5cd8f9eb3a4917ba077a9a6a1537af"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/cpu_x86.jsonl",
+      "size": 270299,
+      "sha256": "2cfdeda9cb5fe54293a1f55c54dc162a624f8888e3a142eda493a36b45a2adba"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/datasheet_pointers.jsonl",
+      "size": 10693,
+      "sha256": "4444f68ff3a959b4f8f27bfe7cdbfe8f360b12a557e08c401bea48d5a4d9ee9f"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/firmware_bios_uefi.jsonl",
+      "size": 18324,
+      "sha256": "2f509082c1d3ea576ca68579b4e417f6bed87993f9ec972ea7b4faa87ed38fea"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/fpga.jsonl",
+      "size": 19686,
+      "sha256": "d0458ffd6d80eb5024f707238fea421cc18be804aa6c7f4d9002de02c7aee314"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/gpu_discrete.jsonl",
+      "size": 80149,
+      "sha256": "383805d99ffea47557710adef40cfdb1c2e53ff1a076fc2f1d061d77375edaef"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/gpu_integrated.jsonl",
+      "size": 30255,
+      "sha256": "84a1105bb77da253b9f6e1b17007dd52aff5ccfa5fdaaa28ec0428c343f4762c"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/interconnect_fabric.jsonl",
+      "size": 17595,
+      "sha256": "06a1d91104434a032b6a97eebcd6c63bc25fa7d50a8bea22705e234c633c9a55"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/interconnect_pcie.jsonl",
+      "size": 25878,
+      "sha256": "cefb13cfe5a9fe38b6d97e0ba100a859149ae3326ee1eb45077004220be49c40"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/interconnect_storage_bus.jsonl",
+      "size": 14958,
+      "sha256": "04a5327cc9a67a964251850d65d514e99c1a7a3574ca3a58e76e67cd7380c0e5"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/interconnect_usb_thunderbolt.jsonl",
+      "size": 32684,
+      "sha256": "0f46a9f6ae09460ef7025389d95399726c6a0343b277c34a457ea83532db746b"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/memory_cache.jsonl",
+      "size": 16026,
+      "sha256": "f4fd805a69f1a2582c7f61d974d57963c87ca0467a7b9a364217bd9b5a9dd5db"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/memory_dram.jsonl",
+      "size": 85027,
+      "sha256": "5d558e26c24365bdbdc3b5867ecd2c8e4265b107eea7cd3f52f664f193b0ccbc"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/memory_hbm.jsonl",
+      "size": 7007,
+      "sha256": "5a0dece0a9b49ca85f5b0f045887ae1cc3a5d26f244e376a0c0ac798528eb5ed"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/motherboard_chipset.jsonl",
+      "size": 7591,
+      "sha256": "8062e9e757b51bb1e5654951943bb3e131012f547285b186cdc007390cda4316"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/motherboard_form_factor.jsonl",
+      "size": 25653,
+      "sha256": "f246a72232a993d60351b83899b415577dd44aaa61c98239a35b8f29c3493ecc"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/npu.jsonl",
+      "size": 40953,
+      "sha256": "54e86a1b62f720bf9d0836050da6c61d43255a782ae2d21b8beeb1b84847c64f"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/qpu.jsonl",
+      "size": 37964,
+      "sha256": "e711696d7233b04d556939b30eb1560189e70a2f00bbab98aaf78a5aba75f84b"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/research_paper.jsonl",
+      "size": 1309720,
+      "sha256": "6048cf650a2c3247cdde5349389fef8ad373e1cdac459ad37bd032ae49d25387"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/soc_mobile_tv_embedded.jsonl",
+      "size": 33673,
+      "sha256": "4b7cbcf3d0b79c4cdb24b76988156d0a4ca4a3786976065ce8852d35ca405228"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/storage_hdd.jsonl",
+      "size": 35340,
+      "sha256": "b17135a9ba6e83b397c4745029a8fe54e21078bd72f0b3402c761cafc305c37d"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/storage_optical_tape.jsonl",
+      "size": 40132,
+      "sha256": "fa69b74381e9ffc6b034fe5536649250f468e95ff781375077eeaaad4763c593"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/storage_ssd.jsonl",
+      "size": 26888,
+      "sha256": "0da40a379c8a6620e32cf353a6c5d574a73174da04f7d346939bd3d6b17b263d"
+    },
+    {
+      "path": "corpus/hardware_blueprints/entries/tpu.jsonl",
+      "size": 7775,
+      "sha256": "8713cf8f9eb1bdc3de8653f9df07aa0e0a3bb475474162e4aedd9698ef635630"
+    },
+    {
+      "path": "corpus/hardware_blueprints/schema.json",
+      "size": 1477,
+      "sha256": "0606f50285685caa541f210066a1404c6211018eaebabb5cba7d953827d32666"
+    },
+    {
+      "path": "corpus/hardware_blueprints/seeds/openalex_queries.yaml",
+      "size": 1311,
+      "sha256": "5847c4becc3798af6fa42fc109f3f757c5cd2ec765fc9e27d5465afc3e2af6a6"
+    },
+    {
+      "path": "corpus/hardware_blueprints/seeds/wikipedia_seeds.yaml",
+      "size": 5330,
+      "sha256": "705e6ff755091e79c04172fae442e26bf1f23a0a4c236226f5a8aa1f0cb1e3a4"
+    }
+  ]
+}

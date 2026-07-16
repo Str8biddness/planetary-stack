@@ -1,0 +1,15 @@
+{
+  "done": [
+    "TIGER-Lab/MMLU-Pro_def",
+    "TIGER-Lab/MathInstruct_def",
+    "allenai/winogrande_winogrande_xl",
+    "wiki_qa_def",
+    "lighteval/mmlu_all",
+    "Open-Orca/OpenOrca_def",
+    "google-research-datasets/nq_open_def",
+    "HuggingFaceH4/ultrachat_200k_def",
+    "sahil2801/CodeAlpaca-20k_def",
+    "hendrycks/ethics_justice"
+  ],
+  "added": 0
+}

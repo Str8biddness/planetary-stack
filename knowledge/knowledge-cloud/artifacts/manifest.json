@@ -1,0 +1,145 @@
+{
+  "version": "1",
+  "kind": "synthesus-knowledge-artifacts",
+  "generated_at": "2026-07-16T05:15:28.520129+00:00",
+  "roots": [
+    "."
+  ],
+  "artifacts": [
+    {
+      "path": "faiss.index",
+      "size": 261212259,
+      "sha256": "2ed3fd628412dc92a57580fce2f4eaffd1ac9da4212b98cad48ba61f9c03fd0c"
+    },
+    {
+      "path": "faiss_metadata.json",
+      "size": 256881112,
+      "sha256": "5cbc48ef69c169ec408bf5aed7e81f611ab8f8c2c31027aeb9aac3a0becad4ff"
+    },
+    {
+      "path": "knowledge.kndb",
+      "size": 38500,
+      "sha256": "35aa50935f05151801e1c0b5473b9d6706ed0f212c78a9d1aae9cb22673b4627"
+    },
+    {
+      "path": "knowledge.kndb.meta.db",
+      "size": 47648768,
+      "sha256": "e1572f409a99c9c967ac42ae7a60618cf9df55d55e9e9ffc9bb0808dd3ca90be"
+    },
+    {
+      "path": "knowledge.meta.db",
+      "size": 2351104,
+      "sha256": "a010bcb27416196eb3d3235704e75acdb1bc7e91ddeee56d87247a63bd43faa7"
+    },
+    {
+      "path": "knowledge_cloud/chaining_patterns.json",
+      "size": 2837,
+      "sha256": "89997b0848bd622eb4a34314acddb99888abb9aaef09c09da50a7365dd851731"
+    },
+    {
+      "path": "knowledge_cloud/learned_transitions.json",
+      "size": 8941,
+      "sha256": "c48d9454cb1f6a2fb1fc60f87f68b841234b882d036a69041d8190b856cb2d88"
+    },
+    {
+      "path": "knowledge_cloud/transitions.json",
+      "size": 3169,
+      "sha256": "7a87f396fa5d22ae96860a9749871232ab6afb0813dc9c382bc5f3a93519cdcd"
+    },
+    {
+      "path": "knowledge_cloud/world_lore.json",
+      "size": 39476,
+      "sha256": "05bceeefd9c43d7338e24311aaa1557953c72bdc6de9dc57936d5b0d4c887347"
+    },
+    {
+      "path": "models/swarm_embedder.pkl",
+      "size": 4443817,
+      "sha256": "b0489baaf1d0ee71a301f9c80dc09f0edc9cfa73f3f6c2bac6eaf346b26039a7"
+    }
+  ],
+  "build": {
+    "package_version": "0.3.0",
+    "generated_by": "synthesus-kc build",
+    "profile": "public-base",
+    "git_commit": "346d5c25474e366d88d9f13f0a69981c558ae1a5",
+    "git_short_commit": "346d5c2",
+    "git_branch": "agent/repair-knowledge-cloud-bundle",
+    "git_dirty": false,
+    "python_version": "3.12.3",
+    "platform": "Linux-6.17.0-40-generic-x86_64-with-glibc2.39",
+    "host": "dakin-chronos",
+    "embedder": {
+      "path": "models/swarm_embedder.pkl",
+      "sha256": "b0489baaf1d0ee71a301f9c80dc09f0edc9cfa73f3f6c2bac6eaf346b26039a7",
+      "size": 4443817
+    },
+    "source_manifest": {
+      "path": "manifests/source_manifest.json",
+      "sha256": "058dedea55e0855dcc99b4e9a562c57381e7e3c3409c005e1ed9023f85fca349",
+      "size": 27113,
+      "kind": "synthesus-knowledge-source-plane",
+      "generated_at": "2026-07-16T05:25:53.981277+00:00",
+      "roots": [
+        "sources",
+        "synthesus_knowledge_cloud",
+        "pipelines",
+        "docs",
+        "patterns",
+        "synthetic",
+        "grounding_corpus",
+        "support_models",
+        "corpus"
+      ],
+      "artifact_count": 153
+    },
+    "datasets": {
+      "conceptnet": {
+        "version": "1",
+        "id": "conceptnet5_assertions",
+        "name": "ConceptNet 5.7 assertions",
+        "source_type": "public_gzip_csv",
+        "license": ""
+      },
+      "huggingface": {
+        "version": "1",
+        "id": "huggingface_pending",
+        "name": "Hugging Face datasets (planned)",
+        "source_type": "huggingface_datasets",
+        "license": ""
+      },
+      "jeopardy": {
+        "version": "1",
+        "id": "jeopardy_clue_dataset",
+        "name": "Jeopardy clue dataset",
+        "source_type": "github_tsv",
+        "license": ""
+      },
+      "kaggle": {
+        "version": "1",
+        "id": "kaggle_pending",
+        "name": "Kaggle datasets (planned)",
+        "source_type": "kaggle_api",
+        "license": ""
+      }
+    },
+    "extra": {
+      "embed_dim": 128,
+      "sample_jeopardy": 87500,
+      "sample_conceptnet": 75000,
+      "outputs": {
+        "faiss": true,
+        "kndb": true,
+        "sqlite_meta": true,
+        "source_manifest": true
+      },
+      "sources": [
+        "jeopardy",
+        "conceptnet",
+        "world_lore",
+        "synthetic_lore",
+        "character_patterns"
+      ]
+    }
+  },
+  "manifest_revised_at": "2026-07-16T05:29:10.737419+00:00"
+}

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HardwareBlueprintEntry",
+  "type": "object",
+  "required": ["id", "category", "title", "summary", "source"],
+  "properties": {
+    "id": {"type": "string", "description": "Stable slug, e.g. intel_core_i5_10400f"},
+    "category": {"type": "string", "enum": [
+      "cpu_x86", "cpu_arm", "cpu_riscv", "cpu_other",
+      "gpu_discrete", "gpu_integrated", "gpu_mobile",
+      "npu", "tpu", "qpu", "fpga", "accelerator_other",
+      "memory_dram", "memory_hbm", "memory_cache",
+      "storage_ssd", "storage_hdd", "storage_optical_tape",
+      "motherboard_form_factor", "motherboard_chipset", "firmware_bios_uefi",
+      "interconnect_pcie", "interconnect_usb_thunderbolt", "interconnect_storage_bus",
+      "interconnect_fabric", "soc_mobile_tv_embedded"
+    ]},
+    "title": {"type": "string"},
+    "manufacturer": {"type": ["string", "null"]},
+    "family": {"type": ["string", "null"]},
+    "isa": {"type": ["string", "null"]},
+    "year": {"type": ["integer", "null"]},
+    "summary": {"type": "string"},
+    "facts": {"type": "array", "items": {"type": "string"}},
+    "specs": {"type": "object"},
+    "source": {
+      "type": "object",
+      "required": ["url", "license"],
+      "properties": {
+        "url": {"type": "string"},
+        "license": {"type": "string"},
+        "fetched_at": {"type": "string", "format": "date-time"},
+        "attribution": {"type": "string"}
+      }
+    }
+  }
+}

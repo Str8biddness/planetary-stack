@@ -1,0 +1,30 @@
+version: "1"
+id: huggingface_pending
+name: Hugging Face datasets (planned)
+source_type: huggingface_datasets
+license:
+  spdx: "MIXED"
+  notes: >
+    Hugging Face datasets carry per-dataset licenses. Any dataset enabled here
+    must declare its SPDX license individually under `pending[].license`. The
+    rebuild pipeline must refuse to ingest a Hugging Face dataset without a
+    declared license.
+status: planned
+default_enabled: false
+pending:
+  - id: metamath
+    repo: meta-math/MetaMathQA
+    rebuild_command: "synthesus-kc build profiles/public-base.yaml"
+    license:
+      spdx: MIT
+      notes: Mathematical reasoning grounding.
+  - id: opencharacter
+    repo: opencharacter/opencharacter-dialogues
+    rebuild_command: "synthesus-kc build profiles/public-base.yaml"
+    license:
+      spdx: "Apache-2.0"
+      notes: Character dialogue grounding.
+loader: pipelines/ingest/huggingface_loader.py::load_dataset
+notes:
+  - Loader is intentionally not implemented yet; declared here to fix the integration contract.
+  - Enable only when a Synthesus-side embargo review has cleared the dataset.

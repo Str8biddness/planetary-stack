@@ -1,0 +1,30 @@
+version: "1"
+id: jeopardy_clue_dataset
+name: Jeopardy clue dataset
+source_type: github_tsv
+license:
+  spdx: "Unknown"
+  notes: >
+    Trivia clue text aired publicly on Jeopardy!. Mirror repository is published
+    by jwolle1 on GitHub without an explicit SPDX license declaration. Use is
+    research-oriented; redistribute only the derived index, not raw clues, in
+    commercial products.
+repository: https://github.com/jwolle1/jeopardy_clue_dataset
+files:
+  - url: https://raw.githubusercontent.com/jwolle1/jeopardy_clue_dataset/main/combined_season1-41.tsv
+    cache_path: data/jeopardy/combined_season1-41.tsv
+    optional: false
+    expected_extension: tsv
+  - url: https://raw.githubusercontent.com/jwolle1/jeopardy_clue_dataset/main/extra_matches.tsv
+    cache_path: data/jeopardy/extra_matches.tsv
+    optional: true
+    expected_extension: tsv
+loader: pipelines/ingest/kaggle_loader.py::load_jeopardy
+entry_source: jeopardy_github
+output_schema:
+  key: string
+  question: string
+  answer: string
+  category: string
+  value: metadata string
+  source: jeopardy_github

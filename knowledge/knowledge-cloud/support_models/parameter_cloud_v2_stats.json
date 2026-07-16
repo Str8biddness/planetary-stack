@@ -1,0 +1,25 @@
+{
+  "total_entries": 848000,
+  "vector_dimension": 1536,
+  "total_parameters": 1302528000,
+  "shards": [
+    {
+      "shard_key": "knowledge.grounding",
+      "param_count": 424000
+    },
+    {
+      "shard_key": "knowledge.coding",
+      "param_count": 212000
+    },
+    {
+      "shard_key": "knowledge.world",
+      "param_count": 212000
+    }
+  ],
+  "ingested_at": 1774924780174,
+  "status": "active_hemisphere_split",
+  "hemispheres": [
+    "left",
+    "right"
+  ]
+}

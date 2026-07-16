@@ -1,0 +1,136 @@
+version: "1"
+name: synthesus-knowledge-cloud-source-manifest
+description: >
+  Source manifest for the Synthesus Knowledge Cloud rebuild pipeline. This file
+  distinguishes public upstream datasets, generated grounding corpora, and
+  synthetic narrative/lore planes from the compiled runtime artifacts.
+
+planes:
+  runtime_artifacts:
+    path: artifacts/
+    purpose: Manifest-verified compiled bundle consumed by local Synthesus installs.
+  source_datasets:
+    path: sources/
+    purpose: Upstream dataset declarations and reproducible fetch metadata.
+  grounding_corpus:
+    path: grounding_corpus/
+    purpose: Curated/generated text corpora used for transition learning, grounding, and lightweight model support.
+  patterns:
+    path: patterns/
+    purpose: Global and character-specific PPBRS/narrative seed patterns.
+  synthetic:
+    path: synthetic/
+    purpose: Lore forge and narrative simulation generation scripts.
+  support_models:
+    path: support_models/
+    purpose: Lightweight vocabularies, priors, checkpoints, and non-FAISS model-support artifacts.
+
+public_sources:
+  - id: jeopardy_clue_dataset
+    type: github_tsv
+    default_enabled: true
+    loader: pipelines/ingest/kaggle_loader.py::load_jeopardy
+    upstream:
+      main_url: https://raw.githubusercontent.com/jwolle1/jeopardy_clue_dataset/main/combined_season1-41.tsv
+      extra_url: https://raw.githubusercontent.com/jwolle1/jeopardy_clue_dataset/main/extra_matches.tsv
+      repository: https://github.com/jwolle1/jeopardy_clue_dataset
+    local_cache:
+      directory: data/jeopardy
+      files:
+        - combined_season1-41.tsv
+        - extra_matches.tsv
+    output_schema:
+      key: string
+      question: string
+      answer: string
+      category: string
+      value: metadata string
+      source: jeopardy_github
+    notes:
+      - No Kaggle credential is required for this loader path.
+      - Reservoir sampling is supported for smoke tests and partial rebuilds.
+
+  - id: conceptnet5_assertions
+    type: public_gzip_csv
+    default_enabled: true
+    loader: pipelines/ingest/kaggle_loader.py::load_conceptnet
+    upstream:
+      url: https://s3.amazonaws.com/conceptnet/downloads/2019/edges/conceptnet-assertions-5.7.0.csv.gz
+      docs: https://github.com/commonsense/conceptnet5/wiki/Downloads
+    local_cache:
+      directory: data/conceptnet
+      files:
+        - conceptnet-assertions-5.7.0.csv.gz
+    filters:
+      language: en
+      relations:
+        - RelatedTo
+        - IsA
+        - PartOf
+        - HasA
+        - UsedFor
+        - CapableOf
+        - AtLocation
+        - Synonym
+        - Antonym
+        - DerivedFrom
+        - HasContext
+        - Causes
+        - Desires
+    output_schema:
+      key: string
+      question: generated natural language prompt
+      answer: target concept
+      category: conceptnet:<relation>
+      value: weight metadata
+      source: conceptnet5
+    notes:
+      - Raw source is not vendored by default; use fetch/build scripts.
+      - English filtered assertions become general commonsense knowledge nodes.
+
+curated_local_sources:
+  - id: kaggle_grounding_v1
+    path: grounding_corpus/kaggle_grounding_v1.txt
+    role: dialogue/grounding corpus for transition learning and narrative grounding.
+  - id: massive_grounding_v1
+    path: grounding_corpus/massive_grounding_v1.txt
+    role: high-volume grounding corpus.
+  - id: massive_coding_v1
+    path: grounding_corpus/massive_coding_v1.txt
+    role: technical/coding grounding corpus.
+  - id: world_building_v1
+    path: grounding_corpus/world_building_v1.txt
+    role: world-building and narrative simulation corpus.
+  - id: unified_grounding_v1
+    path: grounding_corpus/unified_grounding_v1.txt
+    role: merged grounding surface for downstream training and transition learning.
+
+synthetic_sources:
+  - id: lore_forge
+    path: synthetic/lore_forge/lore_forge.py
+    output: artifacts/knowledge_cloud/world_lore.json
+    role: Generates structured lore nodes with SlotFiller-compatible slots.
+  - id: mass_generate_entries
+    path: synthetic/generation_scripts/mass_generate_entries.py
+    output: artifacts/knowledge_cloud/world_lore.json
+    role: Scales RPG-relevant knowledge entries across creatures, locations, items, and concepts.
+  - id: learned_transitions
+    path: synthetic/generation_scripts/learn_transitions.py
+    output: artifacts/knowledge_cloud/learned_transitions.json
+    role: Learns transition weights from dialogue/grounding corpora.
+  - id: bulk_patterns
+    path: synthetic/generation_scripts/generate_bulk_patterns.py
+    output: patterns/
+    role: Generates large character/global pattern banks for PPBRS and narrative response selection.
+
+compiled_outputs:
+  - artifacts/faiss.index
+  - artifacts/faiss_metadata.json
+  - artifacts/knowledge.kndb
+  - artifacts/knowledge.kndb.meta.db
+  - artifacts/knowledge.meta.db
+  - artifacts/models/swarm_embedder.pkl
+  - artifacts/knowledge_cloud/world_lore.json
+  - artifacts/knowledge_cloud/transitions.json
+  - artifacts/knowledge_cloud/learned_transitions.json
+  - artifacts/knowledge_cloud/chaining_patterns.json

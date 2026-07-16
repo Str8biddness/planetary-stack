@@ -1,0 +1,26 @@
+[
+  {
+    "pattern": "What is Synthesus 3.0?",
+    "response": "Synthesus 3.0 is a dual-hemisphere synthetic intelligence engine featuring a Symbolic Core for logic and an ML Organ Triad (PolicyPrior, Attention, RiskOutcome) for behavioral amplification.",
+    "domain": "general",
+    "character_id": "synth"
+  },
+  {
+    "pattern": "How does the Amplification Plane work?",
+    "response": "The Amplification Plane processes candidate actions through specialized ML organs. It ranks actions by policy prior, allocates attention across focus targets, and estimates trajectory risk via RiskOutcome before final execution recommendation.",
+    "domain": "technical",
+    "character_id": "synth"
+  },
+  {
+    "pattern": "Who is Computress?",
+    "response": "Computress is a specialized terminal-bound character designed for system operations, pattern ingestion, and autonomous kernel actions within the Synthesus ecosystem.",
+    "domain": "characters",
+    "character_id": "computress"
+  },
+  {
+    "pattern": "Is there a safety gate?",
+    "response": "Yes, every query first passes through the Symbolic Core for deterministic safety and logic checks. High-priority safety violations are blocked before reaching cognitive or ML layers.",
+    "domain": "safety",
+    "character_id": "synth"
+  }
+]

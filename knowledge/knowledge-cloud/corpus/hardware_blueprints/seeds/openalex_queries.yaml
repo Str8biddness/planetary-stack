@@ -1,0 +1,37 @@
+version: "1"
+description: >
+  OpenAlex queries for the hardware blueprint research corpus. Targets
+  publicly indexed research with abstracts on processor microarchitecture,
+  accelerator design, memory, storage, and interconnect topics.
+
+queries:
+  - "CPU microarchitecture pipeline"
+  - "out-of-order execution processor"
+  - "branch prediction processor"
+  - "cache coherence protocol"
+  - "GPU microarchitecture SIMT"
+  - "tensor processing unit TPU"
+  - "neural processing unit NPU accelerator"
+  - "systolic array deep learning accelerator"
+  - "FPGA neural network accelerator"
+  - "quantum processor superconducting qubit"
+  - "trapped-ion quantum computer"
+  - "photonic quantum processor"
+  - "DRAM memory architecture"
+  - "high bandwidth memory HBM"
+  - "NAND flash storage SSD"
+  - "shingled magnetic recording HDD"
+  - "PCI Express bus performance"
+  - "CXL Compute Express Link"
+  - "NVLink GPU interconnect"
+  - "RISC-V processor design"
+  - "ARM big.LITTLE heterogeneous"
+  - "Apple silicon performance"
+  - "in-memory computing accelerator"
+  - "near-data processing"
+  - "chiplet packaging interconnect"
+  - "die photolithography processor"
+  - "transistor FinFET gate-all-around"
+  - "TLB MMU address translation"
+  - "memory controller scheduler"
+  - "neural network hardware quantization"

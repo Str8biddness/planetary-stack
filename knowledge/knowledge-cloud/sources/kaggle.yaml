@@ -1,0 +1,24 @@
+version: "1"
+id: kaggle_pending
+name: Kaggle datasets (planned)
+source_type: kaggle_api
+license:
+  spdx: "MIXED"
+  notes: >
+    Kaggle datasets carry per-dataset licenses. Any dataset enabled here must
+    declare its SPDX license individually under `pending[].license`. The
+    rebuild pipeline must refuse to ingest a Kaggle dataset without a declared
+    license.
+status: planned
+default_enabled: false
+pending:
+  - id: trivia_qa
+    repo: trivia-qa
+    rebuild_command: "synthesus-kc build profiles/public-base.yaml"
+    license:
+      spdx: "Apache-2.0"
+      notes: Public TriviaQA release; verify Kaggle packaging terms before enabling automated ingest.
+loader: pipelines/ingest/kaggle_api_loader.py::load_kaggle
+notes:
+  - Requires KAGGLE_USERNAME and KAGGLE_KEY in environment.
+  - Loader is intentionally not implemented yet; declared here to fix the integration contract.

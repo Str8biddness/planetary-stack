@@ -1,0 +1,443 @@
+"""Source-plane structural validation for the Knowledge Cloud repository."""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from pathlib import Path
+
+import yaml
+
+REQUIRED_PATHS = [
+    "sources/datasets.yaml",
+    "sources/jeopardy.yaml",
+    "sources/conceptnet.yaml",
+    "pipelines/ingest/kaggle_loader.py",
+    "pipelines/build/kn_populator.py",
+    "pipelines/build/run_population.py",
+    "pipelines/build/swarm_embedder.py",
+    "pipelines/publish/cloud_sync.py",
+    "pipelines/publish/manifest_manager.py",
+    "patterns/global/initial_patterns.json",
+    "patterns/characters/registry.json",
+    "synthetic/lore_forge/lore_forge.py",
+    "synthetic/generation_scripts/learn_transitions.py",
+    "synthetic/generation_scripts/mass_generate_entries.py",
+    "corpus/hardware_blueprints/INDEX.md",
+    "corpus/hardware_blueprints/schema.json",
+    "corpus/hardware_blueprints/seeds/wikipedia_seeds.yaml",
+    "corpus/hardware_blueprints/seeds/openalex_queries.yaml",
+    "corpus/emulation/INDEX.md",
+    "corpus/emulation/schema.json",
+    "corpus/emulation/seeds/wikipedia_seeds.yaml",
+    "corpus/emulation/seeds/arxiv_queries.yaml",
+    "pipelines/ingest_corpus/wikipedia_fetcher.py",
+    "pipelines/ingest_corpus/papers_fetcher.py",
+    "pipelines/ingest_corpus/corpus_loader.py",
+]
+
+
+@dataclass(frozen=True)
+class SourcePlaneValidation:
+    required_paths: int
+    character_pattern_banks: int
+    errors: tuple[str, ...]
+
+    @property
+    def ok(self) -> bool:
+        return not self.errors
+
+
+def _validate_license_block(data: dict, rel: str, errors: list[str]) -> None:
+    license_block = data.get("license")
+    if not isinstance(license_block, dict):
+        errors.append(f"source manifest missing license block: {rel}")
+        return
+    spdx = license_block.get("spdx")
+    notes = license_block.get("notes")
+    if not isinstance(spdx, str) or not spdx.strip():
+        errors.append(f"source manifest missing license.spdx: {rel}")
+    if not isinstance(notes, str) or not notes.strip():
+        errors.append(f"source manifest missing license.notes: {rel}")
+
+
+def _validate_source_manifest_yaml(
+    path: Path,
+    root_path: Path,
+    errors: list[str],
+    source_ids: dict[str, str],
+    pending_ids: dict[str, str],
+) -> None:
+    rel = path.relative_to(root_path).as_posix()
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        errors.append(f"invalid yaml {rel}: {exc}")
+        return
+    if not isinstance(data, dict):
+        errors.append(f"source manifest is not a mapping: {rel}")
+        return
+    if path.name == "datasets.yaml":
+        return
+
+    for field in ("version", "id", "name", "source_type"):
+        value = data.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"source manifest missing {field}: {rel}")
+
+    source_id = data.get("id")
+    if isinstance(source_id, str) and source_id.strip():
+        previous = source_ids.setdefault(source_id, rel)
+        if previous != rel:
+            errors.append(
+                f"duplicate source manifest id: {source_id} in {rel} "
+                f"already declared in {previous}"
+            )
+
+    _validate_license_block(data, rel, errors)
+
+    loader = data.get("loader")
+    if not isinstance(loader, str) or "::" not in loader:
+        errors.append(f"source manifest missing loader module path: {rel}")
+
+    if data.get("default_enabled", True) is not False:
+        has_fetch_target = any(
+            key in data for key in ("url", "repository", "files", "docs")
+        )
+        if not has_fetch_target:
+            errors.append(f"enabled source manifest missing upstream locator: {rel}")
+
+    pending = data.get("pending", [])
+    if pending is None:
+        pending = []
+    if not isinstance(pending, list):
+        errors.append(f"source manifest pending field must be a list: {rel}")
+        return
+    for index, item in enumerate(pending):
+        if not isinstance(item, dict):
+            errors.append(f"pending source entry is not a mapping: {rel}[{index}]")
+            continue
+        entry_id = item.get("id")
+        if not isinstance(entry_id, str) or not entry_id.strip():
+            errors.append(f"pending source entry missing id: {rel}[{index}]")
+        else:
+            previous = pending_ids.setdefault(entry_id, f"{rel}[{index}]")
+            if previous != f"{rel}[{index}]":
+                errors.append(
+                    f"duplicate pending source id: {entry_id} in {rel}[{index}] "
+                    f"already declared in {previous}"
+                )
+        entry_license = item.get("license")
+        if not isinstance(entry_license, dict):
+            errors.append(f"pending source entry missing license block: {rel}[{index}]")
+            continue
+        spdx = entry_license.get("spdx")
+        notes = entry_license.get("notes")
+        if not isinstance(spdx, str) or not spdx.strip():
+            errors.append(f"pending source entry missing license.spdx: {rel}[{index}]")
+        if not isinstance(notes, str) or not notes.strip():
+            errors.append(f"pending source entry missing license.notes: {rel}[{index}]")
+        rebuild_command = item.get("rebuild_command")
+        if not isinstance(rebuild_command, str) or not rebuild_command.strip():
+            errors.append(f"pending source entry missing rebuild_command: {rel}[{index}]")
+        has_pending_locator = any(
+            isinstance(item.get(key), str) and item.get(key, "").strip()
+            for key in ("repo", "url", "repository", "dataset")
+        )
+        has_pending_files = isinstance(item.get("files"), list) and bool(item.get("files"))
+        if not has_pending_locator and not has_pending_files:
+            errors.append(f"pending source entry missing upstream locator: {rel}[{index}]")
+
+
+def _validate_aggregate_source_manifest_yaml(
+    path: Path,
+    root_path: Path,
+    errors: list[str],
+    source_manifests: dict[str, dict],
+) -> None:
+    rel = path.relative_to(root_path).as_posix()
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        errors.append(f"invalid yaml {rel}: {exc}")
+        return
+    if not isinstance(data, dict):
+        errors.append(f"source manifest is not a mapping: {rel}")
+        return
+
+    public_sources = data.get("public_sources", [])
+    if public_sources is None:
+        public_sources = []
+    if not isinstance(public_sources, list):
+        errors.append(f"aggregate source manifest public_sources field must be a list: {rel}")
+        return
+
+    def source_locators(source_manifest: dict) -> set[str]:
+        locators: set[str] = set()
+        for key in ("url", "repository", "docs", "repo", "dataset"):
+            value = source_manifest.get(key)
+            if isinstance(value, str) and value.strip():
+                locators.add(value.strip())
+        files = source_manifest.get("files", [])
+        if isinstance(files, list):
+            for file_item in files:
+                if not isinstance(file_item, dict):
+                    continue
+                for key in ("url", "repository", "docs"):
+                    value = file_item.get(key)
+                    if isinstance(value, str) and value.strip():
+                        locators.add(value.strip())
+        return locators
+
+    def source_cache_paths(source_manifest: dict) -> set[str]:
+        cache_paths: set[str] = set()
+        cache_path = source_manifest.get("cache_path")
+        if isinstance(cache_path, str) and cache_path.strip():
+            cache_paths.add(cache_path.strip())
+        files = source_manifest.get("files", [])
+        if isinstance(files, list):
+            for file_item in files:
+                if not isinstance(file_item, dict):
+                    continue
+                file_cache_path = file_item.get("cache_path")
+                if isinstance(file_cache_path, str) and file_cache_path.strip():
+                    cache_paths.add(file_cache_path.strip())
+        return cache_paths
+
+    aggregate_ids: dict[str, int] = {}
+    for index, item in enumerate(public_sources):
+        if not isinstance(item, dict):
+            errors.append(f"aggregate public source entry is not a mapping: {rel}[{index}]")
+            continue
+        source_id = item.get("id")
+        if not isinstance(source_id, str) or not source_id.strip():
+            errors.append(f"aggregate public source entry missing id: {rel}[{index}]")
+            continue
+        previous = aggregate_ids.setdefault(source_id, index)
+        if previous != index:
+            errors.append(
+                f"duplicate aggregate public source id: {source_id} in {rel}[{index}] "
+                f"already declared in {rel}[{previous}]"
+            )
+        source_manifest = source_manifests.get(source_id)
+        if source_manifest is None:
+            errors.append(
+                f"aggregate public source id has no source manifest: {source_id} in {rel}[{index}]"
+            )
+            continue
+        expected_type = source_manifest.get("source_type")
+        aggregate_type = item.get("type")
+        if aggregate_type is not None and aggregate_type != expected_type:
+            errors.append(
+                f"aggregate public source type mismatch for {source_id} in {rel}[{index}]: "
+                f"{aggregate_type} != {expected_type}"
+            )
+        expected_loader = source_manifest.get("loader")
+        aggregate_loader = item.get("loader")
+        if aggregate_loader is not None and aggregate_loader != expected_loader:
+            errors.append(
+                f"aggregate public source loader mismatch for {source_id} in {rel}[{index}]: "
+                f"{aggregate_loader} != {expected_loader}"
+            )
+        aggregate_default = item.get("default_enabled")
+        source_default = source_manifest.get("default_enabled", True)
+        if aggregate_default is not None and aggregate_default != source_default:
+            errors.append(
+                f"aggregate public source default_enabled mismatch for {source_id} in {rel}[{index}]: "
+                f"{aggregate_default} != {source_default}"
+            )
+        aggregate_license = item.get("license")
+        if aggregate_license is not None:
+            source_license = source_manifest.get("license")
+            if not isinstance(aggregate_license, dict):
+                errors.append(
+                    f"aggregate public source license field must be a mapping for {source_id} "
+                    f"in {rel}[{index}]"
+                )
+            elif not isinstance(source_license, dict):
+                errors.append(
+                    f"aggregate public source license has no source manifest license block for "
+                    f"{source_id} in {rel}[{index}]"
+                )
+            else:
+                for license_key in ("spdx", "notes"):
+                    aggregate_value = aggregate_license.get(license_key)
+                    if aggregate_value is None:
+                        continue
+                    source_value = source_license.get(license_key)
+                    if aggregate_value != source_value:
+                        errors.append(
+                            f"aggregate public source license.{license_key} mismatch for "
+                            f"{source_id} in {rel}[{index}]: {aggregate_value} != {source_value}"
+                        )
+        aggregate_upstream = item.get("upstream")
+        if aggregate_upstream is not None:
+            if not isinstance(aggregate_upstream, dict):
+                errors.append(
+                    f"aggregate public source upstream field must be a mapping for {source_id} "
+                    f"in {rel}[{index}]"
+                )
+            else:
+                declared_locators = source_locators(source_manifest)
+                for upstream_key, upstream_value in sorted(aggregate_upstream.items()):
+                    if not isinstance(upstream_value, str) or not upstream_value.strip():
+                        errors.append(
+                            f"aggregate public source upstream locator must be non-empty for "
+                            f"{source_id} in {rel}[{index}].upstream.{upstream_key}"
+                        )
+                        continue
+                    if upstream_value.strip() not in declared_locators:
+                        errors.append(
+                            f"aggregate public source upstream locator mismatch for {source_id} "
+                            f"in {rel}[{index}].upstream.{upstream_key}: "
+                            f"{upstream_value} not declared in source manifest"
+                        )
+        aggregate_local_cache = item.get("local_cache")
+        if aggregate_local_cache is not None:
+            if not isinstance(aggregate_local_cache, dict):
+                errors.append(
+                    f"aggregate public source local_cache field must be a mapping for "
+                    f"{source_id} in {rel}[{index}]"
+                )
+            else:
+                cache_directory = aggregate_local_cache.get("directory")
+                cache_files = aggregate_local_cache.get("files")
+                if cache_files is not None:
+                    if not isinstance(cache_directory, str) or not cache_directory.strip():
+                        errors.append(
+                            f"aggregate public source local_cache.directory must be non-empty "
+                            f"when files are declared for {source_id} in {rel}[{index}]"
+                        )
+                    if not isinstance(cache_files, list):
+                        errors.append(
+                            f"aggregate public source local_cache.files must be a list for "
+                            f"{source_id} in {rel}[{index}]"
+                        )
+                    elif isinstance(cache_directory, str) and cache_directory.strip():
+                        declared_cache_paths = source_cache_paths(source_manifest)
+                        for cache_index, cache_file in enumerate(cache_files):
+                            if not isinstance(cache_file, str) or not cache_file.strip():
+                                errors.append(
+                                    f"aggregate public source local_cache file must be non-empty for "
+                                    f"{source_id} in {rel}[{index}].local_cache.files[{cache_index}]"
+                                )
+                                continue
+                            aggregate_cache_path = (
+                                f"{cache_directory.strip().rstrip('/')}/{cache_file.strip().lstrip('/')}"
+                            )
+                            if aggregate_cache_path not in declared_cache_paths:
+                                errors.append(
+                                    f"aggregate public source local_cache file mismatch for "
+                                    f"{source_id} in {rel}[{index}].local_cache.files[{cache_index}]: "
+                                    f"{aggregate_cache_path} not declared as source manifest cache_path"
+                                )
+        aggregate_filters = item.get("filters")
+        if aggregate_filters is not None:
+            source_filters = source_manifest.get("filters")
+            if not isinstance(aggregate_filters, dict):
+                errors.append(
+                    f"aggregate public source filters field must be a mapping for "
+                    f"{source_id} in {rel}[{index}]"
+                )
+            elif not isinstance(source_filters, dict):
+                errors.append(
+                    f"aggregate public source filters have no source manifest filters block for "
+                    f"{source_id} in {rel}[{index}]"
+                )
+            else:
+                for filter_key, aggregate_value in sorted(aggregate_filters.items()):
+                    source_value = source_filters.get(filter_key)
+                    if aggregate_value != source_value:
+                        errors.append(
+                            f"aggregate public source filters.{filter_key} mismatch for "
+                            f"{source_id} in {rel}[{index}]: {aggregate_value} != {source_value}"
+                        )
+        aggregate_output_schema = item.get("output_schema")
+        if aggregate_output_schema is not None:
+            source_output_schema = source_manifest.get("output_schema")
+            if not isinstance(aggregate_output_schema, dict):
+                errors.append(
+                    f"aggregate public source output_schema field must be a mapping for "
+                    f"{source_id} in {rel}[{index}]"
+                )
+            elif not isinstance(source_output_schema, dict):
+                errors.append(
+                    f"aggregate public source output_schema has no source manifest output_schema "
+                    f"block for {source_id} in {rel}[{index}]"
+                )
+            else:
+                for schema_key, aggregate_value in sorted(aggregate_output_schema.items()):
+                    source_value = source_output_schema.get(schema_key)
+                    if aggregate_value != source_value:
+                        errors.append(
+                            f"aggregate public source output_schema.{schema_key} mismatch for "
+                            f"{source_id} in {rel}[{index}]: {aggregate_value} != {source_value}"
+                        )
+
+
+def _validate_source_identity_namespace(
+    errors: list[str],
+    source_ids: dict[str, str],
+    pending_ids: dict[str, str],
+) -> None:
+    for source_id, source_rel in sorted(source_ids.items()):
+        pending_rel = pending_ids.get(source_id)
+        if pending_rel:
+            errors.append(
+                f"source identity collides with pending source id: {source_id} in {source_rel} "
+                f"already declared as pending in {pending_rel}"
+            )
+
+
+def validate_source_planes(root: str | Path = ".") -> SourcePlaneValidation:
+    root_path = Path(root).resolve()
+    errors: list[str] = []
+    for rel in REQUIRED_PATHS:
+        path = root_path / rel
+        if not path.exists():
+            errors.append(f"missing required path: {rel}")
+        elif path.is_file() and path.stat().st_size <= 0:
+            errors.append(f"empty required file: {rel}")
+
+    for rel in ["patterns/global/initial_patterns.json", "patterns/characters/registry.json"]:
+        path = root_path / rel
+        if path.exists():
+            try:
+                json.loads(path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                errors.append(f"invalid json {rel}: {exc}")
+
+    sources_dir = root_path / "sources"
+    source_ids: dict[str, str] = {}
+    pending_ids: dict[str, str] = {}
+    source_manifests: dict[str, dict] = {}
+    if sources_dir.exists():
+        source_paths = sorted(path for path in sources_dir.glob("*.yaml") if path.name != "datasets.yaml")
+        for path in source_paths:
+            _validate_source_manifest_yaml(path, root_path, errors, source_ids, pending_ids)
+            try:
+                data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if isinstance(data, dict):
+                source_id = data.get("id")
+                if isinstance(source_id, str) and source_id.strip() and source_id not in source_manifests:
+                    source_manifests[source_id] = data
+        _validate_source_identity_namespace(errors, source_ids, pending_ids)
+        aggregate_path = sources_dir / "datasets.yaml"
+        if aggregate_path.exists():
+            _validate_aggregate_source_manifest_yaml(aggregate_path, root_path, errors, source_manifests)
+
+    char_dir = root_path / "patterns/characters"
+    pattern_files = sorted(char_dir.glob("*/patterns.json")) if char_dir.exists() else []
+    if not pattern_files:
+        errors.append("no character pattern files found under patterns/characters/*/patterns.json")
+    for path in pattern_files:
+        if path.stat().st_size < 1000:
+            errors.append(f"suspiciously small character pattern file: {path.relative_to(root_path)}")
+
+    return SourcePlaneValidation(
+        required_paths=len(REQUIRED_PATHS),
+        character_pattern_banks=len(pattern_files),
+        errors=tuple(errors),
+    )

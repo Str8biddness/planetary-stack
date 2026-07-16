@@ -1,0 +1,26 @@
+name: hardware-emulation
+description: Hardware blueprint + emulation/virtualization corpus build.
+sources:
+  - corpus_hardware_blueprints
+  - corpus_emulation
+  - jeopardy
+  - conceptnet
+limits:
+  max_entries: 200000
+  max_source_fraction:
+    corpus_hardware_blueprints: 0.40
+    corpus_emulation: 0.40
+    jeopardy: 0.10
+    conceptnet: 0.10
+embedding:
+  dim: 128
+  model: swarm_embedder
+outputs:
+  faiss: true
+  kndb: true
+  sqlite_meta: true
+  source_manifest: true
+notes:
+  - Wires the new corpus/ JSONL planes into the Knowledge Cloud rebuild.
+  - Requires the corpus loader (pipelines/ingest_corpus/corpus_loader.py).
+  - Targeted at the Synthesus EmulEngineering subsystem.

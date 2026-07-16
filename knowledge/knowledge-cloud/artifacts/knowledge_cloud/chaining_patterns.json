@@ -1,0 +1,61 @@
+{
+  "version": "1.0.0",
+  "description": "Knowledge Cloud entries with slot declarations for chaining MVP testing",
+  "entries": [
+    {
+      "entity_id": "dragon_warning",
+      "entity": "Dragon Warning",
+      "entity_type": "concept",
+      "description": "[entity] is a [topic] creature of great [emotion] danger. Approach with extreme caution.",
+      "slots": ["[entity]", "[topic]", "[emotion]"],
+      "facts": ["Breathes fire", "Has thick scales", "Guards treasure hoards"],
+      "tags": ["combat", "lore", "creatures"],
+      "depth": "acquainted",
+      "relations": {"feared_by": "villagers", "weak_to": "ice_magic"}
+    },
+    {
+      "entity_id": "castle_location",
+      "entity": "Castle Location",
+      "entity_type": "location",
+      "description": "The [entity] stands as a [topic] fortress in the [time] hours. Many adventurers seek its secrets.",
+      "slots": ["[entity]", "[topic]", "[time]"],
+      "facts": ["Built 500 years ago", "Has hidden passages", "Home to a dragon"],
+      "tags": ["location", "lore", "exploration"],
+      "depth": "familiar",
+      "relations": {"contains": "dragon_warning", "governed_by": "local_lord"}
+    },
+    {
+      "entity_id": "magic_combat",
+      "entity": "Magic Combat",
+      "entity_type": "concept",
+      "description": "When facing [entity], use [topic] spells with [emotion] focus. The [time] is best for casting.",
+      "slots": ["[entity]", "[topic]", "[emotion]", "[time]"],
+      "facts": ["Ice spells damage fire creatures", "Mana drains faster at night", "Focus increases damage"],
+      "tags": ["combat", "magic", "strategy"],
+      "depth": "familiar",
+      "relations": {"counters": "dragon_warning", "requires": "spellbook"}
+    },
+    {
+      "entity_id": "market_trade",
+      "entity": "Market Trading",
+      "entity_type": "concept",
+      "description": "Traders at the [entity] discuss [topic] goods with [emotion] enthusiasm. Best deals happen in the [time].",
+      "slots": ["[entity]", "[topic]", "[emotion]", "[time]"],
+      "facts": ["Prices fluctuate daily", "Rare items appear at dawn", "Bargaining is expected"],
+      "tags": ["trade", "economy", "social"],
+      "depth": "acquainted",
+      "relations": {"located_in": "castle_location", "sells": "magic_items"}
+    },
+    {
+      "entity_id": "adventure_quest",
+      "entity": "Adventure Quest",
+      "entity_type": "event",
+      "description": "A [topic] quest awaits at [entity]. Many feel [emotion] about the challenges ahead. Depart in the [time].",
+      "slots": ["[entity]", "[topic]", "[emotion]", "[time]"],
+      "facts": ["Rewards are substantial", "Risks are high", "Preparation is key"],
+      "tags": ["quest", "adventure", "opportunity"],
+      "depth": "rumor",
+      "relations": {"starts_at": "castle_location", "involves": "dragon_warning"}
+    }
+  ]
+}

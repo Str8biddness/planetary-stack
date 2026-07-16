@@ -1,0 +1,135 @@
+version: "1"
+description: >
+  Seed Wikipedia titles for the emulation/virtualization corpus.
+
+hypervisor_type1:
+  - Hypervisor
+  - Xen
+  - VMware ESXi
+  - Microsoft Hyper-V
+  - KVM (Linux)
+  - Bhyve
+  - Proxmox VE
+  - Nutanix AHV
+  - OpenStack
+  - Firecracker (KVM)
+
+hypervisor_type2:
+  - VirtualBox
+  - VMware Workstation
+  - VMware Fusion
+  - Parallels Desktop for Mac
+  - QEMU
+
+container_runtime:
+  - Container (computing)
+  - Docker (software)
+  - Podman
+  - containerd
+  - LXC
+  - LXD
+  - Kata Containers
+  - gVisor
+  - crosvm
+  - Kubernetes
+
+emulator_pc:
+  - DOSBox
+  - Bochs
+  - PCem
+  - 86Box
+  - VirtualPC
+  - PCSX
+  - Wine (software)
+
+emulator_console:
+  - Dolphin (emulator)
+  - PCSX2
+  - RPCS3
+  - Cemu
+  - Ryujinx
+  - Yuzu (emulator)
+  - Citra (emulator)
+  - DeSmuME
+  - Snes9x
+  - VBA-M
+  - Project64
+  - Mupen64Plus
+  - Mednafen
+  - Higan (emulator)
+  - BSnes
+  - Nestopia
+  - FCEUX
+
+emulator_handheld:
+  - mGBA
+  - Visual Boy Advance
+  - Citra (emulator)
+  - melonDS
+  - PPSSPP
+  - Vita3K
+  - DraStic
+
+emulator_arcade:
+  - MAME
+  - FB Alpha
+  - Final Burn Neo
+
+emulator_mobile:
+  - BlueStacks
+  - Genymotion
+  - Android Studio
+  - Google Play Games for PC
+
+emulator_mainframe_retro:
+  - SIMH
+  - Hercules (emulator)
+  - SheepShaver
+  - Basilisk II
+  - SoftMac
+
+concept_virtualization:
+  - Virtualization
+  - Hardware-assisted virtualization
+  - Paravirtualization
+  - Full virtualization
+  - x86 virtualization
+  - Nested virtualization
+  - Memory virtualization
+  - IOMMU
+  - Input–output memory management unit
+  - Second Level Address Translation
+  - Extended Page Tables
+  - Rapid Virtualization Indexing
+  - Software-defined networking
+  - VirtIO
+  - Single-root input/output virtualization
+
+concept_translation:
+  - Binary translation
+  - Dynamic recompilation
+  - Just-in-time compilation
+  - Ahead-of-time compilation
+  - LLVM
+  - QEMU TCG
+  - Transmeta
+  - Apple Rosetta
+  - WoW64
+  - Dynamic binary instrumentation
+
+concept_isolation:
+  - Sandbox (computer security)
+  - Trusted execution environment
+  - Confidential computing
+  - SGX
+  - AMD SEV
+  - Trusted Platform Module
+
+concept_io_virtualization:
+  - PCI passthrough
+  - SR-IOV
+  - VFIO
+  - Virtual network interface
+  - Open vSwitch
+
+research_paper: []

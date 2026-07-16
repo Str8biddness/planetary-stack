@@ -1,0 +1,1194 @@
+{
+  "version": "1.0.0",
+  "description": "Synthesus Knowledge Cloud — Shared World Knowledge Repository",
+  "entries": [
+    {
+      "entity_id": "dragon",
+      "entity": "Dragon",
+      "entity_type": "creature",
+      "description": "Dragons are ancient, fearsome reptilian creatures of immense power. Legends say they once ruled the skies over the Northern Mountains before retreating into deep caverns beneath the Frostpeak range. [entity] is a [topic] creature of great [emotion] danger.",
+      "attributes": {
+        "danger": 9,
+        "rarity": "legendary",
+        "intelligence": "high",
+        "lifespan": "millennia"
+      },
+      "facts": [
+        "Breathes fire hot enough to melt steel",
+        "Guards treasure hoards obsessively",
+        "Hates thieves above all other intruders",
+        "Can sense gold from miles away",
+        "Ancient dragons can speak in riddles"
+      ],
+      "relations": {
+        "weak_to": "ice magic",
+        "feared_by": "villagers",
+        "hunted_by": "dragon slayers",
+        "inhabits": "mountain caverns"
+      },
+      "tags": [
+        "combat",
+        "lore",
+        "quest",
+        "creature"
+      ],
+      "aliases": [
+        "wyrm",
+        "fire drake",
+        "great wyrm",
+        "serpent"
+      ],
+      "depth": "rumor",
+      "trust_threshold": 0.0,
+      "emotion_variants": {
+        "afraid": "Dragons... *shudders* Don't speak of them too loudly. The old tales say they can hear their name on the wind.",
+        "friendly": "Ah, dragons! Magnificent creatures in the old stories. Terrible, yes, but magnificent. My grandfather claimed he saw one flying over the Frostpeak range sixty years ago."
+      },
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[emotion]"
+      ]
+    },
+    {
+      "entity_id": "troll",
+      "entity": "Troll",
+      "entity_type": "creature",
+      "description": "Trolls are hulking, dim-witted creatures that dwell under bridges and in dark caves along trade routes. They're not especially dangerous alone, but a pack of them can overwhelm even experienced fighters. [entity] inspires [emotion] annoyance in [topic] encounters.",
+      "attributes": {
+        "danger": 5,
+        "rarity": "uncommon",
+        "intelligence": "low",
+        "weakness": "sunlight"
+      },
+      "facts": [
+        "Stone-hard skin that regenerates minor wounds",
+        "Turns to stone in direct sunlight",
+        "Attracted to the smell of cooked meat",
+        "Territorial but can be bribed with food"
+      ],
+      "relations": {
+        "weak_to": "sunlight",
+        "found_near": "bridges and caves",
+        "preys_on": "travelers"
+      },
+      "tags": [
+        "combat",
+        "creature",
+        "lore"
+      ],
+      "aliases": [
+        "bridge troll",
+        "cave troll",
+        "stone troll"
+      ],
+      "depth": "acquainted",
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[emotion]"
+      ]
+    },
+    {
+      "entity_id": "shadow_wraith",
+      "entity": "Shadow Wraith",
+      "entity_type": "creature",
+      "description": "Shadow Wraiths are spectral entities that manifest in places of great suffering or dark magic. They drain the warmth from the living and leave a cold that seeps into the bones. Some say the missing caravans in Blackhollow were taken by wraiths. [entity] fills victims with [emotion] terror in the [time] hours.",
+      "attributes": {
+        "danger": 8,
+        "rarity": "rare",
+        "corporeal": false,
+        "weakness": "light magic"
+      },
+      "facts": [
+        "Invisible in complete darkness",
+        "Can pass through solid walls",
+        "Leaves a trail of frost where it moves",
+        "Drawn to fear and despair"
+      ],
+      "relations": {
+        "weak_to": "light magic",
+        "associated_with": "Blackhollow",
+        "feared_by": "caravan drivers"
+      },
+      "tags": [
+        "combat",
+        "lore",
+        "quest",
+        "creature"
+      ],
+      "aliases": [
+        "wraith",
+        "shadow",
+        "dark spirit",
+        "specter"
+      ],
+      "depth": "rumor",
+      "emotion_variants": {
+        "afraid": "*lowers voice* The wraiths... they say you don't see them, you feel them. A cold that creeps into your chest. By the time you notice, it's too late."
+      },
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[emotion]",
+        "[time]"
+      ]
+    },
+    {
+      "entity_id": "dire_wolf",
+      "entity": "Dire Wolf",
+      "entity_type": "creature",
+      "description": "Dire wolves are massive predators twice the size of their common cousins. They hunt in packs across the Northern Road and the forests beyond. Experienced hunters know to travel in groups when dire wolves are about. [entity] commands [emotion] respect in [topic] hunts.",
+      "attributes": {
+        "danger": 6,
+        "rarity": "uncommon",
+        "pack_size": "5-12",
+        "intelligence": "moderate"
+      },
+      "facts": [
+        "Hunt in coordinated packs with military precision",
+        "Alpha pairs mate for life",
+        "Can track prey across three days of rainfall",
+        "Their pelts are worth a small fortune"
+      ],
+      "relations": {
+        "found_in": "northern forests",
+        "hunted_for": "pelts",
+        "preys_on": "deer and livestock"
+      },
+      "tags": [
+        "combat",
+        "creature",
+        "lore"
+      ],
+      "aliases": [
+        "dire wolf",
+        "great wolf",
+        "northern wolf"
+      ],
+      "depth": "acquainted",
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[emotion]"
+      ]
+    },
+    {
+      "entity_id": "ironhaven",
+      "entity": "Ironhaven",
+      "entity_type": "location",
+      "description": "Ironhaven is a bustling trade city built where the Northern Road meets the Silverflow River. Home to the Merchant's Alliance and governed by Duke Aldric, it serves as the commercial heart of the region with the busiest market this side of the mountains. [entity] thrives with [topic] activity in the [time] hours.",
+      "attributes": {
+        "population": "~15,000",
+        "founded": "250 years ago",
+        "specialty": "commerce and trade",
+        "government": "duchy"
+      },
+      "facts": [
+        "The market square hosts traders from six surrounding regions",
+        "The Merchant's Alliance controls all commercial tariffs",
+        "Duke Aldric's castle overlooks the city from the northern hill",
+        "Famous for its ironwork and merchant guilds"
+      ],
+      "relations": {
+        "governed_by": "Duke Aldric",
+        "trade_partner": "Silvermoor",
+        "connected_via": "Northern Road",
+        "guild": "Merchant's Alliance"
+      },
+      "tags": [
+        "world_info",
+        "location",
+        "commerce"
+      ],
+      "aliases": [
+        "the city",
+        "iron haven",
+        "the trade city"
+      ],
+      "depth": "familiar",
+      "agentic_actions": {
+        "travel": [
+          "move_to_point:ironhaven_gate",
+          "play_arrival_sound"
+        ],
+        "shop_buy": [
+          "open_market_ui",
+          "pointing_gesture:market_square"
+        ]
+      },
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[time]"
+      ]
+    },
+    {
+      "entity_id": "silvermoor",
+      "entity": "Silvermoor",
+      "entity_type": "location",
+      "description": "Silvermoor is an elegant city of white stone walls five days' ride south along the trade road. Famous throughout the realm for silk, enchanted fabrics, and exquisite dyes produced by the Silvermoor Weavers' Guild.",
+      "attributes": {
+        "population": "~20,000",
+        "specialty": "silk and enchanted textiles",
+        "architecture": "white stone"
+      },
+      "facts": [
+        "The Weavers' Guild is the finest textile guild in the realm",
+        "White stone walls glow faintly at sunset",
+        "Home to the largest dye markets in three kingdoms",
+        "Enchanted fabrics from Silvermoor can resist fire and blade"
+      ],
+      "relations": {
+        "trade_partner": "Ironhaven",
+        "famous_for": "silk and dyes",
+        "guild": "Silvermoor Weavers' Guild"
+      },
+      "tags": [
+        "world_info",
+        "location",
+        "commerce"
+      ],
+      "aliases": [
+        "silver moor",
+        "the white city",
+        "city of silk"
+      ],
+      "depth": "familiar",
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[time]"
+      ]
+    },
+    {
+      "entity_id": "blackhollow",
+      "entity": "Blackhollow",
+      "entity_type": "location",
+      "description": "Blackhollow is a dark, dense stretch of forest on the Northern Road about two days' ride from Ironhaven. The trees grow thick and the road narrows dangerously. Three caravans have gone missing there in recent months, and merchants speak of shadows in the treeline. [entity] fills travelers with [emotion] dread in the [time] hours.",
+      "attributes": {
+        "danger": 8,
+        "terrain": "dense forest",
+        "reputation": "cursed"
+      },
+      "facts": [
+        "No sunlight reaches the forest floor at midday",
+        "Local wildlife has fled the area in recent months",
+        "Ancient ruins are rumored to lie at its heart",
+        "Temperature drops noticeably upon entering"
+      ],
+      "relations": {
+        "located_on": "Northern Road",
+        "associated_with": "missing caravans",
+        "rumored_to_contain": "ancient ruins"
+      },
+      "tags": [
+        "world_info",
+        "quest",
+        "location",
+        "danger"
+      ],
+      "aliases": [
+        "the hollow",
+        "that forest",
+        "the dark forest",
+        "blackhollow forest"
+      ],
+      "depth": "acquainted",
+      "emotion_variants": {
+        "afraid": "Blackhollow... nobody goes there willingly anymore. Something dwells in those trees. Something that took three caravans without a trace."
+      },
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[emotion]",
+        "[time]"
+      ]
+    },
+    {
+      "entity_id": "frostpeak_pass",
+      "entity": "Frostpeak Pass",
+      "entity_type": "location",
+      "description": "Frostpeak Pass is the treacherous mountain crossing north of the trade routes. Brutal in winter and barely passable even in summer, it connects the lowland kingdoms to the northern territories. You can see three kingdoms from its summit on a clear day.",
+      "attributes": {
+        "elevation": "very high",
+        "danger": 7,
+        "passable_seasons": "late spring to early fall"
+      },
+      "facts": [
+        "Avalanches claim lives every winter",
+        "You can see three kingdoms from the summit",
+        "Ancient waymarkers guide travelers through the fog",
+        "The pass has been used for trade for over 500 years"
+      ],
+      "relations": {
+        "connects": "lowland kingdoms to northern territories",
+        "danger_from": "avalanches and cold"
+      },
+      "tags": [
+        "world_info",
+        "location",
+        "travel"
+      ],
+      "aliases": [
+        "frostpeak",
+        "the pass",
+        "mountain pass",
+        "the mountain crossing"
+      ],
+      "depth": "acquainted",
+      "slots": [
+        "[entity]",
+        "[time]"
+      ]
+    },
+    {
+      "entity_id": "northern_road",
+      "entity": "The Northern Road",
+      "entity_type": "location",
+      "description": "The Northern Road is the primary trade artery running from Ironhaven through Blackhollow and up to the mountain passes. It's been the lifeline of commerce for the Merchant's Alliance for centuries, though recent caravan disappearances have made it increasingly dangerous. [entity] carries [topic] caravans through all [time] hours.",
+      "attributes": {
+        "length": "several hundred miles",
+        "condition": "well-maintained but dangerous"
+      },
+      "facts": [
+        "Half the merchants in the Alliance depend on this road",
+        "Guard patrols have been doubled after the disappearances",
+        "Waystations every day's ride offer shelter and supplies"
+      ],
+      "relations": {
+        "connects": "Ironhaven to Frostpeak",
+        "passes_through": "Blackhollow",
+        "maintained_by": "Merchant's Alliance"
+      },
+      "tags": [
+        "world_info",
+        "location",
+        "commerce",
+        "quest"
+      ],
+      "aliases": [
+        "northern road",
+        "the road",
+        "trade road",
+        "the road north"
+      ],
+      "depth": "familiar",
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[time]"
+      ]
+    },
+    {
+      "entity_id": "redstone",
+      "entity": "Redstone",
+      "entity_type": "location",
+      "description": "Redstone is a rough mining town east of Ironhaven, built around rich deposits of iron, copper, and gemstones. The people are hard, the taverns are rowdy, and they pay premium prices for supplies from the lowlands.",
+      "attributes": {
+        "population": "~3,000",
+        "specialty": "mining",
+        "resources": [
+          "iron",
+          "copper",
+          "gemstones"
+        ]
+      },
+      "facts": [
+        "The mines run deep beneath the red clay hills",
+        "Gemstones from Redstone are prized across three kingdoms",
+        "Bar fights are considered a local sport"
+      ],
+      "relations": {
+        "trades_with": "Ironhaven",
+        "exports": "iron, copper, gemstones"
+      },
+      "tags": [
+        "world_info",
+        "location",
+        "commerce"
+      ],
+      "aliases": [
+        "the mining town",
+        "red stone"
+      ],
+      "depth": "acquainted",
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[time]"
+      ]
+    },
+    {
+      "entity_id": "merchants_alliance",
+      "entity": "The Merchant's Alliance",
+      "entity_type": "faction",
+      "description": "The Merchant's Alliance is the powerful trade guild that controls commerce across the region. They negotiate tariffs with the duke, organize caravan escorts, settle trade disputes, and maintain the trade roads. Without them, the regional economy would collapse. [entity] manages [topic] operations around the clock in [time] hours.",
+      "attributes": {
+        "membership": "~200 merchants",
+        "influence": "high",
+        "age": "over 100 years"
+      },
+      "facts": [
+        "Controls all commercial tariffs in the region",
+        "Maintains a private guard force for caravan escorts",
+        "Settles trade disputes through binding arbitration",
+        "The Guild Master is elected by senior merchants"
+      ],
+      "relations": {
+        "negotiates_with": "Duke Aldric",
+        "based_in": "Ironhaven",
+        "maintains": "Northern Road"
+      },
+      "tags": [
+        "world_info",
+        "faction",
+        "commerce"
+      ],
+      "aliases": [
+        "merchant's alliance",
+        "the alliance",
+        "trade guild",
+        "the guild",
+        "merchants alliance"
+      ],
+      "depth": "familiar",
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[time]"
+      ]
+    },
+    {
+      "entity_id": "dukes_guard",
+      "entity": "The Duke's Guard",
+      "entity_type": "faction",
+      "description": "Duke Aldric's personal military force responsible for maintaining order in Ironhaven and the surrounding territory. Well-equipped but stretched thin, they patrol the city walls and occasionally escort high-value caravans.",
+      "attributes": {
+        "size": "~500 soldiers",
+        "loyalty": "to Duke Aldric",
+        "equipment": "steel armor and halberds"
+      },
+      "facts": [
+        "Wear the duke's sigil — a silver tower on blue",
+        "Have jurisdiction over criminal matters",
+        "Recently increased patrols due to caravan disappearances",
+        "Underfunded due to declining tax revenue"
+      ],
+      "relations": {
+        "serves": "Duke Aldric",
+        "rivals": "Merchant's Alliance private guards",
+        "patrols": "Ironhaven"
+      },
+      "tags": [
+        "world_info",
+        "faction"
+      ],
+      "aliases": [
+        "duke's guard",
+        "city guard",
+        "ducal guard",
+        "the guard"
+      ],
+      "depth": "acquainted",
+      "slots": [
+        "[entity]",
+        "[topic]"
+      ]
+    },
+    {
+      "entity_id": "weavers_guild",
+      "entity": "Silvermoor Weavers' Guild",
+      "entity_type": "faction",
+      "description": "The finest textile guild in the realm, based in Silvermoor. Their enchanted fabrics and exquisite dyes are sought after by nobility across multiple kingdoms. Membership is earned through a seven-year apprenticeship.",
+      "attributes": {
+        "specialty": "enchanted textiles",
+        "reputation": "legendary",
+        "apprenticeship": "7 years"
+      },
+      "facts": [
+        "Their enchanted silk can resist fire and blade",
+        "Only accept 12 new apprentices per year",
+        "Master Weavers can imbue fabric with minor magical properties",
+        "Their trademark blue dye is a closely guarded secret"
+      ],
+      "relations": {
+        "based_in": "Silvermoor",
+        "trades_with": "Ironhaven merchants",
+        "supplies": "nobility across kingdoms"
+      },
+      "tags": [
+        "world_info",
+        "faction",
+        "commerce"
+      ],
+      "aliases": [
+        "weavers guild",
+        "the weavers",
+        "silvermoor guild"
+      ],
+      "depth": "acquainted",
+      "slots": [
+        "[entity]",
+        "[topic]"
+      ]
+    },
+    {
+      "entity_id": "starfire_essence",
+      "entity": "Starfire Essence",
+      "entity_type": "item",
+      "description": "Starfire Essence is a rare alchemical compound that glows with an ethereal inner light. Used in high-end enchantments and the creation of magical artifacts, it's worth more than its weight in gold. [entity] inspires [emotion] awe among [topic] practitioners.",
+      "attributes": {
+        "rarity": "extremely rare",
+        "value": "priceless",
+        "use": "enchantments and magical artifacts"
+      },
+      "facts": [
+        "Glows with a warm, pulsing light even in complete darkness",
+        "Only found in deposits beneath ancient magical sites",
+        "Must be stored in lead-lined containers or it evaporates within days",
+        "A single vial can power an enchantment lasting decades"
+      ],
+      "relations": {
+        "used_for": "enchantments",
+        "found_in": "ancient magical sites",
+        "traded_by": "elite alchemists"
+      },
+      "tags": [
+        "shopping",
+        "lore",
+        "item"
+      ],
+      "aliases": [
+        "starfire",
+        "the essence",
+        "starfire compound"
+      ],
+      "depth": "familiar",
+      "agentic_actions": {
+        "shop_buy": [
+          "trigger_rare_item_ui",
+          "gasp_animation"
+        ]
+      },
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[emotion]"
+      ]
+    },
+    {
+      "entity_id": "silvermoor_silk",
+      "entity": "Silvermoor Silk",
+      "entity_type": "item",
+      "description": "Silvermoor Silk is the finest textile in the realm — lightweight, durable, and available in colors that never fade. The enchanted varieties woven by the Weavers' Guild can resist fire, repel water, and even mend small tears on their own. [entity] brings [emotion] delight to [topic] enthusiasts.",
+      "attributes": {
+        "quality": "finest in the realm",
+        "value": "high",
+        "origin": "Silvermoor"
+      },
+      "facts": [
+        "Colors never fade even after years of wear",
+        "Enchanted silk can resist fire and repel water",
+        "Takes 6 months to weave a single enchanted bolt",
+        "Duke Aldric's court robes are made exclusively from it"
+      ],
+      "relations": {
+        "produced_by": "Silvermoor Weavers' Guild",
+        "traded_via": "Northern Road",
+        "traded_by": "Ironhaven merchants"
+      },
+      "tags": [
+        "shopping",
+        "item",
+        "commerce"
+      ],
+      "aliases": [
+        "silvermoor fabric",
+        "enchanted silk",
+        "fine silk"
+      ],
+      "depth": "familiar",
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[emotion]"
+      ]
+    },
+    {
+      "entity_id": "healing_potion",
+      "entity": "Healing Potion",
+      "entity_type": "item",
+      "description": "Healing potions are alchemical remedies that accelerate the body's natural recovery. Quality varies wildly — a good one from a trained herbalist can mend a broken bone in hours, while a cheap market potion might just cure a headache. [entity] provides [topic] relief when needed most in [time] hours.",
+      "attributes": {
+        "rarity": "common",
+        "value": "moderate",
+        "effectiveness": "varies by quality"
+      },
+      "facts": [
+        "Made from moonpetal flowers and silverroot",
+        "Must be consumed within a month of brewing",
+        "Higher quality potions have a faintly golden color",
+        "Overconsumption causes temporary blindness"
+      ],
+      "relations": {
+        "brewed_by": "herbalists and alchemists",
+        "ingredients": "moonpetal and silverroot"
+      },
+      "tags": [
+        "shopping",
+        "item",
+        "combat"
+      ],
+      "aliases": [
+        "health potion",
+        "restorative",
+        "healing elixir",
+        "potion"
+      ],
+      "depth": "acquainted",
+      "agentic_actions": {
+        "shop_buy": [
+          "open_item_shop",
+          "examine_potion_animation"
+        ]
+      },
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[time]"
+      ]
+    },
+    {
+      "entity_id": "enchanting_reagents",
+      "entity": "Enchanting Reagents",
+      "entity_type": "item",
+      "description": "Enchanting reagents are the raw materials required for imbuing objects with magical properties. They include crystallized mana, powdered moonstone, and various rare botanical extracts. Without them, even the most skilled enchanter is powerless.",
+      "attributes": {
+        "rarity": "uncommon to rare",
+        "value": "high",
+        "shelf_life": "limited"
+      },
+      "facts": [
+        "Crystallized mana loses potency after 90 days",
+        "Powdered moonstone must be harvested under a full moon",
+        "The best reagents come from deep underground deposits",
+        "Impure reagents can cause enchantments to backfire violently"
+      ],
+      "relations": {
+        "used_for": "enchantment",
+        "sourced_from": "Silvermoor and mountain mines",
+        "traded_by": "specialist merchants"
+      },
+      "tags": [
+        "shopping",
+        "item",
+        "lore"
+      ],
+      "aliases": [
+        "reagents",
+        "enchanting materials",
+        "magical reagents"
+      ],
+      "depth": "acquainted",
+      "slots": [
+        "[entity]",
+        "[topic]"
+      ]
+    },
+    {
+      "entity_id": "missing_caravans",
+      "entity": "The Missing Caravans",
+      "entity_type": "event",
+      "description": "Three merchant caravans have vanished on the Northern Road in the past two months. Two were found empty — drivers reported being robbed by something fast and invisible. The third hasn't been found at all. The Merchant's Alliance is in crisis. The [entity] mystery creates [emotion] tension in [topic] circles.",
+      "attributes": {
+        "timeframe": "past 2 months",
+        "caravans_lost": 3,
+        "status": "unresolved"
+      },
+      "facts": [
+        "Drivers reported shadows moving impossibly fast",
+        "All disappearances occurred near Blackhollow",
+        "The Alliance is hiring sellswords for protection",
+        "Duke's Guard investigation has produced no results"
+      ],
+      "relations": {
+        "location": "Northern Road near Blackhollow",
+        "affects": "Merchant's Alliance",
+        "possibly_caused_by": "Shadow Wraiths"
+      },
+      "tags": [
+        "quest",
+        "event",
+        "world_info"
+      ],
+      "aliases": [
+        "missing caravans",
+        "caravan disappearances",
+        "the disappearances",
+        "vanishing caravans"
+      ],
+      "depth": "familiar",
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[emotion]"
+      ]
+    },
+    {
+      "entity_id": "winter_fever",
+      "entity": "The Winter Fever",
+      "entity_type": "event",
+      "description": "A devastating plague that swept through the region five years ago during an unusually harsh winter. It claimed hundreds of lives including many prominent citizens. The herbalists eventually developed a cure from frostbloom flowers. The [entity] created [emotion] despair in [topic] communities [time] ago.",
+      "attributes": {
+        "timeframe": "5 years ago",
+        "mortality_rate": "~15%",
+        "cure": "frostbloom tincture"
+      },
+      "facts": [
+        "Struck hardest in overcrowded market districts",
+        "No noble family was spared",
+        "The cure was discovered by the herbalist Thessaly",
+        "Survivors gained natural immunity"
+      ],
+      "relations": {
+        "cured_by": "frostbloom tincture",
+        "discovered_by": "Thessaly the herbalist",
+        "affected": "all major cities"
+      },
+      "tags": [
+        "lore",
+        "event",
+        "backstory"
+      ],
+      "aliases": [
+        "the fever",
+        "winter plague",
+        "the plague"
+      ],
+      "depth": "acquainted",
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[emotion]",
+        "[time]"
+      ]
+    },
+    {
+      "entity_id": "trade_routes",
+      "entity": "Trade Routes",
+      "entity_type": "concept",
+      "description": "The network of roads and paths connecting the major cities and towns of the region. The Northern Road is the primary artery, but secondary routes connect Redstone, the coastal towns, and the mountain settlements. Trade routes are the lifeblood of the economy. [entity] facilitate [topic] movement in all [time] hours.",
+      "attributes": {
+        "primary_route": "Northern Road",
+        "maintained_by": "Merchant's Alliance"
+      },
+      "facts": [
+        "Waystations every day's ride offer safe rest",
+        "Route guards are hired and paid by the Alliance",
+        "Winter closures can cause months of supply shortages",
+        "Bandits target the less-patrolled secondary routes"
+      ],
+      "relations": {
+        "maintained_by": "Merchant's Alliance",
+        "protected_by": "caravan escorts"
+      },
+      "tags": [
+        "world_info",
+        "commerce",
+        "concept"
+      ],
+      "aliases": [
+        "trade road",
+        "merchant routes",
+        "commercial roads"
+      ],
+      "depth": "acquainted",
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[time]"
+      ]
+    },
+    {
+      "entity_id": "haggling",
+      "entity": "Haggling",
+      "entity_type": "concept",
+      "description": "The art of negotiation over prices — an essential skill in any marketplace. Experienced merchants know that the posted price is merely a starting point. Relationship, timing, and charm all factor into the final deal. [entity] is crucial in [topic] dealings, especially at [time] close.",
+      "attributes": {
+        "skill_type": "social",
+        "importance": "high in commerce"
+      },
+      "facts": [
+        "Most merchants expect customers to negotiate",
+        "Insulting lowball offers can permanently damage a relationship",
+        "Buying in bulk typically warrants a 10-15% discount",
+        "The best time to haggle is at market close when merchants want to sell remaining stock"
+      ],
+      "relations": {
+        "practiced_by": "merchants and buyers",
+        "taught_by": "Merchant's Alliance"
+      },
+      "tags": [
+        "commerce",
+        "concept",
+        "shopping"
+      ],
+      "aliases": [
+        "bargaining",
+        "negotiation",
+        "price negotiation"
+      ],
+      "depth": "acquainted",
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[time]"
+      ]
+    },
+    {
+      "entity_id": "enchantment",
+      "entity": "Enchantment",
+      "entity_type": "concept",
+      "description": "The magical art of imbuing objects with supernatural properties. Practiced by trained enchanters using specialized reagents, it ranges from simple glow-charms to complex battle enchantments that can turn the tide of war. [entity] inspires [emotion] wonder among [topic] students.",
+      "attributes": {
+        "skill_type": "magical",
+        "training_required": "5+ years",
+        "cost": "high"
+      },
+      "facts": [
+        "Requires specific reagents matched to the desired effect",
+        "Poorly made enchantments can backfire catastrophically",
+        "The Silvermoor Weavers are the foremost textile enchanters",
+        "Military-grade enchantments are restricted by ducal law"
+      ],
+      "relations": {
+        "practiced_by": "trained enchanters",
+        "requires": "enchanting reagents",
+        "regulated_by": "ducal law"
+      },
+      "tags": [
+        "lore",
+        "concept"
+      ],
+      "aliases": [
+        "magic",
+        "magical enchantment",
+        "enchanting"
+      ],
+      "depth": "acquainted",
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[emotion]"
+      ]
+    },
+    {
+      "entity_id": "guild_law",
+      "entity": "Guild Law",
+      "entity_type": "concept",
+      "description": "The body of rules and regulations governing commerce, guild membership, and trade disputes in the region. Enforced by the Merchant's Alliance with the backing of ducal authority, it covers everything from tariffs to quality standards. [entity] governs [topic] practices year-round in [time] hours.",
+      "attributes": {
+        "enforced_by": "Merchant's Alliance and Duke",
+        "scope": "regional commerce"
+      },
+      "facts": [
+        "All merchants must pay annual guild dues",
+        "Price fixing is punishable by expulsion",
+        "Trade disputes are settled by guild arbitration",
+        "Non-guild merchants pay double tariffs at gates"
+      ],
+      "relations": {
+        "enforced_by": "Merchant's Alliance",
+        "backed_by": "Duke Aldric",
+        "applies_to": "all merchants"
+      },
+      "tags": [
+        "world_info",
+        "commerce",
+        "concept"
+      ],
+      "aliases": [
+        "trade law",
+        "merchant law",
+        "guild regulations"
+      ],
+      "depth": "acquainted",
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[time]"
+      ]
+    },
+    {
+      "entity_id": "synthesus_engine",
+      "entity": "Synthesus Engine",
+      "entity_type": "concept",
+      "description": "The Synthesus Engine is a dual-hemisphere cognitive architecture for NPC intelligence. The Left Hemisphere handles fast pattern matching while the Right Hemisphere manages emotion, memory, relationships, and world awareness. It replaces traditional LLM-based dialogue with a system running 90% on pattern matching.",
+      "attributes": {
+        "version": "2.0",
+        "developer": "AIVM LLC",
+        "latency": "<5ms",
+        "gpu_required": false
+      },
+      "facts": [
+        "Runs 90% on pattern matching and 10% on specialized ML micro-models",
+        "Total ML footprint is approximately 458 KB",
+        "Can support 1000+ concurrent NPCs on a single server",
+        "Zero GPU required — runs entirely on CPU"
+      ],
+      "relations": {
+        "developed_by": "AIVM LLC",
+        "uses": "ML Swarm micro-models",
+        "deployed_on": "PS5 and mid-tier gaming PCs"
+      },
+      "tags": [
+        "platform",
+        "technology",
+        "concept"
+      ],
+      "aliases": [
+        "synthesus",
+        "the engine",
+        "cognitive engine",
+        "NPC brain"
+      ],
+      "depth": "familiar"
+    },
+    {
+      "entity_id": "aivm",
+      "entity": "AIVM LLC",
+      "entity_type": "faction",
+      "description": "AIVM LLC is the company behind the Synthesus Engine — a startup focused on building intelligent NPC systems that don't require cloud-connected LLMs or GPU hardware. Their philosophy: games should run on the hardware players already own.",
+      "attributes": {
+        "type": "technology company",
+        "focus": "NPC AI",
+        "philosophy": "local-first, no cloud dependency"
+      },
+      "facts": [
+        "Founded to solve the cost problem of LLM-based NPCs",
+        "Build systems that run entirely on consumer hardware",
+        "Developed the ML Swarm architecture of 12 specialized micro-models",
+        "Goal: make every NPC feel alive without a $60/month API bill"
+      ],
+      "relations": {
+        "develops": "Synthesus Engine",
+        "competes_with": "cloud LLM providers"
+      },
+      "tags": [
+        "platform",
+        "technology",
+        "faction"
+      ],
+      "aliases": [
+        "AIVM",
+        "the company"
+      ],
+      "depth": "familiar",
+      "slots": [
+        "[entity]",
+        "[topic]"
+      ]
+    },
+    {
+      "entity_id": "ml_swarm",
+      "entity": "ML Swarm",
+      "entity_type": "concept",
+      "description": "The ML Swarm is a collection of 12 specialized micro-models that replace what would traditionally require a 0.6B parameter language model. Seven models face players (intent, sentiment, emotion, behavior, loot, dialogue ranking, embeddings) and five simulate the world.",
+      "attributes": {
+        "total_models": 12,
+        "total_size": "~458 KB",
+        "inference_time": "<1ms",
+        "framework": "sklearn"
+      },
+      "facts": [
+        "Uses sklearn LogisticRegression and TF-IDF pipelines",
+        "Zero GPU required for any model",
+        "All 12 models combined are smaller than a single web page image",
+        "Each model is trained on domain-specific data under 1 second"
+      ],
+      "relations": {
+        "part_of": "Synthesus Engine",
+        "replaces": "large language models",
+        "uses": "scikit-learn"
+      },
+      "tags": [
+        "platform",
+        "technology",
+        "concept"
+      ],
+      "aliases": [
+        "swarm",
+        "micro-models",
+        "ML models"
+      ],
+      "depth": "familiar",
+      "slots": [
+        "[time]"
+      ]
+    },
+    {
+      "entity_id": "character_genome",
+      "entity": "Character Genome",
+      "entity_type": "concept",
+      "description": "A Character Genome is the complete definition of an NPC character in the Synthesus system, consisting of up to four JSON files: bio.json (identity), patterns.json (dialogue), knowledge.json (entity knowledge), and personality.json (creative responses).",
+      "attributes": {
+        "files": 4,
+        "format": "JSON",
+        "extensible": true
+      },
+      "facts": [
+        "Every character is defined by a directory of JSON files",
+        "The bio.json file is the only required file",
+        "Patterns define trigger-response pairs for the Left Hemisphere",
+        "Knowledge graphs store what the NPC personally knows about the world"
+      ],
+      "relations": {
+        "defines": "NPC characters",
+        "consumed_by": "Cognitive Engine",
+        "created_by": "Character Factory"
+      },
+      "tags": [
+        "platform",
+        "technology",
+        "concept"
+      ],
+      "aliases": [
+        "genome",
+        "character definition",
+        "NPC genome",
+        "character spec"
+      ],
+      "depth": "familiar"
+    },
+    {
+      "entity_id": "moonpetal",
+      "entity": "Moonpetal Flower",
+      "entity_type": "item",
+      "description": "Moonpetal flowers are delicate, silver-petaled blooms that only open under moonlight. They're the primary ingredient in healing potions and various medicinal tinctures. Found in shaded forest clearings and cultivated by herbalists.",
+      "attributes": {
+        "rarity": "uncommon",
+        "value": "moderate",
+        "harvest_time": "nighttime only"
+      },
+      "facts": [
+        "Petals dissolve instantly in sunlight",
+        "Must be harvested between midnight and dawn",
+        "A single flower yields enough extract for three basic healing potions",
+        "Wild moonpetals are more potent than cultivated ones"
+      ],
+      "relations": {
+        "used_in": "healing potions",
+        "cultivated_by": "herbalists",
+        "found_in": "forest clearings"
+      },
+      "tags": [
+        "item",
+        "lore",
+        "shopping"
+      ],
+      "aliases": [
+        "moonpetal",
+        "moon petal",
+        "silver petal",
+        "healing flower"
+      ],
+      "depth": "acquainted",
+      "slots": [
+        "[entity]",
+        "[topic]"
+      ]
+    },
+    {
+      "entity_id": "frostbloom",
+      "entity": "Frostbloom",
+      "entity_type": "item",
+      "description": "Frostbloom is an extremely rare arctic flower that only blooms during the harshest winter storms. Its tincture was the cure for the devastating Winter Fever that swept the region five years ago. [entity] brought [emotion] hope during the [topic] crisis.",
+      "attributes": {
+        "rarity": "very rare",
+        "value": "very high",
+        "bloom_condition": "winter storms only"
+      },
+      "facts": [
+        "Only grows above the snowline on the highest peaks",
+        "The herbalist Thessaly discovered its curative properties",
+        "A single bloom can cure a dozen fever victims",
+        "Attempts to cultivate it at lower altitudes have all failed"
+      ],
+      "relations": {
+        "cures": "Winter Fever",
+        "found_on": "mountain peaks",
+        "discovered_by": "Thessaly"
+      },
+      "tags": [
+        "item",
+        "lore",
+        "quest"
+      ],
+      "aliases": [
+        "frost bloom",
+        "frost flower",
+        "winter bloom"
+      ],
+      "depth": "rumor",
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[emotion]"
+      ]
+    },
+    {
+      "entity_id": "duke_aldric",
+      "entity": "Duke Aldric",
+      "entity_type": "person",
+      "description": "Duke Aldric rules Ironhaven and the surrounding territory. A pragmatic but increasingly strained leader, he maintains order through alliances with the Merchant's Alliance and his personal guard. Rumors suggest his coffers are thinner than he lets on. [entity] maintains [emotion] control over [topic] matters.",
+      "attributes": {
+        "title": "Duke",
+        "age": "mid-50s",
+        "residence": "Ironhaven Castle"
+      },
+      "facts": [
+        "Has ruled for 22 years",
+        "His court robes are made from Silvermoor enchanted silk",
+        "Tariff agreements with the Alliance fund most city services",
+        "Recently took loans from foreign interests"
+      ],
+      "relations": {
+        "rules": "Ironhaven",
+        "allied_with": "Merchant's Alliance",
+        "commands": "Duke's Guard"
+      },
+      "tags": [
+        "world_info",
+        "person",
+        "politics"
+      ],
+      "aliases": [
+        "duke",
+        "aldric",
+        "the duke",
+        "his grace",
+        "ruler of ironhaven"
+      ],
+      "depth": "acquainted",
+      "trust_threshold": 60.0,
+      "emotion_variants": {
+        "suspicious": "*lowers voice* The duke has been acting strange lately. Quiet. His guards ask too many questions around the market."
+      },
+      "agentic_actions": {
+        "join_faction": [
+          "trigger_recruitment_flow",
+          "salute_animation"
+        ],
+        "lore_query": [
+          "nod_respectfully"
+        ]
+      },
+      "slots": [
+        "[entity]",
+        "[topic]",
+        "[emotion]"
+      ]
+    }
+  ]
+}
