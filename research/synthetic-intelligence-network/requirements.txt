@@ -1,0 +1,1 @@
+# Synthetic Intelligence Neural Network Dependencies\n\n# Core dependencies\ntorch>=2.0.0\ntorchvision>=0.15.0\nnumpy>=1.24.0\n\n# Optional dependencies for training\ntqdm>=4.65.0\ntensorboard>=2.13.0\nwandb>=0.15.0\n\n# Development dependencies\npytest>=7.3.0\npylint>=2.17.0\nblack>=23.3.0
