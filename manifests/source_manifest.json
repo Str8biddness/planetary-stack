@@ -1,7 +1,7 @@
 {
   "version": "1",
   "kind": "synthesus-knowledge-source-plane",
-  "generated_at": "2026-07-16T05:12:03.264989+00:00",
+  "generated_at": "2026-07-16T05:20:20.693464+00:00",
   "roots": [
     "sources",
     "synthesus_knowledge_cloud",
@@ -121,8 +121,8 @@
     },
     {
       "path": "pipelines/build/reindex_bundle.py",
-      "size": 3787,
-      "sha256": "fc4bc934c8039a3fa8b2c9dd37e46fab25277b64b624f4cf87243ff7c6eb48d4"
+      "size": 6225,
+      "sha256": "68aa84e64b7e8a3509ab86d7f83fe121e321095ee4fe3a8715d159a8dc1d72f9"
     },
     {
       "path": "pipelines/build/run_population.py",
@@ -196,8 +196,8 @@
     },
     {
       "path": "docs/BUILD.md",
-      "size": 3355,
-      "sha256": "268bcdbc957f90f6f81e2637479a75e2aef544c67f487fd389b7990da0d35fba"
+      "size": 3649,
+      "sha256": "2d86f2bb36fdb0069324bc75abc0f8f08ce3452cf6dcc7a27121c977d57773bb"
     },
     {
       "path": "docs/DATA_MODEL.md",

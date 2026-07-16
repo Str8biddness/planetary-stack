@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from pipelines.build.reindex_bundle import record_to_text
+from pipelines.build.reindex_bundle import rebuild_index, record_to_text
 from synthesus_knowledge_cloud.json_stream import count_json_array, iter_json_array
 
 
@@ -36,3 +36,13 @@ def test_iter_json_array_rejects_non_array(tmp_path: Path) -> None:
 )
 def test_record_to_text_prefers_query_side(record, expected: str) -> None:
     assert record_to_text(record) == expected
+
+
+def test_rebuild_index_rejects_unknown_index_kind(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="index_kind"):
+        rebuild_index(
+            tmp_path / "metadata.json",
+            tmp_path / "embedder.pkl",
+            tmp_path / "faiss.index",
+            index_kind="unknown",
+        )

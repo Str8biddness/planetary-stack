@@ -51,8 +51,14 @@ without re-downloading the source corpus:
 python -m pipelines.build.reindex_bundle \
   --metadata artifacts/faiss_metadata.json \
   --embedder artifacts/models/swarm_embedder.pkl \
-  --output artifacts/faiss.index
+  --output artifacts/faiss.index \
+  --index-kind ivf
 ```
+
+`flat` preserves exhaustive search. `ivf` keeps the same vector IDs and
+metadata alignment while using a trained inverted-file index for bounded
+latency on large local bundles; cluster, probe, and training sizes are
+configurable through the corresponding `--ivf-*` flags.
 
 ## Stamp without rebuilding
 
