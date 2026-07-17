@@ -102,3 +102,36 @@ large LFS smudging. The doctor was corrected to distinguish pointer-only files
 from hydrated objects. A separate LFS pull retrieved
 `artifacts/knowledge.kndb` at 38,500 bytes with the expected SHA-256
 `35aa50935f05151801e1c0b5473b9d6706ed0f212c78a9d1aae9cb22673b4627`.
+
+## Authenticated local controller
+
+The 2026-07-16 `synthesusd` service-boundary slice was validated against an
+isolated headless desktop on shell port 18081 and controller port 15011 while
+the primary desktop remained online:
+
+```text
+controller without API key: HTTP 401
+controller health with install API key: online
+runtime: online
+terminal: online
+terminal transport: unix_socket
+terminal capability without desktop JWT: HTTP 401
+terminal capability with logged-in desktop JWT: HTTP 200
+terminal directory: 0700
+terminal socket: 0600
+unauthorized terminal WebSocket: rejected
+JWT-bound authenticated PTY command + resize: passed
+terminal capability absent from access logs: passed
+desktop chat source: chal_runtime
+isolated processes and socket after shutdown: absent
+```
+
+Focused source validation:
+
+```text
+4 passed
+Python byte compilation: passed
+JavaScript syntax check: passed
+Installer shell syntax: passed
+Desktop icon: 1254x1254 RGB PNG; favicon and launcher references present
+```

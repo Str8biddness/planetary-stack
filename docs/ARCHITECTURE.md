@@ -55,6 +55,20 @@ Planetary Desktop ── localhost WebSocket/HTTP ── synthesusd
 Crossing a zone requires explicit identity, authorization, encryption,
 resource limits, and audit records.
 
+## Local controller boundary
+
+The desktop now reaches private services through `synthesusd`, bound only to
+loopback. Runtime HTTP requires the per-install API key already used on the
+server-to-server hop. Browser terminal HTTP/WebSocket traffic uses a separate
+random capability generated for each desktop launch and an allowlisted local
+UI origin. The desktop shell releases that capability only to a valid logged-in
+user session.
+
+The PTY backend has no TCP listener. `synthesusd` reaches it through a Unix
+socket inside a mode-0700 user directory, with the socket node restricted to
+mode 0600. The browser never receives the runtime API key or human-attestation
+secret.
+
 ## Workload classes
 
 ### Suitable across the public Internet
@@ -80,4 +94,3 @@ owned by one subscriber and deliberately excludes public third-party
 workloads. That release proves the interface, scheduler, workload protocol,
 failure recovery, resource controls, and customer value before adding a
 marketplace and adversarial nodes.
-

@@ -249,6 +249,7 @@ cat > "$APPS/synthesus.desktop" <<DESK
 Name=Synthesus
 Comment=Local, private AI desktop
 Exec=$BIN_DIR/synthesus
+Icon=$SYNTHESUS_HOME/desktop/assets/synthesus-icon.png
 Terminal=false
 Type=Application
 Categories=Utility;

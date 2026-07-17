@@ -9,8 +9,9 @@ and prints a PASS/FAIL report. Run it before every release.
 
     python3 self_test.py
 
-Covers the FUNCTIONAL journey against the running stack (shell :8081, runtime
-:5010, pty :8082). Full click-through-the-UI screenshotting is the CDP v2.
+Covers the FUNCTIONAL journey against the running stack (shell :8081,
+authenticated synthesusd :5011, private PTY Unix socket, runtime :5010).
+Full click-through-the-UI screenshotting is the CDP v2.
 """
 from __future__ import annotations
 import asyncio, json, os, subprocess, sys, tempfile, time, urllib.request
@@ -31,6 +32,7 @@ def check(name, ok, detail=""):
 
 def main():
     print("Synthesus self-test — new-user journey\n")
+    auth_token = None
 
     # 0. stack up?
     try:
@@ -53,6 +55,7 @@ def main():
     try:
         s, d = _post("/api/auth/login", {"email": email, "password": pw})
         check("log in", d.get("status") == "success", d.get("message", ""))
+        auth_token = d.get("token")
     except Exception as e:
         check("log in", False, str(e))
 
@@ -87,8 +90,20 @@ def main():
     # 6. terminal PTY round-trip
     try:
         import websockets  # type: ignore
+        ipc_request = urllib.request.Request(
+            SHELL + "/api/ipc/session",
+            headers={"Authorization": f"Bearer {auth_token or ''}"},
+        )
+        with urllib.request.urlopen(ipc_request, timeout=5) as response:
+            ipc = json.loads(response.read().decode())
+        controller_host = f"127.0.0.1:{ipc['controller_port']}"
+        terminal_uri = f"ws://{controller_host}{ipc['terminal_ws_path']}/selftest"
         async def pty():
-            async with websockets.connect("ws://127.0.0.1:8082/ws/pty/user/selftest") as ws:
+            async with websockets.connect(
+                terminal_uri,
+                origin=SHELL,
+                subprotocols=["synthesus-terminal", ipc["terminal_token"]],
+            ) as ws:
                 await ws.send("echo SELFTEST_PTY_OK\n")
                 buf = ""
                 for _ in range(8):
