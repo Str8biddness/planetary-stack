@@ -85,6 +85,25 @@ class ControllerSettings:
             parent_pid=int(parent) if parent else None,
         )
 
+    def validate_for_production(self) -> None:
+        """Raise SystemExit for any config that is unsafe to run in production.
+
+        Called from the lifespan startup hook so the check fires regardless of
+        how uvicorn was invoked (direct script *or* ``uvicorn synthesusd:app``).
+        """
+        _KEY_PLACEHOLDER = "dev-key-change-me"
+        if not self.api_key or self.api_key == _KEY_PLACEHOLDER:
+            raise SystemExit(
+                "SYNTHESUS_API_KEY is not set or equals the insecure placeholder. "
+                "Run install.sh or set SYNTHESUS_API_KEY to a strong random value."
+            )
+        host = os.environ.get("SYNTHESUS_CONTROLLER_HOST", "127.0.0.1")
+        if host not in {"127.0.0.1", "localhost", "::1"}:
+            raise SystemExit(
+                f"synthesusd refuses non-loopback binding: {host!r}. "
+                "Set SYNTHESUS_CONTROLLER_HOST to 127.0.0.1 or localhost."
+            )
+
 
 def _constant_time_match(provided: str | None, expected: str) -> bool:
     return bool(provided and expected and hmac.compare_digest(provided, expected))
@@ -144,6 +163,11 @@ async def _parent_watchdog(parent_pid: int | None) -> None:
             os.kill(os.getpid(), signal.SIGTERM)
             return
         except PermissionError:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "_parent_watchdog: PermissionError probing pid %d — watchdog disabled",
+                parent_pid,
+            )
             return
 
 
@@ -152,9 +176,12 @@ def create_app(
     *,
     runtime_transport: httpx.AsyncBaseTransport | None = None,
     terminal_transport: httpx.AsyncBaseTransport | None = None,
+    validate: bool = False,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        if validate:
+            settings.validate_for_production()
         watchdog = asyncio.create_task(_parent_watchdog(settings.parent_pid))
         try:
             yield
@@ -387,12 +414,13 @@ def create_app(
 
 
 SETTINGS = ControllerSettings.from_environment()
-app = create_app(SETTINGS)
+# validate=True ensures the loopback + key guards fire at startup regardless
+# of whether uvicorn imports this module directly (``uvicorn synthesusd:app``)
+# or the file is run as a script.
+app = create_app(SETTINGS, validate=True)
 
 
 if __name__ == "__main__":
     host = os.environ.get("SYNTHESUS_CONTROLLER_HOST", "127.0.0.1")
     port = int(os.environ.get("SYNTHESUS_CONTROLLER_PORT", "5011"))
-    if host not in {"127.0.0.1", "localhost", "::1"}:
-        raise SystemExit("synthesusd refuses non-loopback binding")
     uvicorn.run(app, host=host, port=port, log_level="info")

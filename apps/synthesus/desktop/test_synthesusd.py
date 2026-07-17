@@ -149,3 +149,30 @@ def test_terminal_backend_has_no_tcp_listener():
     )
     assert "uvicorn.run(app, uds=SOCKET_PATH" in source
     assert "uvicorn.run(app, host=" not in source
+
+
+def test_from_environment_rejects_non_loopback_host(monkeypatch):
+    monkeypatch.setenv("SYNTHESUS_CONTROLLER_HOST", "0.0.0.0")
+    monkeypatch.setenv("SYNTHESUS_API_KEY", "strong-random-key-x7z")
+    import pytest
+    settings = synthesusd.ControllerSettings.from_environment()
+    with pytest.raises(SystemExit, match="non-loopback"):
+        settings.validate_for_production()
+
+
+def test_from_environment_rejects_placeholder_api_key(monkeypatch):
+    monkeypatch.setenv("SYNTHESUS_CONTROLLER_HOST", "127.0.0.1")
+    monkeypatch.setenv("SYNTHESUS_API_KEY", "dev-key-change-me")
+    import pytest
+    settings = synthesusd.ControllerSettings.from_environment()
+    with pytest.raises(SystemExit, match="SYNTHESUS_API_KEY"):
+        settings.validate_for_production()
+
+
+def test_from_environment_rejects_missing_api_key(monkeypatch):
+    monkeypatch.setenv("SYNTHESUS_CONTROLLER_HOST", "127.0.0.1")
+    monkeypatch.delenv("SYNTHESUS_API_KEY", raising=False)
+    import pytest
+    settings = synthesusd.ControllerSettings.from_environment()
+    with pytest.raises(SystemExit, match="SYNTHESUS_API_KEY"):
+        settings.validate_for_production()
