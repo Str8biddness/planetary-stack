@@ -553,7 +553,6 @@ def _require_accepted(label: str, result: Any) -> None:
 def _revoke_failed_lease(
     service: LocalVSourceControlPlane,
     lease: Any,
-    lease_sha256: str,
 ) -> None:
     """Best-effort terminal transition that never masks the original failure."""
 
@@ -561,11 +560,12 @@ def _revoke_failed_lease(
         current = service.get_lease(lease.lease_id)
         if current is None or current.state != LeaseState.ACTIVE:
             return
+        current_sha256 = document_sha256(current)
         service.revoke_lease(
             lease.lease_id,
-            lease_sha256=lease_sha256,
-            fencing_token=lease.fencing_token,
-            renewal_sequence=lease.renewal_sequence,
+            lease_sha256=current_sha256,
+            fencing_token=current.fencing_token,
+            renewal_sequence=current.renewal_sequence,
             revocation_reason=LeaseRevocationReason.INTEGRITY_FAILURE,
         )
     except BaseException:
@@ -791,6 +791,91 @@ def _job_json(payload: dict[str, Any]) -> bytes:
     )
 
 
+def _prepare_allocated_transfer(
+    *,
+    config: MeshSmokeConfig,
+    lease: Any,
+    request: ChalRequest,
+    scheduler: Ed25519DocumentSigner,
+    scheduler_public: bytes,
+    controller: Ed25519DocumentSigner,
+    controller_public: bytes,
+    registry: EnrollmentRegistry,
+    object_sha256: str,
+) -> tuple[
+    dict[str, Any],
+    str,
+    TransferContext,
+    MeshEnrollmentRecord,
+    MeshEnrollmentRecord,
+    dict[str, Any],
+]:
+    """Validate and materialize every post-allocation pre-listener binding."""
+
+    if (
+        lease.node_id != config.destination.node_id
+        or lease.transport.value != "lan_mtls"
+        or lease.state != LeaseState.ACTIVE
+    ):
+        raise MeshSecurityError("scheduler did not issue an active lan_mtls lease")
+    lease_wire = lease.model_dump(mode="json", by_alias=True)
+    lease_sha256 = document_sha256(lease)
+    parse_signed_lease(
+        lease_wire,
+        scheduler_key_id=scheduler.key_id,
+        scheduler_public_key=scheduler_public,
+    )
+    context = TransferContext(
+        account_id=config.account_id,
+        request_sha256=document_sha256(request),
+        lease_id=lease.lease_id,
+        lease_sha256=lease_sha256,
+        fencing_token=lease.fencing_token,
+        selected_transport="lan_mtls",
+        source_node_id=config.source.node_id,
+        destination_node_id=config.destination.node_id,
+        object_sha256=object_sha256,
+        byte_length=config.object_bytes,
+        expires_at=lease.not_before + timedelta(seconds=lease.ttl_seconds),
+    )
+    SignedLeaseValidator(
+        lease_wire=lease_wire,
+        request_wire=request.model_dump(mode="json", by_alias=True),
+        scheduler_key_id=scheduler.key_id,
+        scheduler_public_key=scheduler_public,
+        controller_key_id=controller.key_id,
+        controller_public_key=controller_public,
+        expected_context=context,
+    )
+    source_record = registry.record(config.account_id, config.source.node_id)
+    destination_record = registry.record(
+        config.account_id, config.destination.node_id
+    )
+    registry.active_peer(config.account_id, config.source.node_id)
+    registry.active_peer(config.account_id, config.destination.node_id)
+    serve_job = {
+        "schema": SERVE_SCHEMA,
+        "account_id": config.account_id,
+        "node_id": config.destination.node_id,
+        "bind_host": config.bind_address,
+        "port": config.port,
+        "declared_vpn_cidrs": list(config.declared_vpn_cidrs),
+        "timeout_seconds": config.timeout_seconds,
+        "transfer_context": context.to_wire(),
+        "lease": lease_wire,
+        "request": request.model_dump(mode="json", by_alias=True),
+        "source_peer": _peer_wire(source_record),
+    }
+    return (
+        lease_wire,
+        lease_sha256,
+        context,
+        source_record,
+        destination_record,
+        serve_job,
+    )
+
+
 def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]:
     nodes = (config.source, config.destination)
     pins = [carrier.verify_node(node) for node in nodes]
@@ -975,61 +1060,30 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
     )
     _require_accepted("mesh allocation", allocation)
     lease = allocation.lease
-    if (
-        lease is None
-        or lease.node_id != config.destination.node_id
-        or lease.transport.value != "lan_mtls"
-        or lease.state != LeaseState.ACTIVE
-    ):
-        raise MeshSecurityError("scheduler did not issue an active lan_mtls lease")
-    lease_wire = lease.model_dump(mode="json", by_alias=True)
-    lease_sha256 = document_sha256(lease)
-    parse_signed_lease(
-        lease_wire,
-        scheduler_key_id=scheduler.key_id,
-        scheduler_public_key=scheduler_public,
-    )
-
-    context = TransferContext(
-        account_id=config.account_id,
-        request_sha256=document_sha256(request),
-        lease_id=lease.lease_id,
-        lease_sha256=lease_sha256,
-        fencing_token=lease.fencing_token,
-        selected_transport="lan_mtls",
-        source_node_id=config.source.node_id,
-        destination_node_id=config.destination.node_id,
-        object_sha256=object_sha256,
-        byte_length=config.object_bytes,
-        expires_at=lease.not_before + timedelta(seconds=lease.ttl_seconds),
-    )
-    SignedLeaseValidator(
-        lease_wire=lease_wire,
-        request_wire=request.model_dump(mode="json", by_alias=True),
-        scheduler_key_id=scheduler.key_id,
-        scheduler_public_key=scheduler_public,
-        controller_key_id=controller.key_id,
-        controller_public_key=controller_public,
-        expected_context=context,
-    )
-    source_record = registry.record(config.account_id, config.source.node_id)
-    destination_record = registry.record(config.account_id, config.destination.node_id)
-    registry.active_peer(config.account_id, config.source.node_id)
-    registry.active_peer(config.account_id, config.destination.node_id)
-
-    serve_job = {
-        "schema": SERVE_SCHEMA,
-        "account_id": config.account_id,
-        "node_id": config.destination.node_id,
-        "bind_host": config.bind_address,
-        "port": config.port,
-        "declared_vpn_cidrs": list(config.declared_vpn_cidrs),
-        "timeout_seconds": config.timeout_seconds,
-        "transfer_context": context.to_wire(),
-        "lease": lease_wire,
-        "request": request.model_dump(mode="json", by_alias=True),
-        "source_peer": _peer_wire(source_record),
-    }
+    if lease is None:
+        raise MeshSecurityError("scheduler accepted allocation without returning a lease")
+    try:
+        (
+            lease_wire,
+            lease_sha256,
+            context,
+            source_record,
+            destination_record,
+            serve_job,
+        ) = _prepare_allocated_transfer(
+            config=config,
+            lease=lease,
+            request=request,
+            scheduler=scheduler,
+            scheduler_public=scheduler_public,
+            controller=controller,
+            controller_public=controller_public,
+            registry=registry,
+            object_sha256=object_sha256,
+        )
+    except BaseException:
+        _revoke_failed_lease(service, lease)
+        raise
     handle = None
     try:
         handle = carrier.start_serve(
@@ -1074,7 +1128,7 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
     except BaseException:
         if handle is not None:
             handle.kill()
-        _revoke_failed_lease(service, lease, lease_sha256)
+        _revoke_failed_lease(service, lease)
         raise
 
     try:
@@ -1089,7 +1143,7 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
         if released is None or released.state != LeaseState.RELEASED:
             raise MeshSecurityError("lease was not durably released after the transfer")
     except BaseException:
-        _revoke_failed_lease(service, lease, lease_sha256)
+        _revoke_failed_lease(service, lease)
         raise
 
     expected_receipt = context.receipt_sha256(object_sha256)

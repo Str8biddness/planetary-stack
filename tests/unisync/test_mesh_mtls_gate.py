@@ -6,7 +6,7 @@ import sqlite3
 import stat
 import sys
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from multiprocessing import get_context
 from pathlib import Path
 
@@ -26,7 +26,8 @@ from services.unisync import (
     TransferContext,
     encode_frame,
 )
-from services.unisync import mesh_authority as mesh_authority_module
+from services.unisync import mesh_common as mesh_common_module
+from services.unisync import mesh_smoke as mesh_smoke_module
 from services.unisync.mesh_authority import (
     EnrollmentRegistry,
     MeshCertificateAuthority,
@@ -54,7 +55,11 @@ from services.unisync.mesh_identity import (
     load_or_create_contract_identity,
     load_tls_credential_paths,
 )
-from services.unisync.mesh_lease import LeaseUseStore, SignedLeaseValidator
+from services.unisync.mesh_lease import (
+    LEASE_USE_LOCK_FILE,
+    LeaseUseStore,
+    SignedLeaseValidator,
+)
 from services.unisync.mesh_smoke import (
     LocalMeshCarrier,
     MeshNodeConfig,
@@ -243,16 +248,16 @@ def test_registry_lock_serializes_register_and_revoke_without_resurrection(
 
     def revoke_first() -> None:
         revoke_started.set()
-        real_flock = mesh_authority_module.fcntl.flock
+        real_flock = mesh_common_module.fcntl.flock
 
         def observed_flock(descriptor: int, operation: int) -> object:
-            if operation == mesh_authority_module.fcntl.LOCK_EX:
+            if operation == mesh_common_module.fcntl.LOCK_EX:
                 revoke_lock_attempted.set()
                 try:
                     return real_flock(
                         descriptor,
-                        mesh_authority_module.fcntl.LOCK_EX
-                        | mesh_authority_module.fcntl.LOCK_NB,
+                        mesh_common_module.fcntl.LOCK_EX
+                        | mesh_common_module.fcntl.LOCK_NB,
                     )
                 except BlockingIOError:
                     revoke_lock_blocked.set()
@@ -262,7 +267,7 @@ def test_registry_lock_serializes_register_and_revoke_without_resurrection(
                         revoke_lock_acquired_early.set()
             return real_flock(descriptor, operation)
 
-        mesh_authority_module.fcntl.flock = observed_flock
+        mesh_common_module.fcntl.flock = observed_flock
         try:
             revoking.revoke(account_id, first.node_id, reason="concurrent revocation")
             results.put(("revoke", "ok"))
@@ -498,6 +503,135 @@ def test_transfer_start_failure_durably_revokes_allocated_lease(tmp_path: Path) 
             "SELECT state, terminal_state FROM leases"
         ).fetchall()
     assert rows == [("revoked", "revoked")]
+
+
+def test_post_allocation_validation_failure_durably_revokes_lease(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _local_mesh_config(tmp_path)
+
+    def reject_validation(*args: object, **kwargs: object) -> object:
+        raise MeshSecurityError("injected post-allocation validator failure")
+
+    monkeypatch.setattr(mesh_smoke_module, "SignedLeaseValidator", reject_validation)
+    with pytest.raises(
+        MeshSecurityError, match="injected post-allocation validator failure"
+    ):
+        run_mesh_mtls_smoke(
+            config,
+            LocalMeshCarrier(timeout_seconds=config.timeout_seconds),
+        )
+
+    with sqlite3.connect(config.state_db) as connection:
+        rows = connection.execute(
+            "SELECT state, terminal_state FROM leases"
+        ).fetchall()
+    assert rows == [("revoked", "revoked")]
+
+
+def test_lease_use_lock_allows_only_one_concurrent_admission(tmp_path: Path) -> None:
+    state = tmp_path / "lease-state"
+    state.mkdir(mode=0o700)
+    account_id = "account:test:mesh"
+    node_id = "node:test:source"
+    context = TransferContext(
+        account_id=account_id,
+        request_sha256="1" * 64,
+        lease_id="lease:test:concurrent",
+        lease_sha256="2" * 64,
+        fencing_token=1,
+        selected_transport="lan_mtls",
+        source_node_id=node_id,
+        destination_node_id="node:test:destination",
+        object_sha256="3" * 64,
+        byte_length=128,
+        expires_at=datetime.now(UTC) + timedelta(minutes=1),
+    )
+    first_store = LeaseUseStore(state, account_id=account_id, node_id=node_id)
+    second_store = LeaseUseStore(state, account_id=account_id, node_id=node_id)
+    process_context = get_context("fork")
+    save_entered = process_context.Event()
+    allow_save = process_context.Event()
+    second_started = process_context.Event()
+    second_lock_attempted = process_context.Event()
+    second_lock_blocked = process_context.Event()
+    second_lock_acquired_early = process_context.Event()
+    results = process_context.Queue()
+    original_save = first_store._save
+
+    def paused_save() -> None:
+        save_entered.set()
+        if not allow_save.wait(10):
+            raise AssertionError("timed out waiting to release lease-use save")
+        original_save()
+
+    first_store._save = paused_save  # type: ignore[method-assign]
+
+    def admit_first() -> None:
+        try:
+            first_store.begin(context)
+            results.put(("first", "ok"))
+        except BaseException as exc:
+            results.put(("first", type(exc).__name__))
+
+    def admit_second() -> None:
+        second_started.set()
+        real_flock = mesh_common_module.fcntl.flock
+
+        def observed_flock(descriptor: int, operation: int) -> object:
+            if operation == mesh_common_module.fcntl.LOCK_EX:
+                second_lock_attempted.set()
+                try:
+                    return real_flock(
+                        descriptor,
+                        mesh_common_module.fcntl.LOCK_EX
+                        | mesh_common_module.fcntl.LOCK_NB,
+                    )
+                except BlockingIOError:
+                    second_lock_blocked.set()
+                    return real_flock(descriptor, operation)
+                finally:
+                    if not second_lock_blocked.is_set():
+                        second_lock_acquired_early.set()
+            return real_flock(descriptor, operation)
+
+        mesh_common_module.fcntl.flock = observed_flock
+        try:
+            second_store.begin(context)
+            results.put(("second", "ok"))
+        except BaseException as exc:
+            results.put(("second", type(exc).__name__))
+
+    first_process = process_context.Process(target=admit_first)
+    second_process = process_context.Process(target=admit_second)
+    first_process.start()
+    second_started_by_parent = False
+    try:
+        assert save_entered.wait(2)
+        second_process.start()
+        second_started_by_parent = True
+        assert second_started.wait(2)
+        assert second_lock_attempted.wait(2)
+        assert second_lock_blocked.wait(2)
+        assert not second_lock_acquired_early.is_set()
+    finally:
+        allow_save.set()
+        first_process.join(2)
+        if second_started_by_parent:
+            second_process.join(2)
+
+    assert not first_process.is_alive()
+    assert first_process.exitcode == 0
+    assert second_started_by_parent
+    assert not second_process.is_alive()
+    assert second_process.exitcode == 0
+    outcomes = sorted(results.get(timeout=2) for _ in range(2))
+    assert outcomes == [("first", "ok"), ("second", "AuthorizationError")]
+    persisted = strict_json((state / "lease-use.json").read_bytes())
+    assert len(persisted["records"]) == 1
+    assert persisted["records"][0]["state"] == "admitted"
+    assert _mode(state / LEASE_USE_LOCK_FILE) == 0o600
 
 
 def test_real_tcp_tls13_gate_binds_signed_request_lease_and_both_peers(

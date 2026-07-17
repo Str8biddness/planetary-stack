@@ -9,14 +9,16 @@ from __future__ import annotations
 
 import base64
 import binascii
+import fcntl
 import ipaddress
 import json
 import os
 import re
 import stat
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 MAX_PRIVATE_FILE_BYTES = 16 * 1024
 IDENTIFIER_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._:-]{2,127}$")
@@ -245,4 +247,85 @@ def fsync_directory(path: Path) -> None:
     try:
         os.fsync(descriptor)
     finally:
+        os.close(descriptor)
+
+
+@contextmanager
+def owned_file_lock(
+    directory: Path,
+    filename: str,
+    *,
+    exclusive: bool,
+) -> Iterator[None]:
+    """Lock a stable owner-only sidecar without following or replacing it."""
+
+    directory = safe_owned_directory(Path(directory), create=False)
+    if (
+        not isinstance(filename, str)
+        or not filename
+        or Path(filename).name != filename
+        or "\x00" in filename
+    ):
+        raise MeshSecurityError("mesh lock filename is unsafe")
+    path = directory / filename
+    flags = os.O_RDWR
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor: int | None = None
+    created = False
+    try:
+        for _ in range(3):
+            try:
+                descriptor = os.open(
+                    path,
+                    flags | os.O_CREAT | os.O_EXCL,
+                    0o600,
+                )
+                created = True
+                break
+            except FileExistsError:
+                try:
+                    descriptor = os.open(path, flags)
+                    break
+                except FileNotFoundError:
+                    continue
+    except OSError as exc:
+        raise MeshSecurityError("cannot open the mesh state lock") from exc
+    if descriptor is None:
+        raise MeshSecurityError("mesh state lock is unstable")
+    try:
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_uid != os.geteuid()
+            or opened.st_nlink != 1
+        ):
+            raise MeshSecurityError("mesh state lock is not a safe owned file")
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+        except OSError as exc:
+            raise MeshSecurityError("cannot acquire the mesh state lock") from exc
+        if created:
+            os.fchmod(descriptor, 0o600)
+            os.fsync(descriptor)
+            fsync_directory(directory)
+        opened = os.fstat(descriptor)
+        try:
+            linked = path.lstat()
+        except FileNotFoundError as exc:
+            raise MeshSecurityError("mesh state lock disappeared") from exc
+        if (
+            not stat.S_ISREG(linked.st_mode)
+            or opened.st_dev != linked.st_dev
+            or opened.st_ino != linked.st_ino
+            or stat.S_IMODE(opened.st_mode) != 0o600
+            or opened.st_size != 0
+        ):
+            raise MeshSecurityError("mesh state lock integrity check failed")
+        yield
+    finally:
+        # Closing the unique open description releases flock without a second
+        # syscall that could mask the original fail-closed error.
         os.close(descriptor)

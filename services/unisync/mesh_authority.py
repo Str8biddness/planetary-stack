@@ -14,16 +14,14 @@ distribution) are explicit non-claims and remain separate gates.
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import os
 import secrets
 import stat
-from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -37,6 +35,7 @@ from .mesh_common import (
     compact_json,
     fsync_directory,
     normalize_san_set,
+    owned_file_lock,
     parse_wire_time,
     read_private_file,
     require_identifier,
@@ -351,9 +350,10 @@ class EnrollmentRegistry:
     def __init__(self, directory: Path) -> None:
         self._directory = safe_owned_directory(Path(directory))
         self._path = self._directory / REGISTRY_FILE
-        self._lock_path = self._directory / REGISTRY_LOCK_FILE
         self._records: dict[tuple[str, str], MeshEnrollmentRecord] = {}
-        with self._locked(exclusive=True):
+        with owned_file_lock(
+            self._directory, REGISTRY_LOCK_FILE, exclusive=True
+        ):
             try:
                 self._path.lstat()
                 exists = True
@@ -367,72 +367,6 @@ class EnrollmentRegistry:
     @property
     def path(self) -> Path:
         return self._path
-
-    @contextmanager
-    def _locked(self, *, exclusive: bool) -> Iterator[None]:
-        """Hold the stable registry lock across every read-modify-replace cycle."""
-
-        flags = os.O_RDWR
-        if hasattr(os, "O_CLOEXEC"):
-            flags |= os.O_CLOEXEC
-        if hasattr(os, "O_NOFOLLOW"):
-            flags |= os.O_NOFOLLOW
-        descriptor: int | None = None
-        created = False
-        try:
-            for _ in range(3):
-                try:
-                    descriptor = os.open(
-                        self._lock_path,
-                        flags | os.O_CREAT | os.O_EXCL,
-                        0o600,
-                    )
-                    created = True
-                    break
-                except FileExistsError:
-                    try:
-                        descriptor = os.open(self._lock_path, flags)
-                        break
-                    except FileNotFoundError:
-                        continue
-        except OSError as exc:
-            raise MeshSecurityError("cannot open the enrollment registry lock") from exc
-        if descriptor is None:
-            raise MeshSecurityError("enrollment registry lock is unstable")
-        try:
-            opened = os.fstat(descriptor)
-            if (
-                not stat.S_ISREG(opened.st_mode)
-                or opened.st_uid != os.geteuid()
-                or opened.st_nlink != 1
-            ):
-                raise MeshSecurityError("enrollment registry lock is not a safe owned file")
-            try:
-                fcntl.flock(descriptor, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
-            except OSError as exc:
-                raise MeshSecurityError("cannot acquire the enrollment registry lock") from exc
-            if created:
-                os.fchmod(descriptor, 0o600)
-                os.fsync(descriptor)
-                fsync_directory(self._directory)
-            opened = os.fstat(descriptor)
-            try:
-                linked = self._lock_path.lstat()
-            except FileNotFoundError as exc:
-                raise MeshSecurityError("enrollment registry lock disappeared") from exc
-            if (
-                not stat.S_ISREG(linked.st_mode)
-                or opened.st_dev != linked.st_dev
-                or opened.st_ino != linked.st_ino
-                or stat.S_IMODE(opened.st_mode) != 0o600
-                or opened.st_size != 0
-            ):
-                raise MeshSecurityError("enrollment registry lock integrity check failed")
-            yield
-        finally:
-            # Closing the unique open description releases flock without a
-            # second syscall that could mask the original fail-closed error.
-            os.close(descriptor)
 
     def _load(self) -> None:
         raw = read_private_file(self._path, max_bytes=MAX_REGISTRY_BYTES)
@@ -490,7 +424,9 @@ class EnrollmentRegistry:
     def register(self, record: MeshEnrollmentRecord) -> None:
         """Explicitly add one peer; duplicates and substitutions fail closed."""
 
-        with self._locked(exclusive=True):
+        with owned_file_lock(
+            self._directory, REGISTRY_LOCK_FILE, exclusive=True
+        ):
             self._load()
             key = (record.account_id, record.node_id)
             if key in self._records:
@@ -511,7 +447,9 @@ class EnrollmentRegistry:
                 raise
 
     def revoke(self, account_id: str, node_id: str, *, reason: str) -> None:
-        with self._locked(exclusive=True):
+        with owned_file_lock(
+            self._directory, REGISTRY_LOCK_FILE, exclusive=True
+        ):
             self._load()
             key = (account_id, node_id)
             record = self._records.get(key)
@@ -559,7 +497,9 @@ class EnrollmentRegistry:
     ) -> EnrolledPeerIdentity:
         """Return the active enrollment or fail closed."""
 
-        with self._locked(exclusive=False):
+        with owned_file_lock(
+            self._directory, REGISTRY_LOCK_FILE, exclusive=False
+        ):
             self._load()
             record = self._records.get((account_id, node_id))
             if record is None:
@@ -574,7 +514,9 @@ class EnrollmentRegistry:
             return record.peer_identity()
 
     def record(self, account_id: str, node_id: str) -> MeshEnrollmentRecord:
-        with self._locked(exclusive=False):
+        with owned_file_lock(
+            self._directory, REGISTRY_LOCK_FILE, exclusive=False
+        ):
             self._load()
             record = self._records.get((account_id, node_id))
             if record is None:
@@ -582,6 +524,8 @@ class EnrollmentRegistry:
             return record
 
     def snapshot_wire(self) -> list[dict[str, Any]]:
-        with self._locked(exclusive=False):
+        with owned_file_lock(
+            self._directory, REGISTRY_LOCK_FILE, exclusive=False
+        ):
             self._load()
             return [record.to_wire() for _, record in sorted(self._records.items())]

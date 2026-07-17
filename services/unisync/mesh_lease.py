@@ -36,6 +36,7 @@ from .mesh_common import (
     MeshSecurityError,
     compact_json,
     fsync_directory,
+    owned_file_lock,
     read_private_file,
     require_identifier,
     require_sha256,
@@ -46,6 +47,7 @@ from .mesh_common import (
 )
 
 LEASE_USE_FILE = "lease-use.json"
+LEASE_USE_LOCK_FILE = "lease-use.lock"
 LEASE_USE_SCHEMA = "planetary.unisync.mesh_lease_use.v1"
 LEASE_USE_RECORD_SCHEMA = "planetary.unisync.mesh_lease_use_record.v1"
 MAX_LEASE_USE_BYTES = 1024 * 1024
@@ -248,12 +250,15 @@ class LeaseUseStore:
         self._account_id = require_identifier("account_id", account_id)
         self._node_id = require_identifier("node_id", node_id)
         self._records: dict[str, dict[str, Any]] = {}
-        try:
-            self._path.lstat()
-        except FileNotFoundError:
-            self._save()
-        else:
-            self._load()
+        with owned_file_lock(
+            self._directory, LEASE_USE_LOCK_FILE, exclusive=True
+        ):
+            try:
+                self._path.lstat()
+            except FileNotFoundError:
+                self._save()
+            else:
+                self._load()
 
     @property
     def path(self) -> Path:
@@ -327,45 +332,51 @@ class LeaseUseStore:
             context.destination_node_id,
         }:
             raise AuthorizationError("lease-use context does not name this node")
-        self._load()
-        existing = self._records.get(context.lease_id)
-        if existing is not None and existing["fencing_token"] >= context.fencing_token:
-            raise AuthorizationError("lease revision was already admitted or superseded")
-        record = {
-            "schema": LEASE_USE_RECORD_SCHEMA,
-            "lease_id": context.lease_id,
-            "lease_sha256": context.lease_sha256,
-            "fencing_token": context.fencing_token,
-            "state": "admitted",
-            "updated_at": wire_time(datetime.now(UTC)),
-        }
-        previous = self._records
-        self._records = {**previous, context.lease_id: record}
-        try:
-            self._save()
-        except BaseException:
-            self._records = previous
-            raise
+        with owned_file_lock(
+            self._directory, LEASE_USE_LOCK_FILE, exclusive=True
+        ):
+            self._load()
+            existing = self._records.get(context.lease_id)
+            if existing is not None and existing["fencing_token"] >= context.fencing_token:
+                raise AuthorizationError("lease revision was already admitted or superseded")
+            record = {
+                "schema": LEASE_USE_RECORD_SCHEMA,
+                "lease_id": context.lease_id,
+                "lease_sha256": context.lease_sha256,
+                "fencing_token": context.fencing_token,
+                "state": "admitted",
+                "updated_at": wire_time(datetime.now(UTC)),
+            }
+            previous = self._records
+            self._records = {**previous, context.lease_id: record}
+            try:
+                self._save()
+            except BaseException:
+                self._records = previous
+                raise
 
     def finish(self, context: TransferContext, *, succeeded: bool) -> None:
-        self._load()
-        record = self._records.get(context.lease_id)
-        if (
-            record is None
-            or record["lease_sha256"] != context.lease_sha256
-            or record["fencing_token"] != context.fencing_token
-            or record["state"] != "admitted"
+        with owned_file_lock(
+            self._directory, LEASE_USE_LOCK_FILE, exclusive=True
         ):
-            raise AuthorizationError("lease-use completion does not match admitted revision")
-        replacement = {
-            **record,
-            "state": "completed" if succeeded else "failed",
-            "updated_at": wire_time(datetime.now(UTC)),
-        }
-        previous = self._records
-        self._records = {**previous, context.lease_id: replacement}
-        try:
-            self._save()
-        except BaseException:
-            self._records = previous
-            raise
+            self._load()
+            record = self._records.get(context.lease_id)
+            if (
+                record is None
+                or record["lease_sha256"] != context.lease_sha256
+                or record["fencing_token"] != context.fencing_token
+                or record["state"] != "admitted"
+            ):
+                raise AuthorizationError("lease-use completion does not match admitted revision")
+            replacement = {
+                **record,
+                "state": "completed" if succeeded else "failed",
+                "updated_at": wire_time(datetime.now(UTC)),
+            }
+            previous = self._records
+            self._records = {**previous, context.lease_id: replacement}
+            try:
+                self._save()
+            except BaseException:
+                self._records = previous
+                raise
