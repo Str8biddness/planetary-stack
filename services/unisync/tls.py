@@ -242,11 +242,13 @@ def _require_peer_san(peer_cert: dict[str, object], allowed_sans: set[str]) -> N
         raise AuthorizationError("mTLS peer certificate is not in the declared peer allowlist")
 
 
-def _certificate_identity_from_der(der_bytes: bytes) -> tuple[set[str], str, str]:
+def _certificate_identity_from_der(
+    der_bytes: bytes,
+) -> tuple[set[str], str, str, str, str]:
     try:
         from cryptography import x509
         from cryptography.hazmat.primitives import serialization
-        from cryptography.x509.oid import ExtensionOID
+        from cryptography.x509.oid import ExtensionOID, NameOID
     except ImportError as exc:
         raise TLSConfigurationError("cryptography is required for TLS peer identity binding") from exc
     try:
@@ -259,13 +261,27 @@ def _certificate_identity_from_der(der_bytes: bytes) -> tuple[set[str], str, str
         sans.add(_normalize_san(str(name.value)))
     if not sans:
         raise AuthorizationError("mTLS peer certificate has no SANs")
+    account_names = certificate.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
+    node_names = certificate.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+    if len(account_names) != 1 or len(node_names) != 1:
+        raise AuthorizationError(
+            "mTLS peer certificate does not bind exactly one account and node"
+        )
+    certificate_account_id = account_names[0].value
+    certificate_node_id = node_names[0].value
     certificate_sha256 = hashlib.sha256(der_bytes).hexdigest()
     public_key_der = certificate.public_key().public_bytes(
         serialization.Encoding.DER,
         serialization.PublicFormat.SubjectPublicKeyInfo,
     )
     public_key_sha256 = hashlib.sha256(public_key_der).hexdigest()
-    return sans, certificate_sha256, public_key_sha256
+    return (
+        sans,
+        certificate_sha256,
+        public_key_sha256,
+        certificate_account_id,
+        certificate_node_id,
+    )
 
 
 def _derive_authenticated_peer_identity(
@@ -276,8 +292,19 @@ def _derive_authenticated_peer_identity(
 ) -> AuthenticatedPeerIdentity:
     if not peer_cert or not der_bytes:
         raise AuthorizationError("peer certificate is required")
-    sans, certificate_sha256, public_key_sha256 = _certificate_identity_from_der(der_bytes)
+    (
+        sans,
+        certificate_sha256,
+        public_key_sha256,
+        certificate_account_id,
+        certificate_node_id,
+    ) = _certificate_identity_from_der(der_bytes)
     for enrollment in enrollments:
+        if (
+            enrollment.account_id != certificate_account_id
+            or enrollment.node_id != certificate_node_id
+        ):
+            continue
         if sans.isdisjoint(enrollment.normalized_sans()):
             continue
         if enrollment.certificate_sha256 is not None and enrollment.certificate_sha256 != certificate_sha256:

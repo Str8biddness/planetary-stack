@@ -61,7 +61,11 @@ from services.unisync.mesh_smoke import (
     MeshSmokeConfig,
     run_mesh_mtls_smoke,
 )
-from services.unisync.tls import _literal_allowed_address
+from services.unisync.tls import (
+    EnrolledPeerIdentity,
+    _derive_authenticated_peer_identity,
+    _literal_allowed_address,
+)
 
 
 def _public_ed25519() -> bytes:
@@ -361,6 +365,57 @@ def test_enrollment_rejects_changed_identity_substituted_key_and_symlink(
             node_id="node:test:linked",
             sans=["linked.test"],
         )
+
+
+def test_tls_peer_matcher_rejects_registry_account_or_node_relabeling(
+    tmp_path: Path,
+) -> None:
+    account_id = "account:test:alpha"
+    node_id = "node:test:identity"
+    enrollment = create_tls_enrollment(
+        tmp_path / "identity",
+        account_id=account_id,
+        node_id=node_id,
+        sans=["identity.test"],
+    )
+    issued = MeshCertificateAuthority.create("Peer Subject Test CA").issue_node_certificate(
+        enrollment["csr_pem"],
+        account_id=account_id,
+        node_id=node_id,
+        sans=enrollment["sans"],
+    )
+    certificate = x509.load_pem_x509_certificate(issued.certificate_pem.encode("ascii"))
+    certificate_der = certificate.public_bytes(Encoding.DER)
+
+    def peer(record_account_id: str, record_node_id: str) -> EnrolledPeerIdentity:
+        return EnrolledPeerIdentity(
+            account_id=record_account_id,
+            node_id=record_node_id,
+            sans=frozenset(issued.sans),
+            certificate_sha256=issued.certificate_sha256,
+            public_key_sha256=issued.public_key_sha256,
+        )
+
+    peer_certificate = {"subjectAltName": (("DNS", "identity.test"),)}
+    with pytest.raises(AuthorizationError, match="not enrolled"):
+        _derive_authenticated_peer_identity(
+            peer_cert=peer_certificate,
+            der_bytes=certificate_der,
+            enrollments=(peer("account:test:beta", node_id),),
+        )
+    with pytest.raises(AuthorizationError, match="not enrolled"):
+        _derive_authenticated_peer_identity(
+            peer_cert=peer_certificate,
+            der_bytes=certificate_der,
+            enrollments=(peer(account_id, "node:test:other"),),
+        )
+    authenticated = _derive_authenticated_peer_identity(
+        peer_cert=peer_certificate,
+        der_bytes=certificate_der,
+        enrollments=(peer(account_id, node_id),),
+    )
+    assert authenticated.account_id == account_id
+    assert authenticated.node_id == node_id
 
 
 def test_strict_mesh_json_and_frame_json_reject_ambiguity() -> None:
