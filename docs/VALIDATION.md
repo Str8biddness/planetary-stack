@@ -129,9 +129,19 @@ isolated processes and socket after shutdown: absent
 Focused source validation:
 
 ```text
-4 passed
+10 passed
 Python byte compilation: passed
 JavaScript syntax check: passed
 Installer shell syntax: passed
 Desktop icon: 1254x1254 RGB PNG; favicon and launcher references present
 ```
+
+Adversarial review remediation added source-level gates proving that controller
+startup rejects missing/default API keys and non-loopback hosts, that the module
+does not export a CLI-bindable ASGI app, and that terminal resize dimensions
+stay within the unsigned-short PTY ioctl range.
+
+The remediated entrypoint also passed a live loopback smoke: a known-default
+key and `0.0.0.0` bind were refused before startup, the unique-key test daemon
+returned HTTP 401 anonymously and HTTP 200 with its key, and neither test
+capability appeared in its log.

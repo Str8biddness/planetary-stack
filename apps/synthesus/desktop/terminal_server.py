@@ -40,7 +40,7 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logging.basicConfig(
     level=logging.INFO,
@@ -241,8 +241,8 @@ async def pty_ws(websocket: WebSocket, session_id: str):
 
 class ResizeReq(BaseModel):
     session_id: str
-    cols: int
-    rows: int
+    cols: int = Field(ge=1, le=65535)
+    rows: int = Field(ge=1, le=65535)
 
 
 @app.post("/api/terminal/resize")

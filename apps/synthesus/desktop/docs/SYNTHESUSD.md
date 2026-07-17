@@ -23,6 +23,8 @@ Synthesus runtime :5010       user-only Unix socket
 
 - Runtime proxy routes require `X-API-Key`, using the private install key that
   the desktop shell already injects on its server-to-server hop.
+- Controller startup refuses an absent or known-default install key; source
+  launches must run the installer or provide a unique `SYNTHESUS_API_KEY`.
 - Terminal HTTP and WebSocket routes require a separate random capability
   generated for each desktop launch.
 - WebSocket capabilities travel in the subprotocol handshake, not in the URL,
@@ -36,6 +38,9 @@ Synthesus runtime :5010       user-only Unix socket
 ## Transport
 
 - `synthesusd` refuses non-loopback binding.
+- The module does not export an ASGI `app` object, preventing
+  `uvicorn synthesusd:app --host 0.0.0.0` from bypassing the guarded script
+  entrypoint.
 - The PTY backend listens on
   `~/.synthesus/ipc/terminal.sock`, not a TCP port.
 - The socket directory is mode `0700`; the socket is created under umask

@@ -4,8 +4,11 @@ import asyncio
 from pathlib import Path
 
 import httpx
+import pytest
+from pydantic import ValidationError
 
 import synthesusd
+import terminal_server
 
 
 def _settings(socket_path: Path) -> synthesusd.ControllerSettings:
@@ -149,3 +152,31 @@ def test_terminal_backend_has_no_tcp_listener():
     )
     assert "uvicorn.run(app, uds=SOCKET_PATH" in source
     assert "uvicorn.run(app, host=" not in source
+
+
+def test_environment_rejects_missing_default_and_non_loopback_controller(monkeypatch):
+    monkeypatch.delenv("SYNTHESUS_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="unique per-install secret"):
+        synthesusd.ControllerSettings.from_environment()
+
+    monkeypatch.setenv("SYNTHESUS_API_KEY", "dev-key-change-me")
+    with pytest.raises(RuntimeError, match="unique per-install secret"):
+        synthesusd.ControllerSettings.from_environment()
+
+    monkeypatch.setenv("SYNTHESUS_API_KEY", "syn_test_unique_secret")
+    monkeypatch.setenv("SYNTHESUS_CONTROLLER_HOST", "0.0.0.0")
+    with pytest.raises(RuntimeError, match="refuses non-loopback"):
+        synthesusd.ControllerSettings.from_environment()
+
+
+def test_module_does_not_export_an_app_for_uvicorn_cli_bypass():
+    assert not hasattr(synthesusd, "app")
+
+
+@pytest.mark.parametrize(
+    ("cols", "rows"),
+    [(0, 24), (80, 0), (65536, 24), (80, 65536)],
+)
+def test_terminal_resize_dimensions_are_bounded(cols, rows):
+    with pytest.raises(ValidationError):
+        terminal_server.ResizeReq(session_id="bounds", cols=cols, rows=rows)

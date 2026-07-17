@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import logging
 import os
 import re
 import signal
@@ -42,6 +43,9 @@ _RESPONSE_HEADERS = {
     "etag",
 }
 _SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{1,96}$")
+_LOOPBACK_BIND_HOSTS = {"127.0.0.1", "localhost", "::1"}
+_KNOWN_DEFAULT_API_KEY = "dev-key-change-me"
+log = logging.getLogger("synthesusd")
 
 
 @dataclass(frozen=True)
@@ -53,9 +57,24 @@ class ControllerSettings:
     terminal_socket: Path
     allowed_origins: tuple[str, ...]
     parent_pid: int | None = None
+    bind_host: str = "127.0.0.1"
 
     @classmethod
     def from_environment(cls) -> "ControllerSettings":
+        api_key = os.environ.get("SYNTHESUS_API_KEY", "").strip()
+        if not api_key or hmac.compare_digest(api_key, _KNOWN_DEFAULT_API_KEY):
+            raise RuntimeError(
+                "SYNTHESUS_API_KEY must be a unique per-install secret; "
+                "run install.sh or set it explicitly"
+            )
+        bind_host = os.environ.get(
+            "SYNTHESUS_CONTROLLER_HOST",
+            "127.0.0.1",
+        ).strip()
+        if bind_host not in _LOOPBACK_BIND_HOSTS:
+            raise RuntimeError(
+                f"synthesusd refuses non-loopback binding: {bind_host!r}"
+            )
         shell_port = int(os.environ.get("SYNTHESUS_SHELL_PORT", "8081"))
         allowed = os.environ.get("SYNTHESUS_CONTROLLER_ALLOWED_ORIGINS", "").strip()
         origins = tuple(
@@ -68,7 +87,7 @@ class ControllerSettings:
         )
         parent = os.environ.get("SYNTHESUS_CONTROLLER_PARENT_PID", "").strip()
         return cls(
-            api_key=os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me"),
+            api_key=api_key,
             terminal_token=os.environ.get("SYNTHESUS_TERMINAL_TOKEN", ""),
             session_id=os.environ.get("SYNTHESUS_CONTROLLER_SESSION_ID", ""),
             runtime_url=os.environ.get(
@@ -83,6 +102,7 @@ class ControllerSettings:
             ).expanduser(),
             allowed_origins=origins,
             parent_pid=int(parent) if parent else None,
+            bind_host=bind_host,
         )
 
 
@@ -143,7 +163,12 @@ async def _parent_watchdog(parent_pid: int | None) -> None:
         except ProcessLookupError:
             os.kill(os.getpid(), signal.SIGTERM)
             return
-        except PermissionError:
+        except PermissionError as exc:
+            log.warning(
+                "cannot monitor parent pid %s; controller watchdog disabled: %s",
+                parent_pid,
+                exc,
+            )
             return
 
 
@@ -386,13 +411,15 @@ def create_app(
     return app
 
 
-SETTINGS = ControllerSettings.from_environment()
-app = create_app(SETTINGS)
-
-
 if __name__ == "__main__":
-    host = os.environ.get("SYNTHESUS_CONTROLLER_HOST", "127.0.0.1")
+    try:
+        settings = ControllerSettings.from_environment()
+    except (RuntimeError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
     port = int(os.environ.get("SYNTHESUS_CONTROLLER_PORT", "5011"))
-    if host not in {"127.0.0.1", "localhost", "::1"}:
-        raise SystemExit("synthesusd refuses non-loopback binding")
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    uvicorn.run(
+        create_app(settings),
+        host=settings.bind_host,
+        port=port,
+        log_level="info",
+    )

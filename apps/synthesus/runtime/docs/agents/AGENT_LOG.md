@@ -207,17 +207,25 @@ Keep entries chronological. Do not rewrite history; append new sessions.
   isolated-port development overrides.
 - Added a shared high-contrast Synthesus icon for the web favicon and installed
   Linux desktop entry.
+- Closed adversarial review findings by refusing missing/default controller API
+  keys, removing the module-level ASGI app that allowed a Uvicorn CLI bind to
+  bypass the guarded entrypoint, warning when parent monitoring is unavailable,
+  and bounding terminal resize dimensions.
 - Advanced Synthesus 5 Phase 9 product runtime polish and Planetary Stack
   Phase 4 service-boundary work without modifying the frozen memory contract.
 
 ### Verified
-- Focused controller suite: `4 passed`.
+- Focused controller suite: `10 passed`, including missing/default-key,
+  non-loopback host, absent module-level ASGI app, and PTY resize-bound gates.
 - Python byte compilation passed for `synthesusd.py`,
   `synthesus_native_shell.py`, `terminal_server.py`, and `self_test.py`.
 - `node --check script.js` passed.
 - `bash -n install.sh` passed; the generated desktop icon is a square
   1254-by-1254 RGB PNG and both application references resolve to its bundled
   path.
+- Live remediation smoke refused the known-default key and a `0.0.0.0` bind,
+  then returned HTTP 401 anonymously and HTTP 200 with a unique test key on
+  loopback; neither test capability appeared in controller logs.
 - Live controller without an API key returned HTTP 401; authenticated health
   reported the runtime and terminal online.
 - The shell returned HTTP 401 for anonymous terminal-capability minting and
