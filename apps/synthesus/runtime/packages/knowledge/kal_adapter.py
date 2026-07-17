@@ -59,6 +59,11 @@ try:
 except Exception:
     KnowledgeCloudMountTable = None
 
+try:
+    from knowledge.runtime_mount import resolve_knowledge_root
+except Exception:
+    resolve_knowledge_root = None
+
 
 logger = logging.getLogger(__name__)
 
@@ -83,19 +88,29 @@ class CHALMemoryController:
         knowledge_root: Optional[str | Path] = None,
         strict_mount_integrity: bool = False,
         hot_context_limit: int = 128,
+        knowledge_cloud: Any | None = None,
+        writeback_root: Optional[str | Path] = None,
+        mount_boot_report: Any | None = None,
     ):
         self._mounts: Dict[str, Mount] = {}
-        self._knowledge_cloud = None
+        self._knowledge_cloud = knowledge_cloud
         self._runtime = None
-        self._mount_boot_report = None
+        self._mount_boot_report = mount_boot_report
         self._hot_context: OrderedDict[str, HotContextEntry] = OrderedDict()
         self._hot_context_limit = max(0, hot_context_limit)
         self._hot_context_hits = 0
         self._hot_context_misses = 0
-        self._knowledge_root = Path(
-            knowledge_root
-            or os.environ.get("SYNTHESUS_KNOWLEDGE_ROOT", "")
-            or Path.cwd() / "data"
+        runtime_root = Path(__file__).resolve().parents[2]
+        resolved_root = None
+        if knowledge_root is not None:
+            resolved_root = Path(knowledge_root)
+        elif resolve_knowledge_root is not None:
+            resolved_root = resolve_knowledge_root(runtime_root, required=False)
+        self._knowledge_root = Path(resolved_root or Path.cwd() / "data")
+        self._writeback_root = Path(
+            writeback_root
+            or os.environ.get("SYNTHESUS_KNOWLEDGE_WRITEBACK_ROOT", "")
+            or runtime_root / "data" / "knowledge_cloud"
         )
         self._strict_mount_integrity = strict_mount_integrity
         
@@ -110,9 +125,17 @@ class CHALMemoryController:
             except Exception as e:
                 logger.warning(f"CHAL: Failed to init runtime: {e}")
 
-        if KnowledgeCloud is not None:
+        if KnowledgeCloud is not None and self._knowledge_cloud is None:
             try:
-                self._knowledge_cloud = KnowledgeCloud()
+                manifest_path = self._knowledge_root / "manifest.json"
+                if manifest_path.exists():
+                    self._knowledge_cloud = KnowledgeCloud(
+                        data_dir=self._knowledge_root / "knowledge_cloud",
+                        evolution_path=self._writeback_root / "evolution.json",
+                        read_only_base=True,
+                    )
+                else:
+                    self._knowledge_cloud = KnowledgeCloud()
             except Exception as e:
                 logger.warning(f"CHAL: Failed to init KnowledgeCloud: {e}")
 
@@ -173,6 +196,15 @@ class CHALMemoryController:
         """Boot CHAL mounts from a Knowledge Cloud manifest when artifacts exist locally."""
         if KnowledgeCloudMountTable is None:
             return False
+        if self._mount_boot_report is not None:
+            report = self._mount_boot_report
+            for mount_point in report.mounts:
+                self.mount(mount_point)
+            logger.info(
+                "CHAL: Reused verified Knowledge Cloud boot report from %s",
+                report.manifest_path,
+            )
+            return bool(report.mounts)
         manifest_path = self._knowledge_root / "manifest.json"
         if not manifest_path.exists():
             return False
@@ -264,17 +296,22 @@ class CHALMemoryController:
         
         # Try Knowledge Cloud (mounted at /mnt/rom/lore)
         if self._knowledge_cloud is not None:
-            rom_mounts = self.get_mounts(MountType.ROM)
-            if rom_mounts:
+            lore_mounts = [
+                mount
+                for mount in self.get_mounts(MountType.ROM)
+                if mount.mount_path in {"/mnt/rom/world_lore", "/mnt/rom/lore"}
+                or mount.partition.namespace == "game_lore"
+            ]
+            if lore_mounts:
                 try:
                     result = self._knowledge_cloud.lookup(text, trust=trust_available * 100.0)
                     if result and result.get("response"):
                         confidence = result.get("confidence", 0.5)
-                        source = f"rom_mount:{rom_mounts[0].partition.partition_id}"
+                        source = f"rom_mount:{lore_mounts[0].partition.partition_id}"
                         metadata = {
                             **result,
                             "hot_context": False,
-                            "mounts": self._active_mount_metadata(rom_mounts),
+                            "mounts": self._active_mount_metadata(lore_mounts),
                         }
                         self._put_hot_context(cache_key, result["response"], confidence, source, metadata)
                         return result["response"], self._telemetry("kc_lookup", start_time, False, confidence, source, metadata)

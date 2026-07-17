@@ -172,9 +172,11 @@ class KnowledgeCloud:
 
     def __init__(
         self,
-        data_dir: str = "data/knowledge_cloud",
+        data_dir: str | Path = "data/knowledge_cloud",
         similarity_floor: float = 0.30,
         vqd: Optional[Any] = None,
+        evolution_path: str | Path | None = None,
+        read_only_base: bool = False,
     ):
         """Initialize the KnowledgeCloud.
 
@@ -182,8 +184,16 @@ class KnowledgeCloud:
             data_dir: Directory where knowledge entries are stored.
             similarity_floor: Minimum cosine similarity score for search results.
             vqd: Optional Virtual Quantum Device instance for accelerated ranking.
+            evolution_path: Writable overlay for witnessed/evolved knowledge.
+            read_only_base: Protect the source lore directory from mutation.
         """
         self.data_dir = Path(data_dir)
+        self.evolution_path = (
+            Path(evolution_path)
+            if evolution_path is not None
+            else self.data_dir / "evolution.json"
+        )
+        self.read_only_base = read_only_base
         self.similarity_floor = similarity_floor
         self.vqd = vqd
 
@@ -253,7 +263,7 @@ class KnowledgeCloud:
 
     def _persist_evolution(self, entry: KnowledgeEntry):
         """Append or update a record in evolution.json."""
-        evo_path = self.data_dir / "evolution.json"
+        evo_path = self.evolution_path
 
         data = {"version": "1.0.0", "entries": []}
         if evo_path.exists():
@@ -278,6 +288,7 @@ class KnowledgeCloud:
         data["last_updated"] = time.time()
 
         try:
+            evo_path.parent.mkdir(parents=True, exist_ok=True)
             evo_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
         except Exception as e:
             logger.error(f"KnowledgeCloud: Failed to persist evolution: {e}")
@@ -577,6 +588,14 @@ class KnowledgeCloud:
 
     def add_entry(self, entry: KnowledgeEntry) -> bool:
         """Add a knowledge entry and rebuild the index."""
+        if self.read_only_base:
+            self.upsert_entry(entry)
+            logger.info(
+                "KnowledgeCloud: Added overlay entry '%s' (%s)",
+                entry.entity_id,
+                entry.entity_type,
+            )
+            return True
         self._entries[entry.entity_id] = entry
         self._update_alias_index(entry)
         self._save_entries()
@@ -586,6 +605,10 @@ class KnowledgeCloud:
 
     def remove_entry(self, entity_id: str) -> bool:
         """Remove a knowledge entry by ID."""
+        if self.read_only_base:
+            raise PermissionError(
+                "KnowledgeCloud base is immutable; removal requires a versioned artifact rebuild"
+            )
         if entity_id not in self._entries:
             return False
         entry = self._entries.pop(entity_id)
@@ -608,8 +631,11 @@ class KnowledgeCloud:
             if hasattr(entry, key):
                 setattr(entry, key, value)
         self._update_alias_index(entry)
-        self._save_entries()
-        self._build_index()
+        if self.read_only_base:
+            self.upsert_entry(entry)
+        else:
+            self._save_entries()
+            self._build_index()
         return True
 
     def get_entry(self, entity_id: str) -> Optional[KnowledgeEntry]:
@@ -652,6 +678,9 @@ class KnowledgeCloud:
             "build_time_ms": round(self._build_time_ms, 1),
             "similarity_floor": self.similarity_floor,
             "embedder_load_time_ms": round(self._embedder_load_time_ms, 1),
+            "base_path": str(self.data_dir),
+            "evolution_path": str(self.evolution_path),
+            "read_only_base": self.read_only_base,
         }
 
     # ── Internal Methods ──────────────────────────────────────────────
@@ -701,7 +730,16 @@ class KnowledgeCloud:
             "who", "how", "why", "tell", "me", "about", "this", "that", "these", "those", "they",
             "it", "its", "their", "there", "here", "from", "as", "into", "than", "then",
         }
-        return {term for term in terms if term not in stop_words}
+        normalized: Set[str] = set()
+        for term in terms:
+            if term in stop_words:
+                continue
+            normalized.add(term)
+            if len(term) > 4 and term.endswith("ies"):
+                normalized.add(term[:-3] + "y")
+            elif len(term) > 4 and term.endswith("s") and not term.endswith("ss"):
+                normalized.add(term[:-1])
+        return normalized
 
     def _entry_query_overlap(self, entry: KnowledgeEntry, query_terms: Set[str]) -> int:
         """Calculate the number of query terms that overlap with a knowledge entry.
@@ -793,14 +831,14 @@ class KnowledgeCloud:
             logger.info(f"KnowledgeCloud: Created data directory at {self.data_dir}")
             return
 
-        allowed_files = {"world_lore.json", "test_entries.json", "evolution.json"}
+        allowed_files = {"world_lore.json", "test_entries.json"}
         ignored_files = {"transitions.json", "learned_transitions.json", "chaining_patterns.json"}
 
         loaded = 0
         for json_file in self.data_dir.glob("*.json"):
             if json_file.name in ignored_files:
                 continue
-            if json_file.name not in allowed_files and json_file.name != "evolution.json":
+            if json_file.name not in allowed_files:
                 continue
             try:
                 with open(json_file, "r", encoding="utf-8") as f:
@@ -822,7 +860,7 @@ class KnowledgeCloud:
 
     def _load_evolution(self) -> None:
         """Load character-witnessed knowledge from evolution.json."""
-        evo_path = self.data_dir / "evolution.json"
+        evo_path = self.evolution_path
         if not evo_path.exists():
             return
 
@@ -839,6 +877,10 @@ class KnowledgeCloud:
 
     def _save_entries(self) -> None:
         """Persist all entries back to a single JSON file."""
+        if self.read_only_base:
+            raise PermissionError(
+                "KnowledgeCloud base is immutable; persist changes through the evolution overlay"
+            )
         self.data_dir.mkdir(parents=True, exist_ok=True)
         output_path = self.data_dir / "world_lore.json"
 

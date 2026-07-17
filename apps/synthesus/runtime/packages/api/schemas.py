@@ -62,6 +62,7 @@ class HealthResponse(BaseModel):
     llm: Dict[str, Any] = Field(default_factory=dict)
     cognitive_engine_active: bool = False
     rag_active: bool = False
+    knowledge_cloud: Dict[str, Any] = Field(default_factory=dict)
     active_sessions: int = 0
     total_requests: int = 0
 

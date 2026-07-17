@@ -558,6 +558,45 @@ def test_kal_hot_context_serves_repeated_mounted_queries(tmp_path: Path):
     assert stats["misses"] == 1
 
 
+def test_kal_query_attributes_the_world_lore_mount_when_multiple_roms(
+    tmp_path: Path,
+):
+    _write_manifest(
+        tmp_path,
+        [
+            _write_artifact(tmp_path, "knowledge.kndb", b"kndb"),
+            _write_artifact(
+                tmp_path,
+                "knowledge_cloud/world_lore.json",
+                b'{"entries": []}\n',
+            ),
+        ],
+        source_manifest=_source_manifest_fingerprint(),
+    )
+
+    class FakeKnowledgeCloud:
+        def lookup(self, text: str, trust: float):
+            return {
+                "response": f"lore:{text}",
+                "confidence": 0.9,
+            }
+
+    controller = CHALMemoryController(
+        knowledge_root=tmp_path,
+        strict_mount_integrity=True,
+        knowledge_cloud=FakeKnowledgeCloud(),
+    )
+    controller._runtime = None
+
+    response, telemetry = controller.query("Duke Aldric")
+
+    assert response == "lore:Duke Aldric"
+    assert telemetry.source == "rom_mount:kc_knowledge_cloud_world_lore_json"
+    assert [item["mount_path"] for item in telemetry.metadata["mounts"]] == [
+        "/mnt/rom/world_lore"
+    ]
+
+
 def test_kal_hot_context_lru_eviction(tmp_path: Path):
     _write_manifest(
         tmp_path,

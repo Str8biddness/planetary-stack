@@ -205,7 +205,26 @@ The standalone Knowledge Cloud data-plane validator now enforces the same source
 
 Source-plane admission also treats concrete source manifest IDs and planned `pending[]` dataset IDs as one CHAL source-identity namespace. A pending public dataset cannot reuse an already-admitted source ID, so later promotion into the mounted Knowledge Cloud rebuild substrate cannot create ambiguous provenance fingerprints.
 
-By default, the command uses `SYNTHESUS_KNOWLEDGE_ROOT` when set, then the companion `synthesus-knowledge-cloud/artifacts` checkout when present, and finally the runtime `data/` directory. It is also part of `tools/synthesus5_focused_suite.py`, so the source-only Synthesus 5 release gate now fails if the mounted Knowledge Cloud bundle cannot cold boot.
+By default, the command uses `SYNTHESUS_KNOWLEDGE_ROOT` when set, then
+`knowledge/knowledge-cloud/artifacts` in the Planetary Stack monorepo, then a
+companion `synthesus-knowledge-cloud/artifacts` checkout, and finally the
+runtime `data/` directory. It is also part of
+`tools/synthesus5_focused_suite.py`, so the source-only Synthesus 5 release
+gate fails if the mounted Knowledge Cloud bundle cannot cold boot.
+
+Production startup uses the same resolver and runs full runtime admission
+before constructing the shared Knowledge Cloud or Cognitive Hypervisor. The
+admission gate verifies manifest byte sizes and SHA-256 hashes, retrieval
+counts/dimensions, all 12 required CHAL mounts, and source-manifest
+provenance. A missing or invalid bundle is reported as `DEGRADED`; the runtime
+does not silently replace it with an empty cloud.
+
+Mounted artifact lore is immutable. `world_lore.json` is loaded from the
+verified artifact root, while witnessed/evolved facts are written to the
+runtime overlay at `data/knowledge_cloud/evolution.json` (or
+`SYNTHESUS_KNOWLEDGE_EVOLUTION_PATH`). API health reports the artifact root,
+manifest version, active mounts, retrieval semantics, source provenance,
+read-only base state, and writeback path.
 
 ## Synthesus 5 Hot-Context Cache
 

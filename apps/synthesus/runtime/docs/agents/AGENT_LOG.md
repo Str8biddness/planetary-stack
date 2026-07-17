@@ -142,3 +142,52 @@ Keep entries chronological. Do not rewrite history; append new sessions.
   user may potentially reuse the global sudo ticket. This is an explicit,
   documented trusted-workstation tradeoff and is why the mode is opt-in,
   loopback-only, short-lived, and revoked on exit.
+## Current Session — 2026-07-16 (Planetary Stack Knowledge Mount)
+
+### Summary
+- Added monorepo-first Knowledge Cloud artifact discovery with explicit
+  `SYNTHESUS_KNOWLEDGE_ROOT` override and standalone companion fallbacks.
+- Wired production startup to run the full Knowledge Cloud runtime admission
+  gate before sharing one mounted KAL controller with the Cognitive Hypervisor.
+- Kept verified artifact lore immutable and moved witnessed/evolved facts to a
+  writable runtime overlay.
+- Fixed the cross-NPC evolution regression by retaining query-focused grounded
+  facts when SequenceLinker or synthesis omitted retrieved evidence.
+- Corrected mounted provenance attribution so world-lore queries identify
+  `/mnt/rom/world_lore`, not whichever ROM artifact appeared first in the
+  manifest.
+
+### Verified
+- Strict cold start: 10 artifacts hash-valid, 12 required mounts active,
+  501,819 FAISS vectors and metadata records, FAISS/embedder/profile dimension
+  128, source-manifest provenance valid.
+- Production lifecycle/E2E: health, Knowledge Cloud stats, and entry-list
+  endpoints passed with the mounted bundle.
+- Live WebSocket desktop path returned `source="chal_runtime"`; the direct
+  debug trace reported `route="grounded_path"`,
+  `mounted_context_used=true`, exact `/mnt/rom/world_lore` artifact and
+  source-manifest provenance, accepted grounded writeback, and
+  `final_language_owner="cgpu_llm"` with Ollama reachable.
+- Focused evolution/runtime-mount/synthesis suite: 9 passed, 5 skipped.
+- CHAL Hypervisor, memory-writeback, and mount-table suite: 46 passed.
+- Direct mounted query returned Duke Aldric lore with
+  `operation_id="kc_lookup"` and exact `/mnt/rom/world_lore` artifact
+  provenance.
+- Full installed-environment suite: 1,713 passed, 48 skipped, 3 expected
+  failures, with one unrelated intent-classifier p99 timing failure
+  (16.6 ms vs 15 ms). The same timing test fails on the unchanged base
+  worktree (17.6 ms) and passes in the development environment, confirming it
+  is not introduced by this change.
+
+### Left Off / Next Steps
+- Merge the standalone Knowledge Cloud draft PR and synchronize/validate the
+  `zo.pub` artifact mirror.
+- Merge the desktop-terminal security PR before rebasing this branch so both
+  reviewed changes land without combining their scopes.
+- Run the full Synthesus 5 release gate before creating `synthesus5-rc1`.
+
+### Architectural Notes
+- The artifact plane is now immutable ROM/parameters/corpus/provenance at
+  runtime; evolving NPC knowledge is a writeback overlay, not an artifact edit.
+- A missing or invalid manifest produces an explicit degraded controller and
+  cannot silently become an empty successful Knowledge Cloud.
