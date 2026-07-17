@@ -37,6 +37,7 @@ from services.vsource import Ed25519DocumentSigner, sign_contract_document
 
 from .mesh_common import (
     MeshSecurityError,
+    b64url_decode,
     b64url_encode,
     compact_json,
     fsync_directory,
@@ -54,20 +55,34 @@ TLS_KEY_FILE = "tls-key.pem"
 TLS_IDENTITY_FILE = "tls-identity.json"
 TLS_CERTIFICATE_FILE = "tls-certificate.pem"
 TLS_CA_FILE = "tls-ca.pem"
+MESH_TRUST_FILE = "mesh-trust.json"
 CONTRACT_KEY_FILE = "contract-ed25519.key"
 CONTRACT_IDENTITY_FILE = "contract-identity.json"
 TLS_IDENTITY_SCHEMA = "planetary.unisync.mesh_tls_identity.v1"
+MESH_TRUST_SCHEMA = "planetary.unisync.mesh_trust.v1"
 CONTRACT_IDENTITY_SCHEMA = "planetary.unisync.mesh_contract_identity.v1"
 MAX_PEM_BYTES = 16 * 1024
 _TLS_IDENTITY_FIELDS = frozenset(
     {"schema", "account_id", "node_id", "sans", "tls_public_key_sha256"}
 )
 _CONTRACT_IDENTITY_FIELDS = frozenset({"schema", "account_id", "node_id", "key_id"})
+_MESH_TRUST_FIELDS = frozenset(
+    {
+        "schema",
+        "account_id",
+        "node_id",
+        "controller_key_id",
+        "controller_public_key_base64",
+        "scheduler_key_id",
+        "scheduler_public_key_base64",
+    }
+)
 _TLS_STATE_FILES = (
     TLS_KEY_FILE,
     TLS_IDENTITY_FILE,
     TLS_CERTIFICATE_FILE,
     TLS_CA_FILE,
+    MESH_TRUST_FILE,
 )
 
 
@@ -367,6 +382,77 @@ def load_tls_credential_paths(
         "key_file": directory / TLS_KEY_FILE,
     }
     return paths, metadata
+
+
+def install_mesh_trust(
+    state_dir: Path,
+    *,
+    account_id: str,
+    node_id: str,
+    controller_key_id: str,
+    controller_public_key: bytes,
+    scheduler_key_id: str,
+    scheduler_public_key: bytes,
+) -> dict[str, Any]:
+    """Persist public controller/scheduler anchors delivered at enrollment."""
+
+    require_identifier("account_id", account_id)
+    require_identifier("node_id", node_id)
+    require_identifier("controller_key_id", controller_key_id)
+    require_identifier("scheduler_key_id", scheduler_key_id)
+    if not isinstance(controller_public_key, bytes) or len(controller_public_key) != 32:
+        raise MeshSecurityError("controller public key must be 32 raw Ed25519 bytes")
+    if not isinstance(scheduler_public_key, bytes) or len(scheduler_public_key) != 32:
+        raise MeshSecurityError("scheduler public key must be 32 raw Ed25519 bytes")
+    directory = safe_owned_directory(state_dir, create=False)
+    load_tls_credential_paths(directory, account_id=account_id, node_id=node_id)
+    payload = {
+        "schema": MESH_TRUST_SCHEMA,
+        "account_id": account_id,
+        "node_id": node_id,
+        "controller_key_id": controller_key_id,
+        "controller_public_key_base64": b64url_encode(controller_public_key),
+        "scheduler_key_id": scheduler_key_id,
+        "scheduler_public_key_base64": b64url_encode(scheduler_public_key),
+    }
+    write_exclusive_private(
+        directory / MESH_TRUST_FILE,
+        (compact_json(payload) + "\n").encode("utf-8"),
+    )
+    fsync_directory(directory)
+    return payload
+
+
+def load_mesh_trust(
+    state_dir: Path,
+    *,
+    account_id: str,
+    node_id: str,
+) -> dict[str, Any]:
+    """Load exact public trust anchors; missing or altered state fails closed."""
+
+    directory = safe_owned_directory(state_dir, create=False)
+    payload = strict_json(read_private_file(directory / MESH_TRUST_FILE))
+    if set(payload) != _MESH_TRUST_FIELDS or payload["schema"] != MESH_TRUST_SCHEMA:
+        raise MeshSecurityError("mesh trust state has unexpected fields")
+    if payload["account_id"] != account_id or payload["node_id"] != node_id:
+        raise MeshSecurityError("mesh trust state does not bind this account and node")
+    controller_key_id = require_identifier(
+        "controller_key_id", payload["controller_key_id"]
+    )
+    scheduler_key_id = require_identifier(
+        "scheduler_key_id", payload["scheduler_key_id"]
+    )
+    return {
+        "controller_key_id": controller_key_id,
+        "controller_public_key": b64url_decode(
+            payload["controller_public_key_base64"], expected_bytes=32
+        ),
+        "scheduler_key_id": scheduler_key_id,
+        "scheduler_public_key": b64url_decode(
+            payload["scheduler_public_key_base64"], expected_bytes=32
+        ),
+    }
 
 
 @dataclass(frozen=True)

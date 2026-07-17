@@ -10,6 +10,7 @@ from services.unisync import AuthenticatedPeerIdentity, AuthorizationError, Tran
 
 
 REQUEST_SHA = "1" * 64
+LEASE_ID = "lease:test:001"
 LEASE_SHA = "2" * 64
 
 
@@ -61,6 +62,7 @@ def make_context(
     transport: str = "local_process",
     account_id: str = "account:local",
     request_sha256: str = REQUEST_SHA,
+    lease_id: str = LEASE_ID,
     lease_sha256: str = LEASE_SHA,
     fencing_token: int = 11,
     expires_delta: timedelta = timedelta(minutes=5),
@@ -68,6 +70,7 @@ def make_context(
     return TransferContext(
         account_id=account_id,
         request_sha256=request_sha256,
+        lease_id=lease_id,
         lease_sha256=lease_sha256,
         fencing_token=fencing_token,
         selected_transport=transport,

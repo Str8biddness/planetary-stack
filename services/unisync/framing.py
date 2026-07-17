@@ -26,6 +26,10 @@ VALID_FRAME_TYPES = {FRAME_START, FRAME_ACK, FRAME_CHUNK, FRAME_COMPLETE, FRAME_
 _HEADER_PREFIX = struct.Struct("!I")
 
 
+def _reject_non_finite_number(value: str) -> None:
+    raise InvalidFrameError(f"non-I-JSON frame value {value!r}")
+
+
 @dataclass(frozen=True, slots=True)
 class FrameLimits:
     max_header_bytes: int = 4096
@@ -59,7 +63,11 @@ def _loads_no_duplicate_keys(payload: bytes) -> dict[str, Any]:
         return result
 
     try:
-        decoded = json.loads(payload.decode("utf-8"), object_pairs_hook=hook)
+        decoded = json.loads(
+            payload.decode("utf-8"),
+            object_pairs_hook=hook,
+            parse_constant=_reject_non_finite_number,
+        )
     except InvalidFrameError:
         raise
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -145,7 +153,15 @@ def encode_frame(
                 raise InvalidFrameError(f"reserved frame header key {key!r}")
             header[key] = value
     _validate_header(header, payload, limits)
-    header_bytes = json.dumps(header, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    try:
+        header_bytes = json.dumps(
+            header,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise InvalidFrameError("frame header must contain only I-JSON values") from exc
     if len(header_bytes) > limits.max_header_bytes:
         raise FrameTooLargeError("header exceeds configured cap")
     frame_bytes = _HEADER_PREFIX.pack(len(header_bytes)) + header_bytes + payload

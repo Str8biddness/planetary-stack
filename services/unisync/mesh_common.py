@@ -193,7 +193,12 @@ def write_exclusive_private(path: Path, payload: bytes) -> None:
         os.close(descriptor)
 
 
-def read_private_file(path: Path, *, expected_size: int | None = None) -> bytes:
+def read_private_file(
+    path: Path,
+    *,
+    expected_size: int | None = None,
+    max_bytes: int = MAX_PRIVATE_FILE_BYTES,
+) -> bytes:
     """Read a regular owner-only mode-0600 file with a hard size bound."""
 
     flags = os.O_RDONLY
@@ -213,13 +218,15 @@ def read_private_file(path: Path, *, expected_size: int | None = None) -> bytes:
             or metadata.st_uid != os.getuid()
         ):
             raise MeshSecurityError("mesh state files must be regular owner-only mode-0600 files")
-        if metadata.st_size > MAX_PRIVATE_FILE_BYTES:
+        if max_bytes <= 0:
+            raise MeshSecurityError("private file size bound must be positive")
+        if metadata.st_size > max_bytes:
             raise MeshSecurityError("mesh state file exceeds its size bound")
         if expected_size is not None and metadata.st_size != expected_size:
             raise MeshSecurityError(f"mesh state file must contain exactly {expected_size} bytes")
         payload = bytearray()
-        while len(payload) <= MAX_PRIVATE_FILE_BYTES:
-            chunk = os.read(descriptor, min(4096, MAX_PRIVATE_FILE_BYTES + 1 - len(payload)))
+        while len(payload) <= max_bytes:
+            chunk = os.read(descriptor, min(4096, max_bytes + 1 - len(payload)))
             if not chunk:
                 break
             payload.extend(chunk)

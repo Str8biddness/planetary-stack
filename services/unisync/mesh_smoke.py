@@ -9,7 +9,8 @@ actual private-LAN TCP mTLS socket.
 Carrier discipline is explicit and auditable:
 
 - The pinned SSH (or local subprocess rehearsal) carrier is bootstrap control
-  only: it starts the four fixed node CLIs and provisions the source object.
+  only: it starts fixed node CLIs; the source node generates the opaque object
+  inside its local content-addressed store.
 - The workload bytes reach the destination node exclusively through the
   Unisync ``lan_mtls`` socket; the destination never receives them over SSH.
 
@@ -82,6 +83,8 @@ from .mesh_node_cli import (
     ENROLL_INSTALL_RESULT_SCHEMA,
     ENROLL_INSTALL_SCHEMA,
     MAX_OBJECT_BYTES,
+    PREPARE_RESULT_SCHEMA,
+    PREPARE_SCHEMA,
     SEND_RESULT_SCHEMA,
     SEND_SCHEMA,
     SERVE_READY_SCHEMA,
@@ -306,13 +309,27 @@ class ServeHandle:
     def _drain_stdout(self) -> None:
         assert self._process.stdout is not None
         total = 0
-        for line in self._process.stdout:
-            total += len(line)
-            if len(line) > MAX_OUTPUT_LINE_BYTES or total > MAX_CARRIER_OUTPUT_BYTES:
+        pending = bytearray()
+        while True:
+            chunk = self._process.stdout.read(65_536)
+            if not chunk:
+                break
+            total += len(chunk)
+            pending.extend(chunk)
+            if total > MAX_CARRIER_OUTPUT_BYTES or len(pending) > MAX_OUTPUT_LINE_BYTES:
                 self._overflow = True
                 self._process.kill()
                 return
-            self._lines.put(line)
+            while b"\n" in pending:
+                line, _, remainder = pending.partition(b"\n")
+                if len(line) > MAX_OUTPUT_LINE_BYTES:
+                    self._overflow = True
+                    self._process.kill()
+                    return
+                self._lines.put(bytes(line))
+                pending = bytearray(remainder)
+        if pending:
+            self._lines.put(bytes(pending))
 
     def _drain_stderr(self) -> None:
         assert self._process.stderr is not None
@@ -417,15 +434,15 @@ class SshMeshCarrier(SshCarrier):
         timeout_seconds: float,
     ) -> ServeHandle:
         argv = [*self._base_argv(self._target(node).ssh_alias), self._mesh_command(node, arguments)]
-        process = subprocess.Popen(
-            argv,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        assert process.stdin is not None
-        process.stdin.write(stdin)
-        process.stdin.close()
+        with tempfile.TemporaryFile() as input_file:
+            input_file.write(stdin)
+            input_file.seek(0)
+            process = subprocess.Popen(
+                argv,
+                stdin=input_file,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
         return ServeHandle(process, timeout_seconds=timeout_seconds)
 
 
@@ -484,17 +501,17 @@ class LocalMeshCarrier:
         stdin: bytes,
         timeout_seconds: float,
     ) -> ServeHandle:
-        process = subprocess.Popen(
-            self._argv(node, arguments),
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            cwd=node.repo,
-            env=self._env(node),
-        )
-        assert process.stdin is not None
-        process.stdin.write(stdin)
-        process.stdin.close()
+        with tempfile.TemporaryFile() as input_file:
+            input_file.write(stdin)
+            input_file.seek(0)
+            process = subprocess.Popen(
+                self._argv(node, arguments),
+                stdin=input_file,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=node.repo,
+                env=self._env(node),
+            )
         return ServeHandle(process, timeout_seconds=timeout_seconds)
 
 
@@ -782,6 +799,12 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
 
     run_token = secrets.token_hex(8)
     now = datetime.now(UTC).replace(microsecond=0)
+    subject_id = config.subject_id
+    scheduler_id = f"scheduler:unisync-mesh:{run_token}"
+    controller = _signer(f"key:controller:unisync-mesh:{run_token}")
+    scheduler = _signer(f"key:scheduler:unisync-mesh:{run_token}")
+    controller_public = _signer_public_bytes(controller)
+    scheduler_public = _signer_public_bytes(scheduler)
     authority = MeshCertificateAuthority.create(f"Unisync Mesh CA {run_token}")
     registry = EnrollmentRegistry(config.registry_dir)
     issued: list[IssuedCertificate] = []
@@ -821,6 +844,10 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
                     "ca_pem": certificate.ca_pem,
                     "certificate_sha256": certificate.certificate_sha256,
                     "public_key_sha256": certificate.public_key_sha256,
+                    "controller_key_id": controller.key_id,
+                    "controller_public_key_base64": b64url_encode(controller_public),
+                    "scheduler_key_id": scheduler.key_id,
+                    "scheduler_public_key_base64": b64url_encode(scheduler_public),
                 }
             ),
         )
@@ -831,20 +858,19 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
             or install_result.get("public_key_sha256") != certificate.public_key_sha256
             or install_result.get("serial_hex") != certificate.serial_hex
             or install_result.get("node_id") != node.node_id
+            or install_result.get("trust_installed") is not True
+            or install_result.get("controller_key_id") != controller.key_id
+            or install_result.get("scheduler_key_id") != scheduler.key_id
         ):
             raise MeshSecurityError(
                 f"node {node.node_id} did not confirm the exact issued certificate"
             )
 
-    subject_id = config.subject_id
-    scheduler_id = f"scheduler:unisync-mesh:{run_token}"
-    controller = _signer(f"key:controller:unisync-mesh:{run_token}")
-    scheduler = _signer(f"key:scheduler:unisync-mesh:{run_token}")
     resolver = _MemoryResolver()
     resolver.add(
         KeyRecord(
             key_id=controller.key_id,
-            public_key=_signer_public_bytes(controller),
+            public_key=controller_public,
             account_id=config.account_id,
             audiences=(scheduler_id,),
             subject_id=subject_id,
@@ -863,8 +889,31 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
             )
         )
 
-    payload_bytes = secrets.token_bytes(config.object_bytes)
-    object_sha256 = hashlib.sha256(payload_bytes).hexdigest()
+    prepare_result = carrier.run_cli(
+        config.source,
+        ["prepare", "--state-dir", config.source.state_dir],
+        stdin=_job_json(
+            {
+                "schema": PREPARE_SCHEMA,
+                "account_id": config.account_id,
+                "node_id": config.source.node_id,
+                "byte_length": config.object_bytes,
+            }
+        ),
+    )
+    if (
+        prepare_result.get("schema") != PREPARE_RESULT_SCHEMA
+        or prepare_result.get("account_id") != config.account_id
+        or prepare_result.get("node_id") != config.source.node_id
+        or prepare_result.get("byte_length") != config.object_bytes
+        or not isinstance(prepare_result.get("object_sha256"), str)
+    ):
+        raise MeshSecurityError("source did not prepare the exact bounded local object")
+    object_sha256 = prepare_result["object_sha256"]
+    if len(object_sha256) != 64 or any(
+        character not in "0123456789abcdef" for character in object_sha256
+    ):
+        raise MeshSecurityError("source returned an invalid object digest")
 
     database_path = _prepare_state_db(config.state_db)
     clock = _SystemClock()
@@ -912,7 +961,6 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
         raise MeshSecurityError("scheduler did not issue an active lan_mtls lease")
     lease_wire = lease.model_dump(mode="json", by_alias=True)
     lease_sha256 = document_sha256(lease)
-    scheduler_public = _signer_public_bytes(scheduler)
     parse_signed_lease(
         lease_wire,
         scheduler_key_id=scheduler.key_id,
@@ -922,6 +970,7 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
     context = TransferContext(
         account_id=config.account_id,
         request_sha256=document_sha256(request),
+        lease_id=lease.lease_id,
         lease_sha256=lease_sha256,
         fencing_token=lease.fencing_token,
         selected_transport="lan_mtls",
@@ -933,8 +982,11 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
     )
     SignedLeaseValidator(
         lease_wire=lease_wire,
+        request_wire=request.model_dump(mode="json", by_alias=True),
         scheduler_key_id=scheduler.key_id,
         scheduler_public_key=scheduler_public,
+        controller_key_id=controller.key_id,
+        controller_public_key=controller_public,
         expected_context=context,
     )
     source_record = registry.record(config.account_id, config.source.node_id)
@@ -952,8 +1004,7 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
         "timeout_seconds": config.timeout_seconds,
         "transfer_context": context.to_wire(),
         "lease": lease_wire,
-        "scheduler_key_id": scheduler.key_id,
-        "scheduler_public_key_base64": b64url_encode(scheduler_public),
+        "request": request.model_dump(mode="json", by_alias=True),
         "source_peer": _peer_wire(source_record),
     }
     handle = carrier.start_serve(
@@ -987,10 +1038,8 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
             "timeout_seconds": config.timeout_seconds,
             "transfer_context": context.to_wire(),
             "lease": lease_wire,
-            "scheduler_key_id": scheduler.key_id,
-            "scheduler_public_key_base64": b64url_encode(scheduler_public),
+            "request": request.model_dump(mode="json", by_alias=True),
             "destination_peer": _peer_wire(destination_record),
-            "object_base64": b64url_encode(payload_bytes),
         }
         send_result = carrier.run_cli(
             config.source,
@@ -1058,7 +1107,7 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
         "trust_bundle": {
             "scheduler_id": scheduler_id,
             "controller_key_id": controller.key_id,
-            "controller_public_key_base64": b64url_encode(_signer_public_bytes(controller)),
+            "controller_public_key_base64": b64url_encode(controller_public),
             "scheduler_key_id": scheduler.key_id,
             "scheduler_public_key_base64": b64url_encode(scheduler_public),
             "node_contracts": [enrollment["contract"] for enrollment in enrollments],
@@ -1095,7 +1144,8 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
             "bootstrap_carrier": carrier.kind,
             "data_transport": "lan_mtls",
             "workload_bytes_to_destination_via_lan_mtls_only": True,
-            "workload_bytes_provisioned_to_source_via_bootstrap": True,
+            "workload_bytes_generated_on_source_node": True,
+            "workload_bytes_provisioned_to_source_via_bootstrap": False,
             "negotiated_tls_version": "TLSv1.3",
             "mutual_tls_client_certificate_required": True,
             "node_local_private_key_export": False,

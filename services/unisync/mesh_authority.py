@@ -360,7 +360,7 @@ class EnrollmentRegistry:
         return self._path
 
     def _load(self) -> None:
-        raw = read_private_file(self._path)
+        raw = read_private_file(self._path, max_bytes=MAX_REGISTRY_BYTES)
         if len(raw) > MAX_REGISTRY_BYTES:
             raise MeshSecurityError("enrollment registry exceeds its size bound")
         payload = strict_json(raw)
@@ -415,6 +415,7 @@ class EnrollmentRegistry:
     def register(self, record: MeshEnrollmentRecord) -> None:
         """Explicitly add one peer; duplicates and substitutions fail closed."""
 
+        self._load()
         key = (record.account_id, record.node_id)
         if key in self._records:
             raise MeshSecurityError(
@@ -425,17 +426,25 @@ class EnrollmentRegistry:
                 raise MeshSecurityError("certificate fingerprint is already enrolled")
             if existing.public_key_sha256 == record.public_key_sha256:
                 raise MeshSecurityError("public-key fingerprint is already enrolled")
-        self._records[key] = record
-        self._save()
+        previous = self._records
+        self._records = {**previous, key: record}
+        try:
+            self._save()
+        except BaseException:
+            self._records = previous
+            raise
 
     def revoke(self, account_id: str, node_id: str, *, reason: str) -> None:
+        self._load()
         key = (account_id, node_id)
         record = self._records.get(key)
         if record is None:
             raise MeshSecurityError("cannot revoke an unknown enrollment")
         if record.status != "active":
-            raise MeshSecurityError("enrollment is already revoked")
-        self._records[key] = MeshEnrollmentRecord(
+            if record.revocation_reason == reason:
+                return
+            raise MeshSecurityError("enrollment is already revoked with a different reason")
+        replacement = MeshEnrollmentRecord(
             **{
                 **{
                     field: getattr(record, field)
@@ -456,7 +465,13 @@ class EnrollmentRegistry:
                 "revocation_reason": reason,
             }
         )
-        self._save()
+        previous = self._records
+        self._records = {**previous, key: replacement}
+        try:
+            self._save()
+        except BaseException:
+            self._records = previous
+            raise
 
     def active_peer(
         self,
@@ -467,6 +482,7 @@ class EnrollmentRegistry:
     ) -> EnrolledPeerIdentity:
         """Return the active enrollment or fail closed."""
 
+        self._load()
         record = self._records.get((account_id, node_id))
         if record is None:
             raise AuthorizationError("peer is not enrolled in the mesh registry")
@@ -480,10 +496,12 @@ class EnrollmentRegistry:
         return record.peer_identity()
 
     def record(self, account_id: str, node_id: str) -> MeshEnrollmentRecord:
+        self._load()
         record = self._records.get((account_id, node_id))
         if record is None:
             raise AuthorizationError("peer is not enrolled in the mesh registry")
         return record
 
     def snapshot_wire(self) -> list[dict[str, Any]]:
+        self._load()
         return [record.to_wire() for _, record in sorted(self._records.items())]

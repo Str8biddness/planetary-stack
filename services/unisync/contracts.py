@@ -128,6 +128,7 @@ class TransferContext:
 
     account_id: str
     request_sha256: str
+    lease_id: str
     lease_sha256: str
     fencing_token: int
     selected_transport: str
@@ -140,6 +141,7 @@ class TransferContext:
     def __post_init__(self) -> None:
         _require_safe_id(self.account_id, "account_id")
         _require_sha256(self.request_sha256, "request_sha256")
+        _require_safe_id(self.lease_id, "lease_id")
         _require_sha256(self.lease_sha256, "lease_sha256")
         _require_transport_id(self.selected_transport)
         _require_safe_id(self.source_node_id, "source_node_id")
@@ -161,6 +163,7 @@ class TransferContext:
         required = {
             "account_id",
             "request_sha256",
+            "lease_id",
             "lease_sha256",
             "fencing_token",
             "selected_transport",
@@ -179,6 +182,7 @@ class TransferContext:
         return cls(
             account_id=_require_wire_string(payload, "account_id"),
             request_sha256=_require_wire_string(payload, "request_sha256"),
+            lease_id=_require_wire_string(payload, "lease_id"),
             lease_sha256=_require_wire_string(payload, "lease_sha256"),
             fencing_token=_require_safe_integer(payload["fencing_token"], "fencing_token", minimum=1),
             selected_transport=_require_wire_string(payload, "selected_transport"),
@@ -193,6 +197,7 @@ class TransferContext:
         return {
             "account_id": self.account_id,
             "request_sha256": self.request_sha256,
+            "lease_id": self.lease_id,
             "lease_sha256": self.lease_sha256,
             "fencing_token": self.fencing_token,
             "selected_transport": self.selected_transport,

@@ -1,12 +1,14 @@
 """Fixed node-local CLI for the Unisync private-mesh mTLS smoke gate.
 
-The coordinator may invoke only these four subcommands over its pinned
+The coordinator may invoke only these five subcommands over its pinned
 administrative SSH carrier:
 
 - ``enroll-init``: generate node-local TLS and contract keys, emit a CSR and a
   signed ``lan_mtls`` inventory.  No private key ever leaves the node.
 - ``enroll-install``: install an issued certificate after exact chain, SAN,
   account/node, and public-key binding verification.
+- ``prepare``: create one bounded opaque source object locally and return only
+  its content digest and size.
 - ``serve``: receive exactly one lease-bound object over a real TCP mTLS
   socket bound to an explicitly declared loopback/private/VPN address.
 - ``send``: upload exactly one lease-bound object over a real TCP mTLS socket.
@@ -22,6 +24,7 @@ import argparse
 import hashlib
 import json
 import platform
+import secrets
 import sys
 import time
 from datetime import UTC, datetime
@@ -43,13 +46,15 @@ from .mesh_identity import (
     build_signed_inventory,
     create_tls_enrollment,
     install_certificate,
+    install_mesh_trust,
     inventory_sha256,
     inventory_wire,
     load_or_create_contract_identity,
+    load_mesh_trust,
     load_tls_credential_paths,
     public_contract_record,
 )
-from .mesh_lease import SignedLeaseValidator
+from .mesh_lease import LeaseUseStore, SignedLeaseValidator
 from .storage import ContentAddressedStore
 from .tls import (
     EnrolledPeerIdentity,
@@ -63,6 +68,8 @@ from .errors import TLSConfigurationError
 ENROLL_INIT_SCHEMA = "planetary.unisync.mesh_enroll_init.v1"
 ENROLL_INSTALL_SCHEMA = "planetary.unisync.mesh_enroll_install.v1"
 ENROLL_INSTALL_RESULT_SCHEMA = "planetary.unisync.mesh_enroll_install_result.v1"
+PREPARE_SCHEMA = "planetary.unisync.mesh_prepare.v1"
+PREPARE_RESULT_SCHEMA = "planetary.unisync.mesh_prepare_result.v1"
 SERVE_SCHEMA = "planetary.unisync.mesh_serve.v1"
 SERVE_READY_SCHEMA = "planetary.unisync.mesh_serve_ready.v1"
 SERVE_RESULT_SCHEMA = "planetary.unisync.mesh_serve_result.v1"
@@ -71,8 +78,9 @@ SEND_RESULT_SCHEMA = "planetary.unisync.mesh_send_result.v1"
 CLI_ERROR_SCHEMA = "planetary.unisync.mesh_cli_error.v1"
 
 MAX_INSTALL_JOB_BYTES = 64 * 1024
+MAX_PREPARE_JOB_BYTES = 8 * 1024
 MAX_SERVE_JOB_BYTES = 256 * 1024
-MAX_SEND_JOB_BYTES = 12 * 1024 * 1024
+MAX_SEND_JOB_BYTES = 256 * 1024
 MAX_OBJECT_BYTES = 8 * 1024 * 1024
 INBOX_DIR = "inbox"
 OUTBOX_DIR = "outbox"
@@ -86,8 +94,13 @@ _INSTALL_FIELDS = frozenset(
         "ca_pem",
         "certificate_sha256",
         "public_key_sha256",
+        "controller_key_id",
+        "controller_public_key_base64",
+        "scheduler_key_id",
+        "scheduler_public_key_base64",
     }
 )
+_PREPARE_FIELDS = frozenset({"schema", "account_id", "node_id", "byte_length"})
 _PEER_FIELDS = frozenset(
     {"account_id", "node_id", "sans", "certificate_sha256", "public_key_sha256"}
 )
@@ -102,8 +115,7 @@ _SERVE_FIELDS = frozenset(
         "timeout_seconds",
         "transfer_context",
         "lease",
-        "scheduler_key_id",
-        "scheduler_public_key_base64",
+        "request",
         "source_peer",
     }
 )
@@ -119,10 +131,8 @@ _SEND_FIELDS = frozenset(
         "timeout_seconds",
         "transfer_context",
         "lease",
-        "scheduler_key_id",
-        "scheduler_public_key_base64",
+        "request",
         "destination_peer",
-        "object_base64",
     }
 )
 
@@ -208,15 +218,23 @@ def _lease_wire(payload: object) -> dict[str, Any]:
 def _validator_for_job(
     job: dict[str, Any],
     context: TransferContext,
+    *,
+    state_dir: Path,
+    account_id: str,
+    node_id: str,
 ) -> SignedLeaseValidator:
-    scheduler_key_id = require_identifier("scheduler_key_id", job["scheduler_key_id"])
-    scheduler_public_key = b64url_decode(
-        job["scheduler_public_key_base64"], expected_bytes=32
+    trust = load_mesh_trust(
+        state_dir,
+        account_id=account_id,
+        node_id=node_id,
     )
     return SignedLeaseValidator(
         lease_wire=_lease_wire(job["lease"]),
-        scheduler_key_id=scheduler_key_id,
-        scheduler_public_key=scheduler_public_key,
+        request_wire=_lease_wire(job["request"]),
+        scheduler_key_id=trust["scheduler_key_id"],
+        scheduler_public_key=trust["scheduler_public_key"],
+        controller_key_id=trust["controller_key_id"],
+        controller_public_key=trust["controller_public_key"],
         expected_context=context,
     )
 
@@ -274,12 +292,60 @@ def command_enroll_install(arguments: argparse.Namespace) -> dict[str, Any]:
             "public_key_sha256", job["public_key_sha256"]
         ),
     )
+    trust = install_mesh_trust(
+        Path(arguments.state_dir),
+        account_id=account_id,
+        node_id=node_id,
+        controller_key_id=require_identifier(
+            "controller_key_id", job["controller_key_id"]
+        ),
+        controller_public_key=b64url_decode(
+            job["controller_public_key_base64"], expected_bytes=32
+        ),
+        scheduler_key_id=require_identifier(
+            "scheduler_key_id", job["scheduler_key_id"]
+        ),
+        scheduler_public_key=b64url_decode(
+            job["scheduler_public_key_base64"], expected_bytes=32
+        ),
+    )
     return {
         "schema": ENROLL_INSTALL_RESULT_SCHEMA,
         "account_id": account_id,
         "node_id": node_id,
         "installed": True,
+        "trust_installed": True,
+        "controller_key_id": trust["controller_key_id"],
+        "scheduler_key_id": trust["scheduler_key_id"],
         **metadata,
+    }
+
+
+def command_prepare(arguments: argparse.Namespace) -> dict[str, Any]:
+    """Create one bounded opaque object locally and reveal only digest and size."""
+
+    job = _read_stdin_job(MAX_PREPARE_JOB_BYTES)
+    if set(job) != _PREPARE_FIELDS or job["schema"] != PREPARE_SCHEMA:
+        raise MeshSecurityError("prepare job has unexpected fields")
+    account_id = require_identifier("account_id", job["account_id"])
+    node_id = require_identifier("node_id", job["node_id"])
+    byte_length = job["byte_length"]
+    if (
+        not isinstance(byte_length, int)
+        or isinstance(byte_length, bool)
+        or not 1 <= byte_length <= MAX_OBJECT_BYTES
+    ):
+        raise MeshSecurityError("byte_length is outside the bounded object range")
+    state_dir = Path(arguments.state_dir)
+    load_tls_credential_paths(state_dir, account_id=account_id, node_id=node_id)
+    payload = secrets.token_bytes(byte_length)
+    digest = ContentAddressedStore(state_dir / OUTBOX_DIR).put_bytes(payload)
+    return {
+        "schema": PREPARE_RESULT_SCHEMA,
+        "account_id": account_id,
+        "node_id": node_id,
+        "object_sha256": digest,
+        "byte_length": byte_length,
     }
 
 
@@ -301,8 +367,14 @@ def command_serve(arguments: argparse.Namespace) -> dict[str, Any]:
         raise MeshSecurityError("serve job source peer does not match the transfer context")
     if not isinstance(job["bind_host"], str):
         raise MeshSecurityError("bind_host must be a string")
-    validator = _validator_for_job(job, context)
     state_dir = Path(arguments.state_dir)
+    validator = _validator_for_job(
+        job,
+        context,
+        state_dir=state_dir,
+        account_id=account_id,
+        node_id=node_id,
+    )
     paths, certificate_metadata = load_tls_credential_paths(
         state_dir, account_id=account_id, node_id=node_id
     )
@@ -321,41 +393,53 @@ def command_serve(arguments: argparse.Namespace) -> dict[str, Any]:
         limits=DEFAULT_LIMITS,
         idle_timeout=min(timeout, 30.0),
     )
-    server.start()
+    lease_use = LeaseUseStore(state_dir, account_id=account_id, node_id=node_id)
+    lease_use.begin(context)
     try:
-        host, port = server.address
-        _print_json(
-            {
-                "schema": SERVE_READY_SCHEMA,
-                "node_id": node_id,
-                "host": host,
-                "port": port,
-            }
-        )
-        destination = ContentAddressedStore(destination_root)
-        deadline = time.monotonic() + timeout
-        received = False
-        while time.monotonic() < deadline:
-            if destination.has(context.object_sha256):
-                received = True
-                break
-            time.sleep(0.1)
-    finally:
-        server.close()
-    result: dict[str, Any] = {
-        "schema": SERVE_RESULT_SCHEMA,
-        "node_id": node_id,
-        "received": received,
-        "object_sha256": context.object_sha256 if received else None,
-        "byte_length": destination.stat_size(context.object_sha256) if received else None,
-        "verified_receipt_sha256": context.receipt_sha256() if received else None,
-        "certificate_sha256": certificate_metadata["certificate_sha256"],
-        "audit_events": server.audit_events,
-        "errors": [type(error).__name__ for error in server.errors],
-    }
-    if received and result["byte_length"] != context.byte_length:
-        raise MeshSecurityError("received object size does not match the transfer context")
-    return result
+        server.start()
+        try:
+            host, port = server.address
+            _print_json(
+                {
+                    "schema": SERVE_READY_SCHEMA,
+                    "node_id": node_id,
+                    "host": host,
+                    "port": port,
+                }
+            )
+            destination = ContentAddressedStore(destination_root)
+            deadline = time.monotonic() + timeout
+            received = False
+            while time.monotonic() < deadline:
+                if destination.has(context.object_sha256):
+                    received = True
+                    break
+                time.sleep(0.1)
+        finally:
+            server.close()
+        if not received:
+            raise MeshSecurityError("mTLS receiver timed out before committing the object")
+        result: dict[str, Any] = {
+            "schema": SERVE_RESULT_SCHEMA,
+            "node_id": node_id,
+            "received": True,
+            "object_sha256": context.object_sha256,
+            "byte_length": destination.stat_size(context.object_sha256),
+            "verified_receipt_sha256": context.receipt_sha256(),
+            "certificate_sha256": certificate_metadata["certificate_sha256"],
+            "audit_events": server.audit_events,
+            "errors": [type(error).__name__ for error in server.errors],
+        }
+        if result["byte_length"] != context.byte_length:
+            raise MeshSecurityError("received object size does not match the transfer context")
+        lease_use.finish(context, succeeded=True)
+        return result
+    except BaseException:
+        try:
+            lease_use.finish(context, succeeded=False)
+        except BaseException:
+            pass
+        raise
 
 
 class _RecordingLanClient(TrustedLanClient):
@@ -404,20 +488,22 @@ def command_send(arguments: argparse.Namespace) -> dict[str, Any]:
     server_hostname = normalize_san(job["server_hostname"])
     if server_hostname not in destination_peer.sans:
         raise MeshSecurityError("server_hostname is not an enrolled destination SAN")
-    payload = b64url_decode(job["object_base64"], max_bytes=MAX_OBJECT_BYTES)
-    if not payload:
-        raise MeshSecurityError("transfer object must be nonempty")
-    if len(payload) != context.byte_length:
-        raise MeshSecurityError("transfer object size does not match the transfer context")
-    if hashlib.sha256(payload).hexdigest() != context.object_sha256:
-        raise MeshSecurityError("transfer object digest does not match the transfer context")
-    validator = _validator_for_job(job, context)
     state_dir = Path(arguments.state_dir)
+    validator = _validator_for_job(
+        job,
+        context,
+        state_dir=state_dir,
+        account_id=account_id,
+        node_id=node_id,
+    )
     paths, certificate_metadata = load_tls_credential_paths(
         state_dir, account_id=account_id, node_id=node_id
     )
     source = ContentAddressedStore(state_dir / OUTBOX_DIR)
-    source.put_bytes(payload)
+    if source.stat_size(context.object_sha256) != context.byte_length:
+        raise MeshSecurityError(
+            "source content-addressed object is missing or has the wrong size"
+        )
     client = _RecordingLanClient(
         credentials=TLSCredentials(**paths),
         server_hostname=server_hostname,
@@ -425,25 +511,36 @@ def command_send(arguments: argparse.Namespace) -> dict[str, Any]:
         enrolled_server_identities=(destination_peer,),
         limits=DEFAULT_LIMITS,
     )
-    result = client.upload_object(
-        context=context,
-        source_root=source.root,
-        host=job["server_host"],
-        port=_require_port(job["server_port"], allow_zero=False),
-        timeout=min(timeout, 30.0),
-    )
-    return {
-        "schema": SEND_RESULT_SCHEMA,
-        "node_id": node_id,
-        "object_sha256": result.object_sha256,
-        "bytes_transferred": result.bytes_transferred,
-        "resumed_from": result.resumed_from,
-        "transport_id": result.transport_id,
-        "verified_receipt_sha256": result.verified_receipt_sha256,
-        "certificate_sha256": certificate_metadata["certificate_sha256"],
-        "negotiated_tls_version": client.negotiated_tls_version,
-        "negotiated_cipher": client.negotiated_cipher,
-    }
+    lease_use = LeaseUseStore(state_dir, account_id=account_id, node_id=node_id)
+    lease_use.begin(context)
+    try:
+        result = client.upload_object(
+            context=context,
+            source_root=source.root,
+            host=job["server_host"],
+            port=_require_port(job["server_port"], allow_zero=False),
+            timeout=min(timeout, 30.0),
+        )
+        response = {
+            "schema": SEND_RESULT_SCHEMA,
+            "node_id": node_id,
+            "object_sha256": result.object_sha256,
+            "bytes_transferred": result.bytes_transferred,
+            "resumed_from": result.resumed_from,
+            "transport_id": result.transport_id,
+            "verified_receipt_sha256": result.verified_receipt_sha256,
+            "certificate_sha256": certificate_metadata["certificate_sha256"],
+            "negotiated_tls_version": client.negotiated_tls_version,
+            "negotiated_cipher": client.negotiated_cipher,
+        }
+        lease_use.finish(context, succeeded=True)
+        return response
+    except BaseException:
+        try:
+            lease_use.finish(context, succeeded=False)
+        except BaseException:
+            pass
+        raise
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -454,7 +551,7 @@ def _parser() -> argparse.ArgumentParser:
     enroll_init.add_argument("--account-id", required=True)
     enroll_init.add_argument("--node-id", required=True)
     enroll_init.add_argument("--san", action="append", required=True)
-    for name in ("enroll-install", "serve", "send"):
+    for name in ("enroll-install", "prepare", "serve", "send"):
         sub = subparsers.add_parser(name)
         sub.add_argument("--state-dir", type=Path, required=True)
     return parser
@@ -463,6 +560,7 @@ def _parser() -> argparse.ArgumentParser:
 _COMMANDS = {
     "enroll-init": command_enroll_init,
     "enroll-install": command_enroll_install,
+    "prepare": command_prepare,
     "serve": command_serve,
     "send": command_send,
 }

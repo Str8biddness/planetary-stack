@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
+import os
 import socket
 import ssl
+import stat
 import threading
 from collections import deque
 from dataclasses import dataclass
@@ -60,9 +62,25 @@ class TLSCredentials:
     key_file: Path
 
     def require_files(self) -> None:
-        for path in (self.ca_file, self.cert_file, self.key_file):
-            if not Path(path).is_file():
-                raise TLSConfigurationError(f"TLS credential file is missing: {path}")
+        for label, configured_path in (
+            ("CA", self.ca_file),
+            ("certificate", self.cert_file),
+            ("private key", self.key_file),
+        ):
+            path = Path(configured_path)
+            try:
+                metadata = path.lstat()
+            except FileNotFoundError as exc:
+                raise TLSConfigurationError(f"TLS credential file is missing: {path}") from exc
+            if path.is_symlink() or not stat.S_ISREG(metadata.st_mode):
+                raise TLSConfigurationError(f"TLS {label} must be a regular non-symlink file")
+            if metadata.st_uid != os.getuid():
+                raise TLSConfigurationError(f"TLS {label} must be owned by the current user")
+            mode = stat.S_IMODE(metadata.st_mode)
+            if label == "private key" and mode != 0o600:
+                raise TLSConfigurationError("TLS private key must have mode 0600")
+            if label != "private key" and mode & 0o022:
+                raise TLSConfigurationError(f"TLS {label} must not be group/other writable")
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,8 +109,15 @@ class EnrolledPeerIdentity:
 
 
 def _set_tls13_minimum(context: ssl.SSLContext) -> None:
-    if hasattr(ssl, "TLSVersion") and hasattr(ssl.TLSVersion, "TLSv1_3"):
-        context.minimum_version = ssl.TLSVersion.TLSv1_3
+    if (
+        not getattr(ssl, "HAS_TLSv1_3", False)
+        or not hasattr(ssl, "TLSVersion")
+        or not hasattr(ssl.TLSVersion, "TLSv1_3")
+    ):
+        raise TLSConfigurationError("this runtime does not support required TLSv1.3")
+    context.minimum_version = ssl.TLSVersion.TLSv1_3
+    if context.minimum_version != ssl.TLSVersion.TLSv1_3:
+        raise TLSConfigurationError("TLSv1.3 minimum version could not be enforced")
 
 
 def _server_context(credentials: TLSCredentials) -> ssl.SSLContext:
@@ -135,6 +160,7 @@ RFC1918_CIDRS = tuple(
     )
 )
 ULA_CIDR = ipaddress.ip_network("fc00::/7")
+CGNAT_CIDR = ipaddress.ip_network("100.64.0.0/10")
 LIMITED_BROADCAST = ipaddress.ip_address("255.255.255.255")
 
 
@@ -147,9 +173,19 @@ def _normalize_san(value: str) -> str:
 
 def _parse_vpn_cidrs(values: Iterable[str]) -> tuple[ipaddress._BaseNetwork, ...]:
     try:
-        return tuple(ipaddress.ip_network(value, strict=False) for value in values)
+        networks = tuple(ipaddress.ip_network(value, strict=False) for value in values)
     except ValueError as exc:
         raise TLSConfigurationError("declared VPN CIDRs must be valid IP networks") from exc
+    allowed_spaces = (*RFC1918_CIDRS, CGNAT_CIDR, ULA_CIDR)
+    for network in networks:
+        if not any(
+            network.version == allowed.version and network.subnet_of(allowed)
+            for allowed in allowed_spaces
+        ):
+            raise TLSConfigurationError(
+                "declared VPN CIDRs must remain inside private, CGNAT, or ULA space"
+            )
+    return networks
 
 
 def _is_documentation_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
@@ -432,6 +468,8 @@ class TrustedLanServer:
             client_sock.settimeout(self.handshake_timeout)
             with context.wrap_socket(client_sock, server_side=True) as tls_sock:
                 tls_sock.settimeout(self.idle_timeout)
+                if tls_sock.version() != "TLSv1.3":
+                    raise TLSConfigurationError("negotiated TLS version is not TLSv1.3")
                 peer_cert = tls_sock.getpeercert()
                 if not peer_cert:
                     raise AuthorizationError("client certificate is required")
@@ -618,6 +656,10 @@ class TrustedLanClient:
             transport_id=self.transport_id,
             max_total_bytes=self.limits.max_total_bytes,
         )
+        if not self.enrolled_server_identities:
+            raise TLSConfigurationError(
+                "network mTLS requires an explicitly enrolled destination identity"
+            )
         token = cancellation or CancellationToken()
         source = ContentAddressedStore(source_root)
         if source.stat_size(context.object_sha256) != context.byte_length:
@@ -626,20 +668,21 @@ class TrustedLanClient:
         with socket.create_connection((host, port), timeout=timeout) as raw_sock:
             raw_sock.settimeout(timeout)
             with ssl_context.wrap_socket(raw_sock, server_hostname=self.server_hostname) as tls_sock:
-                if self.enrolled_server_identities:
-                    server_identity = _derive_authenticated_peer_identity(
-                        peer_cert=tls_sock.getpeercert(),
-                        der_bytes=tls_sock.getpeercert(binary_form=True),
-                        enrollments=self.enrolled_server_identities,
-                    )
-                    require_authorized(
-                        context,
-                        validator=self.validator,
-                        transport_id=self.transport_id,
-                        max_total_bytes=self.limits.max_total_bytes,
-                        peer_identity=server_identity,
-                        expected_peer_role="destination",
-                    )
+                if tls_sock.version() != "TLSv1.3":
+                    raise TLSConfigurationError("negotiated TLS version is not TLSv1.3")
+                server_identity = _derive_authenticated_peer_identity(
+                    peer_cert=tls_sock.getpeercert(),
+                    der_bytes=tls_sock.getpeercert(binary_form=True),
+                    enrollments=self.enrolled_server_identities,
+                )
+                require_authorized(
+                    context,
+                    validator=self.validator,
+                    transport_id=self.transport_id,
+                    max_total_bytes=self.limits.max_total_bytes,
+                    peer_identity=server_identity,
+                    expected_peer_role="destination",
+                )
                 return self._upload_over_socket(
                     tls_sock=tls_sock,
                     context=context,
