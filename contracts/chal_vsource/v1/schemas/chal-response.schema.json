@@ -4,7 +4,6 @@
       "additionalProperties": false,
       "properties": {
         "classification": {
-          "default": "private",
           "enum": [
             "public",
             "private",
@@ -20,11 +19,12 @@
           "type": "string"
         },
         "sha256": {
-          "pattern": "^[a-f0-9]{64}$",
+          "pattern": "^[a-f0-9]{64}$(?![\\s\\S])",
           "title": "Sha256",
           "type": "string"
         },
         "size_bytes": {
+          "maximum": 9007199254740991,
           "minimum": 0,
           "title": "Size Bytes",
           "type": "integer"
@@ -32,16 +32,17 @@
         "uri": {
           "maxLength": 512,
           "minLength": 8,
-          "pattern": "^(artifact|aivm|chal|kc|mem)://[A-Za-z0-9][A-Za-z0-9._~:/?#@!$&'()*+,;=%-]*$",
+          "pattern": "^(artifact|aivm|chal|kc|mem)://[A-Za-z0-9][A-Za-z0-9._~:/?#@!$&'()*+,;=%-]*$(?![\\s\\S])",
           "title": "Uri",
           "type": "string"
         }
       },
       "required": [
-        "uri",
+        "classification",
+        "media_type",
         "sha256",
         "size_bytes",
-        "media_type"
+        "uri"
       ],
       "title": "ContentReference",
       "type": "object"
@@ -78,28 +79,48 @@
         "device_uri": {
           "anyOf": [
             {
-              "pattern": "^chal://[A-Za-z0-9._~:/-]+$",
+              "maxLength": 256,
+              "minLength": 10,
+              "pattern": "^chal://[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)*$(?![\\s\\S])",
               "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Device Uri"
+        },
+        "diagnostic_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 3,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Diagnostic Id"
         },
         "error_id": {
           "maxLength": 128,
           "minLength": 3,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
           "title": "Error Id",
           "type": "string"
         },
         "request_id": {
           "maxLength": 128,
           "minLength": 3,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
           "title": "Request Id",
+          "type": "string"
+        },
+        "request_sha256": {
+          "pattern": "^[a-f0-9]{64}$(?![\\s\\S])",
+          "title": "Request Sha256",
           "type": "string"
         },
         "retry_after_ms": {
@@ -113,40 +134,40 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Retry After Ms"
         },
         "retryable": {
           "title": "Retryable",
           "type": "boolean"
         },
-        "safe_detail": {
-          "maxLength": 512,
-          "minLength": 1,
-          "title": "Safe Detail",
-          "type": "string"
-        },
         "schema": {
           "const": "planetary.chal.error.v1",
-          "default": "planetary.chal.error.v1",
           "title": "Schema",
           "type": "string"
+        },
+        "signature": {
+          "$ref": "#/$defs/Signature"
         },
         "trace_id": {
           "maxLength": 128,
           "minLength": 3,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
           "title": "Trace Id",
           "type": "string"
         }
       },
       "required": [
+        "code",
+        "device_uri",
+        "diagnostic_id",
         "error_id",
         "request_id",
-        "trace_id",
-        "code",
+        "request_sha256",
+        "retry_after_ms",
         "retryable",
-        "safe_detail"
+        "schema",
+        "signature",
+        "trace_id"
       ],
       "title": "ErrorFrame",
       "type": "object"
@@ -160,19 +181,93 @@
       ],
       "title": "ResponseStatus",
       "type": "string"
+    },
+    "Signature": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "const": "ed25519",
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "key_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
+          "title": "Key Id",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 86,
+          "minLength": 86,
+          "pattern": "^[A-Za-z0-9_-]{86}$(?![\\s\\S])",
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "algorithm",
+        "key_id",
+        "value"
+      ],
+      "title": "Signature",
+      "type": "object"
     }
   },
   "$id": "https://schemas.reality-core.systems/chal-vsource/v1/chal-response.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "else": {
+        "properties": {
+          "error": {
+            "not": {
+              "type": "null"
+            }
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "if": {
+        "properties": {
+          "status": {
+            "const": "succeeded"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "error": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
   "properties": {
+    "account_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
+      "title": "Account Id",
+      "type": "string"
+    },
     "completed_at": {
       "format": "date-time",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$(?![\\s\\S])",
       "title": "Completed At",
       "type": "string"
     },
     "device_uri": {
-      "pattern": "^chal://[A-Za-z0-9._~:/-]+$",
+      "maxLength": 256,
+      "minLength": 10,
+      "pattern": "^chal://[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)*$(?![\\s\\S])",
       "title": "Device Uri",
       "type": "string"
     },
@@ -184,8 +279,32 @@
         {
           "type": "null"
         }
-      ],
-      "default": null
+      ]
+    },
+    "fencing_token": {
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "title": "Fencing Token",
+      "type": "integer"
+    },
+    "lease_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
+      "title": "Lease Id",
+      "type": "string"
+    },
+    "lease_sha256": {
+      "pattern": "^[a-f0-9]{64}$(?![\\s\\S])",
+      "title": "Lease Sha256",
+      "type": "string"
+    },
+    "node_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
+      "title": "Node Id",
+      "type": "string"
     },
     "outputs": {
       "items": {
@@ -198,22 +317,29 @@
     "request_id": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Request Id",
+      "type": "string"
+    },
+    "request_sha256": {
+      "pattern": "^[a-f0-9]{64}$(?![\\s\\S])",
+      "title": "Request Sha256",
       "type": "string"
     },
     "response_id": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Response Id",
       "type": "string"
     },
     "schema": {
       "const": "planetary.chal.response.v1",
-      "default": "planetary.chal.response.v1",
       "title": "Schema",
       "type": "string"
+    },
+    "signature": {
+      "$ref": "#/$defs/Signature"
     },
     "status": {
       "$ref": "#/$defs/ResponseStatus"
@@ -222,7 +348,7 @@
       "items": {
         "maxLength": 128,
         "minLength": 3,
-        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
         "type": "string"
       },
       "maxItems": 256,
@@ -232,19 +358,34 @@
     "trace_id": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Trace Id",
       "type": "string"
     }
   },
   "required": [
-    "response_id",
-    "request_id",
-    "trace_id",
+    "account_id",
+    "completed_at",
     "device_uri",
+    "error",
+    "fencing_token",
+    "lease_id",
+    "lease_sha256",
+    "node_id",
+    "outputs",
+    "request_id",
+    "request_sha256",
+    "response_id",
+    "schema",
+    "signature",
     "status",
-    "completed_at"
+    "telemetry_ids",
+    "trace_id"
   ],
   "title": "ChalResponse",
-  "type": "object"
+  "type": "object",
+  "x-planetary-semantic-invariants": [
+    "Verify Ed25519 and require nested error request_id, request_sha256, and trace_id to match.",
+    "Require lease_id, lease_sha256, and fencing_token to equal the current durable active lease revision before accepting a result."
+  ]
 }

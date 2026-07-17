@@ -4,7 +4,6 @@
       "additionalProperties": false,
       "properties": {
         "classification": {
-          "default": "private",
           "enum": [
             "public",
             "private",
@@ -20,11 +19,12 @@
           "type": "string"
         },
         "sha256": {
-          "pattern": "^[a-f0-9]{64}$",
+          "pattern": "^[a-f0-9]{64}$(?![\\s\\S])",
           "title": "Sha256",
           "type": "string"
         },
         "size_bytes": {
+          "maximum": 9007199254740991,
           "minimum": 0,
           "title": "Size Bytes",
           "type": "integer"
@@ -32,16 +32,17 @@
         "uri": {
           "maxLength": 512,
           "minLength": 8,
-          "pattern": "^(artifact|aivm|chal|kc|mem)://[A-Za-z0-9][A-Za-z0-9._~:/?#@!$&'()*+,;=%-]*$",
+          "pattern": "^(artifact|aivm|chal|kc|mem)://[A-Za-z0-9][A-Za-z0-9._~:/?#@!$&'()*+,;=%-]*$(?![\\s\\S])",
           "title": "Uri",
           "type": "string"
         }
       },
       "required": [
-        "uri",
+        "classification",
+        "media_type",
         "sha256",
         "size_bytes",
-        "media_type"
+        "uri"
       ],
       "title": "ContentReference",
       "type": "object"
@@ -50,17 +51,10 @@
       "additionalProperties": false,
       "properties": {
         "checkpoint_required": {
-          "default": false,
           "title": "Checkpoint Required",
           "type": "boolean"
         },
-        "deadline": {
-          "format": "date-time",
-          "title": "Deadline",
-          "type": "string"
-        },
         "grounding_required": {
-          "default": false,
           "title": "Grounding Required",
           "type": "boolean"
         },
@@ -71,7 +65,6 @@
           "type": "integer"
         },
         "network_access": {
-          "default": "none",
           "enum": [
             "none",
             "artifact_plane_only"
@@ -84,66 +77,136 @@
         },
         "template_leakage_allowed": {
           "const": false,
-          "default": false,
           "title": "Template Leakage Allowed",
           "type": "boolean"
         }
       },
       "required": [
-        "resources",
+        "checkpoint_required",
+        "grounding_required",
         "latency_budget_ms",
-        "deadline"
+        "network_access",
+        "resources",
+        "template_leakage_allowed"
       ],
       "title": "RequestConstraints",
       "type": "object"
     },
     "ResourceVector": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "gpu_memory_bytes": {
+                "minimum": 1
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "gpu_count": {
+                "const": 0
+              }
+            },
+            "required": [
+              "gpu_count"
+            ]
+          },
+          "then": {
+            "properties": {
+              "gpu_memory_bytes": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ],
       "properties": {
         "cpu_millicores": {
-          "default": 0,
+          "maximum": 9007199254740991,
           "minimum": 0,
           "title": "Cpu Millicores",
           "type": "integer"
         },
         "egress_bps": {
-          "default": 0,
+          "maximum": 9007199254740991,
           "minimum": 0,
           "title": "Egress Bps",
           "type": "integer"
         },
         "gpu_count": {
-          "default": 0,
+          "maximum": 64,
           "minimum": 0,
           "title": "Gpu Count",
           "type": "integer"
         },
         "gpu_memory_bytes": {
-          "default": 0,
+          "maximum": 9007199254740991,
           "minimum": 0,
           "title": "Gpu Memory Bytes",
           "type": "integer"
         },
         "ingress_bps": {
-          "default": 0,
+          "maximum": 9007199254740991,
           "minimum": 0,
           "title": "Ingress Bps",
           "type": "integer"
         },
         "memory_bytes": {
-          "default": 0,
+          "maximum": 9007199254740991,
           "minimum": 0,
           "title": "Memory Bytes",
           "type": "integer"
         },
         "storage_bytes": {
-          "default": 0,
+          "maximum": 9007199254740991,
           "minimum": 0,
           "title": "Storage Bytes",
           "type": "integer"
         }
       },
+      "required": [
+        "cpu_millicores",
+        "egress_bps",
+        "gpu_count",
+        "gpu_memory_bytes",
+        "ingress_bps",
+        "memory_bytes",
+        "storage_bytes"
+      ],
       "title": "ResourceVector",
+      "type": "object"
+    },
+    "Signature": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "const": "ed25519",
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "key_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
+          "title": "Key Id",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 86,
+          "minLength": 86,
+          "pattern": "^[A-Za-z0-9_-]{86}$(?![\\s\\S])",
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "algorithm",
+        "key_id",
+        "value"
+      ],
+      "title": "Signature",
       "type": "object"
     },
     "WorkloadKind": {
@@ -175,7 +238,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Batch Size"
         },
         "checkpoint_interval_seconds": {
@@ -189,7 +251,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Checkpoint Interval Seconds"
         },
         "chunk_size": {
@@ -203,11 +264,9 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Chunk Size"
         },
         "deterministic": {
-          "default": false,
           "title": "Deterministic",
           "type": "boolean"
         },
@@ -222,7 +281,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Height"
         },
         "max_tokens": {
@@ -236,7 +294,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Max Tokens"
         },
         "precision": {
@@ -256,7 +313,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Precision"
         },
         "replica_count": {
@@ -270,13 +326,12 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Replica Count"
         },
         "seed": {
           "anyOf": [
             {
-              "maximum": 9223372036854775807,
+              "maximum": 9007199254740991,
               "minimum": 0,
               "type": "integer"
             },
@@ -284,7 +339,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Seed"
         },
         "steps": {
@@ -298,7 +352,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Steps"
         },
         "temperature": {
@@ -312,7 +365,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Temperature"
         },
         "top_k": {
@@ -326,7 +378,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Top K"
         },
         "width": {
@@ -340,10 +391,24 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Width"
         }
       },
+      "required": [
+        "batch_size",
+        "checkpoint_interval_seconds",
+        "chunk_size",
+        "deterministic",
+        "height",
+        "max_tokens",
+        "precision",
+        "replica_count",
+        "seed",
+        "steps",
+        "temperature",
+        "top_k",
+        "width"
+      ],
       "title": "WorkloadParameters",
       "type": "object"
     }
@@ -355,14 +420,14 @@
     "account_id": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Account Id",
       "type": "string"
     },
     "capability_id": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Capability Id",
       "type": "string"
     },
@@ -370,19 +435,16 @@
       "$ref": "#/$defs/RequestConstraints"
     },
     "device_uri": {
-      "pattern": "^chal://[A-Za-z0-9._~:/-]+$",
+      "maxLength": 256,
+      "minLength": 10,
+      "pattern": "^chal://[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)*$(?![\\s\\S])",
       "title": "Device Uri",
-      "type": "string"
-    },
-    "expires_at": {
-      "format": "date-time",
-      "title": "Expires At",
       "type": "string"
     },
     "idempotency_key": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Idempotency Key",
       "type": "string"
     },
@@ -396,6 +458,7 @@
     },
     "issued_at": {
       "format": "date-time",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$(?![\\s\\S])",
       "title": "Issued At",
       "type": "string"
     },
@@ -407,35 +470,42 @@
         {
           "maxLength": 128,
           "minLength": 3,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
           "type": "string"
         },
         {
           "type": "null"
         }
       ],
-      "default": null,
       "title": "Parent Request Id"
     },
     "request_id": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Request Id",
       "type": "string"
     },
     "schema": {
       "const": "planetary.chal.request.v1",
-      "default": "planetary.chal.request.v1",
       "title": "Schema",
       "type": "string"
+    },
+    "signature": {
+      "$ref": "#/$defs/Signature"
     },
     "trace_id": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Trace Id",
       "type": "string"
+    },
+    "ttl_seconds": {
+      "maximum": 3600,
+      "minimum": 1,
+      "title": "Ttl Seconds",
+      "type": "integer"
     },
     "workload_kind": {
       "$ref": "#/$defs/WorkloadKind"
@@ -445,18 +515,28 @@
     }
   },
   "required": [
-    "request_id",
-    "trace_id",
-    "issued_at",
-    "expires_at",
-    "idempotency_key",
     "account_id",
     "capability_id",
+    "constraints",
     "device_uri",
+    "idempotency_key",
+    "inputs",
+    "issued_at",
+    "parameters",
+    "parent_request_id",
+    "request_id",
+    "schema",
+    "signature",
+    "trace_id",
+    "ttl_seconds",
     "workload_kind",
-    "workload_manifest",
-    "constraints"
+    "workload_manifest"
   ],
   "title": "ChalRequest",
-  "type": "object"
+  "type": "object",
+  "x-planetary-semantic-invariants": [
+    "Verify Ed25519 over RFC8785(document without signature).",
+    "Authority expires at issued_at + ttl_seconds; reject after that window.",
+    "Persist (account_id,idempotency_key)->request_sha256 and reject a conflicting payload."
+  ]
 }

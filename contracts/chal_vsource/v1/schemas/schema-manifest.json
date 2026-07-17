@@ -1,42 +1,50 @@
 {
   "bundle": "planetary.chal-vsource.v1",
+  "canonicalization": {
+    "implementation": "rfc8785==0.1.4",
+    "rfc": 8785
+  },
+  "contract_version": "1.0.0",
+  "generator": {
+    "pydantic": "2.13.4"
+  },
   "json_schema_draft": "2020-12",
   "schemas": {
     "capability.schema.json": {
       "id": "https://schemas.reality-core.systems/chal-vsource/v1/capability.schema.json",
-      "sha256": "7a62a00a0b3888c2e6165b962c73044a676a62d6da2d9ccaebc4f2786aa2aa0e"
+      "sha256": "64da68512e6b8d4ff88a033a63064ff20de37595009883b2dcbcfde3aea6312d"
     },
     "chal-request.schema.json": {
       "id": "https://schemas.reality-core.systems/chal-vsource/v1/chal-request.schema.json",
-      "sha256": "1d2d95b2e23f45273537a92696563d81d90be7d18da58e5c3124a3e5a5fd9a9e"
+      "sha256": "074799ba4ab216ca10249cc98c4c3782f8960f1eacdc4fc78c1601659ce7e43c"
     },
     "chal-response.schema.json": {
       "id": "https://schemas.reality-core.systems/chal-vsource/v1/chal-response.schema.json",
-      "sha256": "851e45dde43c6bfc9b9259163424e7c9ff93664a4475155ff084c2f347b41222"
+      "sha256": "f8dea26148aea969c3b6c451a52294f12d47dfe81c453d1ac1094720e31a7f47"
     },
     "error.schema.json": {
       "id": "https://schemas.reality-core.systems/chal-vsource/v1/error.schema.json",
-      "sha256": "9db5ee405fa84f5528e5c6cf7d5d6d9d2390e5d936ce090e8ceb5796ebe82f0d"
+      "sha256": "03e2e710f410b925746524371555662613352a27936bd2327d714a1020f3b9d8"
     },
     "inventory.schema.json": {
       "id": "https://schemas.reality-core.systems/chal-vsource/v1/inventory.schema.json",
-      "sha256": "3272ccbea6d93f545abf2095620cf1bc828a73ff0e1e81fd9e92e1e013f7f8eb"
+      "sha256": "b50219a4fbd083715a895825b84df295fb16cfdfb929c50f1952a0335ed32141"
     },
     "lease.schema.json": {
       "id": "https://schemas.reality-core.systems/chal-vsource/v1/lease.schema.json",
-      "sha256": "9999e94956d078e5fb303816475d236e19fd22802431eb916ec51b9ddcf46196"
+      "sha256": "367b87e51d225e6996e4800cb5845e676d62cb162e72abf59c414e0d1f702654"
     },
     "lifecycle.schema.json": {
       "id": "https://schemas.reality-core.systems/chal-vsource/v1/lifecycle.schema.json",
-      "sha256": "a0c848372cd62da64ab2c22025044c0fa08f748939ad2431eb07f8fd5c1bf554"
+      "sha256": "39694034c6b696abf6688c113aadf0f948db36f20a0ad055916e0601f58568e5"
     },
     "placement.schema.json": {
       "id": "https://schemas.reality-core.systems/chal-vsource/v1/placement.schema.json",
-      "sha256": "90c47aceaa2f29a7bbf82765d9c7ae20e42eceb5e8df2617c9307016ccd57f45"
+      "sha256": "3e8f6934dbfa40302817d6df0c4f4edf5b661abd15b29d0323a5ca9ec7171f29"
     },
     "telemetry.schema.json": {
       "id": "https://schemas.reality-core.systems/chal-vsource/v1/telemetry.schema.json",
-      "sha256": "c2ab1160737e3e5a7e56cf8e379700c8e48a89da9ca90eb0ed83da22cd29db20"
+      "sha256": "b05e25e3a0f7a851f19d774ee7d77bf8466ea2665933cfded5c4b1d565a7b0a8"
     }
   }
 }

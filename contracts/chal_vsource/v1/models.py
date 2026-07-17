@@ -8,17 +8,24 @@ user content are not valid protocol fields.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+import base64
+import binascii
+import json
+from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import (
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
+    WithJsonSchema,
     field_validator,
     model_validator,
 )
+
+from .canonical import document_sha256
 
 
 Identifier = Annotated[
@@ -26,6 +33,80 @@ Identifier = Annotated[
     Field(min_length=3, max_length=128, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._:-]+$"),
 ]
 Sha256 = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+MAX_SAFE_INTEGER = 9_007_199_254_740_991
+
+
+def _normalize_json_integer(value: Any) -> Any:
+    """Align strict Pydantic parsing with JSON Schema's integer semantics."""
+
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return value
+
+
+JsonInteger = Annotated[int, BeforeValidator(_normalize_json_integer)]
+NonNegativeSafeInt = Annotated[
+    JsonInteger,
+    Field(ge=0, le=MAX_SAFE_INTEGER),
+]
+PositiveSafeInt = Annotated[
+    JsonInteger,
+    Field(ge=1, le=MAX_SAFE_INTEGER),
+]
+GpuCount = Annotated[JsonInteger, Field(ge=0, le=64)]
+
+
+def _require_canonical_timestamp(value: Any) -> Any:
+    if isinstance(value, str):
+        try:
+            parsed = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+        except ValueError as exc:
+            raise ValueError(
+                "timestamp must use canonical UTC second encoding YYYY-MM-DDTHH:MM:SSZ"
+            ) from exc
+        if parsed.strftime("%Y-%m-%dT%H:%M:%SZ") != value:
+            raise ValueError("timestamp must use canonical UTC second encoding")
+        return parsed.replace(tzinfo=timezone.utc)
+    if isinstance(value, datetime):
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("timestamp datetime must be timezone-aware")
+        if value.utcoffset().total_seconds() != 0 or value.microsecond != 0:
+            raise ValueError("timestamp datetime must be UTC with second precision")
+        return value
+    raise ValueError("timestamp must be a canonical UTC string or datetime")
+
+
+CanonicalTimestamp = Annotated[
+    datetime,
+    BeforeValidator(_require_canonical_timestamp),
+    WithJsonSchema(
+        {
+            "format": "date-time",
+            "pattern": (
+                r"^[0-9]{4}-(0[1-9]|1[0-2])-"
+                r"(0[1-9]|[12][0-9]|3[01])T"
+                r"([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+            ),
+            "type": "string",
+        }
+    ),
+]
+DeviceUri = Annotated[
+    str,
+    Field(
+        min_length=10,
+        max_length=256,
+        pattern=r"^chal://[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)*$",
+    ),
+]
+DeviceUriPrefix = Annotated[
+    str,
+    Field(
+        min_length=11,
+        max_length=257,
+        pattern=r"^chal://[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)*/$",
+    ),
+]
 Uri = Annotated[
     str,
     Field(
@@ -34,21 +115,28 @@ Uri = Annotated[
         pattern=r"^(artifact|aivm|chal|kc|mem)://[A-Za-z0-9][A-Za-z0-9._~:/?#@!$&'()*+,;=%-]*$",
     ),
 ]
-_RESOURCE_FIELDS = (
-    "cpu_millicores",
-    "memory_bytes",
-    "gpu_count",
-    "gpu_memory_bytes",
-    "storage_bytes",
-    "ingress_bps",
-    "egress_bps",
-)
+
+
+def _require_canonical_sequence(values: list[Any], field_name: str) -> list[Any]:
+    encoded = [
+        value.value if isinstance(value, StrEnum) else str(value) for value in values
+    ]
+    if encoded != sorted(set(encoded)):
+        raise ValueError(f"{field_name} must be unique and lexicographically sorted")
+    return values
+
+
+def device_uri_matches_prefix(device_uri: str, resource_prefix: str) -> bool:
+    """Match a normalized CHAL URI by literal, segment-bounded prefix."""
+
+    return device_uri.startswith(resource_prefix)
 
 
 class StrictContract(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
         populate_by_name=False,
+        strict=True,
         validate_assignment=True,
     )
 
@@ -97,96 +185,118 @@ class CapabilityAction(StrEnum):
     WRITE_ARTIFACT = "write_artifact"
 
 
+class AttestationLevel(StrEnum):
+    UNVERIFIED = "unverified"
+    SOFTWARE_VERIFIED = "software_verified"
+    HARDWARE_VERIFIED = "hardware_verified"
+
+
 class Signature(StrictContract):
-    algorithm: Literal["ed25519"] = "ed25519"
+    algorithm: Literal["ed25519"]
     key_id: Identifier
     value: Annotated[
         str,
         Field(min_length=86, max_length=86, pattern=r"^[A-Za-z0-9_-]{86}$"),
     ]
 
+    @field_validator("value")
+    @classmethod
+    def require_canonical_ed25519_base64url(cls, value: str) -> str:
+        try:
+            decoded = base64.urlsafe_b64decode(value + "==")
+        except (binascii.Error, ValueError) as exc:
+            raise ValueError("signature must be canonical unpadded base64url") from exc
+        canonical = base64.urlsafe_b64encode(decoded).rstrip(b"=").decode("ascii")
+        if len(decoded) != 64 or canonical != value:
+            raise ValueError("signature must encode exactly 64 bytes canonically")
+        return value
+
 
 class ContentReference(StrictContract):
     uri: Uri
     sha256: Sha256
-    size_bytes: Annotated[int, Field(ge=0)]
+    size_bytes: NonNegativeSafeInt
     media_type: Annotated[str, Field(min_length=3, max_length=128)]
-    classification: Literal["public", "private", "restricted"] = "private"
+    classification: Literal["public", "private", "restricted"]
 
 
 class ResourceVector(StrictContract):
-    cpu_millicores: Annotated[int, Field(ge=0)] = 0
-    memory_bytes: Annotated[int, Field(ge=0)] = 0
-    gpu_count: Annotated[int, Field(ge=0)] = 0
-    gpu_memory_bytes: Annotated[int, Field(ge=0)] = 0
-    storage_bytes: Annotated[int, Field(ge=0)] = 0
-    ingress_bps: Annotated[int, Field(ge=0)] = 0
-    egress_bps: Annotated[int, Field(ge=0)] = 0
+    cpu_millicores: NonNegativeSafeInt
+    memory_bytes: NonNegativeSafeInt
+    gpu_count: GpuCount
+    gpu_memory_bytes: NonNegativeSafeInt
+    storage_bytes: NonNegativeSafeInt
+    ingress_bps: NonNegativeSafeInt
+    egress_bps: NonNegativeSafeInt
+
+    @model_validator(mode="after")
+    def require_consistent_gpu_authority(self) -> "ResourceVector":
+        if (self.gpu_count == 0) != (self.gpu_memory_bytes == 0):
+            raise ValueError("gpu_count and gpu_memory_bytes must both be zero or positive")
+        return self
+
+
+class HostResourceVector(StrictContract):
+    cpu_millicores: NonNegativeSafeInt
+    memory_bytes: NonNegativeSafeInt
+    storage_bytes: NonNegativeSafeInt
+    ingress_bps: NonNegativeSafeInt
+    egress_bps: NonNegativeSafeInt
 
 
 class RequestConstraints(StrictContract):
     resources: ResourceVector
-    latency_budget_ms: Annotated[int, Field(ge=1, le=3_600_000)]
-    deadline: datetime
-    grounding_required: bool = False
-    template_leakage_allowed: Literal[False] = False
-    network_access: Literal["none", "artifact_plane_only"] = "none"
-    checkpoint_required: bool = False
+    latency_budget_ms: Annotated[JsonInteger, Field(ge=1, le=3_600_000)]
+    grounding_required: bool
+    template_leakage_allowed: Literal[False]
+    network_access: Literal["none", "artifact_plane_only"]
+    checkpoint_required: bool
 
 
 class WorkloadParameters(StrictContract):
     """Allowlisted scalar tuning knobs; inputs remain content references."""
 
-    batch_size: Annotated[int, Field(ge=1, le=65_536)] | None = None
-    max_tokens: Annotated[int, Field(ge=1, le=1_000_000)] | None = None
-    temperature: Annotated[float, Field(ge=0.0, le=2.0)] | None = None
-    top_k: Annotated[int, Field(ge=1, le=1_000_000)] | None = None
-    seed: Annotated[int, Field(ge=0, le=9_223_372_036_854_775_807)] | None = None
-    precision: Literal["auto", "fp32", "fp16", "bf16", "int8", "int4"] | None = (
-        None
-    )
-    checkpoint_interval_seconds: Annotated[int, Field(ge=1, le=86_400)] | None = (
-        None
-    )
-    replica_count: Annotated[int, Field(ge=1, le=1_024)] | None = None
-    chunk_size: Annotated[int, Field(ge=1, le=1_000_000)] | None = None
-    width: Annotated[int, Field(ge=1, le=32_768)] | None = None
-    height: Annotated[int, Field(ge=1, le=32_768)] | None = None
-    steps: Annotated[int, Field(ge=1, le=1_000_000)] | None = None
-    deterministic: bool = False
+    batch_size: Annotated[JsonInteger, Field(ge=1, le=65_536)] | None
+    max_tokens: Annotated[JsonInteger, Field(ge=1, le=1_000_000)] | None
+    temperature: Annotated[
+        float,
+        Field(ge=0.0, le=2.0, allow_inf_nan=False),
+    ] | None
+    top_k: Annotated[JsonInteger, Field(ge=1, le=1_000_000)] | None
+    seed: NonNegativeSafeInt | None
+    precision: Literal["auto", "fp32", "fp16", "bf16", "int8", "int4"] | None
+    checkpoint_interval_seconds: Annotated[
+        JsonInteger,
+        Field(ge=1, le=86_400),
+    ] | None
+    replica_count: Annotated[JsonInteger, Field(ge=1, le=1_024)] | None
+    chunk_size: Annotated[JsonInteger, Field(ge=1, le=1_000_000)] | None
+    width: Annotated[JsonInteger, Field(ge=1, le=32_768)] | None
+    height: Annotated[JsonInteger, Field(ge=1, le=32_768)] | None
+    steps: Annotated[JsonInteger, Field(ge=1, le=1_000_000)] | None
+    deterministic: bool
 
 
 class ChalRequest(StrictContract):
     schema_id: Literal["planetary.chal.request.v1"] = Field(
-        "planetary.chal.request.v1",
+        ...,
         alias="schema",
     )
     request_id: Identifier
     trace_id: Identifier
-    parent_request_id: Identifier | None = None
-    issued_at: datetime
-    expires_at: datetime
+    parent_request_id: Identifier | None
+    issued_at: CanonicalTimestamp
+    ttl_seconds: Annotated[JsonInteger, Field(ge=1, le=3_600)]
     idempotency_key: Identifier
     account_id: Identifier
     capability_id: Identifier
-    device_uri: Annotated[str, Field(pattern=r"^chal://[A-Za-z0-9._~:/-]+$")]
+    device_uri: DeviceUri
     workload_kind: WorkloadKind
     workload_manifest: ContentReference
-    inputs: list[ContentReference] = Field(default_factory=list, max_length=128)
-    parameters: WorkloadParameters = Field(default_factory=WorkloadParameters)
+    inputs: list[ContentReference] = Field(max_length=128)
+    parameters: WorkloadParameters
     constraints: RequestConstraints
-
-    @model_validator(mode="after")
-    def validate_time_window(self) -> "ChalRequest":
-        if self.expires_at <= self.issued_at:
-            raise ValueError("request expires_at must be after issued_at")
-        if self.expires_at - self.issued_at > timedelta(hours=1):
-            raise ValueError("request lifetime cannot exceed one hour")
-        if self.constraints.deadline <= self.issued_at:
-            raise ValueError("request deadline must be after issued_at")
-        if self.constraints.deadline > self.expires_at:
-            raise ValueError("request deadline cannot exceed request expiry")
-        return self
+    signature: Signature
 
 
 class ErrorCode(StrEnum):
@@ -211,20 +321,19 @@ class ErrorCode(StrEnum):
 
 class ErrorFrame(StrictContract):
     schema_id: Literal["planetary.chal.error.v1"] = Field(
-        "planetary.chal.error.v1",
+        ...,
         alias="schema",
     )
     error_id: Identifier
     request_id: Identifier
+    request_sha256: Sha256
     trace_id: Identifier
     code: ErrorCode
     retryable: bool
-    safe_detail: Annotated[str, Field(min_length=1, max_length=512)]
-    retry_after_ms: Annotated[int, Field(ge=1, le=3_600_000)] | None = None
-    device_uri: Annotated[
-        str,
-        Field(pattern=r"^chal://[A-Za-z0-9._~:/-]+$"),
-    ] | None = None
+    diagnostic_id: Identifier | None
+    retry_after_ms: Annotated[JsonInteger, Field(ge=1, le=3_600_000)] | None
+    device_uri: DeviceUri | None
+    signature: Signature
 
     @model_validator(mode="after")
     def validate_retry_fields(self) -> "ErrorFrame":
@@ -242,18 +351,25 @@ class ResponseStatus(StrEnum):
 
 class ChalResponse(StrictContract):
     schema_id: Literal["planetary.chal.response.v1"] = Field(
-        "planetary.chal.response.v1",
+        ...,
         alias="schema",
     )
     response_id: Identifier
     request_id: Identifier
+    request_sha256: Sha256
     trace_id: Identifier
-    device_uri: Annotated[str, Field(pattern=r"^chal://[A-Za-z0-9._~:/-]+$")]
+    account_id: Identifier
+    node_id: Identifier
+    device_uri: DeviceUri
+    lease_id: Identifier
+    lease_sha256: Sha256
+    fencing_token: PositiveSafeInt
     status: ResponseStatus
-    completed_at: datetime
-    outputs: list[ContentReference] = Field(default_factory=list, max_length=128)
-    telemetry_ids: list[Identifier] = Field(default_factory=list, max_length=256)
-    error: ErrorFrame | None = None
+    completed_at: CanonicalTimestamp
+    outputs: list[ContentReference] = Field(max_length=128)
+    telemetry_ids: list[Identifier] = Field(max_length=256)
+    error: ErrorFrame | None
+    signature: Signature
 
     @model_validator(mode="after")
     def require_error_for_non_success(self) -> "ChalResponse":
@@ -261,78 +377,115 @@ class ChalResponse(StrictContract):
             raise ValueError("successful responses cannot contain an error")
         if self.status != ResponseStatus.SUCCEEDED and self.error is None:
             raise ValueError("non-success responses require an error frame")
+        if self.error is not None and (
+            self.error.request_id != self.request_id
+            or self.error.request_sha256 != self.request_sha256
+            or self.error.trace_id != self.trace_id
+        ):
+            raise ValueError("response error must identify the same request and trace")
         return self
 
 
 class CapabilityConstraints(StrictContract):
     resources: ResourceVector
-    workload_kinds: set[WorkloadKind] = Field(min_length=1)
-    transports: set[TransportKind] = Field(min_length=1)
-    resource_patterns: list[Annotated[str, Field(pattern=r"^chal://")]] = Field(
+    minimum_attestation: AttestationLevel
+    workload_kinds: list[WorkloadKind] = Field(
+        min_length=1,
+        json_schema_extra={"uniqueItems": True, "x-canonical-order": "lexicographic"},
+    )
+    transports: list[TransportKind] = Field(
+        min_length=1,
+        json_schema_extra={"uniqueItems": True, "x-canonical-order": "lexicographic"},
+    )
+    resource_prefixes: list[DeviceUriPrefix] = Field(
         min_length=1,
         max_length=128,
+        json_schema_extra={"uniqueItems": True, "x-canonical-order": "lexicographic"},
     )
+
+    @field_validator("workload_kinds", "transports", "resource_prefixes")
+    @classmethod
+    def require_canonical_arrays(cls, values: list[Any], info: Any) -> list[Any]:
+        return _require_canonical_sequence(values, info.field_name)
 
 
 class CapabilityDocument(StrictContract):
     schema_id: Literal["planetary.chal.capability.v1"] = Field(
-        "planetary.chal.capability.v1",
+        ...,
         alias="schema",
     )
     capability_id: Identifier
     issuer_id: Identifier
     subject_id: Identifier
     account_id: Identifier
-    audience_node_ids: set[Identifier] = Field(min_length=1, max_length=128)
-    actions: set[CapabilityAction] = Field(min_length=1)
+    audience_node_ids: list[Identifier] = Field(
+        min_length=1,
+        max_length=128,
+        json_schema_extra={"uniqueItems": True, "x-canonical-order": "lexicographic"},
+    )
+    actions: list[CapabilityAction] = Field(
+        min_length=1,
+        json_schema_extra={"uniqueItems": True, "x-canonical-order": "lexicographic"},
+    )
     constraints: CapabilityConstraints
-    not_before: datetime
-    expires_at: datetime
+    not_before: CanonicalTimestamp
+    ttl_seconds: Annotated[JsonInteger, Field(ge=1, le=3_600)]
     nonce: Annotated[
         str,
         Field(min_length=16, max_length=128, pattern=r"^[A-Za-z0-9_-]+$"),
     ]
-    revocation_epoch: Annotated[int, Field(ge=0)]
-    delegable: Literal[False] = False
+    revocation_epoch: NonNegativeSafeInt
+    delegable: Literal[False]
     signature: Signature
 
-    @model_validator(mode="after")
-    def validate_time_window(self) -> "CapabilityDocument":
-        if self.expires_at <= self.not_before:
-            raise ValueError("capability expires_at must be after not_before")
-        if self.expires_at - self.not_before > timedelta(hours=1):
-            raise ValueError("capability lifetime cannot exceed one hour")
-        return self
+    @field_validator("audience_node_ids", "actions")
+    @classmethod
+    def require_canonical_arrays(cls, values: list[Any], info: Any) -> list[Any]:
+        return _require_canonical_sequence(values, info.field_name)
 
 
 class CpuDescriptor(StrictContract):
     architecture: Literal["x86_64", "aarch64", "riscv64"]
-    logical_cores: Annotated[int, Field(ge=1, le=4096)]
-    features: set[Annotated[str, Field(max_length=64)]] = Field(default_factory=set)
+    logical_cores: Annotated[JsonInteger, Field(ge=1, le=4096)]
+    features: list[
+        Annotated[str, Field(max_length=64, pattern=r"^[a-z0-9][a-z0-9._-]*$")]
+    ] = Field(
+        json_schema_extra={"uniqueItems": True, "x-canonical-order": "lexicographic"},
+    )
+
+    @field_validator("features")
+    @classmethod
+    def require_canonical_features(cls, values: list[str]) -> list[str]:
+        return _require_canonical_sequence(values, "features")
 
 
 class GpuDescriptor(StrictContract):
-    gpu_id: Identifier
     vendor: Annotated[str, Field(min_length=1, max_length=64)]
     model: Annotated[str, Field(min_length=1, max_length=128)]
-    memory_bytes: Annotated[int, Field(ge=1)]
-    compute_apis: set[Literal["cuda", "rocm", "vulkan", "metal", "opencl"]]
+    allocatable_memory_bytes: NonNegativeSafeInt
+    compute_apis: list[Literal["cuda", "metal", "opencl", "rocm", "vulkan"]] = (
+        Field(
+            min_length=1,
+            json_schema_extra={
+                "uniqueItems": True,
+                "x-canonical-order": "lexicographic",
+            },
+        )
+    )
+
+    @field_validator("compute_apis")
+    @classmethod
+    def require_canonical_compute_apis(cls, values: list[str]) -> list[str]:
+        return _require_canonical_sequence(values, "compute_apis")
 
 
 class NodeResources(StrictContract):
-    capacity: ResourceVector
-    allocatable: ResourceVector
+    allocatable: HostResourceVector
     cpu: CpuDescriptor
-    gpus: list[GpuDescriptor] = Field(default_factory=list, max_length=64)
-
-    @model_validator(mode="after")
-    def allocatable_does_not_exceed_capacity(self) -> "NodeResources":
-        for name in _RESOURCE_FIELDS:
-            if getattr(self.allocatable, name) > getattr(self.capacity, name):
-                raise ValueError(f"allocatable {name} exceeds capacity")
-        if self.allocatable.gpu_count > len(self.gpus):
-            raise ValueError("allocatable gpu_count exceeds described GPUs")
-        return self
+    gpus: dict[Identifier, GpuDescriptor] = Field(
+        max_length=64,
+        json_schema_extra={"additionalProperties": False},
+    )
 
 
 class NodeHealth(StrEnum):
@@ -342,36 +495,42 @@ class NodeHealth(StrEnum):
     OFFLINE = "offline"
 
 
+class NodeLabels(StrictContract):
+    power_class: Literal["battery", "consumer", "workstation", "server"] | None
+    thermal_policy: Literal["quiet", "balanced", "performance"] | None
+    network_scope: Literal["local", "trusted_lan", "mtls_relay"] | None
+
+
 class ResourceInventory(StrictContract):
     schema_id: Literal["planetary.vsource.inventory.v1"] = Field(
-        "planetary.vsource.inventory.v1",
+        ...,
         alias="schema",
     )
     inventory_id: Identifier
     node_id: Identifier
     account_id: Identifier
-    trust_zone: Literal["personal_cell"] = "personal_cell"
+    trust_zone: Literal["personal_cell"]
     public_key_fingerprint: Sha256
-    attestation: Literal["unverified", "software_verified", "hardware_verified"]
-    observed_at: datetime
-    expires_at: datetime
+    attestation: AttestationLevel
+    observed_at: CanonicalTimestamp
+    ttl_seconds: Annotated[JsonInteger, Field(ge=1, le=300)]
     health: NodeHealth
     resources: NodeResources
-    transports: set[TransportKind] = Field(min_length=1)
-    workload_kinds: set[WorkloadKind] = Field(min_length=1)
-    labels: dict[str, Annotated[str, Field(max_length=128)]] = Field(
-        default_factory=dict,
-        max_length=64,
+    transports: list[TransportKind] = Field(
+        min_length=1,
+        json_schema_extra={"uniqueItems": True, "x-canonical-order": "lexicographic"},
     )
+    workload_kinds: list[WorkloadKind] = Field(
+        min_length=1,
+        json_schema_extra={"uniqueItems": True, "x-canonical-order": "lexicographic"},
+    )
+    labels: NodeLabels
     signature: Signature
 
-    @model_validator(mode="after")
-    def validate_freshness(self) -> "ResourceInventory":
-        if self.expires_at <= self.observed_at:
-            raise ValueError("inventory expires_at must be after observed_at")
-        if self.expires_at - self.observed_at > timedelta(minutes=5):
-            raise ValueError("inventory lifetime cannot exceed five minutes")
-        return self
+    @field_validator("transports", "workload_kinds")
+    @classmethod
+    def require_canonical_arrays(cls, values: list[Any], info: Any) -> list[Any]:
+        return _require_canonical_sequence(values, info.field_name)
 
 
 class LeaseState(StrEnum):
@@ -382,51 +541,74 @@ class LeaseState(StrEnum):
     REVOKED = "revoked"
 
 
+class LeaseRevocationReason(StrEnum):
+    OWNER_REQUEST = "owner_request"
+    POLICY_CHANGE = "policy_change"
+    CAPABILITY_REVOKED = "capability_revoked"
+    NODE_HEALTH = "node_health"
+    INTEGRITY_FAILURE = "integrity_failure"
+    LEASE_SUPERSEDED = "lease_superseded"
+
+
 class LeaseDocument(StrictContract):
     schema_id: Literal["planetary.vsource.lease.v1"] = Field(
-        "planetary.vsource.lease.v1",
+        ...,
         alias="schema",
     )
     lease_id: Identifier
     placement_id: Identifier
     request_id: Identifier
+    request_sha256: Sha256
     capability_id: Identifier
     node_id: Identifier
+    inventory_id: Identifier
+    inventory_sha256: Sha256
     account_id: Identifier
+    transport: TransportKind
     resources: ResourceVector
+    gpu_ids: list[Identifier] = Field(
+        max_length=64,
+        json_schema_extra={"uniqueItems": True, "x-canonical-order": "lexicographic"},
+    )
     state: LeaseState
-    not_before: datetime
-    expires_at: datetime
-    fencing_token: Annotated[int, Field(ge=1)]
-    renewable: bool = False
-    renewal_count: Annotated[int, Field(ge=0)] = 0
-    max_renewals: Annotated[int, Field(ge=0, le=1024)] = 0
-    revocation_reason: Annotated[str, Field(max_length=256)] | None = None
+    not_before: CanonicalTimestamp
+    ttl_seconds: Annotated[JsonInteger, Field(ge=1, le=900)]
+    fencing_token: PositiveSafeInt
+    renewal_sequence: Annotated[JsonInteger, Field(ge=0, le=1024)]
+    renewals_remaining: Annotated[JsonInteger, Field(ge=0, le=1024)]
+    revocation_reason: LeaseRevocationReason | None
     signature: Signature
 
     @model_validator(mode="after")
     def validate_lease(self) -> "LeaseDocument":
-        if self.expires_at <= self.not_before:
-            raise ValueError("lease expires_at must be after not_before")
-        if self.expires_at - self.not_before > timedelta(minutes=15):
-            raise ValueError("lease lifetime cannot exceed fifteen minutes")
-        if self.renewal_count > self.max_renewals:
-            raise ValueError("lease renewal_count exceeds max_renewals")
-        if not self.renewable and self.max_renewals:
-            raise ValueError("non-renewable leases must set max_renewals to zero")
         if self.state == LeaseState.REVOKED and not self.revocation_reason:
             raise ValueError("revoked leases require revocation_reason")
+        if self.state != LeaseState.REVOKED and self.revocation_reason is not None:
+            raise ValueError("only revoked leases may specify revocation_reason")
+        _require_canonical_sequence(self.gpu_ids, "gpu_ids")
+        if len(self.gpu_ids) != self.resources.gpu_count:
+            raise ValueError("gpu_ids count must equal resources.gpu_count")
         return self
 
 
 class PlacementCandidate(StrictContract):
     node_id: Identifier
+    account_id: Identifier
+    inventory_id: Identifier
+    inventory_sha256: Sha256
     eligible: bool
-    score: Annotated[float, Field(ge=0.0, le=1.0)]
-    reasons: list[Annotated[str, Field(max_length=128)]] = Field(
-        default_factory=list,
+    score: Annotated[float, Field(ge=0.0, le=1.0, allow_inf_nan=False)]
+    reasons: list[
+        Annotated[str, Field(max_length=64, pattern=r"^[a-z0-9][a-z0-9._-]*$")]
+    ] = Field(
         max_length=32,
+        json_schema_extra={"uniqueItems": True, "x-canonical-order": "lexicographic"},
     )
+
+    @field_validator("reasons")
+    @classmethod
+    def require_canonical_reasons(cls, values: list[str]) -> list[str]:
+        return _require_canonical_sequence(values, "reasons")
 
 
 class PlacementResult(StrEnum):
@@ -436,39 +618,62 @@ class PlacementResult(StrEnum):
 
 class PlacementDecision(StrictContract):
     schema_id: Literal["planetary.vsource.placement.v1"] = Field(
-        "planetary.vsource.placement.v1",
+        ...,
         alias="schema",
     )
     placement_id: Identifier
     request_id: Identifier
+    request_sha256: Sha256
     trace_id: Identifier
     account_id: Identifier
     scheduler_id: Identifier
-    scheduler_scope: Literal["same_account_private_cell"] = (
-        "same_account_private_cell"
-    )
-    decided_at: datetime
+    scheduler_scope: Literal["same_account_private_cell"]
+    transport: TransportKind
+    decided_at: CanonicalTimestamp
     result: PlacementResult
-    selected_node_id: Identifier | None = None
+    selected_candidate: PlacementCandidate | None
     candidates: list[PlacementCandidate] = Field(min_length=1, max_length=256)
     policy_version: Identifier
-    rejection_error: ErrorFrame | None = None
+    rejection_error: ErrorFrame | None
+    signature: Signature
 
     @model_validator(mode="after")
     def validate_decision(self) -> "PlacementDecision":
-        eligible_nodes = {
-            candidate.node_id for candidate in self.candidates if candidate.eligible
-        }
+        candidate_keys = [
+            (candidate.node_id, candidate.inventory_id, candidate.inventory_sha256)
+            for candidate in self.candidates
+        ]
+        if len(candidate_keys) != len(set(candidate_keys)):
+            raise ValueError("placement candidates require unique inventory bindings")
+        if any(candidate.account_id != self.account_id for candidate in self.candidates):
+            raise ValueError("placement candidates must belong to the decision account")
         if self.result == PlacementResult.PLACED:
-            if self.selected_node_id not in eligible_nodes:
+            if self.selected_candidate is None or not self.selected_candidate.eligible:
                 raise ValueError("placed decision must select an eligible candidate")
+            selected_key = (
+                self.selected_candidate.node_id,
+                self.selected_candidate.inventory_id,
+                self.selected_candidate.inventory_sha256,
+            )
+            if selected_key not in candidate_keys:
+                raise ValueError("selected candidate must be present in candidates")
+            if self.selected_candidate not in self.candidates:
+                raise ValueError("selected candidate must exactly match its candidate entry")
+            if self.selected_candidate.account_id != self.account_id:
+                raise ValueError("selected candidate must belong to the decision account")
             if self.rejection_error is not None:
                 raise ValueError("placed decision cannot contain rejection_error")
         else:
-            if self.selected_node_id is not None:
+            if self.selected_candidate is not None:
                 raise ValueError("unplaced decision cannot select a node")
             if self.rejection_error is None:
                 raise ValueError("unplaced decision requires rejection_error")
+            if (
+                self.rejection_error.request_id != self.request_id
+                or self.rejection_error.request_sha256 != self.request_sha256
+                or self.rejection_error.trace_id != self.trace_id
+            ):
+                raise ValueError("placement error must identify the same request and trace")
         return self
 
 
@@ -516,11 +721,7 @@ _LIFECYCLE_TRANSITIONS: dict[LifecycleState, set[LifecycleState]] = {
         LifecycleState.FAILED,
         LifecycleState.CANCELLED,
     },
-    LifecycleState.LOST: {
-        LifecycleState.STAGED,
-        LifecycleState.FAILED,
-        LifecycleState.CANCELLED,
-    },
+    LifecycleState.LOST: set(),
     LifecycleState.COMPLETED: set(),
     LifecycleState.FAILED: set(),
     LifecycleState.CANCELLED: set(),
@@ -541,34 +742,50 @@ def validate_lifecycle_transition(
 
 class LifecycleEvent(StrictContract):
     schema_id: Literal["planetary.vsource.lifecycle.v1"] = Field(
-        "planetary.vsource.lifecycle.v1",
+        ...,
         alias="schema",
     )
     event_id: Identifier
-    sequence: Annotated[int, Field(ge=0)]
+    sequence: NonNegativeSafeInt
     workload_id: Identifier
     request_id: Identifier
+    request_sha256: Sha256
     trace_id: Identifier
     placement_id: Identifier
     lease_id: Identifier
+    lease_sha256: Sha256
+    fencing_token: PositiveSafeInt
     node_id: Identifier
+    inventory_id: Identifier
+    inventory_sha256: Sha256
     account_id: Identifier
-    previous_state: LifecycleState | None = None
+    previous_state: LifecycleState | None
     state: LifecycleState
-    occurred_at: datetime
-    checkpoint: ContentReference | None = None
-    outputs: list[ContentReference] = Field(default_factory=list, max_length=128)
-    error: ErrorFrame | None = None
+    occurred_at: CanonicalTimestamp
+    checkpoint: ContentReference | None
+    outputs: list[ContentReference] = Field(max_length=128)
+    error: ErrorFrame | None
+    signature: Signature
 
     @model_validator(mode="after")
     def validate_event(self) -> "LifecycleEvent":
         validate_lifecycle_transition(self.previous_state, self.state)
+        if self.previous_state is None and self.sequence != 0:
+            raise ValueError("the first lifecycle event must use sequence zero")
+        if self.previous_state is not None and self.sequence == 0:
+            raise ValueError("non-initial lifecycle events require a positive sequence")
         if self.state == LifecycleState.COMPLETED and not self.outputs:
             raise ValueError("completed lifecycle event requires output references")
         if self.state in {LifecycleState.FAILED, LifecycleState.LOST} and not self.error:
             raise ValueError(f"{self.state} lifecycle event requires an error")
         if self.state == LifecycleState.CHECKPOINTED and not self.checkpoint:
             raise ValueError("checkpointed lifecycle event requires checkpoint reference")
+        if self.error is not None and (
+            self.error.request_id != self.request_id
+            or self.error.request_sha256 != self.request_sha256
+            or self.error.trace_id != self.trace_id
+        ):
+            raise ValueError("lifecycle error must identify the same request and trace")
         return self
 
 
@@ -585,44 +802,245 @@ class TelemetryPhase(StrEnum):
 class TelemetryLabels(StrictContract):
     """Bounded operational dimensions; user content has no label field."""
 
-    backend: Annotated[str, Field(min_length=1, max_length=64)] | None = None
-    route: Annotated[str, Field(min_length=1, max_length=64)] | None = None
-    region: Annotated[str, Field(min_length=1, max_length=64)] | None = None
-    accelerator: Annotated[str, Field(min_length=1, max_length=64)] | None = None
-    degradation_reason: Annotated[str, Field(min_length=1, max_length=128)] | None = (
-        None
-    )
-    verification: Literal["unverified", "verified", "rejected"] | None = None
+    backend: Literal[
+        "local_process",
+        "aivm_container",
+        "aivm_microvm",
+        "aivm_wasm",
+    ] | None
+    route: Literal[
+        "fast_path",
+        "grounded_path",
+        "deep_reasoning_path",
+        "quad_brain_path",
+        "safety_path",
+    ] | None
+    accelerator: Literal["cpu", "cuda", "metal", "rocm", "vulkan"] | None
+    degradation_code: Literal[
+        "deadline_pressure",
+        "node_draining",
+        "resource_pressure",
+        "transport_fallback",
+        "verification_pending",
+    ] | None
+    verification: Literal["unverified", "verified", "rejected"] | None
 
 
 class TelemetryEvent(StrictContract):
     schema_id: Literal["planetary.chal.telemetry.v1"] = Field(
-        "planetary.chal.telemetry.v1",
+        ...,
         alias="schema",
     )
     telemetry_id: Identifier
     request_id: Identifier
+    request_sha256: Sha256
     trace_id: Identifier
-    workload_id: Identifier | None = None
-    node_id: Identifier | None = None
-    recorded_at: datetime
+    workload_id: Identifier | None
+    node_id: Identifier | None
+    recorded_at: CanonicalTimestamp
     phase: TelemetryPhase
     status: Literal["ok", "degraded", "failed"]
     measurement_kind: Literal["measured", "estimated"]
-    latency_ms: Annotated[float, Field(ge=0.0)] = 0.0
-    queue_ms: Annotated[float, Field(ge=0.0)] = 0.0
-    usage: ResourceVector = Field(default_factory=ResourceVector)
-    input_sha256: Sha256 | None = None
-    output_sha256: Sha256 | None = None
-    contains_user_content: Literal[False] = False
-    labels: TelemetryLabels = Field(default_factory=TelemetryLabels)
-    error_id: Identifier | None = None
+    latency_ms: Annotated[
+        float,
+        Field(ge=0.0, le=31_536_000_000.0, allow_inf_nan=False),
+    ]
+    queue_ms: Annotated[
+        float,
+        Field(ge=0.0, le=31_536_000_000.0, allow_inf_nan=False),
+    ]
+    usage: ResourceVector
+    input_sha256: Sha256 | None
+    output_sha256: Sha256 | None
+    contains_user_content: Literal[False]
+    labels: TelemetryLabels
+    error_id: Identifier | None
+    signature: Signature
 
     @model_validator(mode="after")
     def validate_status_error(self) -> "TelemetryEvent":
         if self.status == "failed" and not self.error_id:
             raise ValueError("failed telemetry requires error_id")
         return self
+
+
+_RESOURCE_VECTOR_FIELDS = (
+    "cpu_millicores",
+    "memory_bytes",
+    "gpu_count",
+    "gpu_memory_bytes",
+    "storage_bytes",
+    "ingress_bps",
+    "egress_bps",
+)
+_HOST_RESOURCE_FIELDS = (
+    "cpu_millicores",
+    "memory_bytes",
+    "storage_bytes",
+    "ingress_bps",
+    "egress_bps",
+)
+_ATTESTATION_RANK = {
+    AttestationLevel.UNVERIFIED: 0,
+    AttestationLevel.SOFTWARE_VERIFIED: 1,
+    AttestationLevel.HARDWARE_VERIFIED: 2,
+}
+
+
+def resource_vector_within(requested: ResourceVector, limit: ResourceVector) -> bool:
+    """Return whether every requested resource component is within its limit."""
+
+    return all(
+        getattr(requested, field) <= getattr(limit, field)
+        for field in _RESOURCE_VECTOR_FIELDS
+    )
+
+
+def validate_lease_bound_response(
+    response: ChalResponse,
+    lease: LeaseDocument,
+) -> None:
+    """Require a result to identify the exact active fenced lease revision."""
+
+    if lease.state != LeaseState.ACTIVE:
+        raise ValueError("response requires an active lease")
+    if (
+        response.request_id != lease.request_id
+        or response.request_sha256 != lease.request_sha256
+        or response.account_id != lease.account_id
+        or response.node_id != lease.node_id
+        or response.lease_id != lease.lease_id
+        or response.lease_sha256 != document_sha256(lease)
+        or response.fencing_token != lease.fencing_token
+    ):
+        raise ValueError("response does not match the exact fenced lease revision")
+
+
+def validate_lease_bound_lifecycle(
+    event: LifecycleEvent,
+    lease: LeaseDocument,
+) -> None:
+    """Require a lifecycle event to identify the exact active lease revision."""
+
+    if lease.state != LeaseState.ACTIVE:
+        raise ValueError("lifecycle event requires an active lease")
+    if (
+        event.request_id != lease.request_id
+        or event.request_sha256 != lease.request_sha256
+        or event.account_id != lease.account_id
+        or event.node_id != lease.node_id
+        or event.placement_id != lease.placement_id
+        or event.lease_id != lease.lease_id
+        or event.lease_sha256 != document_sha256(lease)
+        or event.fencing_token != lease.fencing_token
+        or event.inventory_id != lease.inventory_id
+        or event.inventory_sha256 != lease.inventory_sha256
+    ):
+        raise ValueError("lifecycle event does not match the exact fenced lease revision")
+
+
+def validate_private_cell_allocation(
+    request: ChalRequest,
+    capability: CapabilityDocument,
+    inventory: ResourceInventory,
+    placement: PlacementDecision,
+    lease: LeaseDocument,
+    *,
+    authenticated_subject_id: str,
+) -> None:
+    """Reference validator for the normative same-account allocation joins."""
+
+    account_ids = {
+        request.account_id,
+        capability.account_id,
+        inventory.account_id,
+        placement.account_id,
+        lease.account_id,
+    }
+    if len(account_ids) != 1:
+        raise ValueError("request, capability, inventory, placement, and lease accounts differ")
+
+    request_sha256 = document_sha256(request)
+    inventory_sha256 = document_sha256(inventory)
+    if request.capability_id != capability.capability_id:
+        raise ValueError("request does not identify the supplied capability")
+    if authenticated_subject_id != capability.subject_id:
+        raise ValueError("authenticated subject does not match the capability subject")
+    if lease.capability_id != capability.capability_id:
+        raise ValueError("lease does not identify the supplied capability")
+    if placement.request_id != request.request_id or lease.request_id != request.request_id:
+        raise ValueError("placement or lease request_id does not match the request")
+    if (
+        placement.request_sha256 != request_sha256
+        or lease.request_sha256 != request_sha256
+    ):
+        raise ValueError("placement or lease request digest does not match")
+
+    if placement.result != PlacementResult.PLACED or placement.selected_candidate is None:
+        raise ValueError("allocation requires a placed eligible candidate")
+    if lease.state not in {LeaseState.PENDING, LeaseState.ACTIVE}:
+        raise ValueError("new allocation requires a pending or active lease")
+    selected = placement.selected_candidate
+    if (
+        selected.node_id != inventory.node_id
+        or selected.inventory_id != inventory.inventory_id
+        or selected.inventory_sha256 != inventory_sha256
+        or lease.node_id != inventory.node_id
+        or lease.inventory_id != inventory.inventory_id
+        or lease.inventory_sha256 != inventory_sha256
+        or lease.placement_id != placement.placement_id
+    ):
+        raise ValueError("placement or lease does not bind the supplied inventory")
+    if inventory.health != NodeHealth.READY:
+        raise ValueError("new allocation requires ready inventory")
+    if _ATTESTATION_RANK[inventory.attestation] < _ATTESTATION_RANK[
+        capability.constraints.minimum_attestation
+    ]:
+        raise ValueError("selected inventory does not meet capability attestation")
+
+    required_actions = {CapabilityAction.RESERVE, CapabilityAction.EXECUTE}
+    if not required_actions.issubset(set(capability.actions)):
+        raise ValueError("capability must grant reserve and execute actions")
+    if inventory.node_id not in capability.audience_node_ids:
+        raise ValueError("selected node is outside the capability audience")
+    if request.workload_kind not in capability.constraints.workload_kinds:
+        raise ValueError("request workload is outside capability constraints")
+    if request.workload_kind not in inventory.workload_kinds:
+        raise ValueError("selected inventory does not support the workload")
+    if not any(
+        device_uri_matches_prefix(request.device_uri, prefix)
+        for prefix in capability.constraints.resource_prefixes
+    ):
+        raise ValueError("request device is outside capability resource prefixes")
+    if placement.transport != lease.transport:
+        raise ValueError("placement and lease transports differ")
+    if lease.transport not in capability.constraints.transports:
+        raise ValueError("selected transport is outside capability constraints")
+    if lease.transport not in inventory.transports:
+        raise ValueError("selected inventory does not support the transport")
+
+    if not resource_vector_within(
+        request.constraints.resources,
+        capability.constraints.resources,
+    ):
+        raise ValueError("request resources exceed capability limits")
+    if not resource_vector_within(lease.resources, request.constraints.resources):
+        raise ValueError("lease resources exceed the signed request")
+    for field in _HOST_RESOURCE_FIELDS:
+        if getattr(lease.resources, field) > getattr(
+            inventory.resources.allocatable,
+            field,
+        ):
+            raise ValueError(f"lease {field} exceeds signed allocatable inventory")
+
+    gpu_memory = 0
+    for gpu_id in lease.gpu_ids:
+        gpu = inventory.resources.gpus.get(gpu_id)
+        if gpu is None:
+            raise ValueError("lease references a GPU absent from signed inventory")
+        gpu_memory += gpu.allocatable_memory_bytes
+    if gpu_memory < lease.resources.gpu_memory_bytes:
+        raise ValueError("lease GPU memory exceeds selected signed GPU inventory")
 
 
 SchemaModel: TypeAlias = type[StrictContract]
@@ -639,8 +1057,15 @@ SCHEMA_EXPORTS: dict[str, SchemaModel] = {
     "telemetry.schema.json": TelemetryEvent,
 }
 SCHEMA_MODELS: dict[str, SchemaModel] = {
-    str(model.model_fields["schema_id"].default): model
-    for model in SCHEMA_EXPORTS.values()
+    "planetary.chal.capability.v1": CapabilityDocument,
+    "planetary.chal.error.v1": ErrorFrame,
+    "planetary.chal.request.v1": ChalRequest,
+    "planetary.chal.response.v1": ChalResponse,
+    "planetary.chal.telemetry.v1": TelemetryEvent,
+    "planetary.vsource.inventory.v1": ResourceInventory,
+    "planetary.vsource.lease.v1": LeaseDocument,
+    "planetary.vsource.lifecycle.v1": LifecycleEvent,
+    "planetary.vsource.placement.v1": PlacementDecision,
 }
 
 
@@ -651,12 +1076,15 @@ def validate_document(data: dict[str, Any]) -> StrictContract:
     model = SCHEMA_MODELS.get(str(schema))
     if model is None:
         raise ValueError(f"unsupported CHAL/vSource schema: {schema!r}")
-    return model.model_validate(data)
+    encoded = json.dumps(data, allow_nan=False, separators=(",", ":"))
+    return model.model_validate_json(encoded)
 
 
 __all__ = [
+    "AttestationLevel",
     "CapabilityAction",
     "CapabilityDocument",
+    "CanonicalTimestamp",
     "ChalRequest",
     "ChalResponse",
     "ContentReference",
@@ -664,11 +1092,16 @@ __all__ = [
     "ErrorCode",
     "ErrorFrame",
     "GpuDescriptor",
+    "HostResourceVector",
+    "JsonInteger",
     "LeaseDocument",
+    "LeaseRevocationReason",
     "LeaseState",
     "LifecycleEvent",
     "LifecycleState",
+    "MAX_SAFE_INTEGER",
     "NodeHealth",
+    "NodeLabels",
     "NodeResources",
     "PlacementCandidate",
     "PlacementDecision",
@@ -687,6 +1120,11 @@ __all__ = [
     "TrustZone",
     "WorkloadKind",
     "WorkloadParameters",
+    "device_uri_matches_prefix",
+    "resource_vector_within",
     "validate_document",
+    "validate_lease_bound_lifecycle",
+    "validate_lease_bound_response",
     "validate_lifecycle_transition",
+    "validate_private_cell_allocation",
 ]

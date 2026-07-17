@@ -22,11 +22,63 @@
       ],
       "title": "ErrorCode",
       "type": "string"
+    },
+    "Signature": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "const": "ed25519",
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "key_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
+          "title": "Key Id",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 86,
+          "minLength": 86,
+          "pattern": "^[A-Za-z0-9_-]{86}$(?![\\s\\S])",
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "algorithm",
+        "key_id",
+        "value"
+      ],
+      "title": "Signature",
+      "type": "object"
     }
   },
   "$id": "https://schemas.reality-core.systems/chal-vsource/v1/error.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "retryable": {
+            "const": false
+          }
+        },
+        "required": [
+          "retryable"
+        ]
+      },
+      "then": {
+        "properties": {
+          "retry_after_ms": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
   "properties": {
     "code": {
       "$ref": "#/$defs/ErrorCode"
@@ -34,28 +86,48 @@
     "device_uri": {
       "anyOf": [
         {
-          "pattern": "^chal://[A-Za-z0-9._~:/-]+$",
+          "maxLength": 256,
+          "minLength": 10,
+          "pattern": "^chal://[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)*$(?![\\s\\S])",
           "type": "string"
         },
         {
           "type": "null"
         }
       ],
-      "default": null,
       "title": "Device Uri"
+    },
+    "diagnostic_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Diagnostic Id"
     },
     "error_id": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Error Id",
       "type": "string"
     },
     "request_id": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Request Id",
+      "type": "string"
+    },
+    "request_sha256": {
+      "pattern": "^[a-f0-9]{64}$(?![\\s\\S])",
+      "title": "Request Sha256",
       "type": "string"
     },
     "retry_after_ms": {
@@ -69,41 +141,44 @@
           "type": "null"
         }
       ],
-      "default": null,
       "title": "Retry After Ms"
     },
     "retryable": {
       "title": "Retryable",
       "type": "boolean"
     },
-    "safe_detail": {
-      "maxLength": 512,
-      "minLength": 1,
-      "title": "Safe Detail",
-      "type": "string"
-    },
     "schema": {
       "const": "planetary.chal.error.v1",
-      "default": "planetary.chal.error.v1",
       "title": "Schema",
       "type": "string"
+    },
+    "signature": {
+      "$ref": "#/$defs/Signature"
     },
     "trace_id": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Trace Id",
       "type": "string"
     }
   },
   "required": [
+    "code",
+    "device_uri",
+    "diagnostic_id",
     "error_id",
     "request_id",
-    "trace_id",
-    "code",
+    "request_sha256",
+    "retry_after_ms",
     "retryable",
-    "safe_detail"
+    "schema",
+    "signature",
+    "trace_id"
   ],
   "title": "ErrorFrame",
-  "type": "object"
+  "type": "object",
+  "x-planetary-semantic-invariants": [
+    "Verify Ed25519 over RFC8785(document without signature)."
+  ]
 }

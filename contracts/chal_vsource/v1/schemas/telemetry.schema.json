@@ -2,51 +2,119 @@
   "$defs": {
     "ResourceVector": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "gpu_memory_bytes": {
+                "minimum": 1
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "gpu_count": {
+                "const": 0
+              }
+            },
+            "required": [
+              "gpu_count"
+            ]
+          },
+          "then": {
+            "properties": {
+              "gpu_memory_bytes": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ],
       "properties": {
         "cpu_millicores": {
-          "default": 0,
+          "maximum": 9007199254740991,
           "minimum": 0,
           "title": "Cpu Millicores",
           "type": "integer"
         },
         "egress_bps": {
-          "default": 0,
+          "maximum": 9007199254740991,
           "minimum": 0,
           "title": "Egress Bps",
           "type": "integer"
         },
         "gpu_count": {
-          "default": 0,
+          "maximum": 64,
           "minimum": 0,
           "title": "Gpu Count",
           "type": "integer"
         },
         "gpu_memory_bytes": {
-          "default": 0,
+          "maximum": 9007199254740991,
           "minimum": 0,
           "title": "Gpu Memory Bytes",
           "type": "integer"
         },
         "ingress_bps": {
-          "default": 0,
+          "maximum": 9007199254740991,
           "minimum": 0,
           "title": "Ingress Bps",
           "type": "integer"
         },
         "memory_bytes": {
-          "default": 0,
+          "maximum": 9007199254740991,
           "minimum": 0,
           "title": "Memory Bytes",
           "type": "integer"
         },
         "storage_bytes": {
-          "default": 0,
+          "maximum": 9007199254740991,
           "minimum": 0,
           "title": "Storage Bytes",
           "type": "integer"
         }
       },
+      "required": [
+        "cpu_millicores",
+        "egress_bps",
+        "gpu_count",
+        "gpu_memory_bytes",
+        "ingress_bps",
+        "memory_bytes",
+        "storage_bytes"
+      ],
       "title": "ResourceVector",
+      "type": "object"
+    },
+    "Signature": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "const": "ed25519",
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "key_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
+          "title": "Key Id",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 86,
+          "minLength": 86,
+          "pattern": "^[A-Za-z0-9_-]{86}$(?![\\s\\S])",
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "algorithm",
+        "key_id",
+        "value"
+      ],
+      "title": "Signature",
       "type": "object"
     },
     "TelemetryLabels": {
@@ -56,71 +124,72 @@
         "accelerator": {
           "anyOf": [
             {
-              "maxLength": 64,
-              "minLength": 1,
+              "enum": [
+                "cpu",
+                "cuda",
+                "metal",
+                "rocm",
+                "vulkan"
+              ],
               "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Accelerator"
         },
         "backend": {
           "anyOf": [
             {
-              "maxLength": 64,
-              "minLength": 1,
+              "enum": [
+                "local_process",
+                "aivm_container",
+                "aivm_microvm",
+                "aivm_wasm"
+              ],
               "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Backend"
         },
-        "degradation_reason": {
+        "degradation_code": {
           "anyOf": [
             {
-              "maxLength": 128,
-              "minLength": 1,
+              "enum": [
+                "deadline_pressure",
+                "node_draining",
+                "resource_pressure",
+                "transport_fallback",
+                "verification_pending"
+              ],
               "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Degradation Reason"
-        },
-        "region": {
-          "anyOf": [
-            {
-              "maxLength": 64,
-              "minLength": 1,
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Region"
+          "title": "Degradation Code"
         },
         "route": {
           "anyOf": [
             {
-              "maxLength": 64,
-              "minLength": 1,
+              "enum": [
+                "fast_path",
+                "grounded_path",
+                "deep_reasoning_path",
+                "quad_brain_path",
+                "safety_path"
+              ],
               "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Route"
         },
         "verification": {
@@ -137,10 +206,16 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Verification"
         }
       },
+      "required": [
+        "accelerator",
+        "backend",
+        "degradation_code",
+        "route",
+        "verification"
+      ],
       "title": "TelemetryLabels",
       "type": "object"
     },
@@ -161,10 +236,35 @@
   "$id": "https://schemas.reality-core.systems/chal-vsource/v1/telemetry.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "failed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "error_id": {
+            "not": {
+              "type": "null"
+            }
+          }
+        },
+        "required": [
+          "error_id"
+        ]
+      }
+    }
+  ],
   "properties": {
     "contains_user_content": {
       "const": false,
-      "default": false,
       "title": "Contains User Content",
       "type": "boolean"
     },
@@ -173,34 +273,32 @@
         {
           "maxLength": 128,
           "minLength": 3,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
           "type": "string"
         },
         {
           "type": "null"
         }
       ],
-      "default": null,
       "title": "Error Id"
     },
     "input_sha256": {
       "anyOf": [
         {
-          "pattern": "^[a-f0-9]{64}$",
+          "pattern": "^[a-f0-9]{64}$(?![\\s\\S])",
           "type": "string"
         },
         {
           "type": "null"
         }
       ],
-      "default": null,
       "title": "Input Sha256"
     },
     "labels": {
       "$ref": "#/$defs/TelemetryLabels"
     },
     "latency_ms": {
-      "default": 0.0,
+      "maximum": 31536000000.0,
       "minimum": 0.0,
       "title": "Latency Ms",
       "type": "number"
@@ -218,55 +316,61 @@
         {
           "maxLength": 128,
           "minLength": 3,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
           "type": "string"
         },
         {
           "type": "null"
         }
       ],
-      "default": null,
       "title": "Node Id"
     },
     "output_sha256": {
       "anyOf": [
         {
-          "pattern": "^[a-f0-9]{64}$",
+          "pattern": "^[a-f0-9]{64}$(?![\\s\\S])",
           "type": "string"
         },
         {
           "type": "null"
         }
       ],
-      "default": null,
       "title": "Output Sha256"
     },
     "phase": {
       "$ref": "#/$defs/TelemetryPhase"
     },
     "queue_ms": {
-      "default": 0.0,
+      "maximum": 31536000000.0,
       "minimum": 0.0,
       "title": "Queue Ms",
       "type": "number"
     },
     "recorded_at": {
       "format": "date-time",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$(?![\\s\\S])",
       "title": "Recorded At",
       "type": "string"
     },
     "request_id": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Request Id",
+      "type": "string"
+    },
+    "request_sha256": {
+      "pattern": "^[a-f0-9]{64}$(?![\\s\\S])",
+      "title": "Request Sha256",
       "type": "string"
     },
     "schema": {
       "const": "planetary.chal.telemetry.v1",
-      "default": "planetary.chal.telemetry.v1",
       "title": "Schema",
       "type": "string"
+    },
+    "signature": {
+      "$ref": "#/$defs/Signature"
     },
     "status": {
       "enum": [
@@ -280,14 +384,14 @@
     "telemetry_id": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Telemetry Id",
       "type": "string"
     },
     "trace_id": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Trace Id",
       "type": "string"
     },
@@ -299,26 +403,42 @@
         {
           "maxLength": 128,
           "minLength": 3,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
           "type": "string"
         },
         {
           "type": "null"
         }
       ],
-      "default": null,
       "title": "Workload Id"
     }
   },
   "required": [
-    "telemetry_id",
-    "request_id",
-    "trace_id",
-    "recorded_at",
+    "contains_user_content",
+    "error_id",
+    "input_sha256",
+    "labels",
+    "latency_ms",
+    "measurement_kind",
+    "node_id",
+    "output_sha256",
     "phase",
+    "queue_ms",
+    "recorded_at",
+    "request_id",
+    "request_sha256",
+    "schema",
+    "signature",
     "status",
-    "measurement_kind"
+    "telemetry_id",
+    "trace_id",
+    "usage",
+    "workload_id"
   ],
   "title": "TelemetryEvent",
-  "type": "object"
+  "type": "object",
+  "x-planetary-semantic-invariants": [
+    "Verify node Ed25519 signature and request digest binding.",
+    "Producers must apply the metadata allowlist before emission; raw content has no representable field."
+  ]
 }

@@ -1,5 +1,11 @@
 # Hardware Blueprints for Synthesus 5 CHAL
 
+> **Read-only extraction-seed history.** These examples predate the canonical
+> CHAL/vSource v1 wire contract and are neither deployable policy nor node
+> authorization. Raw UDP discovery and `master`/`worker` trust do not enroll a
+> node. Use signed inventory, capability, placement, fenced-lease, lifecycle,
+> and telemetry documents from `contracts/chal_vsource/v1`.
+
 ## Overview
 
 Hardware blueprints are declarative JSON/YAML templates that describe cluster topologies, resource pooling, and device mount configurations. Synthesus 5 generates these blueprints dynamically based on runtime conditions, then the CHAL layer instantiates them.

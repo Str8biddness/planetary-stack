@@ -22,7 +22,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install smoke dependencies
-        run: python -m pip install --disable-pip-version-check PyYAML requests 'pydantic>=2.7' pytest
+        run: python -m pip install --disable-pip-version-check PyYAML requests -e '.[test]'
 
       - name: Check repository contracts
         run: |

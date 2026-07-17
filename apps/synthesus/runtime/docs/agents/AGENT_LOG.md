@@ -1,5 +1,14 @@
 # Synthesus Agent Log
 
+> **Security supersession notice:** entries dated 2026-06-28 and earlier are
+> preserved history, not active implementation instructions. Do not deploy
+> bytecode/`marshal`/`eval` workers, raw TCP/UDP task listeners, implicit node
+> trust, or unauthenticated discovery described below. Current work must use
+> signed, content-addressed `contracts/chal_vsource/v1` messages, exact active
+> fenced leases, authenticated transports, and a hardened AIVM sandbox. The
+> runtime registry, allocator, node agent, signature verifier, and Unisync
+> transport remain unimplemented until separately reviewed.
+
 This file is the handoff ledger for agents working in this repository.
 
 ## Protocol
@@ -267,19 +276,36 @@ Keep entries chronological. Do not rewrite history; append new sessions.
   and workload lifecycle shapes without claiming the scheduler is implemented.
 - Required content-addressed workload and artifact references and rejected
   executable parameter fields, raw/secret-bearing telemetry labels, unknown
-  fields, public-fabric placement scope, invalid resource overcommit, stale
-  time windows, unfenced leases, and illegal lifecycle transitions.
+  fields, public-fabric placement scope, out-of-range TTLs, unfenced leases,
+  and illegal lifecycle transitions.
 - Marked imported raw-bytecode, kernel-trust-bypass, and unauthenticated
   hardware-blueprint material as historical and superseded.
+- Remediated independent-review findings by requiring signatures on every
+  document, binding downstream frames to RFC 8785 request/inventory digests,
+  replacing unordered signed sets with canonical arrays, enforcing strict
+  I-JSON-safe types, pinning the schema generator, and independently testing
+  exported JSON Schema conditionals.
+- Replaced inventory capacity claims with current allocatable resources and a
+  GPU-ID-keyed map; placement candidates now bind account plus signed inventory
+  identity and digest.
+- Bound responses and lifecycle events to the exact active lease digest and
+  fencing token; added an executable private-cell authorization reference for
+  account, action, audience, workload, device, transport, resource, and GPU-ID
+  joins.
+- Closed JSON Schema/reference parity for terminal-newline regexes and
+  mathematically integral JSON numbers, and made schema writes byte-stable on
+  every platform.
 
 ### Verified
 - `python -m contracts.chal_vsource.v1.schema_tool --check` validated all nine
   committed schemas with no generated drift.
-- `python -m pytest -q tests/test_chal_vsource_contracts.py` passed 18 tests,
-  including full private-cell document round trips and adversarial rejection
-  paths.
+- `make test-contracts` passed 42 tests with `PYTHONHASHSEED=1` and again with
+  `PYTHONHASHSEED=4` (84 executions), including full private-cell round trips,
+  independent Draft 2020-12 validation, RFC 8785 reproducibility, and
+  adversarial rejection paths.
 - `make test-contracts` is now a root target and the monorepo smoke workflow
-  installs its explicit Pydantic/pytest dependencies and executes it.
+  installs exact Pydantic, RFC 8785, JSON Schema, and pytest dependencies and
+  executes it.
 - Python byte compilation passed for the canonical models and schema tool.
 
 ### Left Off / Next Steps

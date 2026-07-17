@@ -65,11 +65,16 @@ strict Pydantic models and nine committed Draft 2020-12 JSON Schemas freeze:
 - vSource inventory, placement, fenced lease, and lifecycle frames.
 
 Version 1 schedules only inside a same-account private cell. Workload and data
-fields cross the boundary as signed descriptors or content-addressed artifact
-references. Raw bytecode, `marshal`, pickle, `eval`, arbitrary shell commands,
-raw prompt/output telemetry, implicit delegation, and public-fabric placement
-are not part of the protocol. Unisync will implement transport beneath this
-boundary; it cannot grant authority or weaken validation.
+fields cross the boundary as signed descriptors with RFC 8785 request and
+inventory digests or as content-addressed artifact references. Bounded TTLs,
+I-JSON-safe numbers, canonical arrays, fenced leases, and metadata enums are
+wire invariants. Allocation admission applies componentwise capability,
+request, inventory, transport, and GPU-ID joins; results and lifecycle events
+bind the exact active lease digest and fencing token. Raw bytecode, `marshal`,
+pickle, `eval`, arbitrary shell
+commands, raw prompt/output telemetry, implicit delegation, and public-fabric
+placement are not part of the protocol. Unisync will implement transport
+beneath this boundary; it cannot grant authority or weaken validation.
 
 The schemas define messages, not a claim of runtime completion. Signature
 verification, enrollment/revocation, the inventory registry, allocator,

@@ -13,7 +13,8 @@ test: test-contracts test-knowledge-source test-synthesus
 
 test-contracts:
 	$(PYTHON) -m contracts.chal_vsource.v1.schema_tool --check
-	$(PYTHON) -m pytest -q tests/test_chal_vsource_contracts.py
+	PYTHONHASHSEED=1 $(PYTHON) -m pytest -q tests/test_chal_vsource_contracts.py
+	PYTHONHASHSEED=4 $(PYTHON) -m pytest -q tests/test_chal_vsource_contracts.py
 
 test-synthesus:
 	cd apps/synthesus/runtime && $(PYTHON) -m pytest -q

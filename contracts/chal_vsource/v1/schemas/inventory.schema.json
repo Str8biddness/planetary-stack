@@ -1,5 +1,14 @@
 {
   "$defs": {
+    "AttestationLevel": {
+      "enum": [
+        "unverified",
+        "software_verified",
+        "hardware_verified"
+      ],
+      "title": "AttestationLevel",
+      "type": "string"
+    },
     "CpuDescriptor": {
       "additionalProperties": false,
       "properties": {
@@ -15,11 +24,13 @@
         "features": {
           "items": {
             "maxLength": 64,
+            "pattern": "^[a-z0-9][a-z0-9._-]*$(?![\\s\\S])",
             "type": "string"
           },
           "title": "Features",
           "type": "array",
-          "uniqueItems": true
+          "uniqueItems": true,
+          "x-canonical-order": "lexicographic"
         },
         "logical_cores": {
           "maximum": 4096,
@@ -30,6 +41,7 @@
       },
       "required": [
         "architecture",
+        "features",
         "logical_cores"
       ],
       "title": "CpuDescriptor",
@@ -38,32 +50,28 @@
     "GpuDescriptor": {
       "additionalProperties": false,
       "properties": {
+        "allocatable_memory_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Allocatable Memory Bytes",
+          "type": "integer"
+        },
         "compute_apis": {
           "items": {
             "enum": [
               "cuda",
-              "rocm",
-              "vulkan",
               "metal",
-              "opencl"
+              "opencl",
+              "rocm",
+              "vulkan"
             ],
             "type": "string"
           },
+          "minItems": 1,
           "title": "Compute Apis",
           "type": "array",
-          "uniqueItems": true
-        },
-        "gpu_id": {
-          "maxLength": 128,
-          "minLength": 3,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
-          "title": "Gpu Id",
-          "type": "string"
-        },
-        "memory_bytes": {
-          "minimum": 1,
-          "title": "Memory Bytes",
-          "type": "integer"
+          "uniqueItems": true,
+          "x-canonical-order": "lexicographic"
         },
         "model": {
           "maxLength": 128,
@@ -79,13 +87,56 @@
         }
       },
       "required": [
-        "gpu_id",
-        "vendor",
+        "allocatable_memory_bytes",
+        "compute_apis",
         "model",
-        "memory_bytes",
-        "compute_apis"
+        "vendor"
       ],
       "title": "GpuDescriptor",
+      "type": "object"
+    },
+    "HostResourceVector": {
+      "additionalProperties": false,
+      "properties": {
+        "cpu_millicores": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Cpu Millicores",
+          "type": "integer"
+        },
+        "egress_bps": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Egress Bps",
+          "type": "integer"
+        },
+        "ingress_bps": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Ingress Bps",
+          "type": "integer"
+        },
+        "memory_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Memory Bytes",
+          "type": "integer"
+        },
+        "storage_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Storage Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cpu_millicores",
+        "egress_bps",
+        "ingress_bps",
+        "memory_bytes",
+        "storage_bytes"
+      ],
+      "title": "HostResourceVector",
       "type": "object"
     },
     "NodeHealth": {
@@ -98,82 +149,98 @@
       "title": "NodeHealth",
       "type": "string"
     },
+    "NodeLabels": {
+      "additionalProperties": false,
+      "properties": {
+        "network_scope": {
+          "anyOf": [
+            {
+              "enum": [
+                "local",
+                "trusted_lan",
+                "mtls_relay"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Network Scope"
+        },
+        "power_class": {
+          "anyOf": [
+            {
+              "enum": [
+                "battery",
+                "consumer",
+                "workstation",
+                "server"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Power Class"
+        },
+        "thermal_policy": {
+          "anyOf": [
+            {
+              "enum": [
+                "quiet",
+                "balanced",
+                "performance"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Thermal Policy"
+        }
+      },
+      "required": [
+        "network_scope",
+        "power_class",
+        "thermal_policy"
+      ],
+      "title": "NodeLabels",
+      "type": "object"
+    },
     "NodeResources": {
       "additionalProperties": false,
       "properties": {
         "allocatable": {
-          "$ref": "#/$defs/ResourceVector"
-        },
-        "capacity": {
-          "$ref": "#/$defs/ResourceVector"
+          "$ref": "#/$defs/HostResourceVector"
         },
         "cpu": {
           "$ref": "#/$defs/CpuDescriptor"
         },
         "gpus": {
-          "items": {
-            "$ref": "#/$defs/GpuDescriptor"
+          "additionalProperties": false,
+          "maxProperties": 64,
+          "patternProperties": {
+            "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])": {
+              "$ref": "#/$defs/GpuDescriptor"
+            }
           },
-          "maxItems": 64,
+          "propertyNames": {
+            "maxLength": 128,
+            "minLength": 3
+          },
           "title": "Gpus",
-          "type": "array"
+          "type": "object"
         }
       },
       "required": [
-        "capacity",
         "allocatable",
-        "cpu"
+        "cpu",
+        "gpus"
       ],
       "title": "NodeResources",
-      "type": "object"
-    },
-    "ResourceVector": {
-      "additionalProperties": false,
-      "properties": {
-        "cpu_millicores": {
-          "default": 0,
-          "minimum": 0,
-          "title": "Cpu Millicores",
-          "type": "integer"
-        },
-        "egress_bps": {
-          "default": 0,
-          "minimum": 0,
-          "title": "Egress Bps",
-          "type": "integer"
-        },
-        "gpu_count": {
-          "default": 0,
-          "minimum": 0,
-          "title": "Gpu Count",
-          "type": "integer"
-        },
-        "gpu_memory_bytes": {
-          "default": 0,
-          "minimum": 0,
-          "title": "Gpu Memory Bytes",
-          "type": "integer"
-        },
-        "ingress_bps": {
-          "default": 0,
-          "minimum": 0,
-          "title": "Ingress Bps",
-          "type": "integer"
-        },
-        "memory_bytes": {
-          "default": 0,
-          "minimum": 0,
-          "title": "Memory Bytes",
-          "type": "integer"
-        },
-        "storage_bytes": {
-          "default": 0,
-          "minimum": 0,
-          "title": "Storage Bytes",
-          "type": "integer"
-        }
-      },
-      "title": "ResourceVector",
       "type": "object"
     },
     "Signature": {
@@ -181,26 +248,26 @@
       "properties": {
         "algorithm": {
           "const": "ed25519",
-          "default": "ed25519",
           "title": "Algorithm",
           "type": "string"
         },
         "key_id": {
           "maxLength": 128,
           "minLength": 3,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
           "title": "Key Id",
           "type": "string"
         },
         "value": {
           "maxLength": 86,
           "minLength": 86,
-          "pattern": "^[A-Za-z0-9_-]{86}$",
+          "pattern": "^[A-Za-z0-9_-]{86}$(?![\\s\\S])",
           "title": "Value",
           "type": "string"
         }
       },
       "required": [
+        "algorithm",
         "key_id",
         "value"
       ],
@@ -240,23 +307,12 @@
     "account_id": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Account Id",
       "type": "string"
     },
     "attestation": {
-      "enum": [
-        "unverified",
-        "software_verified",
-        "hardware_verified"
-      ],
-      "title": "Attestation",
-      "type": "string"
-    },
-    "expires_at": {
-      "format": "date-time",
-      "title": "Expires At",
-      "type": "string"
+      "$ref": "#/$defs/AttestationLevel"
     },
     "health": {
       "$ref": "#/$defs/NodeHealth"
@@ -264,33 +320,28 @@
     "inventory_id": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Inventory Id",
       "type": "string"
     },
     "labels": {
-      "additionalProperties": {
-        "maxLength": 128,
-        "type": "string"
-      },
-      "maxProperties": 64,
-      "title": "Labels",
-      "type": "object"
+      "$ref": "#/$defs/NodeLabels"
     },
     "node_id": {
       "maxLength": 128,
       "minLength": 3,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
       "title": "Node Id",
       "type": "string"
     },
     "observed_at": {
       "format": "date-time",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$(?![\\s\\S])",
       "title": "Observed At",
       "type": "string"
     },
     "public_key_fingerprint": {
-      "pattern": "^[a-f0-9]{64}$",
+      "pattern": "^[a-f0-9]{64}$(?![\\s\\S])",
       "title": "Public Key Fingerprint",
       "type": "string"
     },
@@ -299,7 +350,6 @@
     },
     "schema": {
       "const": "planetary.vsource.inventory.v1",
-      "default": "planetary.vsource.inventory.v1",
       "title": "Schema",
       "type": "string"
     },
@@ -313,13 +363,19 @@
       "minItems": 1,
       "title": "Transports",
       "type": "array",
-      "uniqueItems": true
+      "uniqueItems": true,
+      "x-canonical-order": "lexicographic"
     },
     "trust_zone": {
       "const": "personal_cell",
-      "default": "personal_cell",
       "title": "Trust Zone",
       "type": "string"
+    },
+    "ttl_seconds": {
+      "maximum": 300,
+      "minimum": 1,
+      "title": "Ttl Seconds",
+      "type": "integer"
     },
     "workload_kinds": {
       "items": {
@@ -328,23 +384,32 @@
       "minItems": 1,
       "title": "Workload Kinds",
       "type": "array",
-      "uniqueItems": true
+      "uniqueItems": true,
+      "x-canonical-order": "lexicographic"
     }
   },
   "required": [
-    "inventory_id",
-    "node_id",
     "account_id",
-    "public_key_fingerprint",
     "attestation",
-    "observed_at",
-    "expires_at",
     "health",
+    "inventory_id",
+    "labels",
+    "node_id",
+    "observed_at",
+    "public_key_fingerprint",
     "resources",
+    "schema",
+    "signature",
     "transports",
-    "workload_kinds",
-    "signature"
+    "trust_zone",
+    "ttl_seconds",
+    "workload_kinds"
   ],
   "title": "ResourceInventory",
-  "type": "object"
+  "type": "object",
+  "x-planetary-semantic-invariants": [
+    "Verify Ed25519 and node-key ownership; inventory expires at observed_at + ttl_seconds.",
+    "The gpus object is keyed by unique GPU IDs and publishes allocatable rather than physical capacity.",
+    "Canonical-order arrays are unique and lexicographically sorted."
+  ]
 }

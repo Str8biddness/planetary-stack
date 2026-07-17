@@ -1,5 +1,11 @@
 # Software-Defined Hardware Abstraction: Agnostic Expansion Drive & Live Compilation
 
+> **Read-only extraction-seed history — not implementation guidance.** Raw
+> Python `marshal`/pickle/`eval`, network bytecode execution, unauthenticated
+> discovery, placeholder credentials, and permissive bindings below are
+> prohibited. Use the signed, content-addressed, same-account
+> `contracts/chal_vsource/v1` boundary and a future hardened AIVM sandbox.
+
 ## Overview
 
 This document explains how Synthesus 5 CHAL implements software-defined storage, live code compilation, and distributed ML backend orchestration using standard systems engineering patterns.

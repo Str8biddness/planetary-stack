@@ -49,11 +49,11 @@ Acceptance gate: one clone contains every canonical source boundary and
   AIVM, knowledge integration, API, frontend, and desktop.
 - [ ] Quarantine duplicate or historical trees under `archive/` with a
   retirement note; do not silently delete unique work.
-- [x] Move architecture-only vSource and Unisync material into versioned
-  cross-component specifications. Evidence: 2026-07-16 the canonical
-  `contracts/chal_vsource/v1` package froze strict private-cell protocol
-  models and nine deterministic JSON Schemas; historical raw-bytecode,
-  trust-bypass, and hardware-blueprint documents are explicitly superseded.
+- [ ] Move architecture-only vSource and Unisync material into versioned
+  cross-component specifications. Progress: 2026-07-16 the canonical
+  `contracts/chal_vsource/v1` package versioned the private-cell control
+  boundary and all discovered raw-bytecode/trust-bypass copies were marked as
+  historical. A versioned Unisync backend/transport specification remains.
 - [x] Fix the mounted Knowledge Cloud evolution regression exposed by
   `tests/test_knowledge_evolution.py::test_knowledge_evolution_propagation`.
   Evidence: 2026-07-16 query-focused grounded-fact retention preserves newly
@@ -102,8 +102,10 @@ changed-component test matrix from documented commands.
 - [x] Freeze the CHAL request, response, capability, telemetry, and error
   schemas. Evidence: 2026-07-16 strict v1 models and committed Draft 2020-12
   schemas cover CHAL requests/responses/errors/capabilities/telemetry plus
-  vSource inventory/placement/fenced leases/lifecycle; schema-drift and
-  adversarial validation suite passed 18 tests.
+  vSource inventory/placement/fenced leases/lifecycle. Forty-two adversarial
+  tests pass under two hash seeds (84 executions); an independent
+  Draft 2020-12 validator, pinned generator manifest, strict reference model,
+  and RFC 8785 digest probes close the cross-language contract gate.
 - [ ] Implement vSource resource inventory, leases, placement, and lifecycle.
   The v1 message shapes are frozen; the registry, allocator, persistent lease
   state machine, signature verification, and node-agent integration remain.
