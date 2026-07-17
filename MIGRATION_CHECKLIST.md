@@ -124,6 +124,10 @@ changed-component test matrix from documented commands.
   context-bound verified receipt. Local memory/PCIe and Internet/relay
   backends remain.
 - [ ] Define AIVM workload and artifact manifests.
+  Progress: strict signed v1 workload/artifact models are admitted against
+  allowlisted images, fixed entrypoint identifiers, bounded resources, and
+  verified artifact bytes. Production issuer enrollment and end-to-end
+  controller/node integration remain.
 - [x] Mount the Knowledge Cloud through a versioned manifest-verified client.
   Evidence: 2026-07-16 production startup resolves the monorepo/standalone
   artifact root, validates hashes, 501,819-vector retrieval semantics,
@@ -172,6 +176,15 @@ indexing, and inference jobs while tolerating a worker disappearing.
 - [ ] Replace raw marshal, pickle, eval, and arbitrary-shell execution at every
   network boundary.
 - [ ] Run untrusted work in a hardened container, microVM, or WASM sandbox.
+  Progress: a 2026-07-17 CPU-only acceptance slice executes one admitted,
+  fixed operator-owned entrypoint in rootless Podman with a digest-pinned
+  cached image, no network, read-only rootfs, no capabilities, no-new-
+  privileges, seccomp availability, a non-root keep-id user, and cgroup v2
+  CPU/memory/PID limits. Owner-only durable replay claims, bounded process
+  output, verified file outputs, and timeout container cleanup fail closed.
+  The physical gate passed on one enrolled Linux worker; arbitrary untrusted
+  workloads, GPU/device isolation, cross-node dispatch, and public
+  multi-tenancy remain explicitly unimplemented.
 - [ ] Enforce signed workload manifests and allowlisted runtime images.
 - [ ] Add node health, capability, benchmark, and reputation records.
 - [ ] Add deterministic result hashes where possible.
