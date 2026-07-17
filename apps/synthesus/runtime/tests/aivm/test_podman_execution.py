@@ -142,9 +142,16 @@ def _request(
 
 
 class FakePodmanRunner:
-    def __init__(self, *, image_digest: str = IMAGE_DIGEST, run_result: CommandResult | None = None):
+    def __init__(
+        self,
+        *,
+        image_digest: str = IMAGE_DIGEST,
+        run_result: CommandResult | None = None,
+        info_mutator=None,
+    ):
         self.image_digest = image_digest
         self.run_result = run_result
+        self.info_mutator = info_mutator
         self.commands: list[tuple[str, ...]] = []
         self.output_mutator = None
 
@@ -167,6 +174,8 @@ class FakePodmanRunner:
                 },
                 "version": {"Version": "5.0.0-test"},
             }
+            if self.info_mutator is not None:
+                self.info_mutator(value)
             return CommandResult(command, 0, json.dumps(value).encode())
         if command[1:3] == ("image", "inspect"):
             value = [
@@ -199,7 +208,12 @@ class FakePodmanRunner:
         return CommandResult(command, 0)
 
 
-def _executor(tmp_path: Path, runner: FakePodmanRunner) -> PodmanExecutor:
+def _executor(
+    tmp_path: Path,
+    runner: FakePodmanRunner,
+    *,
+    max_input_file_bytes: int = 64 * 1024 * 1024,
+) -> PodmanExecutor:
     state = _private_directory(tmp_path / "state")
     artifacts = _private_directory(tmp_path / "artifacts")
     outputs = _private_directory(tmp_path / "outputs")
@@ -226,6 +240,7 @@ def _executor(tmp_path: Path, runner: FakePodmanRunner) -> PodmanExecutor:
         trusted_entrypoints={entrypoint.entrypoint_id: entrypoint},
         stdout_limit_bytes=64,
         stderr_limit_bytes=64,
+        max_input_file_bytes=max_input_file_bytes,
         max_output_files=1,
         max_output_file_bytes=4096,
     )
@@ -262,6 +277,8 @@ def test_success_binds_authority_and_emits_hardened_podman_argv(tmp_path):
         "--log-driver=none",
     }
     assert required.issubset(command)
+    assert command[command.index("--user") + 1] == f"{os.geteuid()}:{os.getegid()}"
+    assert command[command.index("--user") + 1] != "0:0"
     assert command[command.index("--entrypoint") + 1] == "/usr/bin/cp"
     assert command[-4:] == (
         IMMUTABLE_IMAGE,
@@ -325,6 +342,66 @@ def test_cached_image_digest_mismatch_fails_before_claim(tmp_path):
     assert result.reason == "cached_image_digest_mismatch"
     assert not list((tmp_path / "state").glob("*.claim.json"))
     assert not any(command[1] == "run" for command in runner.commands)
+
+
+@pytest.mark.parametrize(
+    ("mutator", "reason"),
+    [
+        (
+            lambda value: value["host"]["security"].update(rootless=False),
+            "podman_not_rootless",
+        ),
+        (
+            lambda value: value["host"]["security"].update(seccompEnabled=False),
+            "podman_seccomp_unavailable",
+        ),
+        (
+            lambda value: value["host"].update(cgroupVersion="v1"),
+            "cgroup_v2_unavailable",
+        ),
+        (
+            lambda value: value["host"].update(cgroupControllers=["cpu", "memory"]),
+            "required_cgroup_controllers_unavailable",
+        ),
+    ],
+)
+def test_missing_host_isolation_capability_fails_before_claim(tmp_path, mutator, reason):
+    runner = FakePodmanRunner(info_mutator=mutator)
+    executor = _executor(tmp_path, runner)
+
+    result = executor.execute(_request())
+
+    assert result.status is ExecutionStatus.UNAVAILABLE
+    assert result.reason == reason
+    assert not list((tmp_path / "state").glob("*.claim.json"))
+    assert not any(command[1] == "run" for command in runner.commands)
+
+
+def test_input_symlink_and_oversize_fail_before_container_start(tmp_path):
+    symlink_runner = FakePodmanRunner()
+    symlink_executor = _executor(tmp_path / "symlink", symlink_runner)
+    artifact = next((tmp_path / "symlink" / "artifacts").iterdir())
+    artifact.unlink()
+    artifact.symlink_to("/etc/passwd")
+
+    symlink_result = symlink_executor.execute(_request())
+
+    assert symlink_result.status is ExecutionStatus.REJECTED
+    assert symlink_result.reason == "input_artifact_not_confined"
+    assert not any(command[1] == "run" for command in symlink_runner.commands)
+
+    oversized_runner = FakePodmanRunner()
+    oversized_executor = _executor(
+        tmp_path / "oversized",
+        oversized_runner,
+        max_input_file_bytes=len(PAYLOAD) - 1,
+    )
+
+    oversized_result = oversized_executor.execute(_request())
+
+    assert oversized_result.status is ExecutionStatus.REJECTED
+    assert oversized_result.reason == "input_artifact_too_large"
+    assert not any(command[1] == "run" for command in oversized_runner.commands)
 
 
 @pytest.mark.parametrize("kind", ["symlink", "hardlink", "unexpected", "oversized"])

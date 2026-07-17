@@ -288,6 +288,9 @@ class ExecutorPolicy:
     podman_binary: str = "podman"
     stdout_limit_bytes: int = 65_536
     stderr_limit_bytes: int = 65_536
+    max_input_files: int = 64
+    max_input_file_bytes: int = 64 * 1024 * 1024
+    max_total_input_bytes: int = 256 * 1024 * 1024
     max_output_files: int = 32
     max_output_file_bytes: int = 64 * 1024 * 1024
 
@@ -299,6 +302,9 @@ class ExecutorPolicy:
         for name in (
             "stdout_limit_bytes",
             "stderr_limit_bytes",
+            "max_input_files",
+            "max_input_file_bytes",
+            "max_total_input_bytes",
             "max_output_files",
             "max_output_file_bytes",
         ):
@@ -773,6 +779,9 @@ class PodmanExecutor:
             },
             "resources": manifest.resources.model_dump(mode="json"),
             "output_limits": {
+                "input_files": self._policy.max_input_files,
+                "input_file_bytes": self._policy.max_input_file_bytes,
+                "total_input_bytes": self._policy.max_total_input_bytes,
                 "files": self._policy.max_output_files,
                 "per_file_bytes": self._policy.max_output_file_bytes,
                 "stdout_bytes": self._policy.stdout_limit_bytes,
@@ -783,8 +792,11 @@ class PodmanExecutor:
 
     def _verify_inputs(self, request: AdmittedExecutionRequest, entrypoint: TrustedEntrypoint) -> str:
         manifest = request.manifest
+        if not manifest.inputs or len(manifest.inputs) > self._policy.max_input_files:
+            raise InvalidExecutionRequest("input_count_out_of_policy")
         descriptors = {item.artifact_id: item for item in manifest.artifacts}
         records: list[dict[str, object]] = []
+        total_bytes = 0
         output_prefix = entrypoint.output_mount.rstrip("/") + "/"
         for artifact_id in manifest.inputs:
             descriptor = descriptors[artifact_id]
@@ -803,9 +815,15 @@ class PodmanExecutor:
                 or before.st_size != descriptor.size_bytes
             ):
                 raise InvalidExecutionRequest("input_artifact_not_confined")
+            if before.st_size > self._policy.max_input_file_bytes:
+                raise InvalidExecutionRequest("input_artifact_too_large")
+            total_bytes += before.st_size
+            if total_bytes > self._policy.max_total_input_bytes:
+                raise InvalidExecutionRequest("input_set_too_large")
             flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
             fd = os.open(path, flags)
             digest = hashlib.sha256()
+            measured = 0
             try:
                 opened = os.fstat(fd)
                 if (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
@@ -814,7 +832,29 @@ class PodmanExecutor:
                     chunk = os.read(fd, _READ_CHUNK)
                     if not chunk:
                         break
+                    measured += len(chunk)
+                    if measured > self._policy.max_input_file_bytes:
+                        raise InvalidExecutionRequest("input_artifact_too_large")
                     digest.update(chunk)
+                after = os.fstat(fd)
+                if (
+                    measured != before.st_size
+                    or (
+                        after.st_dev,
+                        after.st_ino,
+                        after.st_size,
+                        after.st_mtime_ns,
+                        after.st_ctime_ns,
+                    )
+                    != (
+                        before.st_dev,
+                        before.st_ino,
+                        before.st_size,
+                        before.st_mtime_ns,
+                        before.st_ctime_ns,
+                    )
+                ):
+                    raise InvalidExecutionRequest("input_artifact_changed")
             finally:
                 os.close(fd)
             if digest.hexdigest() != descriptor.sha256:
@@ -946,6 +986,8 @@ class PodmanExecutor:
         byte_budget: int,
     ) -> tuple[tuple[Mapping[str, object], ...], str]:
         expected = {relative: output_id for output_id, relative in entrypoint.outputs}
+        if len(expected) > self._policy.max_output_files:
+            raise OutputViolation("output_file_count_exceeded")
         allowed_directories = {""}
         for relative in expected:
             parent = PurePosixPath(relative).parent
@@ -969,6 +1011,7 @@ class PodmanExecutor:
                     or stat.S_ISLNK(info.st_mode)
                     or not stat.S_ISDIR(info.st_mode)
                     or info.st_uid != self._uid
+                    or stat.S_IMODE(info.st_mode) & 0o022
                 ):
                     raise OutputViolation("unsafe_output_directory")
             for filename in files:
@@ -988,7 +1031,8 @@ class PodmanExecutor:
                     raise OutputViolation("unsafe_output_file")
                 if before.st_size > self._policy.max_output_file_bytes:
                     raise OutputViolation("output_file_too_large")
-                total += before.st_size
+                previous_total = total
+                total = previous_total + before.st_size
                 if total > byte_budget:
                     raise OutputViolation("output_budget_exceeded")
                 flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
@@ -1004,13 +1048,29 @@ class PodmanExecutor:
                         if not chunk:
                             break
                         measured += len(chunk)
-                        if measured > self._policy.max_output_file_bytes or measured > byte_budget:
+                        if (
+                            measured > self._policy.max_output_file_bytes
+                            or previous_total + measured > byte_budget
+                        ):
                             raise OutputViolation("output_file_too_large")
                         digest.update(chunk)
                     after = os.fstat(fd)
                     if (
-                        (after.st_dev, after.st_ino) != (before.st_dev, before.st_ino)
-                        or after.st_size != before.st_size
+                        (
+                            after.st_dev,
+                            after.st_ino,
+                            after.st_size,
+                            after.st_mtime_ns,
+                            after.st_ctime_ns,
+                        )
+                        != (
+                            before.st_dev,
+                            before.st_ino,
+                            before.st_size,
+                            before.st_mtime_ns,
+                            before.st_ctime_ns,
+                        )
+                        or measured != before.st_size
                         or after.st_nlink != 1
                         or not stat.S_ISREG(after.st_mode)
                     ):
