@@ -107,8 +107,12 @@ changed-component test matrix from documented commands.
   Draft 2020-12 validator, pinned generator manifest, strict reference model,
   and RFC 8785 digest probes close the cross-language contract gate.
 - [ ] Implement vSource resource inventory, leases, placement, and lifecycle.
-  The v1 message shapes are frozen; the registry, allocator, persistent lease
-  state machine, signature verification, and node-agent integration remain.
+  Progress: 2026-07-17 the local SQLite control plane admits signed inventory,
+  performs same-account capability-constrained placement, issues fenced
+  leases, verifies signed results/lifecycle, and releases terminal leases.
+  Two physical Linux nodes completed the bounded signed hash gate at
+  `2d01c5e`; persistent service/API wiring and production node replay state
+  remain.
 - [ ] Define Unisync backends for local memory/PCIe, trusted LAN, and Internet
   task/object transport.
 - [ ] Define AIVM workload and artifact manifests.
@@ -127,8 +131,18 @@ Cloud artifact without private in-process shortcuts.
 ## Phase 5 — secure personal mesh MVP
 
 - [ ] Build a cross-platform node agent with explicit opt-in resource limits.
+  Progress: a fail-closed Linux node boundary admits exact signed
+  request/capability/inventory/lease joins and executes only a bounded
+  deterministic hash operation. Cross-platform packaging, user controls, and
+  general workload isolation remain.
 - [ ] Implement device enrollment using per-node keys and revocation.
+  Progress: the physical gate creates distinct node-local Ed25519 identities
+  in mode-0700/0600 state and never exports private keys. Persistent issuer
+  enrollment and revocation remain.
 - [ ] Use mutually authenticated encrypted transport for every node.
+  The 2026-07-17 physical gate used exact-host-key-pinned administrative SSH
+  only as its carrier and explicitly records `unisync_mtls_proven=false`;
+  production Unisync mTLS remains required.
 - [ ] Add NAT traversal with a relay fallback; never require unsafe router
   configuration.
 - [ ] Schedule only among machines owned by the same account.

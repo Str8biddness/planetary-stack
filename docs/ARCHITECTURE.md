@@ -76,10 +76,15 @@ commands, raw prompt/output telemetry, implicit delegation, and public-fabric
 placement are not part of the protocol. Unisync will implement transport
 beneath this boundary; it cannot grant authority or weaken validation.
 
-The schemas define messages, not a claim of runtime completion. Signature
-verification, enrollment/revocation, the inventory registry, allocator,
-lease-state persistence, node agent, transport, and AIVM sandbox remain gated
-implementation work.
+The schemas alone do not claim runtime completion. The first local runtime
+slice now provides an SQLite inventory registry, deterministic same-account
+allocator, signed fenced leases, lifecycle/result admission, and a node-local
+agent restricted to a bounded hash operation. A two-Linux-node acceptance
+gate drives that slice over exact-host-key-pinned administrative SSH while the
+signed contract records `local_process`. This is physical integration evidence,
+not a production transport claim. Persistent issuer enrollment/revocation,
+durable node replay state, Unisync mTLS, general workload execution, resource
+controls, failure recovery, and the AIVM sandbox remain gated work.
 
 ## Local controller boundary
 
