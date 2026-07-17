@@ -24,7 +24,7 @@ from .storage import ContentAddressedStore
 class InProcessObjectTransport:
     """Real local byte-copy backend with the same frame and verifier rules."""
 
-    transport_id = "in_process"
+    transport_id = "local_process"
 
     def __init__(
         self,
@@ -97,6 +97,12 @@ class InProcessObjectTransport:
                             limits=self.limits,
                         )
                         frame = decode_frame(frame_bytes, limits=self.limits)
+                        require_authorized(
+                            context,
+                            validator=self.validator,
+                            transport_id=self.transport_id,
+                            max_total_bytes=self.limits.max_total_bytes,
+                        )
                         assembler.receive_chunk(
                             offset=int(frame.header["offset"]),
                             payload=frame.payload,
@@ -118,6 +124,8 @@ class InProcessObjectTransport:
                                 resumed_from=resumed_from,
                             )
                         )
+                if offset != context.byte_length:
+                    raise ValueError("source object ended before declared transfer length")
             complete_frame = encode_frame(
                 FRAME_COMPLETE,
                 sequence=sequence,
@@ -128,6 +136,12 @@ class InProcessObjectTransport:
                 limits=self.limits,
             )
             decode_frame(complete_frame, limits=self.limits)
+            require_authorized(
+                context,
+                validator=self.validator,
+                transport_id=self.transport_id,
+                max_total_bytes=self.limits.max_total_bytes,
+            )
             digest = assembler.finalize()
             if progress is not None:
                 progress(
@@ -146,6 +160,7 @@ class InProcessObjectTransport:
                 bytes_transferred=transferred - resumed_from,
                 resumed_from=resumed_from,
                 transport_id=self.transport_id,
+                verified_receipt_sha256=context.receipt_sha256(digest),
             )
         except Exception:
             assembler.abort()

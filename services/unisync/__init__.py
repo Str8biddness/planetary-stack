@@ -7,6 +7,7 @@ validator from the control plane before any bytes move.
 """
 
 from .contracts import (
+    AuthenticatedPeerIdentity,
     AuthorizationLeaseValidator,
     BackpressureController,
     CancellationToken,
@@ -52,11 +53,12 @@ from .framing import (
 )
 from .local import InProcessObjectTransport
 from .storage import ContentAddressedStore, ObjectAssembler
-from .tls import TrustedLanClient, TrustedLanServer, TLSCredentials
+from .tls import EnrolledPeerIdentity, TrustedLanClient, TrustedLanServer, TLSCredentials
 
 __all__ = [
     "AuthorizationError",
     "AuthorizationLeaseValidator",
+    "AuthenticatedPeerIdentity",
     "BackpressureController",
     "BackpressureError",
     "CancellationError",
@@ -68,6 +70,7 @@ __all__ = [
     "DeferredTransport",
     "DigestMismatchError",
     "ExpiredContextError",
+    "EnrolledPeerIdentity",
     "FRAME_ACK",
     "FRAME_CANCEL",
     "FRAME_CHUNK",

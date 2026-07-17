@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import ipaddress
 import ssl
 import threading
@@ -19,7 +20,11 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 from services.unisync import (
     AuthorizationError,
+    BackpressureError,
+    CancellationToken,
     ContentAddressedStore,
+    EnrolledPeerIdentity,
+    FRAME_ACK,
     FRAME_START,
     TLSConfigurationError,
     TLSCredentials,
@@ -28,6 +33,7 @@ from services.unisync import (
     encode_frame,
 )
 from services.unisync.tls import _client_context, _server_context
+from services.unisync.tls import _derive_authenticated_peer_identity
 from services.unisync.tls import _require_peer_san
 
 from .conftest import StrictValidator, make_context
@@ -204,7 +210,34 @@ def _client_credentials(certs: CertMaterial, *, unknown_ca: bool = False) -> TLS
     return TLSCredentials(ca_file=certs.ca, cert_file=certs.client_cert, key_file=certs.client_key)
 
 
-def _server_instance(tmp_path, certs: CertMaterial, *, expired: bool = False) -> TrustedLanServer:
+def _cert_fingerprints(cert_path: Path) -> tuple[str, str]:
+    cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
+    cert_der = cert.public_bytes(serialization.Encoding.DER)
+    public_key_der = cert.public_key().public_bytes(
+        serialization.Encoding.DER,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    return hashlib.sha256(cert_der).hexdigest(), hashlib.sha256(public_key_der).hexdigest()
+
+
+def _client_enrollment(
+    certs: CertMaterial,
+    *,
+    account_id: str = "account:local",
+    node_id: str = "node:source",
+) -> EnrolledPeerIdentity:
+    certificate_sha256, public_key_sha256 = _cert_fingerprints(certs.client_cert)
+    return EnrolledPeerIdentity(
+        account_id=account_id,
+        node_id=node_id,
+        sans=frozenset({"client.test"}),
+        certificate_sha256=certificate_sha256,
+        public_key_sha256=public_key_sha256,
+    )
+
+
+def _server_instance(tmp_path, certs: CertMaterial, *, expired: bool = False, **kwargs) -> TrustedLanServer:
+    enrolled_client_identities = kwargs.pop("enrolled_client_identities", {_client_enrollment(certs)})
     return TrustedLanServer(
         bind_host="127.0.0.1",
         port=0,
@@ -213,6 +246,8 @@ def _server_instance(tmp_path, certs: CertMaterial, *, expired: bool = False) ->
         validator=StrictValidator(),
         declared_listener_addresses={"127.0.0.1"},
         allowed_client_sans={"client.test"},
+        enrolled_client_identities=enrolled_client_identities,
+        **kwargs,
     )
 
 
@@ -341,7 +376,12 @@ def _run_socketpair_upload(
 
     def serve() -> None:
         try:
-            server._receive_upload(pair.server_stream)
+            peer_identity = _derive_authenticated_peer_identity(
+                peer_cert=pair.server_ssl.getpeercert(),
+                der_bytes=pair.server_ssl.getpeercert(binary_form=True),
+                enrollments=server.enrolled_client_identities,
+            )
+            server._receive_upload(pair.server_stream, peer_identity=peer_identity)
         except BaseException as exc:
             server_errors.append(exc)
 
@@ -361,6 +401,30 @@ def _run_socketpair_upload(
             raise server_errors[0]
 
 
+class _ScriptedStream:
+    def __init__(self, responses: list[bytes]) -> None:
+        self._buffer = b"".join(responses)
+        self.sent: list[bytes] = []
+
+    def sendall(self, payload: bytes) -> None:
+        self.sent.append(payload)
+
+    def recv(self, byte_count: int) -> bytes:
+        if not self._buffer:
+            return b""
+        chunk = self._buffer[:byte_count]
+        self._buffer = self._buffer[byte_count:]
+        return chunk
+
+
+class _CloseOnlySocket:
+    def __init__(self) -> None:
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
 def test_loopback_mtls_transfer_moves_object(tmp_path, payload: bytes, certs: CertMaterial) -> None:
     source = ContentAddressedStore(tmp_path / "source")
     digest = source.put_bytes(payload)
@@ -372,16 +436,60 @@ def test_loopback_mtls_transfer_moves_object(tmp_path, payload: bytes, certs: Ce
         validator=StrictValidator(),
         chunk_size=80,
     )
+    context = make_context(payload, transport="lan_mtls")
     result = _run_socketpair_upload(
         server=server,
         client=client,
-        context=make_context(payload, transport="lan_mtls"),
+        context=context,
         source_root=source.root,
     )
 
     destination = ContentAddressedStore(tmp_path / "destination")
     assert result.object_sha256 == digest
     assert destination.read_bytes(digest) == payload
+    assert result.verified_receipt_sha256 == context.receipt_sha256(digest)
+    assert isinstance(server.validator, StrictValidator)
+    assert server.validator.peer_identities
+    assert server.validator.peer_identities[-1] is not None
+    assert server.validator.peer_identities[-1].node_id == "node:source"
+
+
+@pytest.mark.parametrize(
+    ("enrollment_changes", "message"),
+    [
+        ({"node_id": "node:other"}, "source node"),
+        ({"account_id": "account:other"}, "account"),
+    ],
+)
+def test_client_certificate_identity_must_match_transfer_context(
+    tmp_path,
+    payload: bytes,
+    certs: CertMaterial,
+    enrollment_changes: dict[str, str],
+    message: str,
+) -> None:
+    source = ContentAddressedStore(tmp_path / "source")
+    digest = source.put_bytes(payload)
+    server = _server_instance(
+        tmp_path,
+        certs,
+        enrolled_client_identities={_client_enrollment(certs, **enrollment_changes)},
+    )
+    client = TrustedLanClient(
+        credentials=_client_credentials(certs),
+        server_hostname="server.test",
+        validator=StrictValidator(),
+        chunk_size=80,
+    )
+
+    with pytest.raises(AuthorizationError, match=message):
+        _run_socketpair_upload(
+            server=server,
+            client=client,
+            context=make_context(payload, transport="lan_mtls"),
+            source_root=source.root,
+        )
+    assert not ContentAddressedStore(tmp_path / "destination").has(digest)
 
 
 def test_missing_client_certificate_is_refused(tmp_path, payload: bytes, certs: CertMaterial) -> None:
@@ -453,7 +561,18 @@ def test_expired_server_certificate_is_refused(tmp_path, payload: bytes, certs: 
         )
 
 
-@pytest.mark.parametrize("bind_host", ["0.0.0.0", "::", "8.8.8.8"])
+@pytest.mark.parametrize(
+    "bind_host",
+    [
+        "0.0.0.0",
+        "::",
+        "::ffff:0.0.0.0",
+        "255.255.255.255",
+        "224.0.0.1",
+        "192.0.2.1",
+        "8.8.8.8",
+    ],
+)
 def test_wildcard_and_public_binds_are_rejected(tmp_path, certs: CertMaterial, bind_host: str) -> None:
     server = TrustedLanServer(
         bind_host=bind_host,
@@ -466,6 +585,40 @@ def test_wildcard_and_public_binds_are_rejected(tmp_path, certs: CertMaterial, b
     )
     with pytest.raises(TLSConfigurationError):
         server.start()
+
+
+def test_explicit_vpn_cidr_listener_is_allowed(tmp_path, certs: CertMaterial) -> None:
+    server = TrustedLanServer(
+        bind_host="100.64.1.10",
+        port=0,
+        credentials=_server_credentials(certs),
+        destination_root=tmp_path / "destination",
+        validator=StrictValidator(),
+        declared_listener_addresses={"100.64.1.10"},
+        declared_vpn_cidrs={"100.64.0.0/10"},
+        allowed_client_sans={"client.test"},
+        enrolled_client_identities={_client_enrollment(certs)},
+    )
+    assert str(server.validate_listener_config()) == "100.64.1.10"
+
+
+def test_tls_worker_limit_and_error_retention_are_bounded(tmp_path, certs: CertMaterial) -> None:
+    server = _server_instance(tmp_path, certs, max_workers=1, max_errors=2)
+    assert server._worker_slots.acquire(blocking=False)
+    refused = _CloseOnlySocket()
+    try:
+        assert server._dispatch_client(_server_context(server.credentials), refused) is False
+    finally:
+        server._worker_slots.release()
+    assert refused.closed is True
+    assert len(server.errors) == 1
+    assert isinstance(server.errors[0], BackpressureError)
+
+    server._record_error(RuntimeError("first"))
+    server._record_error(RuntimeError("second"))
+    server._record_error(RuntimeError("third"))
+    assert len(server.errors) == 2
+    assert str(server.errors[0]) == "second"
 
 
 def test_undeclared_listener_address_is_rejected(tmp_path, certs: CertMaterial) -> None:
@@ -494,6 +647,69 @@ def test_plaintext_is_refused_by_tls_listener(tmp_path, payload: bytes, certs: C
     with pytest.raises(ssl.SSLError):
         server_ssl.do_handshake()
     assert not any((tmp_path / "destination").rglob("objects/*/*"))
+
+
+def test_forged_resume_ack_cannot_claim_oversized_success(tmp_path, payload: bytes, certs: CertMaterial) -> None:
+    source = ContentAddressedStore(tmp_path / "source")
+    source.put_bytes(payload)
+    context = make_context(payload, transport="lan_mtls")
+    forged_ack = encode_frame(
+        FRAME_ACK,
+        context=context.to_wire(),
+        extra={"resume_offset": context.byte_length + 1},
+    )
+    client = TrustedLanClient(
+        credentials=_client_credentials(certs),
+        server_hostname="server.test",
+        validator=StrictValidator(),
+    )
+
+    with pytest.raises(TLSConfigurationError, match="resume_offset"):
+        client._upload_over_socket(
+            tls_sock=_ScriptedStream([forged_ack]),
+            context=context,
+            source=source,
+            cancellation=CancellationToken(),
+            deadline=None,
+            progress=None,
+        )
+
+
+def test_final_ack_requires_receiver_verified_receipt(tmp_path, payload: bytes, certs: CertMaterial) -> None:
+    source = ContentAddressedStore(tmp_path / "source")
+    source.put_bytes(payload)
+    context = make_context(payload, transport="lan_mtls")
+    start_ack = encode_frame(
+        FRAME_ACK,
+        context=context.to_wire(),
+        extra={"resume_offset": 0},
+    )
+    chunk_ack = encode_frame(
+        FRAME_ACK,
+        context=context.to_wire(),
+        extra={"resume_offset": context.byte_length},
+    )
+    forged_final = encode_frame(
+        FRAME_ACK,
+        context=context.to_wire(),
+        extra={"object_sha256": context.object_sha256},
+    )
+    client = TrustedLanClient(
+        credentials=_client_credentials(certs),
+        server_hostname="server.test",
+        validator=StrictValidator(),
+        chunk_size=context.byte_length,
+    )
+
+    with pytest.raises(TLSConfigurationError, match="receipt"):
+        client._upload_over_socket(
+            tls_sock=_ScriptedStream([start_ack, chunk_ack, forged_final]),
+            context=context,
+            source=source,
+            cancellation=CancellationToken(),
+            deadline=None,
+            progress=None,
+        )
 
 
 def test_tls_client_also_requires_injected_admission(tmp_path, payload: bytes, certs: CertMaterial) -> None:

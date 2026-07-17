@@ -9,6 +9,7 @@ import struct
 from dataclasses import dataclass
 from typing import Any
 
+from .contracts import MAX_SAFE_INTEGER
 from .errors import DigestMismatchError, FrameTooLargeError, InvalidFrameError
 
 PROTOCOL = "planetary.unisync.transport"
@@ -32,6 +33,7 @@ class FrameLimits:
     max_frame_bytes: int = 72 * 1024
     max_total_bytes: int = 64 * 1024 * 1024
     max_pending_bytes: int = 512 * 1024
+    max_pending_chunks: int = 64
 
 
 DEFAULT_LIMITS = FrameLimits()
@@ -75,24 +77,34 @@ def _validate_header(header: dict[str, Any], payload: bytes, limits: FrameLimits
     if header.get("type") not in VALID_FRAME_TYPES:
         raise InvalidFrameError("unsupported frame type")
     payload_length = header.get("payload_length")
-    if not isinstance(payload_length, int) or payload_length < 0:
+    if not isinstance(payload_length, int) or isinstance(payload_length, bool) or payload_length < 0:
         raise InvalidFrameError("payload_length must be a non-negative integer")
+    if payload_length > MAX_SAFE_INTEGER:
+        raise InvalidFrameError("payload_length exceeds the I-JSON safe integer range")
     if payload_length != len(payload):
         raise InvalidFrameError("payload length does not match frame header")
     if payload_length > limits.max_payload_bytes:
         raise FrameTooLargeError("payload exceeds configured chunk cap")
+    if header.get("type") == FRAME_CHUNK and payload_length == 0:
+        raise InvalidFrameError("chunk payload must be nonempty")
     if header.get("payload_sha256") != hashlib.sha256(payload).hexdigest():
         raise DigestMismatchError("frame payload digest mismatch")
     offset = header.get("offset", 0)
     sequence = header.get("sequence", 0)
-    if not isinstance(offset, int) or offset < 0:
+    if not isinstance(offset, int) or isinstance(offset, bool) or offset < 0:
         raise InvalidFrameError("offset must be a non-negative integer")
-    if not isinstance(sequence, int) or sequence < 0:
+    if offset > MAX_SAFE_INTEGER:
+        raise InvalidFrameError("offset exceeds the I-JSON safe integer range")
+    if not isinstance(sequence, int) or isinstance(sequence, bool) or sequence < 0:
         raise InvalidFrameError("sequence must be a non-negative integer")
+    if sequence > MAX_SAFE_INTEGER:
+        raise InvalidFrameError("sequence exceeds the I-JSON safe integer range")
     total_length = header.get("total_length")
     if total_length is not None:
-        if not isinstance(total_length, int) or total_length < 0:
+        if not isinstance(total_length, int) or isinstance(total_length, bool) or total_length < 0:
             raise InvalidFrameError("total_length must be a non-negative integer")
+        if total_length > MAX_SAFE_INTEGER:
+            raise InvalidFrameError("total_length exceeds the I-JSON safe integer range")
         if total_length > limits.max_total_bytes:
             raise FrameTooLargeError("total_length exceeds configured cap")
     if offset + payload_length > limits.max_total_bytes:
@@ -184,7 +196,7 @@ def read_frame(sock: socket.socket, *, limits: FrameLimits = DEFAULT_LIMITS) -> 
     header_bytes = recv_exact(sock, header_length)
     header = _loads_no_duplicate_keys(header_bytes)
     payload_length = header.get("payload_length")
-    if not isinstance(payload_length, int) or payload_length < 0:
+    if not isinstance(payload_length, int) or isinstance(payload_length, bool) or payload_length < 0:
         raise InvalidFrameError("payload_length must be a non-negative integer")
     if payload_length > limits.max_payload_bytes:
         raise FrameTooLargeError("payload exceeds configured cap")

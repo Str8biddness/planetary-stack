@@ -6,6 +6,7 @@ from datetime import timedelta
 
 import pytest
 
+import services.unisync.storage as storage_module
 from services.unisync import (
     BackpressureError,
     ContentAddressedStore,
@@ -42,6 +43,11 @@ def test_frame_corruption_and_digest_mismatch_are_explicit() -> None:
         decode_frame(bytes(corrupted))
 
 
+def test_chunk_frames_must_not_be_empty() -> None:
+    with pytest.raises(InvalidFrameError, match="nonempty"):
+        encode_frame(FRAME_CHUNK, payload=b"")
+
+
 def test_store_rejects_traversal_and_symlink_attempts(tmp_path) -> None:
     store = ContentAddressedStore(tmp_path / "cas")
     with pytest.raises(StorageSecurityError, match="digest"):
@@ -55,6 +61,24 @@ def test_store_rejects_traversal_and_symlink_attempts(tmp_path) -> None:
     os.symlink(outside, object_path)
     with pytest.raises(StorageSecurityError, match="symlink"):
         store.has(digest)
+
+
+def test_store_temp_symlink_and_leaf_swap_are_rejected(tmp_path, payload: bytes, monkeypatch) -> None:
+    store = ContentAddressedStore(tmp_path / "cas")
+    digest = hashlib.sha256(payload).hexdigest()
+    monkeypatch.setattr(storage_module.secrets, "token_hex", lambda size: "fixed")
+    temp_path = store.root / ".tmp" / f"{digest}.fixed.tmp"
+    outside = tmp_path / "outside"
+    outside.write_bytes(b"outside")
+    os.symlink(outside, temp_path)
+    with pytest.raises(StorageSecurityError, match="escapes|temporary|symlink"):
+        store.put_bytes(payload)
+
+    leaf = store.object_path(digest)
+    leaf.parent.mkdir(parents=True, exist_ok=True)
+    os.symlink(outside, leaf)
+    with pytest.raises(StorageSecurityError, match="symlink"):
+        store.read_bytes(digest)
 
 
 def test_duplicate_reorder_and_resume_offsets_finalize(tmp_path, payload: bytes) -> None:
@@ -106,6 +130,30 @@ def test_reorder_buffer_is_bounded(tmp_path, payload: bytes) -> None:
         assembler.receive_chunk(offset=32, payload=chunk, chunk_sha256=hashlib.sha256(chunk).hexdigest())
 
 
+def test_pending_chunks_reject_empty_overlap_and_entry_count(tmp_path, payload: bytes) -> None:
+    store = ContentAddressedStore(tmp_path / "destination")
+    context = make_context(payload)
+    assembler = store.start_receive(context, limits=FrameLimits(max_payload_bytes=32, max_pending_bytes=256))
+    with pytest.raises(InvalidFrameError, match="nonempty"):
+        assembler.receive_chunk(offset=32, payload=b"", chunk_sha256=hashlib.sha256(b"").hexdigest())
+
+    first = payload[32:48]
+    overlap = payload[40:56]
+    assembler.receive_chunk(offset=32, payload=first, chunk_sha256=hashlib.sha256(first).hexdigest())
+    with pytest.raises(InvalidFrameError, match="overlaps"):
+        assembler.receive_chunk(offset=40, payload=overlap, chunk_sha256=hashlib.sha256(overlap).hexdigest())
+
+    limited = ContentAddressedStore(tmp_path / "entry-limit").start_receive(
+        context,
+        limits=FrameLimits(max_payload_bytes=32, max_pending_bytes=256, max_pending_chunks=1),
+    )
+    chunk_a = payload[32:48]
+    chunk_b = payload[64:80]
+    limited.receive_chunk(offset=32, payload=chunk_a, chunk_sha256=hashlib.sha256(chunk_a).hexdigest())
+    with pytest.raises(BackpressureError, match="entry"):
+        limited.receive_chunk(offset=64, payload=chunk_b, chunk_sha256=hashlib.sha256(chunk_b).hexdigest())
+
+
 def test_failed_final_verification_cleans_partial_data(tmp_path, payload: bytes) -> None:
     bad_payload_context = make_context(b"different" + payload)
     context = replace_context_for_digest(bad_payload_context, payload)
@@ -118,6 +166,26 @@ def test_failed_final_verification_cleans_partial_data(tmp_path, payload: bytes)
         assembler.finalize()
     assert not part_path.exists()
     assert not meta_path.exists()
+
+
+def test_publication_fsyncs_object_and_parent_directories(tmp_path, payload: bytes, monkeypatch) -> None:
+    directory_fsyncs: list[os.PathLike] = []
+    monkeypatch.setattr(storage_module, "_fsync_directory", lambda path: directory_fsyncs.append(path))
+
+    store = ContentAddressedStore(tmp_path / "cas")
+    digest = store.put_bytes(payload)
+    assert store.object_path(digest).parent in directory_fsyncs
+    assert store.root / ".tmp" in directory_fsyncs
+
+    directory_fsyncs.clear()
+    destination = ContentAddressedStore(tmp_path / "destination")
+    context = make_context(payload)
+    assembler = destination.start_receive(context)
+    assembler.receive_chunk(offset=0, payload=payload, chunk_sha256=hashlib.sha256(payload).hexdigest())
+    directory_fsyncs.clear()
+    assert assembler.finalize() == digest
+    assert destination.object_path(digest).parent in directory_fsyncs
+    assert destination.root / ".partials" in directory_fsyncs
 
 
 def test_expired_context_is_representable(payload: bytes) -> None:
