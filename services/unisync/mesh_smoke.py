@@ -311,7 +311,7 @@ class ServeHandle:
         total = 0
         pending = bytearray()
         while True:
-            chunk = self._process.stdout.read(65_536)
+            chunk = os.read(self._process.stdout.fileno(), 65_536)
             if not chunk:
                 break
             total += len(chunk)
@@ -334,7 +334,7 @@ class ServeHandle:
     def _drain_stderr(self) -> None:
         assert self._process.stderr is not None
         while True:
-            chunk = self._process.stderr.read(65536)
+            chunk = os.read(self._process.stderr.fileno(), 65_536)
             if not chunk:
                 return
             if len(self._stderr) + len(chunk) > MAX_CARRIER_OUTPUT_BYTES:
