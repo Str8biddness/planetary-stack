@@ -56,8 +56,12 @@ def _key():
     return rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
 
-def _name(common_name: str) -> x509.Name:
-    return x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
+def _name(common_name: str, *, account_id: str | None = None) -> x509.Name:
+    attributes = []
+    if account_id is not None:
+        attributes.append(x509.NameAttribute(NameOID.ORGANIZATION_NAME, account_id))
+    attributes.append(x509.NameAttribute(NameOID.COMMON_NAME, common_name))
+    return x509.Name(attributes)
 
 
 def _write_key(path: Path, key) -> None:
@@ -96,6 +100,7 @@ def _make_ca(common_name: str):
 def _make_leaf(
     *,
     common_name: str,
+    account_id: str = "account:local",
     ca_key,
     ca_cert,
     dns_names: list[str],
@@ -122,7 +127,7 @@ def _make_leaf(
         san_entries.append(x509.IPAddress(ipaddress.ip_address(address)))
     cert = (
         x509.CertificateBuilder()
-        .subject_name(_name(common_name))
+        .subject_name(_name(common_name, account_id=account_id))
         .issuer_name(ca_cert.subject)
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
@@ -141,7 +146,7 @@ def certs(tmp_path) -> CertMaterial:
     ca_key, ca_cert = _make_ca("Unisync Test CA")
     bad_ca_key, bad_ca_cert = _make_ca("Unisync Unknown CA")
     server_key, server_cert = _make_leaf(
-        common_name="server.test",
+        common_name="node:destination",
         ca_key=ca_key,
         ca_cert=ca_cert,
         dns_names=["server.test"],
@@ -149,7 +154,7 @@ def certs(tmp_path) -> CertMaterial:
         server=True,
     )
     expired_key, expired_cert = _make_leaf(
-        common_name="server.test",
+        common_name="node:destination",
         ca_key=ca_key,
         ca_cert=ca_cert,
         dns_names=["server.test"],
@@ -158,14 +163,14 @@ def certs(tmp_path) -> CertMaterial:
         expired=True,
     )
     client_key, client_cert = _make_leaf(
-        common_name="client.test",
+        common_name="node:source",
         ca_key=ca_key,
         ca_cert=ca_cert,
         dns_names=["client.test"],
         client=True,
     )
     bad_client_key, bad_client_cert = _make_leaf(
-        common_name="client.test",
+        common_name="node:source",
         ca_key=bad_ca_key,
         ca_cert=bad_ca_cert,
         dns_names=["client.test"],
