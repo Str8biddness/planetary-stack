@@ -243,6 +243,7 @@ cat > "$APPS/synthesus.desktop" <<DESK
 Name=Synthesus
 Comment=Local, private AI desktop
 Exec=$BIN_DIR/synthesus --standard
+Icon=$SYNTHESUS_HOME/desktop/assets/synthesus-icon.png
 Terminal=false
 Type=Application
 Categories=Utility;
@@ -252,6 +253,7 @@ cat > "$APPS/synthesus-agentic.desktop" <<DESK
 Name=Synthesus Agentic
 Comment=Local AI desktop with one-time, session-scoped sudo authorization
 Exec=$BIN_DIR/synthesus --agentic
+Icon=$SYNTHESUS_HOME/desktop/assets/synthesus-icon.png
 Terminal=false
 Type=Application
 Categories=Development;

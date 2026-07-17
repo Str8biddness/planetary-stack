@@ -83,9 +83,16 @@ changed-component test matrix from documented commands.
 
 ## Phase 4 — service boundaries and contracts
 
-- [ ] Extract `synthesusd`, the local cognitive controller daemon.
-- [ ] Bind the desktop to authenticated loopback IPC; never expose the
-  terminal server directly to the LAN.
+- [x] Extract `synthesusd`, the local cognitive controller daemon.
+  Evidence: 2026-07-16 the desktop shell routed a live `mode="chal"` request
+  through an independently launched loopback controller and received
+  `source="chal_runtime"`.
+- [x] Bind the desktop to authenticated loopback IPC; never expose the
+  terminal server directly to the LAN. Evidence: runtime proxy requests
+  require the per-install API key; browser terminal traffic requires a
+  logged-in desktop user, separate per-launch capability, and allowlisted
+  origin; the PTY backend listens only on a mode-0600 Unix socket inside a
+  mode-0700 directory.
 - [ ] Freeze the CHAL request, response, capability, telemetry, and error
   schemas.
 - [ ] Implement vSource resource inventory, leases, placement, and lifecycle.

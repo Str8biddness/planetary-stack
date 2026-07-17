@@ -951,6 +951,34 @@ function handleChatKey(event) { if(event.key === 'Enter') sendChatMessage(); }
 // TERMINAL IPC & HIERARCHY APPROVAL
 // ==========================================
 let termCounter = 0;
+let ipcSessionPromise = null;
+
+function getIPCSession() {
+    if (!ipcSessionPromise) {
+        const userToken = localStorage.getItem('synthesus_token');
+        if (!userToken) {
+            return Promise.reject(new Error('Sign in before opening a terminal'));
+        }
+        ipcSessionPromise = fetch('/api/ipc/session', {
+            cache: 'no-store',
+            headers: { 'Authorization': 'Bearer ' + userToken }
+        })
+            .then(response => {
+                if (!response.ok) throw new Error(`IPC session unavailable (${response.status})`);
+                return response.json();
+            })
+            .catch(error => {
+                ipcSessionPromise = null;
+                throw error;
+            });
+    }
+    return ipcSessionPromise;
+}
+
+function controllerHost(config) {
+    const hostname = window.location.hostname || '127.0.0.1';
+    return `${hostname}:${config.controller_port}`;
+}
 
 function spawnTerminalWindow() {
     termCounter++;
@@ -999,9 +1027,15 @@ function spawnTerminalWindow() {
     term.open(document.getElementById(termContainerId));
     
     let ptySocket;
-    function connectPTY() {
+    async function connectPTY() {
         try {
-            ptySocket = new WebSocket(`ws://127.0.0.1:8082/ws/pty/user/${sessionId}`);
+            const config = await getIPCSession();
+            const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            const endpoint = `${scheme}://${controllerHost(config)}${config.terminal_ws_path}/${sessionId}`;
+            ptySocket = new WebSocket(
+                endpoint,
+                ['synthesus-terminal', config.terminal_token]
+            );
             ptySocket.onopen = () => term.write('\r\n[Connected to System PTY (Multi-Session)]\r\n');
             ptySocket.onmessage = (e) => term.write(e.data);
             ptySocket.onclose = () => {
@@ -1010,7 +1044,10 @@ function spawnTerminalWindow() {
                     setTimeout(connectPTY, 2000);
                 }
             };
-        } catch(e) {}
+        } catch(e) {
+            term.write(`\r\n[Authenticated terminal IPC unavailable: ${e.message}]\r\n`);
+            if(document.getElementById(termId)) setTimeout(connectPTY, 2000);
+        }
     }
     connectPTY();
     
@@ -1020,11 +1057,26 @@ function spawnTerminalWindow() {
         }
     });
     
-    term.onResize((size) => {
-        fetch('http://127.0.0.1:8082/api/terminal/resize', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: sessionId, cols: size.cols, rows: size.rows })
-        }).catch(() => {});
+    term.onResize(async (size) => {
+        try {
+            const config = await getIPCSession();
+            const scheme = window.location.protocol === 'https:' ? 'https' : 'http';
+            await fetch(
+                `${scheme}://${controllerHost(config)}${config.terminal_http_path}/api/terminal/resize`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Synthesus-IPC-Token': config.terminal_token
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        cols: size.cols,
+                        rows: size.rows
+                    })
+                }
+            );
+        } catch (_) {}
     });
     
     const resizeObserver = new ResizeObserver(() => fitAddon.fit());
@@ -3662,4 +3714,3 @@ async function runVoiceSpeak() {
         }
     }
 }
-

@@ -7,17 +7,17 @@ A REAL localhost-only PTY server. Not a mock, not an echo shim: every session
 forks a genuine login `bash` on a Unix pseudo-terminal (stdlib `pty`/`os.openpty`)
 and streams it byte-for-byte over a WebSocket to the xterm.js frontend.
 
-Protocol (matched exactly to script.js in the planetary-desktop frontend):
-  * WS   ws://127.0.0.1:8082/ws/pty/user/{session_id}
+Internal protocol (reached only through synthesusd):
+  * WS   /ws/pty/user/{session_id}
          - text/bytes from client  -> written to the pty stdin (keystrokes)
          - bytes from the pty       -> sent to the client as TEXT frames
            (the frontend calls term.write(e.data) with no binaryType set, so
             binary frames would arrive as Blobs it can't render -> we send text)
-  * POST http://127.0.0.1:8082/api/terminal/resize
+  * POST /api/terminal/resize
          - JSON {session_id, cols, rows} -> TIOCSWINSZ on that session's pty
 
-Bind: 127.0.0.1 ONLY. This is a real root-capable shell; it must never be
-exposed on 0.0.0.0.
+Bind: a mode-0600 Unix socket inside a mode-0700 user directory. This is a
+real root-capable shell and must never have a browser- or LAN-facing bind.
 
 Law: DEGRADE LOUDLY. Failures are logged to stderr and surfaced to the client,
 never silently swallowed.
@@ -33,12 +33,14 @@ import struct
 import sys
 import termios
 import logging
+import threading
+import time
 from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logging.basicConfig(
     level=logging.INFO,
@@ -47,8 +49,12 @@ logging.basicConfig(
 )
 log = logging.getLogger("terminal_server")
 
-HOST = "127.0.0.1"   # NEVER 0.0.0.0 — this is a real shell.
-PORT = 8082
+SOCKET_PATH = os.path.expanduser(
+    os.environ.get(
+        "SYNTHESUS_TERMINAL_SOCKET",
+        "~/.synthesus/ipc/terminal.sock",
+    )
+)
 
 app = FastAPI(title="Synthesus God-Mode Terminal Backend")
 
@@ -235,8 +241,8 @@ async def pty_ws(websocket: WebSocket, session_id: str):
 
 class ResizeReq(BaseModel):
     session_id: str
-    cols: int
-    rows: int
+    cols: int = Field(ge=1, le=65535)
+    rows: int = Field(ge=1, le=65535)
 
 
 @app.post("/api/terminal/resize")
@@ -266,5 +272,29 @@ async def health():
 
 
 if __name__ == "__main__":
-    log.info("God-mode terminal backend binding %s:%d (localhost only)", HOST, PORT)
-    uvicorn.run(app, host=HOST, port=PORT, log_level="warning")
+    socket_dir = os.path.dirname(SOCKET_PATH)
+    os.makedirs(socket_dir, mode=0o700, exist_ok=True)
+    os.chmod(socket_dir, 0o700)
+    if os.path.exists(SOCKET_PATH):
+        os.unlink(SOCKET_PATH)
+
+    def restrict_socket_permissions():
+        for _ in range(200):
+            try:
+                os.chmod(SOCKET_PATH, 0o600)
+                return
+            except FileNotFoundError:
+                time.sleep(0.01)
+        log.error("PTY socket did not appear for permission hardening: %s", SOCKET_PATH)
+
+    previous_umask = os.umask(0o077)
+    try:
+        log.info("PTY backend binding user-only Unix socket %s", SOCKET_PATH)
+        threading.Thread(target=restrict_socket_permissions, daemon=True).start()
+        uvicorn.run(app, uds=SOCKET_PATH, log_level="warning")
+    finally:
+        os.umask(previous_umask)
+        try:
+            os.unlink(SOCKET_PATH)
+        except FileNotFoundError:
+            pass
