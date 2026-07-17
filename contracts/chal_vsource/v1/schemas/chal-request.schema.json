@@ -1,0 +1,542 @@
+{
+  "$defs": {
+    "ContentReference": {
+      "additionalProperties": false,
+      "properties": {
+        "classification": {
+          "enum": [
+            "public",
+            "private",
+            "restricted"
+          ],
+          "title": "Classification",
+          "type": "string"
+        },
+        "media_type": {
+          "maxLength": 128,
+          "minLength": 3,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$(?![\\s\\S])",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "uri": {
+          "maxLength": 512,
+          "minLength": 8,
+          "pattern": "^(artifact|aivm|chal|kc|mem)://[A-Za-z0-9][A-Za-z0-9._~:/?#@!$&'()*+,;=%-]*$(?![\\s\\S])",
+          "title": "Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "classification",
+        "media_type",
+        "sha256",
+        "size_bytes",
+        "uri"
+      ],
+      "title": "ContentReference",
+      "type": "object"
+    },
+    "RequestConstraints": {
+      "additionalProperties": false,
+      "properties": {
+        "checkpoint_required": {
+          "title": "Checkpoint Required",
+          "type": "boolean"
+        },
+        "grounding_required": {
+          "title": "Grounding Required",
+          "type": "boolean"
+        },
+        "latency_budget_ms": {
+          "maximum": 3600000,
+          "minimum": 1,
+          "title": "Latency Budget Ms",
+          "type": "integer"
+        },
+        "network_access": {
+          "enum": [
+            "none",
+            "artifact_plane_only"
+          ],
+          "title": "Network Access",
+          "type": "string"
+        },
+        "resources": {
+          "$ref": "#/$defs/ResourceVector"
+        },
+        "template_leakage_allowed": {
+          "const": false,
+          "title": "Template Leakage Allowed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "checkpoint_required",
+        "grounding_required",
+        "latency_budget_ms",
+        "network_access",
+        "resources",
+        "template_leakage_allowed"
+      ],
+      "title": "RequestConstraints",
+      "type": "object"
+    },
+    "ResourceVector": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "gpu_memory_bytes": {
+                "minimum": 1
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "gpu_count": {
+                "const": 0
+              }
+            },
+            "required": [
+              "gpu_count"
+            ]
+          },
+          "then": {
+            "properties": {
+              "gpu_memory_bytes": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "cpu_millicores": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Cpu Millicores",
+          "type": "integer"
+        },
+        "egress_bps": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Egress Bps",
+          "type": "integer"
+        },
+        "gpu_count": {
+          "maximum": 64,
+          "minimum": 0,
+          "title": "Gpu Count",
+          "type": "integer"
+        },
+        "gpu_memory_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Gpu Memory Bytes",
+          "type": "integer"
+        },
+        "ingress_bps": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Ingress Bps",
+          "type": "integer"
+        },
+        "memory_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Memory Bytes",
+          "type": "integer"
+        },
+        "storage_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Storage Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cpu_millicores",
+        "egress_bps",
+        "gpu_count",
+        "gpu_memory_bytes",
+        "ingress_bps",
+        "memory_bytes",
+        "storage_bytes"
+      ],
+      "title": "ResourceVector",
+      "type": "object"
+    },
+    "Signature": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "const": "ed25519",
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "key_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
+          "title": "Key Id",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 86,
+          "minLength": 86,
+          "pattern": "^[A-Za-z0-9_-]{86}$(?![\\s\\S])",
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "algorithm",
+        "key_id",
+        "value"
+      ],
+      "title": "Signature",
+      "type": "object"
+    },
+    "WorkloadKind": {
+      "enum": [
+        "retrieval",
+        "embedding",
+        "indexing",
+        "inference",
+        "evaluation",
+        "simulation",
+        "rendering",
+        "checkpointable_training"
+      ],
+      "title": "WorkloadKind",
+      "type": "string"
+    },
+    "WorkloadParameters": {
+      "additionalProperties": false,
+      "description": "Allowlisted scalar tuning knobs; inputs remain content references.",
+      "properties": {
+        "batch_size": {
+          "anyOf": [
+            {
+              "maximum": 65536,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Batch Size"
+        },
+        "checkpoint_interval_seconds": {
+          "anyOf": [
+            {
+              "maximum": 86400,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Checkpoint Interval Seconds"
+        },
+        "chunk_size": {
+          "anyOf": [
+            {
+              "maximum": 1000000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Chunk Size"
+        },
+        "deterministic": {
+          "title": "Deterministic",
+          "type": "boolean"
+        },
+        "height": {
+          "anyOf": [
+            {
+              "maximum": 32768,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Height"
+        },
+        "max_tokens": {
+          "anyOf": [
+            {
+              "maximum": 1000000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Max Tokens"
+        },
+        "precision": {
+          "anyOf": [
+            {
+              "enum": [
+                "auto",
+                "fp32",
+                "fp16",
+                "bf16",
+                "int8",
+                "int4"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Precision"
+        },
+        "replica_count": {
+          "anyOf": [
+            {
+              "maximum": 1024,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Replica Count"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Seed"
+        },
+        "steps": {
+          "anyOf": [
+            {
+              "maximum": 1000000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Steps"
+        },
+        "temperature": {
+          "anyOf": [
+            {
+              "maximum": 2.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Temperature"
+        },
+        "top_k": {
+          "anyOf": [
+            {
+              "maximum": 1000000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Top K"
+        },
+        "width": {
+          "anyOf": [
+            {
+              "maximum": 32768,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Width"
+        }
+      },
+      "required": [
+        "batch_size",
+        "checkpoint_interval_seconds",
+        "chunk_size",
+        "deterministic",
+        "height",
+        "max_tokens",
+        "precision",
+        "replica_count",
+        "seed",
+        "steps",
+        "temperature",
+        "top_k",
+        "width"
+      ],
+      "title": "WorkloadParameters",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.reality-core.systems/chal-vsource/v1/chal-request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "account_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
+      "title": "Account Id",
+      "type": "string"
+    },
+    "capability_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
+      "title": "Capability Id",
+      "type": "string"
+    },
+    "constraints": {
+      "$ref": "#/$defs/RequestConstraints"
+    },
+    "device_uri": {
+      "maxLength": 256,
+      "minLength": 10,
+      "pattern": "^chal://[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)*$(?![\\s\\S])",
+      "title": "Device Uri",
+      "type": "string"
+    },
+    "idempotency_key": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
+      "title": "Idempotency Key",
+      "type": "string"
+    },
+    "inputs": {
+      "items": {
+        "$ref": "#/$defs/ContentReference"
+      },
+      "maxItems": 128,
+      "title": "Inputs",
+      "type": "array"
+    },
+    "issued_at": {
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$(?![\\s\\S])",
+      "title": "Issued At",
+      "type": "string"
+    },
+    "parameters": {
+      "$ref": "#/$defs/WorkloadParameters"
+    },
+    "parent_request_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Parent Request Id"
+    },
+    "request_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
+      "title": "Request Id",
+      "type": "string"
+    },
+    "schema": {
+      "const": "planetary.chal.request.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "signature": {
+      "$ref": "#/$defs/Signature"
+    },
+    "trace_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$(?![\\s\\S])",
+      "title": "Trace Id",
+      "type": "string"
+    },
+    "ttl_seconds": {
+      "maximum": 3600,
+      "minimum": 1,
+      "title": "Ttl Seconds",
+      "type": "integer"
+    },
+    "workload_kind": {
+      "$ref": "#/$defs/WorkloadKind"
+    },
+    "workload_manifest": {
+      "$ref": "#/$defs/ContentReference"
+    }
+  },
+  "required": [
+    "account_id",
+    "capability_id",
+    "constraints",
+    "device_uri",
+    "idempotency_key",
+    "inputs",
+    "issued_at",
+    "parameters",
+    "parent_request_id",
+    "request_id",
+    "schema",
+    "signature",
+    "trace_id",
+    "ttl_seconds",
+    "workload_kind",
+    "workload_manifest"
+  ],
+  "title": "ChalRequest",
+  "type": "object",
+  "x-planetary-semantic-invariants": [
+    "Verify Ed25519 over RFC8785(document without signature).",
+    "Authority expires at issued_at + ttl_seconds; reject after that window.",
+    "Persist (account_id,idempotency_key)->request_sha256 and reject a conflicting payload."
+  ]
+}

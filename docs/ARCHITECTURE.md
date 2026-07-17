@@ -55,6 +55,32 @@ Planetary Desktop ── localhost WebSocket/HTTP ── synthesusd
 Crossing a zone requires explicit identity, authorization, encryption,
 resource limits, and audit records.
 
+## Versioned CHAL/vSource contract
+
+The canonical distributed control-plane contract is
+[`contracts/chal_vsource/v1`](../contracts/chal_vsource/v1/README.md). Its
+strict Pydantic models and nine committed Draft 2020-12 JSON Schemas freeze:
+
+- CHAL request, response, structured error, capability, and telemetry frames;
+- vSource inventory, placement, fenced lease, and lifecycle frames.
+
+Version 1 schedules only inside a same-account private cell. Workload and data
+fields cross the boundary as signed descriptors with RFC 8785 request and
+inventory digests or as content-addressed artifact references. Bounded TTLs,
+I-JSON-safe numbers, canonical arrays, fenced leases, and metadata enums are
+wire invariants. Allocation admission applies componentwise capability,
+request, inventory, transport, and GPU-ID joins; results and lifecycle events
+bind the exact active lease digest and fencing token. Raw bytecode, `marshal`,
+pickle, `eval`, arbitrary shell
+commands, raw prompt/output telemetry, implicit delegation, and public-fabric
+placement are not part of the protocol. Unisync will implement transport
+beneath this boundary; it cannot grant authority or weaken validation.
+
+The schemas define messages, not a claim of runtime completion. Signature
+verification, enrollment/revocation, the inventory registry, allocator,
+lease-state persistence, node agent, transport, and AIVM sandbox remain gated
+implementation work.
+
 ## Local controller boundary
 
 The desktop now reaches private services through `synthesusd`, bound only to

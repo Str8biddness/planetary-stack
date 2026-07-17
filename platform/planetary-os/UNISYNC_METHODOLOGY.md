@@ -1,5 +1,14 @@
 # AIVM UNISYNC ARCHITECTURE: BARE-METAL HARDWARE ABSTRACTION
 
+> **Historical concept — superseded for implementation.** This document is
+> retained as imported design history. Its proposals to bypass `sudo`, trick a
+> host kernel, inject trusted input, expose raw buses, or treat remote memory as
+> implicitly trusted are prohibited product requirements. The canonical v1
+> boundary is `contracts/chal_vsource/v1`: same-account enrollment, explicit
+> signed capability, short-lived fenced lease, content-addressed I/O, mTLS
+> transport, OS-enforced isolation, and audit telemetry. Unisync is a data
+> transport behind that boundary and grants no authority.
+
 ## 1. The Core Philosophy: Rejection of Legacy Paradigms
 Future agents and developers must understand a fundamental architectural shift in the AIVM project: **We explicitly reject the legacy "Master/Slave" or "Worker Node" networking paradigm.** 
 

@@ -1,0 +1,4 @@
+# Schema bytes and their manifest are pinned to this generator version.
+pydantic==2.13.4
+rfc8785==0.1.4
+jsonschema[format]==4.26.0

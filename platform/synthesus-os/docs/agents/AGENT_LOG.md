@@ -1,5 +1,12 @@
 # Synthesus Agent Log
 
+> **Read-only extraction-seed history.** The bytecode/`marshal`/`eval`, raw
+> TCP/UDP worker, and implicit cluster-trust guidance recorded below is
+> superseded and prohibited for implementation. The canonical writable
+> runtime is `apps/synthesus/runtime`; the canonical distributed boundary is
+> `contracts/chal_vsource/v1`. Historical completion claims are not evidence
+> that a production node agent, transport, scheduler, or sandbox exists.
+
 This file is the handoff ledger for agents working in this repository.
 
 ## Protocol

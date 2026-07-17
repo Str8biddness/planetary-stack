@@ -1,5 +1,15 @@
 # Software-Defined Hardware Abstraction: Agnostic Expansion Drive & Live Compilation
 
+> **Archived design material.** The raw Python `marshal`/pickle/`eval`, TCP
+> bytecode execution, unauthenticated UDP discovery, placeholder credentials,
+> and network-binding examples below are documentation history, not approved
+> implementation guidance. They are prohibited at a CHAL/vSource network
+> boundary. The canonical cross-node v1 contract is
+> `contracts/chal_vsource/v1`: signed capabilities, content-addressed workload
+> manifests, fenced leases, allowlisted transports, structured errors, and
+> metadata-only telemetry. Future execution must occur through a hardened AIVM
+> container, microVM, or WASM sandbox after signature and artifact validation.
+
 ## Overview
 
 This document explains how Synthesus 5 CHAL implements software-defined storage, live code compilation, and distributed ML backend orchestration using standard systems engineering patterns.

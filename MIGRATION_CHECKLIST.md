@@ -50,7 +50,10 @@ Acceptance gate: one clone contains every canonical source boundary and
 - [ ] Quarantine duplicate or historical trees under `archive/` with a
   retirement note; do not silently delete unique work.
 - [ ] Move architecture-only vSource and Unisync material into versioned
-  cross-component specifications.
+  cross-component specifications. Progress: 2026-07-16 the canonical
+  `contracts/chal_vsource/v1` package versioned the private-cell control
+  boundary and all discovered raw-bytecode/trust-bypass copies were marked as
+  historical. A versioned Unisync backend/transport specification remains.
 - [x] Fix the mounted Knowledge Cloud evolution regression exposed by
   `tests/test_knowledge_evolution.py::test_knowledge_evolution_propagation`.
   Evidence: 2026-07-16 query-focused grounded-fact retention preserves newly
@@ -72,6 +75,9 @@ trees fail a repository audit.
   without granting blanket `NOPASSWD` access.
 - [ ] Expand CI into path-filtered desktop, runtime, kernel, and knowledge
   planes.
+- [x] Gate CHAL/vSource schema drift and adversarial protocol validation in
+  root smoke CI. Evidence: 2026-07-16 `make test-contracts` verifies the
+  schema bundle manifest and runs the focused contract suite.
 - [ ] Add formatting, linting, type checking, unit, integration, and security
   commands.
 - [ ] Add a reproducible development container or Nix/devcontainer equivalent.
@@ -93,9 +99,16 @@ changed-component test matrix from documented commands.
   logged-in desktop user, separate per-launch capability, and allowlisted
   origin; the PTY backend listens only on a mode-0600 Unix socket inside a
   mode-0700 directory.
-- [ ] Freeze the CHAL request, response, capability, telemetry, and error
-  schemas.
+- [x] Freeze the CHAL request, response, capability, telemetry, and error
+  schemas. Evidence: 2026-07-16 strict v1 models and committed Draft 2020-12
+  schemas cover CHAL requests/responses/errors/capabilities/telemetry plus
+  vSource inventory/placement/fenced leases/lifecycle. Forty-two adversarial
+  tests pass under two hash seeds (84 executions); an independent
+  Draft 2020-12 validator, pinned generator manifest, strict reference model,
+  and RFC 8785 digest probes close the cross-language contract gate.
 - [ ] Implement vSource resource inventory, leases, placement, and lifecycle.
+  The v1 message shapes are frozen; the registry, allocator, persistent lease
+  state machine, signature verification, and node-agent integration remain.
 - [ ] Define Unisync backends for local memory/PCIe, trusted LAN, and Internet
   task/object transport.
 - [ ] Define AIVM workload and artifact manifests.

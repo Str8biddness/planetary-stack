@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools==78.1.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "planetary-stack-contracts"
+version = "1.0.0"
+description = "Versioned CHAL and vSource private-cell wire contracts"
+readme = "contracts/chal_vsource/v1/README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "jsonschema[format]==4.26.0",
+  "pydantic==2.13.4",
+  "rfc8785==0.1.4",
+]
+
+[project.optional-dependencies]
+test = ["pytest==9.1.1"]
+
+[project.scripts]
+planetary-contracts = "contracts.chal_vsource.v1.schema_tool:main"
+
+[tool.setuptools.packages.find]
+include = ["contracts*"]
+
+[tool.setuptools.package-data]
+"contracts.chal_vsource.v1" = ["README.md", "schemas/*.json"]

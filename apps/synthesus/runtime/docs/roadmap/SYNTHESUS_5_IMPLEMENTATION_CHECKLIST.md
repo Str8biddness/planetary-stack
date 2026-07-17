@@ -50,6 +50,8 @@ Legend:
 
 - [x]  Document CHAL frame schemas in `docs/modules/`. Session log: 2026-05-30 Agent 6 documented the PPBRS firmware-signal frame schema and round-trip validation; 2026-05-31 Agent 4 moved firmware frames to the shared `core.chal.frames` package boundary; 2026-05-31 Agent 6 documented the remaining core/KAL interface trace and budget metadata.
 
+- [x]  Freeze the Planetary cross-node CHAL/vSource v1 wire boundary for requests, responses, errors, signed capabilities, metadata-only telemetry, private-cell inventory/placement, fenced leases, and lifecycle events. Session log: 2026-07-16 Planetary CHAL/vSource v1 Contract Freeze; 42 adversarial tests pass under two hash seeds, with independent Draft 2020-12 validation, pinned generator/schema digests, strict reference semantics, and RFC 8785 request binding. Runtime registry, allocator, node agent, and signature enforcement remain separate work.
+
 ## Phase 2: Cognitive Hypervisor MVP
 
 - [x]  Implement `CognitiveHypervisor` as the central scheduler/control layer.

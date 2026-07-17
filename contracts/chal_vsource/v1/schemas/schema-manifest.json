@@ -1,0 +1,50 @@
+{
+  "bundle": "planetary.chal-vsource.v1",
+  "canonicalization": {
+    "implementation": "rfc8785==0.1.4",
+    "rfc": 8785
+  },
+  "contract_version": "1.0.0",
+  "generator": {
+    "pydantic": "2.13.4"
+  },
+  "json_schema_draft": "2020-12",
+  "schemas": {
+    "capability.schema.json": {
+      "id": "https://schemas.reality-core.systems/chal-vsource/v1/capability.schema.json",
+      "sha256": "64da68512e6b8d4ff88a033a63064ff20de37595009883b2dcbcfde3aea6312d"
+    },
+    "chal-request.schema.json": {
+      "id": "https://schemas.reality-core.systems/chal-vsource/v1/chal-request.schema.json",
+      "sha256": "074799ba4ab216ca10249cc98c4c3782f8960f1eacdc4fc78c1601659ce7e43c"
+    },
+    "chal-response.schema.json": {
+      "id": "https://schemas.reality-core.systems/chal-vsource/v1/chal-response.schema.json",
+      "sha256": "f8dea26148aea969c3b6c451a52294f12d47dfe81c453d1ac1094720e31a7f47"
+    },
+    "error.schema.json": {
+      "id": "https://schemas.reality-core.systems/chal-vsource/v1/error.schema.json",
+      "sha256": "03e2e710f410b925746524371555662613352a27936bd2327d714a1020f3b9d8"
+    },
+    "inventory.schema.json": {
+      "id": "https://schemas.reality-core.systems/chal-vsource/v1/inventory.schema.json",
+      "sha256": "b50219a4fbd083715a895825b84df295fb16cfdfb929c50f1952a0335ed32141"
+    },
+    "lease.schema.json": {
+      "id": "https://schemas.reality-core.systems/chal-vsource/v1/lease.schema.json",
+      "sha256": "367b87e51d225e6996e4800cb5845e676d62cb162e72abf59c414e0d1f702654"
+    },
+    "lifecycle.schema.json": {
+      "id": "https://schemas.reality-core.systems/chal-vsource/v1/lifecycle.schema.json",
+      "sha256": "39694034c6b696abf6688c113aadf0f948db36f20a0ad055916e0601f58568e5"
+    },
+    "placement.schema.json": {
+      "id": "https://schemas.reality-core.systems/chal-vsource/v1/placement.schema.json",
+      "sha256": "3e8f6934dbfa40302817d6df0c4f4edf5b661abd15b29d0323a5ca9ec7171f29"
+    },
+    "telemetry.schema.json": {
+      "id": "https://schemas.reality-core.systems/chal-vsource/v1/telemetry.schema.json",
+      "sha256": "b05e25e3a0f7a851f19d774ee7d77bf8466ea2665933cfded5c4b1d565a7b0a8"
+    }
+  }
+}
