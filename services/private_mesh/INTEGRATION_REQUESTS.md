@@ -23,9 +23,10 @@ coordinator/integrator and are **not** applied here:
    packaging edit. `cryptography` remains a test/runtime extra exactly as for
    `services.vsource`.
 
-4. **Two-node execution interface for the coordinator.** The later physical
-   check drives one `NodeAgent` per enrolled machine over pinned SSH/mTLS.
-   Per node, the coordinator must supply:
+4. **Two-node execution interface — resolved for the SSH smoke gate.**
+   `services.private_mesh.worker_cli` and
+   `services.private_mesh.ssh_smoke` now drive one `NodeAgent` per enrolled
+   machine over pinned administrative SSH. Per node, the coordinator supplies:
 
    - `NodeAgent(account_id=..., node_id=..., inventory=<signed v1 inventory>,
      verifier=Ed25519DocumentVerifier(key_resolver, clock, audience=node_id),
@@ -40,11 +41,12 @@ coordinator/integrator and are **not** applied here:
      `LocalVSourceControlPlane.record_lifecycle_event()` /
      `record_response()` for durable, fenced verification.
 
-   Suggested later gate command (from the coordinator host, once the SSH/mTLS
-   driver exists):
-   `make test-private-mesh PYTHON=.venv/bin/python` for in-process evidence,
-   plus a dedicated two-machine driver invoking the interface above; the
-   in-process suite must never be reported as physical-cluster evidence.
+   The exact physical command and evidence limits are documented in
+   `PHYSICAL_SMOKE.md`. SSH is only the smoke-test carrier. The signed
+   contract transport is `local_process`, and passing this gate must never be
+   reported as Unisync mTLS or production-cluster acceptance. The ephemeral
+   issuer trust view is delivered inside that pinned administrative channel;
+   durable registry enrollment remains deferred.
 
 5. **Durable node-side replay state.** This wave keeps admitted-lease state
    in process memory. Before a node agent survives restarts in a real mesh,
