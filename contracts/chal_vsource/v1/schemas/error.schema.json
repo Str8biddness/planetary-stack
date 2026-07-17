@@ -1,0 +1,109 @@
+{
+  "$defs": {
+    "ErrorCode": {
+      "enum": [
+        "invalid_request",
+        "unauthorized",
+        "forbidden",
+        "capability_expired",
+        "capability_revoked",
+        "no_placement",
+        "lease_conflict",
+        "lease_expired",
+        "node_unavailable",
+        "transport_unavailable",
+        "resource_exhausted",
+        "workload_rejected",
+        "workload_failed",
+        "integrity_failure",
+        "attestation_failed",
+        "deadline_exceeded",
+        "internal_error"
+      ],
+      "title": "ErrorCode",
+      "type": "string"
+    }
+  },
+  "$id": "https://schemas.reality-core.systems/chal-vsource/v1/error.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "code": {
+      "$ref": "#/$defs/ErrorCode"
+    },
+    "device_uri": {
+      "anyOf": [
+        {
+          "pattern": "^chal://[A-Za-z0-9._~:/-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Device Uri"
+    },
+    "error_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Error Id",
+      "type": "string"
+    },
+    "request_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Request Id",
+      "type": "string"
+    },
+    "retry_after_ms": {
+      "anyOf": [
+        {
+          "maximum": 3600000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retry After Ms"
+    },
+    "retryable": {
+      "title": "Retryable",
+      "type": "boolean"
+    },
+    "safe_detail": {
+      "maxLength": 512,
+      "minLength": 1,
+      "title": "Safe Detail",
+      "type": "string"
+    },
+    "schema": {
+      "const": "planetary.chal.error.v1",
+      "default": "planetary.chal.error.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "trace_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Trace Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "error_id",
+    "request_id",
+    "trace_id",
+    "code",
+    "retryable",
+    "safe_detail"
+  ],
+  "title": "ErrorFrame",
+  "type": "object"
+}

@@ -1,5 +1,13 @@
 # AIVM UNISYNC RESOURCE MERGER PLAN (SSI Blueprint)
 
+> **Historical concept — not an executable plan.** The trust-bypass, Ring-0
+> input, remote-memory, foreign-PCIe, and cross-host PID claims below are
+> retained only to preserve imported history. They must not be implemented as
+> authentication or authorization shortcuts. See
+> `contracts/chal_vsource/v1` for the canonical private-cell control contract.
+> Qualified RDMA or other accelerators may be added only as authenticated,
+> encrypted, policy-bounded transport backends with ordinary OS/IOMMU safety.
+
 ## Objective
 To scale the Planetary OS from a single host machine into a **Single System Image (SSI)** supercomputer by physically abstracting hardware resources across the AIVM fabric using Level 2 Bus Bridging.
 

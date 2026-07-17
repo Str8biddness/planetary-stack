@@ -255,3 +255,45 @@ Keep entries chronological. Do not rewrite history; append new sessions.
   surfaces require an explicit capability.
 - The PTY is an internal user-owned service behind `synthesusd`, not a network
   service.
+
+## Current Session — 2026-07-16 (Planetary CHAL/vSource v1 Contract Freeze)
+
+### Summary
+- Added the canonical `contracts/chal_vsource/v1` boundary with strict Pydantic
+  models and deterministic Draft 2020-12 JSON Schema exports.
+- Froze CHAL request, response, structured error, signed-capability descriptor,
+  and metadata-only telemetry shapes.
+- Froze vSource same-account private-cell inventory, placement, fenced lease,
+  and workload lifecycle shapes without claiming the scheduler is implemented.
+- Required content-addressed workload and artifact references and rejected
+  executable parameter fields, raw/secret-bearing telemetry labels, unknown
+  fields, public-fabric placement scope, invalid resource overcommit, stale
+  time windows, unfenced leases, and illegal lifecycle transitions.
+- Marked imported raw-bytecode, kernel-trust-bypass, and unauthenticated
+  hardware-blueprint material as historical and superseded.
+
+### Verified
+- `python -m contracts.chal_vsource.v1.schema_tool --check` validated all nine
+  committed schemas with no generated drift.
+- `python -m pytest -q tests/test_chal_vsource_contracts.py` passed 18 tests,
+  including full private-cell document round trips and adversarial rejection
+  paths.
+- `make test-contracts` is now a root target and the monorepo smoke workflow
+  installs its explicit Pydantic/pytest dependencies and executes it.
+- Python byte compilation passed for the canonical models and schema tool.
+
+### Left Off / Next Steps
+- Implement the vSource registry, allocator, monotonic fencing-token store,
+  lease expiry/revocation loop, and lifecycle persistence against these shapes.
+- Add per-node enrollment keys, signature verification, revocation, mTLS, and
+  explicit resource controls before any remote execution.
+- Define the AIVM signed workload/artifact manifest and hardened execution
+  sandbox before connecting a node agent.
+
+### Architectural Notes
+- Version 1 is a same-account private cell, not a public compute marketplace.
+- A signature field is a wire contract; actual Ed25519 verification remains a
+  mandatory runtime gate.
+- Unisync transports data and artifacts but never establishes authorization.
+- Planetary SSI is a coherent scheduler/resource view, not a shared kernel or
+  implicit cross-machine trust domain.

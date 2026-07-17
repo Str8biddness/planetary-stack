@@ -1,0 +1,278 @@
+{
+  "$defs": {
+    "CapabilityAction": {
+      "enum": [
+        "inspect",
+        "reserve",
+        "execute",
+        "checkpoint",
+        "cancel",
+        "release",
+        "read_artifact",
+        "write_artifact"
+      ],
+      "title": "CapabilityAction",
+      "type": "string"
+    },
+    "CapabilityConstraints": {
+      "additionalProperties": false,
+      "properties": {
+        "resource_patterns": {
+          "items": {
+            "pattern": "^chal://",
+            "type": "string"
+          },
+          "maxItems": 128,
+          "minItems": 1,
+          "title": "Resource Patterns",
+          "type": "array"
+        },
+        "resources": {
+          "$ref": "#/$defs/ResourceVector"
+        },
+        "transports": {
+          "items": {
+            "$ref": "#/$defs/TransportKind"
+          },
+          "minItems": 1,
+          "title": "Transports",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "workload_kinds": {
+          "items": {
+            "$ref": "#/$defs/WorkloadKind"
+          },
+          "minItems": 1,
+          "title": "Workload Kinds",
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "resources",
+        "workload_kinds",
+        "transports",
+        "resource_patterns"
+      ],
+      "title": "CapabilityConstraints",
+      "type": "object"
+    },
+    "ResourceVector": {
+      "additionalProperties": false,
+      "properties": {
+        "cpu_millicores": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Cpu Millicores",
+          "type": "integer"
+        },
+        "egress_bps": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Egress Bps",
+          "type": "integer"
+        },
+        "gpu_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Gpu Count",
+          "type": "integer"
+        },
+        "gpu_memory_bytes": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Gpu Memory Bytes",
+          "type": "integer"
+        },
+        "ingress_bps": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Ingress Bps",
+          "type": "integer"
+        },
+        "memory_bytes": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Memory Bytes",
+          "type": "integer"
+        },
+        "storage_bytes": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Storage Bytes",
+          "type": "integer"
+        }
+      },
+      "title": "ResourceVector",
+      "type": "object"
+    },
+    "Signature": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "const": "ed25519",
+          "default": "ed25519",
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "key_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+          "title": "Key Id",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 86,
+          "minLength": 86,
+          "pattern": "^[A-Za-z0-9_-]{86}$",
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key_id",
+        "value"
+      ],
+      "title": "Signature",
+      "type": "object"
+    },
+    "TransportKind": {
+      "enum": [
+        "local_process",
+        "unix_socket",
+        "lan_mtls",
+        "internet_mtls_relay",
+        "qualified_rdma"
+      ],
+      "title": "TransportKind",
+      "type": "string"
+    },
+    "WorkloadKind": {
+      "enum": [
+        "retrieval",
+        "embedding",
+        "indexing",
+        "inference",
+        "evaluation",
+        "simulation",
+        "rendering",
+        "checkpointable_training"
+      ],
+      "title": "WorkloadKind",
+      "type": "string"
+    }
+  },
+  "$id": "https://schemas.reality-core.systems/chal-vsource/v1/capability.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "account_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Account Id",
+      "type": "string"
+    },
+    "actions": {
+      "items": {
+        "$ref": "#/$defs/CapabilityAction"
+      },
+      "minItems": 1,
+      "title": "Actions",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "audience_node_ids": {
+      "items": {
+        "maxLength": 128,
+        "minLength": 3,
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+        "type": "string"
+      },
+      "maxItems": 128,
+      "minItems": 1,
+      "title": "Audience Node Ids",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "capability_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Capability Id",
+      "type": "string"
+    },
+    "constraints": {
+      "$ref": "#/$defs/CapabilityConstraints"
+    },
+    "delegable": {
+      "const": false,
+      "default": false,
+      "title": "Delegable",
+      "type": "boolean"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "issuer_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Issuer Id",
+      "type": "string"
+    },
+    "nonce": {
+      "maxLength": 128,
+      "minLength": 16,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Nonce",
+      "type": "string"
+    },
+    "not_before": {
+      "format": "date-time",
+      "title": "Not Before",
+      "type": "string"
+    },
+    "revocation_epoch": {
+      "minimum": 0,
+      "title": "Revocation Epoch",
+      "type": "integer"
+    },
+    "schema": {
+      "const": "planetary.chal.capability.v1",
+      "default": "planetary.chal.capability.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "signature": {
+      "$ref": "#/$defs/Signature"
+    },
+    "subject_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Subject Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "capability_id",
+    "issuer_id",
+    "subject_id",
+    "account_id",
+    "audience_node_ids",
+    "actions",
+    "constraints",
+    "not_before",
+    "expires_at",
+    "nonce",
+    "revocation_epoch",
+    "signature"
+  ],
+  "title": "CapabilityDocument",
+  "type": "object"
+}

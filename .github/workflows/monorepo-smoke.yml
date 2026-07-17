@@ -22,13 +22,16 @@ jobs:
           python-version: "3.12"
 
       - name: Install smoke dependencies
-        run: python -m pip install --disable-pip-version-check PyYAML requests
+        run: python -m pip install --disable-pip-version-check PyYAML requests 'pydantic>=2.7' pytest
 
       - name: Check repository contracts
         run: |
           bash -n scripts/doctor.sh scripts/component-status.sh scripts/hydrate-knowledge-cloud.sh
           make doctor PYTHON=python
           make status
+
+      - name: Validate CHAL and vSource protocol contracts
+        run: make test-contracts PYTHON=python
 
       - name: Hydrate Knowledge Cloud source fixtures
         run: git lfs pull --include='knowledge/knowledge-cloud/patterns/characters/**'

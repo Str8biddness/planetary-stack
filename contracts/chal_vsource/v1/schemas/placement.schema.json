@@ -1,0 +1,270 @@
+{
+  "$defs": {
+    "ErrorCode": {
+      "enum": [
+        "invalid_request",
+        "unauthorized",
+        "forbidden",
+        "capability_expired",
+        "capability_revoked",
+        "no_placement",
+        "lease_conflict",
+        "lease_expired",
+        "node_unavailable",
+        "transport_unavailable",
+        "resource_exhausted",
+        "workload_rejected",
+        "workload_failed",
+        "integrity_failure",
+        "attestation_failed",
+        "deadline_exceeded",
+        "internal_error"
+      ],
+      "title": "ErrorCode",
+      "type": "string"
+    },
+    "ErrorFrame": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ErrorCode"
+        },
+        "device_uri": {
+          "anyOf": [
+            {
+              "pattern": "^chal://[A-Za-z0-9._~:/-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Device Uri"
+        },
+        "error_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+          "title": "Error Id",
+          "type": "string"
+        },
+        "request_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+          "title": "Request Id",
+          "type": "string"
+        },
+        "retry_after_ms": {
+          "anyOf": [
+            {
+              "maximum": 3600000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retry After Ms"
+        },
+        "retryable": {
+          "title": "Retryable",
+          "type": "boolean"
+        },
+        "safe_detail": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Safe Detail",
+          "type": "string"
+        },
+        "schema": {
+          "const": "planetary.chal.error.v1",
+          "default": "planetary.chal.error.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "trace_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+          "title": "Trace Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "error_id",
+        "request_id",
+        "trace_id",
+        "code",
+        "retryable",
+        "safe_detail"
+      ],
+      "title": "ErrorFrame",
+      "type": "object"
+    },
+    "PlacementCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "eligible": {
+          "title": "Eligible",
+          "type": "boolean"
+        },
+        "node_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+          "title": "Node Id",
+          "type": "string"
+        },
+        "reasons": {
+          "items": {
+            "maxLength": 128,
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Reasons",
+          "type": "array"
+        },
+        "score": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Score",
+          "type": "number"
+        }
+      },
+      "required": [
+        "node_id",
+        "eligible",
+        "score"
+      ],
+      "title": "PlacementCandidate",
+      "type": "object"
+    },
+    "PlacementResult": {
+      "enum": [
+        "placed",
+        "unplaced"
+      ],
+      "title": "PlacementResult",
+      "type": "string"
+    }
+  },
+  "$id": "https://schemas.reality-core.systems/chal-vsource/v1/placement.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "account_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Account Id",
+      "type": "string"
+    },
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/PlacementCandidate"
+      },
+      "maxItems": 256,
+      "minItems": 1,
+      "title": "Candidates",
+      "type": "array"
+    },
+    "decided_at": {
+      "format": "date-time",
+      "title": "Decided At",
+      "type": "string"
+    },
+    "placement_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Placement Id",
+      "type": "string"
+    },
+    "policy_version": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Policy Version",
+      "type": "string"
+    },
+    "rejection_error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ErrorFrame"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "request_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Request Id",
+      "type": "string"
+    },
+    "result": {
+      "$ref": "#/$defs/PlacementResult"
+    },
+    "scheduler_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Scheduler Id",
+      "type": "string"
+    },
+    "scheduler_scope": {
+      "const": "same_account_private_cell",
+      "default": "same_account_private_cell",
+      "title": "Scheduler Scope",
+      "type": "string"
+    },
+    "schema": {
+      "const": "planetary.vsource.placement.v1",
+      "default": "planetary.vsource.placement.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "selected_node_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Selected Node Id"
+    },
+    "trace_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Trace Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "placement_id",
+    "request_id",
+    "trace_id",
+    "account_id",
+    "scheduler_id",
+    "decided_at",
+    "result",
+    "candidates",
+    "policy_version"
+  ],
+  "title": "PlacementDecision",
+  "type": "object"
+}

@@ -1,0 +1,219 @@
+{
+  "$defs": {
+    "LeaseState": {
+      "enum": [
+        "pending",
+        "active",
+        "released",
+        "expired",
+        "revoked"
+      ],
+      "title": "LeaseState",
+      "type": "string"
+    },
+    "ResourceVector": {
+      "additionalProperties": false,
+      "properties": {
+        "cpu_millicores": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Cpu Millicores",
+          "type": "integer"
+        },
+        "egress_bps": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Egress Bps",
+          "type": "integer"
+        },
+        "gpu_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Gpu Count",
+          "type": "integer"
+        },
+        "gpu_memory_bytes": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Gpu Memory Bytes",
+          "type": "integer"
+        },
+        "ingress_bps": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Ingress Bps",
+          "type": "integer"
+        },
+        "memory_bytes": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Memory Bytes",
+          "type": "integer"
+        },
+        "storage_bytes": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Storage Bytes",
+          "type": "integer"
+        }
+      },
+      "title": "ResourceVector",
+      "type": "object"
+    },
+    "Signature": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "const": "ed25519",
+          "default": "ed25519",
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "key_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+          "title": "Key Id",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 86,
+          "minLength": 86,
+          "pattern": "^[A-Za-z0-9_-]{86}$",
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key_id",
+        "value"
+      ],
+      "title": "Signature",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.reality-core.systems/chal-vsource/v1/lease.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "account_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Account Id",
+      "type": "string"
+    },
+    "capability_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Capability Id",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "fencing_token": {
+      "minimum": 1,
+      "title": "Fencing Token",
+      "type": "integer"
+    },
+    "lease_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Lease Id",
+      "type": "string"
+    },
+    "max_renewals": {
+      "default": 0,
+      "maximum": 1024,
+      "minimum": 0,
+      "title": "Max Renewals",
+      "type": "integer"
+    },
+    "node_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Node Id",
+      "type": "string"
+    },
+    "not_before": {
+      "format": "date-time",
+      "title": "Not Before",
+      "type": "string"
+    },
+    "placement_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Placement Id",
+      "type": "string"
+    },
+    "renewable": {
+      "default": false,
+      "title": "Renewable",
+      "type": "boolean"
+    },
+    "renewal_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Renewal Count",
+      "type": "integer"
+    },
+    "request_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]+$",
+      "title": "Request Id",
+      "type": "string"
+    },
+    "resources": {
+      "$ref": "#/$defs/ResourceVector"
+    },
+    "revocation_reason": {
+      "anyOf": [
+        {
+          "maxLength": 256,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Revocation Reason"
+    },
+    "schema": {
+      "const": "planetary.vsource.lease.v1",
+      "default": "planetary.vsource.lease.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "signature": {
+      "$ref": "#/$defs/Signature"
+    },
+    "state": {
+      "$ref": "#/$defs/LeaseState"
+    }
+  },
+  "required": [
+    "lease_id",
+    "placement_id",
+    "request_id",
+    "capability_id",
+    "node_id",
+    "account_id",
+    "resources",
+    "state",
+    "not_before",
+    "expires_at",
+    "fencing_token",
+    "signature"
+  ],
+  "title": "LeaseDocument",
+  "type": "object"
+}

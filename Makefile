@@ -1,7 +1,7 @@
 SHELL := /usr/bin/env bash
 PYTHON ?= python3
 
-.PHONY: doctor status test test-synthesus test-knowledge test-knowledge-source test-planetary test-planetary-iso
+.PHONY: doctor status test test-contracts test-synthesus test-knowledge test-knowledge-source test-planetary test-planetary-iso
 
 doctor:
 	PYTHON_BIN="$(PYTHON)" ./scripts/doctor.sh
@@ -9,7 +9,11 @@ doctor:
 status:
 	./scripts/component-status.sh
 
-test: test-knowledge-source test-synthesus
+test: test-contracts test-knowledge-source test-synthesus
+
+test-contracts:
+	$(PYTHON) -m contracts.chal_vsource.v1.schema_tool --check
+	$(PYTHON) -m pytest -q tests/test_chal_vsource_contracts.py
 
 test-synthesus:
 	cd apps/synthesus/runtime && $(PYTHON) -m pytest -q
