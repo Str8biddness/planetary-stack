@@ -6,6 +6,7 @@ import multiprocessing
 import os
 import stat
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,8 @@ import pytest
 from aivm.admission import AdmissionDecision, AdmissionStatus
 from aivm.execution import (
     AdmittedExecutionRequest,
+    AuthorityStatus,
+    AuthorityVerification,
     CommandResult,
     ExecutionStatus,
     ExecutorPolicy,
@@ -31,6 +34,7 @@ IMAGE_DIGEST = "sha256:" + "1" * 64
 IMAGE_ID = "sha256:" + "2" * 64
 LOGICAL_IMAGE = f"aivm-cpu-safe@{IMAGE_DIGEST}"
 IMMUTABLE_IMAGE = f"docker.io/library/archlinux@{IMAGE_DIGEST}"
+NOW = datetime(2026, 7, 17, 12, 10, tzinfo=UTC)
 
 
 def _private_directory(path: Path) -> Path:
@@ -39,7 +43,11 @@ def _private_directory(path: Path) -> Path:
     return path
 
 
-def _manifest(*, image_digest: str = IMAGE_DIGEST) -> AIVMWorkloadManifest:
+def _manifest(
+    *,
+    image_digest: str = IMAGE_DIGEST,
+    mount_path: str = "/work/input/payload",
+) -> AIVMWorkloadManifest:
     payload_sha = hashlib.sha256(PAYLOAD).hexdigest()
     wire = {
         "schema": "planetary.aivm.workload.v1",
@@ -60,21 +68,21 @@ def _manifest(*, image_digest: str = IMAGE_DIGEST) -> AIVMWorkloadManifest:
             "host_ipc": False,
             "devices": [],
         },
-        "entrypoint_id": "aivm.copy.v1",
+        "entrypoint_id": "aivm.sha256.v1",
         "resources": {
             "cpu_millicores": 500,
             "memory_bytes": 67_108_864,
             "time_limit_seconds": 5,
             "process_limit": 8,
             "open_file_limit": 64,
-            "output_bytes": 4096,
+            "output_bytes": 256,
             "scratch_bytes": 0,
             "gpu_count": 0,
             "gpu_memory_bytes": 0,
         },
         "filesystem": {
             "rootfs": "readonly",
-            "writable_paths": ["/work/output"],
+            "writable_paths": [],
             "host_mounts": [],
         },
         "network": {"mode": "deny", "allowlist": []},
@@ -89,7 +97,7 @@ def _manifest(*, image_digest: str = IMAGE_DIGEST) -> AIVMWorkloadManifest:
                 "media_type": "application/octet-stream",
                 "content_encoding": "identity",
                 "created_at": "2026-07-17T11:59:00Z",
-                "mount_path": "/work/input/payload",
+                "mount_path": mount_path,
                 "readonly": True,
             }
         ],
@@ -119,11 +127,16 @@ def _admitted(manifest: AIVMWorkloadManifest) -> AdmissionDecision:
     )
 
 
-def _lease(*, fence: int = 7, lease_id: str = "lease:cpu:001") -> LeaseAuthority:
+def _lease(
+    *,
+    fence: int = 7,
+    lease_id: str = "lease:cpu:001",
+    node_id: str = "node:local:001",
+) -> LeaseAuthority:
     return LeaseAuthority(
         account_id="account:owner:001",
         workload_id="workload:cpu:001",
-        node_id="node:local:001",
+        node_id=node_id,
         lease_id=lease_id,
         lease_sha256="3" * 64,
         fencing_token=fence,
@@ -131,14 +144,68 @@ def _lease(*, fence: int = 7, lease_id: str = "lease:cpu:001") -> LeaseAuthority
 
 
 def _request(
-    *, fence: int = 7, lease_id: str = "lease:cpu:001"
+    *,
+    fence: int = 7,
+    lease_id: str = "lease:cpu:001",
+    node_id: str = "node:local:001",
 ) -> AdmittedExecutionRequest:
     manifest = _manifest()
     return AdmittedExecutionRequest(
         manifest,
         _admitted(manifest),
-        _lease(fence=fence, lease_id=lease_id),
+        _lease(fence=fence, lease_id=lease_id, node_id=node_id),
     )
+
+
+class FakeAuthorityVerifier:
+    def __init__(self, *, status: AuthorityStatus = AuthorityStatus.VERIFIED, mutate=None):
+        self.status = status
+        self.mutate = mutate
+        self.consumed: set[tuple[str, str, str]] = set()
+
+    def verify_and_consume(
+        self,
+        request,
+        *,
+        expected_account_id,
+        expected_node_id,
+        now,
+    ):
+        scope = (expected_account_id, expected_node_id, request.lease.lease_id)
+        if scope in self.consumed:
+            return AuthorityVerification(
+                AuthorityStatus.REJECTED,
+                "verifier:test:001",
+            )
+        if self.status is not AuthorityStatus.VERIFIED:
+            return AuthorityVerification(self.status, "verifier:test:001")
+        record = {
+            "status": AuthorityStatus.VERIFIED,
+            "verifier_id": "verifier:test:001",
+            "manifest_sha256": request.manifest_sha256,
+            "account_id": request.manifest.account_id,
+            "workload_id": request.manifest.workload_id,
+            "node_id": request.lease.node_id,
+            "lease_id": request.lease.lease_id,
+            "lease_sha256": request.lease.lease_sha256,
+            "fencing_token": request.lease.fencing_token,
+            "consumed": True,
+        }
+        if self.mutate is not None:
+            self.mutate(record)
+        verification = AuthorityVerification(**record)
+        if verification.binding_record() == {
+            "manifest_sha256": request.manifest_sha256,
+            "account_id": request.manifest.account_id,
+            "workload_id": request.manifest.workload_id,
+            "node_id": request.lease.node_id,
+            "lease_id": request.lease.lease_id,
+            "lease_sha256": request.lease.lease_sha256,
+            "fencing_token": request.lease.fencing_token,
+            "consumed": True,
+        }:
+            self.consumed.add(scope)
+        return verification
 
 
 class FakePodmanRunner:
@@ -153,14 +220,6 @@ class FakePodmanRunner:
         self.run_result = run_result
         self.info_mutator = info_mutator
         self.commands: list[tuple[str, ...]] = []
-        self.output_mutator = None
-
-    @staticmethod
-    def _output_path(command: tuple[str, ...]) -> Path:
-        for index, item in enumerate(command):
-            if item == "--volume" and ":/work/output:rw," in command[index + 1]:
-                return Path(command[index + 1].split(":/work/output:rw,", 1)[0])
-        raise AssertionError("output mount missing")
 
     def run(self, argv, *, timeout_seconds, stdout_limit, stderr_limit):
         command = tuple(argv)
@@ -187,13 +246,6 @@ class FakePodmanRunner:
             ]
             return CommandResult(command, 0, json.dumps(value).encode())
         if command[1] == "run":
-            output_path = self._output_path(command)
-            if self.output_mutator is None:
-                result = output_path / "result.bin"
-                result.write_bytes(PAYLOAD)
-                result.chmod(0o600)
-            else:
-                self.output_mutator(output_path)
             if self.run_result is not None:
                 return CommandResult(
                     command,
@@ -204,7 +256,13 @@ class FakePodmanRunner:
                     self.run_result.stdout_truncated,
                     self.run_result.stderr_truncated,
                 )
-            return CommandResult(command, 0, b"bounded stdout", b"")
+            digest = hashlib.sha256(PAYLOAD).hexdigest()
+            return CommandResult(
+                command,
+                0,
+                f"{digest}  /work/input/payload\n".encode("ascii"),
+                b"",
+            )
         return CommandResult(command, 0)
 
 
@@ -213,38 +271,39 @@ def _executor(
     runner: FakePodmanRunner,
     *,
     max_input_file_bytes: int = 64 * 1024 * 1024,
+    authority_verifier=None,
+    clock=lambda: NOW,
 ) -> PodmanExecutor:
     state = _private_directory(tmp_path / "state")
     artifacts = _private_directory(tmp_path / "artifacts")
-    outputs = _private_directory(tmp_path / "outputs")
     payload_sha = hashlib.sha256(PAYLOAD).hexdigest()
     artifact = artifacts / payload_sha
     artifact.write_bytes(PAYLOAD)
     artifact.chmod(0o600)
     entrypoint = TrustedEntrypoint(
-        entrypoint_id="aivm.copy.v1",
-        executable="/usr/bin/cp",
-        arguments=(
-            "--no-preserve=mode,ownership,timestamps",
-            "/work/input/payload",
-            "/work/output/result.bin",
-        ),
-        output_mount="/work/output",
-        outputs=(("output:result:001", "result.bin"),),
+        entrypoint_id="aivm.sha256.v1",
+        executable="/usr/bin/sha256sum",
+        arguments=("/work/input/payload",),
+        input_mounts=(("artifact:input:001", "/work/input/payload"),),
+        output_id="output:result:001",
     )
     policy = ExecutorPolicy(
         state_dir=state,
         artifact_dir=artifacts,
-        output_dir=outputs,
         trusted_images={LOGICAL_IMAGE: IMMUTABLE_IMAGE},
         trusted_entrypoints={entrypoint.entrypoint_id: entrypoint},
-        stdout_limit_bytes=64,
+        account_id="account:owner:001",
+        node_id="node:local:001",
+        stdout_limit_bytes=256,
         stderr_limit_bytes=64,
         max_input_file_bytes=max_input_file_bytes,
-        max_output_files=1,
-        max_output_file_bytes=4096,
     )
-    return PodmanExecutor(policy, runner=runner)
+    return PodmanExecutor(
+        policy,
+        authority_verifier=authority_verifier or FakeAuthorityVerifier(),
+        runner=runner,
+        clock=clock,
+    )
 
 
 def test_success_binds_authority_and_emits_hardened_podman_argv(tmp_path):
@@ -262,6 +321,8 @@ def test_success_binds_authority_and_emits_hardened_podman_argv(tmp_path):
     assert evidence.runtime_image == LOGICAL_IMAGE
     assert evidence.immutable_image_ref == IMMUTABLE_IMAGE
     assert evidence.cached_image_id == IMAGE_ID
+    assert evidence.authority_verifier_id == "verifier:test:001"
+    assert len(evidence.authority_verification_sha256) == 64
     assert evidence.outputs[0]["sha256"] == hashlib.sha256(PAYLOAD).hexdigest()
     command = next(command for command in runner.commands if command[1] == "run")
     required = {
@@ -279,13 +340,12 @@ def test_success_binds_authority_and_emits_hardened_podman_argv(tmp_path):
     assert required.issubset(command)
     assert command[command.index("--user") + 1] == f"{os.geteuid()}:{os.getegid()}"
     assert command[command.index("--user") + 1] != "0:0"
-    assert command[command.index("--entrypoint") + 1] == "/usr/bin/cp"
-    assert command[-4:] == (
+    assert command[command.index("--entrypoint") + 1] == "/usr/bin/sha256sum"
+    assert command[-2:] == (
         IMMUTABLE_IMAGE,
-        "--no-preserve=mode,ownership,timestamps",
         "/work/input/payload",
-        "/work/output/result.bin",
     )
+    assert not any(":rw," in item for item in command)
     assert "sh" not in command and "bash" not in command
     claim = next((tmp_path / "state").glob("*.claim.json"))
     final = next((tmp_path / "state").glob("*.result.json"))
@@ -304,7 +364,7 @@ def test_consumed_lease_id_cannot_run_again_even_with_a_new_fence(tmp_path):
 
     assert first.ok
     assert replay.status is ExecutionStatus.REJECTED
-    assert replay.reason == "authority_already_consumed"
+    assert replay.reason == "execution_authority_rejected"
     assert same_lease_renewed.status is ExecutionStatus.REJECTED
     assert new_lease.ok
     assert first.evidence.authority_sha256 != new_lease.evidence.authority_sha256
@@ -330,6 +390,58 @@ def test_request_requires_admission_and_exact_lease_identity():
             lease_sha256="3" * 64,
             fencing_token=7,
         )
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda record: record.update(manifest_sha256="9" * 64),
+        lambda record: record.update(fencing_token=record["fencing_token"] - 1),
+    ],
+)
+def test_authority_substitution_or_stale_fence_is_rejected(tmp_path, mutate):
+    runner = FakePodmanRunner()
+    verifier = FakeAuthorityVerifier(mutate=mutate)
+    executor = _executor(tmp_path, runner, authority_verifier=verifier)
+
+    result = executor.execute(_request())
+
+    assert result.status is ExecutionStatus.REJECTED
+    assert result.reason == "execution_authority_binding_mismatch"
+    assert not any(command[1] == "run" for command in runner.commands)
+
+
+def test_wrong_node_and_expired_manifest_are_rejected_before_authority_use(tmp_path):
+    wrong_node_runner = FakePodmanRunner()
+    wrong_node_verifier = FakeAuthorityVerifier()
+    wrong_node_executor = _executor(
+        tmp_path / "wrong-node",
+        wrong_node_runner,
+        authority_verifier=wrong_node_verifier,
+    )
+
+    wrong_node = wrong_node_executor.execute(_request(node_id="node:other:001"))
+
+    assert wrong_node.status is ExecutionStatus.REJECTED
+    assert wrong_node.reason == "executor_node_mismatch"
+    assert not wrong_node_verifier.consumed
+    assert not any(command[1] == "run" for command in wrong_node_runner.commands)
+
+    expired_runner = FakePodmanRunner()
+    expired_verifier = FakeAuthorityVerifier()
+    expired_executor = _executor(
+        tmp_path / "expired",
+        expired_runner,
+        authority_verifier=expired_verifier,
+        clock=lambda: datetime(2026, 7, 17, 12, 30, tzinfo=UTC),
+    )
+
+    expired = expired_executor.execute(_request())
+
+    assert expired.status is ExecutionStatus.REJECTED
+    assert expired.reason == "manifest_outside_validity_window"
+    assert not expired_verifier.consumed
+    assert not any(command[1] == "run" for command in expired_runner.commands)
 
 
 def test_cached_image_digest_mismatch_fails_before_claim(tmp_path):
@@ -404,36 +516,37 @@ def test_input_symlink_and_oversize_fail_before_container_start(tmp_path):
     assert not any(command[1] == "run" for command in oversized_runner.commands)
 
 
-@pytest.mark.parametrize("kind", ["symlink", "hardlink", "unexpected", "oversized"])
-def test_unsafe_outputs_fail_closed(tmp_path, kind):
+def test_manifest_cannot_shadow_a_trusted_runtime_path(tmp_path):
     runner = FakePodmanRunner()
+    executor = _executor(tmp_path, runner)
+    manifest = _manifest(mount_path="/usr/bin/sha256sum")
+    request = AdmittedExecutionRequest(manifest, _admitted(manifest), _lease())
 
-    def mutate(output_path: Path) -> None:
-        if kind == "symlink":
-            (output_path / "result.bin").symlink_to("/etc/passwd")
-        elif kind == "hardlink":
-            source = output_path.parent / "hardlink-source"
-            source.write_bytes(PAYLOAD)
-            source.chmod(0o600)
-            os.link(source, output_path / "result.bin")
-        elif kind == "unexpected":
-            result = output_path / "result.bin"
-            result.write_bytes(PAYLOAD)
-            result.chmod(0o600)
-            extra = output_path / "extra.bin"
-            extra.write_bytes(b"extra")
-            extra.chmod(0o600)
-        else:
-            result = output_path / "result.bin"
-            result.write_bytes(b"x" * 4097)
-            result.chmod(0o600)
+    result = executor.execute(request)
 
-    runner.output_mutator = mutate
+    assert result.status is ExecutionStatus.REJECTED
+    assert result.reason == "manifest_input_destination_mismatch"
+    assert not any(command[1] == "run" for command in runner.commands)
+
+
+@pytest.mark.parametrize(
+    ("stdout", "stderr"),
+    [
+        (b"0" * 64 + b"  /work/input/payload\n", b""),
+        (hashlib.sha256(PAYLOAD).hexdigest().encode() + b"  /wrong\n", b""),
+        (hashlib.sha256(PAYLOAD).hexdigest().encode() + b"  /work/input/payload\n", b"warning"),
+    ],
+)
+def test_noncanonical_fixed_entrypoint_output_fails_closed(tmp_path, stdout, stderr):
+    runner = FakePodmanRunner(
+        run_result=CommandResult(("placeholder",), 0, stdout, stderr)
+    )
     executor = _executor(tmp_path, runner)
 
     result = executor.execute(_request())
 
     assert result.status is ExecutionStatus.FAILED
+    assert result.reason == "fixed_entrypoint_output_invalid"
     assert result.evidence is None
 
 
@@ -535,29 +648,28 @@ def test_physical_rootless_podman_fixed_entrypoint(tmp_path):
     logical = f"aivm-cpu-safe@{image_digest}"
     state = _private_directory(tmp_path / "state")
     artifacts = _private_directory(tmp_path / "artifacts")
-    outputs = _private_directory(tmp_path / "outputs")
     artifact = artifacts / hashlib.sha256(PAYLOAD).hexdigest()
     artifact.write_bytes(PAYLOAD)
     artifact.chmod(0o600)
     entrypoint = TrustedEntrypoint(
-        "aivm.copy.v1",
-        "/usr/bin/cp",
-        (
-            "--no-preserve=mode,ownership,timestamps",
-            "/work/input/payload",
-            "/work/output/result.bin",
-        ),
-        "/work/output",
-        (("output:result:001", "result.bin"),),
+        entrypoint_id="aivm.sha256.v1",
+        executable="/usr/bin/sha256sum",
+        arguments=("/work/input/payload",),
+        input_mounts=(("artifact:input:001", "/work/input/payload"),),
+        output_id="output:result:001",
     )
     executor = PodmanExecutor(
         ExecutorPolicy(
-            state,
-            artifacts,
-            outputs,
-            {logical: immutable_ref},
-            {entrypoint.entrypoint_id: entrypoint},
-        )
+            state_dir=state,
+            artifact_dir=artifacts,
+            trusted_images={logical: immutable_ref},
+            trusted_entrypoints={entrypoint.entrypoint_id: entrypoint},
+            account_id="account:owner:001",
+            node_id="node:local:001",
+            stdout_limit_bytes=256,
+        ),
+        authority_verifier=FakeAuthorityVerifier(),
+        clock=lambda: NOW,
     )
     request = AdmittedExecutionRequest(manifest, _admitted(manifest), _lease())
 
@@ -565,3 +677,4 @@ def test_physical_rootless_podman_fixed_entrypoint(tmp_path):
 
     assert result.ok, result.reason
     assert result.evidence.outputs[0]["sha256"] == hashlib.sha256(PAYLOAD).hexdigest()
+    assert result.evidence.outputs[0]["algorithm"] == "sha256"

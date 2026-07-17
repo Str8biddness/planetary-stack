@@ -2,7 +2,10 @@
 
 from .podman import (
     AdmittedExecutionRequest,
+    AuthorityStatus,
+    AuthorityVerification,
     CommandResult,
+    ExecutionAuthorityVerifier,
     ExecutionEvidence,
     ExecutionResult,
     ExecutionStatus,
@@ -18,7 +21,10 @@ from .podman import (
 
 __all__ = [
     "AdmittedExecutionRequest",
+    "AuthorityStatus",
+    "AuthorityVerification",
     "CommandResult",
+    "ExecutionAuthorityVerifier",
     "ExecutionEvidence",
     "ExecutionResult",
     "ExecutionStatus",

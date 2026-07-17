@@ -1,9 +1,10 @@
-"""A narrow, production rootless-Podman CPU execution boundary.
+"""A narrow, fail-closed rootless-Podman CPU execution boundary.
 
-This module deliberately does not verify signatures or allocate leases.  It
-accepts only the structured result of those earlier gates, binds that result
-to a fixed local image and entrypoint, and executes without an in-process
-fallback.
+The only implemented profile hashes one admitted artifact through a fixed
+operator-owned executable and returns the digest over bounded stdout.  A
+mandatory authority service must atomically verify and consume the exact
+signed-manifest/active-lease binding before Podman starts.  There is no
+in-process fallback and no writable host mount.
 """
 
 from __future__ import annotations
@@ -18,8 +19,9 @@ import signal
 import stat
 import subprocess
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
 from types import MappingProxyType
@@ -135,17 +137,6 @@ def _private_directory(path: Path, *, create: bool) -> Path:
     return path.resolve(strict=True)
 
 
-def _safe_relative_output(value: str) -> str:
-    if not isinstance(value, str) or not value or len(value) > 240:
-        raise ValueError("output path must be a bounded relative path")
-    path = PurePosixPath(value)
-    if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
-        raise ValueError("output path must be normalized and relative")
-    if any(character in value for character in ("\x00", "\n", "\r", ":", "\\")):
-        raise ValueError("output path contains an unsupported character")
-    return value
-
-
 @dataclass(frozen=True)
 class LeaseAuthority:
     """Exact active lease revision already verified by the caller."""
@@ -229,6 +220,61 @@ class AdmittedExecutionRequest:
         object.__setattr__(self, "manifest_sha256", document_sha256(self.manifest))
 
 
+class AuthorityStatus(StrEnum):
+    VERIFIED = "verified"
+    REJECTED = "rejected"
+    UNAVAILABLE = "unavailable"
+
+
+@dataclass(frozen=True)
+class AuthorityVerification:
+    """Exact binding returned only after the authority durably consumes it."""
+
+    status: AuthorityStatus
+    verifier_id: str
+    manifest_sha256: str = ""
+    account_id: str = ""
+    workload_id: str = ""
+    node_id: str = ""
+    lease_id: str = ""
+    lease_sha256: str = ""
+    fencing_token: int = 0
+    consumed: bool = False
+
+    def binding_record(self) -> dict[str, object]:
+        return {
+            "manifest_sha256": self.manifest_sha256,
+            "account_id": self.account_id,
+            "workload_id": self.workload_id,
+            "node_id": self.node_id,
+            "lease_id": self.lease_id,
+            "lease_sha256": self.lease_sha256,
+            "fencing_token": self.fencing_token,
+            "consumed": self.consumed,
+        }
+
+
+class ExecutionAuthorityVerifier(Protocol):
+    """Trust service that verifies and atomically consumes one active lease.
+
+    Implementations must cryptographically verify the exact manifest and
+    active fenced lease revision, join them to the configured account/node,
+    enforce the supplied validity instant, and durably consume the revision
+    before returning ``VERIFIED``.  There is intentionally no permissive
+    implementation or default in this module.
+    """
+
+    def verify_and_consume(
+        self,
+        request: AdmittedExecutionRequest,
+        *,
+        expected_account_id: str,
+        expected_node_id: str,
+        now: datetime,
+    ) -> AuthorityVerification:
+        """Return the exact consumed binding or a fail-closed status."""
+
+
 @dataclass(frozen=True)
 class TrustedEntrypoint:
     """Operator-owned fixed executable; no manifest text becomes argv."""
@@ -236,8 +282,8 @@ class TrustedEntrypoint:
     entrypoint_id: str
     executable: str
     arguments: tuple[str, ...]
-    output_mount: str
-    outputs: tuple[tuple[str, str], ...]
+    input_mounts: tuple[tuple[str, str], ...]
+    output_id: str
 
     def __post_init__(self) -> None:
         _require_identifier("entrypoint_id", self.entrypoint_id)
@@ -253,26 +299,33 @@ class TrustedEntrypoint:
         for argument in self.arguments:
             if not isinstance(argument, str) or len(argument) > 4096 or "\x00" in argument:
                 raise ValueError("trusted entrypoint argument is invalid")
-        mount = PurePosixPath(self.output_mount)
-        if not mount.is_absolute() or ".." in mount.parts or self.output_mount == "/":
-            raise ValueError("output mount must be a normalized absolute path")
-        output_ids = [output_id for output_id, _ in self.outputs]
-        if output_ids != sorted(set(output_ids)) or not output_ids:
-            raise ValueError("trusted outputs must be non-empty, unique, and sorted")
-        relative_paths: list[str] = []
-        for output_id, relative_path in self.outputs:
-            _require_identifier("output_id", output_id)
-            relative_paths.append(_safe_relative_output(relative_path))
-        if len(relative_paths) != len(set(relative_paths)):
-            raise ValueError("trusted output paths must be unique")
+        input_ids = [artifact_id for artifact_id, _ in self.input_mounts]
+        if input_ids != sorted(set(input_ids)) or len(input_ids) != 1:
+            raise ValueError("the fixed CPU profile requires exactly one trusted input")
+        destinations: list[str] = []
+        for artifact_id, destination in self.input_mounts:
+            _require_identifier("artifact_id", artifact_id)
+            path = PurePosixPath(destination)
+            if (
+                not path.is_absolute()
+                or ".." in path.parts
+                or not str(path).startswith("/work/input/")
+                or any(character in destination for character in ("\x00", "\n", "\r", ":"))
+            ):
+                raise ValueError("trusted inputs must use exact paths below /work/input")
+            destinations.append(destination)
+        if len(destinations) != len(set(destinations)):
+            raise ValueError("trusted input destinations must be unique")
+        _require_identifier("output_id", self.output_id)
 
     def policy_record(self) -> dict[str, object]:
         return {
             "entrypoint_id": self.entrypoint_id,
             "executable": self.executable,
             "arguments": list(self.arguments),
-            "output_mount": self.output_mount,
-            "outputs": [list(item) for item in self.outputs],
+            "input_mounts": [list(item) for item in self.input_mounts],
+            "output_id": self.output_id,
+            "output_transport": "bounded_stdout_sha256",
         }
 
 
@@ -282,31 +335,40 @@ class ExecutorPolicy:
 
     state_dir: Path
     artifact_dir: Path
-    output_dir: Path
     trusted_images: Mapping[str, str]
     trusted_entrypoints: Mapping[str, TrustedEntrypoint]
+    account_id: str
+    node_id: str
     podman_binary: str = "podman"
     stdout_limit_bytes: int = 65_536
     stderr_limit_bytes: int = 65_536
     max_input_files: int = 64
     max_input_file_bytes: int = 64 * 1024 * 1024
     max_total_input_bytes: int = 256 * 1024 * 1024
-    max_output_files: int = 32
-    max_output_file_bytes: int = 64 * 1024 * 1024
+    max_cpu_millicores: int = 4_000
+    max_memory_bytes: int = 4 * 1024 * 1024 * 1024
+    max_time_limit_seconds: int = 900
+    max_process_limit: int = 256
+    max_open_file_limit: int = 4096
 
     def __post_init__(self) -> None:
         if not isinstance(self.podman_binary, str) or not self.podman_binary:
             raise ValueError("podman binary is required")
         if any(character in self.podman_binary for character in ("\x00", "\n", "\r")):
             raise ValueError("podman binary is invalid")
+        _require_identifier("account_id", self.account_id)
+        _require_identifier("node_id", self.node_id)
         for name in (
             "stdout_limit_bytes",
             "stderr_limit_bytes",
             "max_input_files",
             "max_input_file_bytes",
             "max_total_input_bytes",
-            "max_output_files",
-            "max_output_file_bytes",
+            "max_cpu_millicores",
+            "max_memory_bytes",
+            "max_time_limit_seconds",
+            "max_process_limit",
+            "max_open_file_limit",
         ):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
@@ -442,7 +504,10 @@ class SubprocessCommandRunner:
                     os.killpg(process.pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
-                exit_code = process.wait(timeout=2.0)
+                try:
+                    exit_code = process.wait(timeout=2.0)
+                except subprocess.TimeoutExpired as exc:
+                    raise RunnerUnavailable("runner_reap_failed") from exc
         finally:
             selector.close()
             process.stdout.close()
@@ -651,6 +716,8 @@ class ReplayStore:
 @dataclass(frozen=True)
 class ExecutionEvidence:
     authority_sha256: str
+    authority_verifier_id: str
+    authority_verification_sha256: str
     policy_sha256: str
     account_id: str
     workload_id: str
@@ -677,6 +744,8 @@ class ExecutionEvidence:
     def to_record(self) -> dict[str, object]:
         return {
             "authority_sha256": self.authority_sha256,
+            "authority_verifier_id": self.authority_verifier_id,
+            "authority_verification_sha256": self.authority_verification_sha256,
             "policy_sha256": self.policy_sha256,
             "account_id": self.account_id,
             "workload_id": self.workload_id,
@@ -720,15 +789,20 @@ class PodmanExecutor:
         self,
         policy: ExecutorPolicy,
         *,
+        authority_verifier: ExecutionAuthorityVerifier,
         runner: CommandRunner | None = None,
         controllers_path: Path = Path("/sys/fs/cgroup/cgroup.controllers"),
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
+        if authority_verifier is None:
+            raise InvalidExecutionRequest("authority_verifier_required")
         self._policy = policy
+        self._authority_verifier = authority_verifier
+        self._clock = clock or (lambda: datetime.now(UTC))
         self._runner = runner or SubprocessCommandRunner()
         self._state_dir = _private_directory(policy.state_dir, create=True)
         self._artifact_dir = _private_directory(policy.artifact_dir, create=True)
-        self._output_dir = _private_directory(policy.output_dir, create=True)
-        if len({self._state_dir, self._artifact_dir, self._output_dir}) != 3:
+        if self._state_dir == self._artifact_dir:
             raise InvalidExecutionRequest("executor_roots_must_be_distinct")
         self._store = ReplayStore(self._state_dir)
         self._probe = PodmanHostProbe(
@@ -741,6 +815,61 @@ class PodmanExecutor:
         if self._uid == 0:
             raise InvalidExecutionRequest("root_executor_is_forbidden")
 
+    def _verify_authority(
+        self,
+        request: AdmittedExecutionRequest,
+    ) -> tuple[AuthorityVerification, str]:
+        try:
+            now = self._clock()
+        except Exception as exc:
+            raise HostUnavailable("authority_clock_unavailable") from exc
+        if (
+            not isinstance(now, datetime)
+            or now.tzinfo is None
+            or now.utcoffset() is None
+        ):
+            raise HostUnavailable("authority_clock_invalid")
+        now = now.astimezone(UTC)
+        if now < request.manifest.issued_at or now >= request.manifest.expires_at:
+            raise InvalidExecutionRequest("manifest_outside_validity_window")
+        if (
+            request.manifest.account_id != self._policy.account_id
+            or request.lease.account_id != self._policy.account_id
+        ):
+            raise InvalidExecutionRequest("executor_account_mismatch")
+        if request.lease.node_id != self._policy.node_id:
+            raise InvalidExecutionRequest("executor_node_mismatch")
+        try:
+            verification = self._authority_verifier.verify_and_consume(
+                request,
+                expected_account_id=self._policy.account_id,
+                expected_node_id=self._policy.node_id,
+                now=now,
+            )
+        except Exception as exc:
+            raise HostUnavailable("execution_authority_unavailable") from exc
+        if not isinstance(verification, AuthorityVerification):
+            raise HostUnavailable("execution_authority_invalid")
+        if verification.status is AuthorityStatus.UNAVAILABLE:
+            raise HostUnavailable("execution_authority_unavailable")
+        if verification.status is not AuthorityStatus.VERIFIED:
+            raise InvalidExecutionRequest("execution_authority_rejected")
+        _require_identifier("verifier_id", verification.verifier_id)
+        expected = {
+            "manifest_sha256": request.manifest_sha256,
+            "account_id": request.manifest.account_id,
+            "workload_id": request.manifest.workload_id,
+            "node_id": request.lease.node_id,
+            "lease_id": request.lease.lease_id,
+            "lease_sha256": request.lease.lease_sha256,
+            "fencing_token": request.lease.fencing_token,
+            "consumed": True,
+        }
+        if verification.binding_record() != expected:
+            raise InvalidExecutionRequest("execution_authority_binding_mismatch")
+        record = {"verifier_id": verification.verifier_id, **expected}
+        return verification, _sha256_json(record)
+
     def _select_policy(
         self, request: AdmittedExecutionRequest
     ) -> tuple[str, str, TrustedEntrypoint, str]:
@@ -752,16 +881,39 @@ class PodmanExecutor:
         entrypoint = self._policy.trusted_entrypoints.get(manifest.entrypoint_id)
         if entrypoint is None:
             raise InvalidExecutionRequest("entrypoint_not_trusted")
-        if tuple(manifest.outputs) != tuple(output_id for output_id, _ in entrypoint.outputs):
+        if manifest.outputs != [entrypoint.output_id]:
             raise InvalidExecutionRequest("manifest_outputs_do_not_match_entrypoint")
-        if manifest.filesystem.writable_paths != [entrypoint.output_mount]:
-            raise InvalidExecutionRequest("manifest_writable_paths_exceed_executor_surface")
+        if tuple(manifest.inputs) != tuple(
+            artifact_id for artifact_id, _ in entrypoint.input_mounts
+        ):
+            raise InvalidExecutionRequest("manifest_inputs_do_not_match_entrypoint")
+        descriptors = {item.artifact_id: item for item in manifest.artifacts}
+        for artifact_id, destination in entrypoint.input_mounts:
+            if descriptors[artifact_id].mount_path != destination:
+                raise InvalidExecutionRequest("manifest_input_destination_mismatch")
+        if manifest.filesystem.writable_paths:
+            raise InvalidExecutionRequest("stdout_profile_rejects_writable_paths")
         if manifest.resources.scratch_bytes != 0:
             raise InvalidExecutionRequest("scratch_is_not_supported_by_cpu_slice")
-        if manifest.resources.output_bytes <= 0:
+        destination = entrypoint.input_mounts[0][1]
+        required_stdout_bytes = 64 + 2 + len(destination.encode("ascii")) + 1
+        if not (
+            required_stdout_bytes
+            <= manifest.resources.output_bytes
+            <= self._policy.stdout_limit_bytes
+        ):
             raise InvalidExecutionRequest("output_budget_required")
         if manifest.resources.open_file_limit < 16:
             raise InvalidExecutionRequest("open_file_limit_too_small")
+        resources = manifest.resources
+        if (
+            resources.cpu_millicores > self._policy.max_cpu_millicores
+            or resources.memory_bytes > self._policy.max_memory_bytes
+            or resources.time_limit_seconds > self._policy.max_time_limit_seconds
+            or resources.process_limit > self._policy.max_process_limit
+            or resources.open_file_limit > self._policy.max_open_file_limit
+        ):
+            raise InvalidExecutionRequest("resource_budget_exceeds_executor_policy")
         policy_record = {
             "version": "planetary.aivm.podman-cpu-policy.v1",
             "image": {"logical": logical_image, "immutable_ref": immutable_ref},
@@ -777,13 +929,11 @@ class PodmanExecutor:
                 "gid": self._gid,
                 "pull": "never",
             },
-            "resources": manifest.resources.model_dump(mode="json"),
-            "output_limits": {
+            "resources": resources.model_dump(mode="json"),
+            "io_limits": {
                 "input_files": self._policy.max_input_files,
                 "input_file_bytes": self._policy.max_input_file_bytes,
                 "total_input_bytes": self._policy.max_total_input_bytes,
-                "files": self._policy.max_output_files,
-                "per_file_bytes": self._policy.max_output_file_bytes,
                 "stdout_bytes": self._policy.stdout_limit_bytes,
                 "stderr_bytes": self._policy.stderr_limit_bytes,
             },
@@ -797,11 +947,11 @@ class PodmanExecutor:
         descriptors = {item.artifact_id: item for item in manifest.artifacts}
         records: list[dict[str, object]] = []
         total_bytes = 0
-        output_prefix = entrypoint.output_mount.rstrip("/") + "/"
+        trusted_destinations = dict(entrypoint.input_mounts)
         for artifact_id in manifest.inputs:
             descriptor = descriptors[artifact_id]
-            if descriptor.mount_path == entrypoint.output_mount or descriptor.mount_path.startswith(output_prefix):
-                raise InvalidExecutionRequest("input_overlaps_output_mount")
+            if descriptor.mount_path != trusted_destinations.get(artifact_id):
+                raise InvalidExecutionRequest("manifest_input_destination_mismatch")
             path = self._artifact_dir / descriptor.sha256
             try:
                 before = path.lstat()
@@ -897,7 +1047,6 @@ class PodmanExecutor:
         *,
         immutable_ref: str,
         entrypoint: TrustedEntrypoint,
-        output_path: Path,
         name: str,
         cidfile: Path,
     ) -> tuple[str, ...]:
@@ -935,22 +1084,20 @@ class PodmanExecutor:
             "--ulimit",
             f"nofile={resources.open_file_limit}:{resources.open_file_limit}",
             "--workdir",
-            "/work",
+            "/",
         ]
         descriptors = {item.artifact_id: item for item in request.manifest.artifacts}
-        for artifact_id in request.manifest.inputs:
+        for artifact_id, destination in entrypoint.input_mounts:
             descriptor = descriptors[artifact_id]
             source = self._artifact_dir / descriptor.sha256
             argv.extend(
                 (
                     "--volume",
-                    f"{source}:{descriptor.mount_path}:ro,nosuid,nodev,noexec",
+                    f"{source}:{destination}:ro,nosuid,nodev,noexec",
                 )
             )
         argv.extend(
             (
-                "--volume",
-                f"{output_path}:{entrypoint.output_mount}:rw,nosuid,nodev,noexec",
                 "--entrypoint",
                 entrypoint.executable,
                 immutable_ref,
@@ -979,121 +1126,6 @@ class PodmanExecutor:
         ok = self._control("rm", "--force", "--ignore", name) and ok
         return ok
 
-    def _scan_outputs(
-        self,
-        output_path: Path,
-        entrypoint: TrustedEntrypoint,
-        byte_budget: int,
-    ) -> tuple[tuple[Mapping[str, object], ...], str]:
-        expected = {relative: output_id for output_id, relative in entrypoint.outputs}
-        if len(expected) > self._policy.max_output_files:
-            raise OutputViolation("output_file_count_exceeded")
-        allowed_directories = {""}
-        for relative in expected:
-            parent = PurePosixPath(relative).parent
-            while str(parent) != ".":
-                allowed_directories.add(str(parent))
-                parent = parent.parent
-        seen: set[str] = set()
-        records: list[Mapping[str, object]] = []
-        total = 0
-        for root, directories, files in os.walk(output_path, topdown=True, followlinks=False):
-            root_path = Path(root)
-            relative_root = root_path.relative_to(output_path).as_posix()
-            if relative_root == ".":
-                relative_root = ""
-            for directory in list(directories):
-                path = root_path / directory
-                relative = f"{relative_root}/{directory}".strip("/")
-                info = path.lstat()
-                if (
-                    relative not in allowed_directories
-                    or stat.S_ISLNK(info.st_mode)
-                    or not stat.S_ISDIR(info.st_mode)
-                    or info.st_uid != self._uid
-                    or stat.S_IMODE(info.st_mode) & 0o022
-                ):
-                    raise OutputViolation("unsafe_output_directory")
-            for filename in files:
-                path = root_path / filename
-                relative = f"{relative_root}/{filename}".strip("/")
-                if relative not in expected or relative in seen:
-                    raise OutputViolation("unexpected_output")
-                if len(seen) >= self._policy.max_output_files:
-                    raise OutputViolation("output_file_count_exceeded")
-                before = path.lstat()
-                if (
-                    not stat.S_ISREG(before.st_mode)
-                    or before.st_uid != self._uid
-                    or before.st_nlink != 1
-                    or stat.S_IMODE(before.st_mode) & 0o022
-                ):
-                    raise OutputViolation("unsafe_output_file")
-                if before.st_size > self._policy.max_output_file_bytes:
-                    raise OutputViolation("output_file_too_large")
-                previous_total = total
-                total = previous_total + before.st_size
-                if total > byte_budget:
-                    raise OutputViolation("output_budget_exceeded")
-                flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-                fd = os.open(path, flags)
-                digest = hashlib.sha256()
-                measured = 0
-                try:
-                    opened = os.fstat(fd)
-                    if (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
-                        raise OutputViolation("output_changed_during_validation")
-                    while True:
-                        chunk = os.read(fd, _READ_CHUNK)
-                        if not chunk:
-                            break
-                        measured += len(chunk)
-                        if (
-                            measured > self._policy.max_output_file_bytes
-                            or previous_total + measured > byte_budget
-                        ):
-                            raise OutputViolation("output_file_too_large")
-                        digest.update(chunk)
-                    after = os.fstat(fd)
-                    if (
-                        (
-                            after.st_dev,
-                            after.st_ino,
-                            after.st_size,
-                            after.st_mtime_ns,
-                            after.st_ctime_ns,
-                        )
-                        != (
-                            before.st_dev,
-                            before.st_ino,
-                            before.st_size,
-                            before.st_mtime_ns,
-                            before.st_ctime_ns,
-                        )
-                        or measured != before.st_size
-                        or after.st_nlink != 1
-                        or not stat.S_ISREG(after.st_mode)
-                    ):
-                        raise OutputViolation("output_changed_during_validation")
-                finally:
-                    os.close(fd)
-                records.append(
-                    {
-                        "output_id": expected[relative],
-                        "path": relative,
-                        "sha256": digest.hexdigest(),
-                        "size_bytes": measured,
-                    }
-                )
-                seen.add(relative)
-        if len(seen) > self._policy.max_output_files:
-            raise OutputViolation("output_file_count_exceeded")
-        if seen != set(expected):
-            raise OutputViolation("required_output_missing")
-        records.sort(key=lambda item: str(item["output_id"]))
-        immutable_records = tuple(MappingProxyType(dict(item)) for item in records)
-        return immutable_records, _sha256_json(records)
-
     def _finalize_failure(self, authority_key: str, status: ExecutionStatus, reason: str) -> None:
         try:
             self._store.finalize(
@@ -1117,6 +1149,7 @@ class PodmanExecutor:
             logical_image, immutable_ref, entrypoint, policy_sha256 = self._select_policy(request)
             input_set_sha256 = self._verify_inputs(request, entrypoint)
             host = self._probe.probe(immutable_ref, request.manifest.runtime_image.digest)
+            verification, verification_sha256 = self._verify_authority(request)
             authority = self._authority_record(
                 request,
                 logical_image=logical_image,
@@ -1124,6 +1157,8 @@ class PodmanExecutor:
                 policy_sha256=policy_sha256,
                 input_set_sha256=input_set_sha256,
             )
+            authority["authority_verifier_id"] = verification.verifier_id
+            authority["authority_verification_sha256"] = verification_sha256
             authority_key, _ = self._store.claim(
                 authority,
                 lease_scope={
@@ -1132,34 +1167,25 @@ class PodmanExecutor:
                     "lease_id": request.lease.lease_id,
                 },
             )
-            output_path = self._output_dir / authority_key
-            output_path.mkdir(mode=0o700, exist_ok=False)
-            if stat.S_IMODE(output_path.lstat().st_mode) != 0o700:
-                raise OutputViolation("output_directory_not_owner_only")
             name = f"aivm-{authority_key[:16]}-{secrets.token_hex(4)}"
             cidfile = self._state_dir / f"{name}.cid"
             argv = self._build_command(
                 request,
                 immutable_ref=immutable_ref,
                 entrypoint=entrypoint,
-                output_path=output_path,
                 name=name,
                 cidfile=cidfile,
             )
             result = self._runner.run(
                 argv,
                 timeout_seconds=float(request.manifest.resources.time_limit_seconds),
-                stdout_limit=self._policy.stdout_limit_bytes,
+                stdout_limit=min(
+                    self._policy.stdout_limit_bytes,
+                    request.manifest.resources.output_bytes,
+                ),
                 stderr_limit=self._policy.stderr_limit_bytes,
             )
             cleanup_ok = self._cleanup(name, timed_out=result.timed_out)
-            if cidfile is not None:
-                try:
-                    cidfile.unlink()
-                except FileNotFoundError:
-                    pass
-                except OSError:
-                    cleanup_ok = False
             if not cleanup_ok:
                 reason = "container_cleanup_failed"
                 self._finalize_failure(authority_key, ExecutionStatus.UNAVAILABLE, reason)
@@ -1176,16 +1202,26 @@ class PodmanExecutor:
                 reason = "container_exit_nonzero"
                 self._finalize_failure(authority_key, ExecutionStatus.FAILED, reason)
                 return ExecutionResult(ExecutionStatus.FAILED, reason)
-            outputs, output_set_sha256 = self._scan_outputs(
-                output_path,
-                entrypoint,
-                min(
-                    request.manifest.resources.output_bytes,
-                    self._policy.max_output_files * self._policy.max_output_file_bytes,
-                ),
+            artifact_id, destination = entrypoint.input_mounts[0]
+            descriptor = next(
+                item for item in request.manifest.artifacts if item.artifact_id == artifact_id
             )
+            expected_stdout = f"{descriptor.sha256}  {destination}\n".encode("ascii")
+            if result.stdout != expected_stdout or result.stderr:
+                raise OutputViolation("fixed_entrypoint_output_invalid")
+            output_record = {
+                "output_id": entrypoint.output_id,
+                "algorithm": "sha256",
+                "input_artifact_id": artifact_id,
+                "sha256": descriptor.sha256,
+                "input_size_bytes": descriptor.size_bytes,
+            }
+            outputs = (MappingProxyType(output_record),)
+            output_set_sha256 = _sha256_json([output_record])
             evidence = ExecutionEvidence(
                 authority_sha256=authority_key,
+                authority_verifier_id=verification.verifier_id,
+                authority_verification_sha256=verification_sha256,
                 policy_sha256=policy_sha256,
                 account_id=request.manifest.account_id,
                 workload_id=request.manifest.workload_id,
@@ -1234,9 +1270,15 @@ class PodmanExecutor:
             if authority_key:
                 self._finalize_failure(authority_key, ExecutionStatus.UNAVAILABLE, "podman_unavailable")
             return ExecutionResult(ExecutionStatus.UNAVAILABLE, "podman_unavailable")
-        except (OSError, ValueError, TypeError):
+        except Exception:
             if name:
                 self._cleanup(name, timed_out=True)
             if authority_key:
                 self._finalize_failure(authority_key, ExecutionStatus.UNAVAILABLE, "execution_boundary_error")
             return ExecutionResult(ExecutionStatus.UNAVAILABLE, "execution_boundary_error")
+        finally:
+            if cidfile is not None:
+                try:
+                    cidfile.unlink()
+                except OSError:
+                    pass

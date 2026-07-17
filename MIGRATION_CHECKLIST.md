@@ -181,7 +181,9 @@ indexing, and inference jobs while tolerating a worker disappearing.
   cached image, no network, read-only rootfs, no capabilities, no-new-
   privileges, seccomp availability, a non-root keep-id user, and cgroup v2
   CPU/memory/PID limits. Owner-only durable replay claims, bounded process
-  output, verified file outputs, and timeout container cleanup fail closed.
+  output, a canonical digest-only result, exact operator-owned input mounts,
+  mandatory exact manifest/lease authority consumption, and timeout container
+  cleanup fail closed. No writable host output mount is exposed to the workload.
   The physical gate passed on one enrolled Linux worker; arbitrary untrusted
   workloads, GPU/device isolation, cross-node dispatch, and public
   multi-tenancy remain explicitly unimplemented.
