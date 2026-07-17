@@ -38,7 +38,7 @@ NOW = datetime(2026, 7, 17, 12, 10, tzinfo=UTC)
 
 
 def _private_directory(path: Path) -> Path:
-    path.mkdir(mode=0o700)
+    path.mkdir(mode=0o700, parents=True)
     path.chmod(0o700)
     return path
 
