@@ -11,9 +11,12 @@ does not change their schema hashes.
    mode-0700 state directory. TLS, CHAL document-signing, and SSH identities
    remain separate. Private keys are regular mode-0600 files and never leave
    the node.
-2. The coordinator verifies each CSR, issues short-lived client/server
-   certificates from its in-process gate CA, and persists exact enrollment
-   records and revocations in a mode-0600 registry.
+2. The coordinator verifies each CSR's account, node, SANs, signature, and
+   public key, issues short-lived client/server certificates with the account
+   and node embedded in the signed X.509 subject, and persists exact
+   enrollment records and revocations in a mode-0600 registry. A stable
+   owner-only lock serializes cross-process registry mutations so a stale
+   writer cannot resurrect a revoked certificate.
 3. During pinned administrative enrollment, each node persists the public
    controller and scheduler trust anchors. Transfer jobs cannot substitute a
    scheduler key alongside a forged lease.
@@ -31,7 +34,8 @@ does not change their schema hashes.
    object only after content hash and size verification and returns a receipt
    bound to the full transfer context.
 8. Each node records the admitted lease revision in a persistent replay fence.
-   Reuse of the same or an older fencing token fails; crashes remain fail-stop.
+   A stable owner-only lock serializes concurrent admissions. Reuse of the same
+   or an older fencing token fails; crashes remain fail-stop.
 
 SSH is only a pinned administrative bootstrap carrier. It starts fixed CLI
 subcommands and carries public certificates/contracts. The workload bytes are
@@ -55,6 +59,9 @@ The evidence file is created exclusively at mode 0600. It contains public
 certificate and contract metadata, exact signed documents, the negotiated TLS
 version/cipher, object digest/size, verified receipt, and explicit claims and
 non-claims. It contains neither private keys nor object bytes.
+
+The first accepted physical run is summarized in
+[`docs/evidence/PRIVATE_MESH_MTLS_PHYSICAL_2026-07-17.md`](../../docs/evidence/PRIVATE_MESH_MTLS_PHYSICAL_2026-07-17.md).
 
 ## Non-claims
 

@@ -77,14 +77,27 @@ placement are not part of the protocol. Unisync will implement transport
 beneath this boundary; it cannot grant authority or weaken validation.
 
 The schemas alone do not claim runtime completion. The first local runtime
-slice now provides an SQLite inventory registry, deterministic same-account
+slice provides an SQLite inventory registry, deterministic same-account
 allocator, signed fenced leases, lifecycle/result admission, and a node-local
-agent restricted to a bounded hash operation. A two-Linux-node acceptance
-gate drives that slice over exact-host-key-pinned administrative SSH while the
-signed contract records `local_process`. This is physical integration evidence,
-not a production transport claim. Persistent issuer enrollment/revocation,
-durable node replay state, Unisync mTLS, general workload execution, resource
-controls, failure recovery, and the AIVM sandbox remain gated work.
+agent restricted to a bounded hash operation. Its first two-Linux-node gate
+uses exact-host-key-pinned administrative SSH while the signed contract records
+`local_process`.
+
+The next physical gate adds the first trusted-LAN Unisync backend. SSH remains
+bootstrap control only: the source creates an opaque content-addressed object
+locally, and its bytes reach the second physical node only over a private TCP
+TLS 1.3 socket. Both endpoints use distinct node-local keys and verify the
+account/node-bound certificate subject, CA chain, SAN, certificate and SPKI
+fingerprints, controller-signed request, scheduler-signed active lease, exact
+fence, object membership, digest, size, and receipt. A persistent node-local
+lease-use record rejects replay, and a cross-process-locked enrollment registry
+prevents stale writers from resurrecting revoked certificates. This is accepted
+private-LAN transport evidence, not completion of the entire Unisync plane.
+
+Persistent production issuer custody, certificate rotation/renewal, online
+revocation distribution, local memory/PCIe and Internet/relay transports,
+general workload execution, resource controls, failure recovery, and the AIVM
+sandbox remain gated work.
 
 ## Local controller boundary
 
