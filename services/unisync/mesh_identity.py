@@ -137,6 +137,7 @@ def validate_issued_certificate(
     certificate: x509.Certificate,
     issuer: x509.Certificate,
     *,
+    account_id: str,
     node_id: str,
     expected_sans: tuple[str, ...],
     expected_spki_sha256: str,
@@ -144,6 +145,8 @@ def validate_issued_certificate(
 ) -> dict[str, Any]:
     """Fail-closed verification of one issued node certificate against its CA."""
 
+    require_identifier("account_id", account_id)
+    require_identifier("node_id", node_id)
     current = (now or datetime.now(UTC)).astimezone(UTC)
     try:
         certificate.verify_directly_issued_by(issuer)
@@ -153,6 +156,7 @@ def validate_issued_certificate(
         issuer_constraints = issuer.extensions.get_extension_for_class(
             x509.BasicConstraints
         )
+        issuer_key_usage = issuer.extensions.get_extension_for_class(x509.KeyUsage)
         leaf_constraints = certificate.extensions.get_extension_for_class(
             x509.BasicConstraints
         )
@@ -162,8 +166,10 @@ def validate_issued_certificate(
         key_usage = certificate.extensions.get_extension_for_class(x509.KeyUsage)
     except x509.ExtensionNotFound as exc:
         raise MeshSecurityError("certificate chain is missing required extensions") from exc
-    if not issuer_constraints.value.ca:
-        raise MeshSecurityError("issuer certificate is not a CA certificate")
+    if not issuer_constraints.value.ca or not issuer_constraints.critical:
+        raise MeshSecurityError("issuer certificate is not a critical CA certificate")
+    if not issuer_key_usage.critical or not issuer_key_usage.value.key_cert_sign:
+        raise MeshSecurityError("issuer certificate cannot sign certificates")
     if leaf_constraints.value.ca or not leaf_constraints.critical:
         raise MeshSecurityError("node certificate must be a critical non-CA leaf")
     if (
@@ -176,6 +182,9 @@ def validate_issued_certificate(
     common_names = certificate.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
     if len(common_names) != 1 or common_names[0].value != node_id:
         raise MeshSecurityError("certificate subject does not bind the enrolled node")
+    account_names = certificate.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
+    if len(account_names) != 1 or account_names[0].value != account_id:
+        raise MeshSecurityError("certificate subject does not bind the enrolled account")
     if certificate.not_valid_before_utc > current or current >= certificate.not_valid_after_utc:
         raise MeshSecurityError("certificate is outside its validity window")
     if (
@@ -249,7 +258,14 @@ def create_tls_enrollment(
             san_entries.append(x509.DNSName(value))
     csr = (
         x509.CertificateSigningRequestBuilder()
-        .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, node_id)]))
+        .subject_name(
+            x509.Name(
+                [
+                    x509.NameAttribute(NameOID.ORGANIZATION_NAME, account_id),
+                    x509.NameAttribute(NameOID.COMMON_NAME, node_id),
+                ]
+            )
+        )
         .add_extension(x509.SubjectAlternativeName(san_entries), critical=False)
         .sign(private_key, hashes.SHA256())
     )
@@ -333,6 +349,7 @@ def install_certificate(
     metadata = validate_issued_certificate(
         certificate,
         issuer,
+        account_id=account_id,
         node_id=node_id,
         expected_sans=tuple(identity["sans"]),
         expected_spki_sha256=identity["tls_public_key_sha256"],
@@ -370,6 +387,7 @@ def load_tls_credential_paths(
     metadata = validate_issued_certificate(
         certificate,
         issuer,
+        account_id=account_id,
         node_id=node_id,
         expected_sans=tuple(identity["sans"]),
         expected_spki_sha256=identity["tls_public_key_sha256"],
@@ -484,7 +502,8 @@ def load_or_create_contract_identity(
     require_identifier("account_id", account_id)
     require_identifier("node_id", node_id)
     directory = safe_owned_directory(state_dir, create=create)
-    key_id = f"key:unisync-mesh:{hashlib.sha256(node_id.encode('utf-8')).hexdigest()[:20]}"
+    identity_scope = f"{account_id}\0{node_id}".encode("utf-8")
+    key_id = f"key:unisync-mesh:{hashlib.sha256(identity_scope).hexdigest()[:20]}"
     expected = {
         "schema": CONTRACT_IDENTITY_SCHEMA,
         "account_id": account_id,

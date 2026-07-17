@@ -48,6 +48,7 @@ from contracts.chal_vsource.v1.canonical import document_sha256
 from contracts.chal_vsource.v1.models import (
     CapabilityDocument,
     ChalRequest,
+    LeaseRevocationReason,
     LeaseState,
     ResourceInventory,
 )
@@ -549,6 +550,28 @@ def _require_accepted(label: str, result: Any) -> None:
         raise MeshSecurityError(f"{label} was rejected: {result.status} {result.reason}")
 
 
+def _revoke_failed_lease(
+    service: LocalVSourceControlPlane,
+    lease: Any,
+    lease_sha256: str,
+) -> None:
+    """Best-effort terminal transition that never masks the original failure."""
+
+    try:
+        current = service.get_lease(lease.lease_id)
+        if current is None or current.state != LeaseState.ACTIVE:
+            return
+        service.revoke_lease(
+            lease.lease_id,
+            lease_sha256=lease_sha256,
+            fencing_token=lease.fencing_token,
+            renewal_sequence=lease.renewal_sequence,
+            revocation_reason=LeaseRevocationReason.INTEGRITY_FAILURE,
+        )
+    except BaseException:
+        return
+
+
 def _wire_model(model_type: Any, payload: object) -> Any:
     return model_type.model_validate_json(
         json.dumps(payload, allow_nan=False, separators=(",", ":"))
@@ -1007,13 +1030,14 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
         "request": request.model_dump(mode="json", by_alias=True),
         "source_peer": _peer_wire(source_record),
     }
-    handle = carrier.start_serve(
-        config.destination,
-        ["serve", "--state-dir", config.destination.state_dir],
-        stdin=_job_json(serve_job),
-        timeout_seconds=float(config.timeout_seconds),
-    )
+    handle = None
     try:
+        handle = carrier.start_serve(
+            config.destination,
+            ["serve", "--state-dir", config.destination.state_dir],
+            stdin=_job_json(serve_job),
+            timeout_seconds=float(config.timeout_seconds),
+        )
         ready = handle.ready()
         if (
             ready.get("schema") != SERVE_READY_SCHEMA
@@ -1046,10 +1070,27 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
             ["send", "--state-dir", config.source.state_dir],
             stdin=_job_json(send_job),
         )
+        serve_result = handle.result()
     except BaseException:
-        handle.kill()
+        if handle is not None:
+            handle.kill()
+        _revoke_failed_lease(service, lease, lease_sha256)
         raise
-    serve_result = handle.result()
+
+    try:
+        release = service.release_lease(
+            lease.lease_id,
+            lease_sha256=lease_sha256,
+            fencing_token=lease.fencing_token,
+            renewal_sequence=lease.renewal_sequence,
+        )
+        _require_accepted("lease release", release)
+        released = service.get_lease(lease.lease_id)
+        if released is None or released.state != LeaseState.RELEASED:
+            raise MeshSecurityError("lease was not durably released after the transfer")
+    except BaseException:
+        _revoke_failed_lease(service, lease, lease_sha256)
+        raise
 
     expected_receipt = context.receipt_sha256(object_sha256)
     if (
@@ -1075,17 +1116,6 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
         or "client_identity_bound" not in serve_result.get("audit_events", [])
     ):
         raise MeshSecurityError("serve result does not prove the bound mTLS receipt")
-
-    release = service.release_lease(
-        lease.lease_id,
-        lease_sha256=lease_sha256,
-        fencing_token=lease.fencing_token,
-        renewal_sequence=lease.renewal_sequence,
-    )
-    _require_accepted("lease release", release)
-    released = service.get_lease(lease.lease_id)
-    if released is None or released.state != LeaseState.RELEASED:
-        raise MeshSecurityError("lease was not durably released after the transfer")
 
     os.chmod(database_path, 0o600)
     if stat.S_IMODE(database_path.lstat().st_mode) != 0o600:
@@ -1154,7 +1184,7 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
             "content_addressed_bounded_object": True,
             "two_distinct_pinned_ssh_endpoints": config.carrier == "ssh",
             "single_host_rehearsal": config.carrier == "local",
-            "physical_two_node_execution_proven": False,
+            "physical_two_node_execution_proven": config.carrier == "ssh",
             "certificate_rotation_renewal_proven": False,
             "revocation_distribution_proven": False,
             "nat_traversal_or_relay_proven": False,

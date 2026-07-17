@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import stat
 import sys
 from dataclasses import replace
 from datetime import UTC, datetime
+from multiprocessing import get_context
 from pathlib import Path
 
 import pytest
@@ -24,10 +26,12 @@ from services.unisync import (
     TransferContext,
     encode_frame,
 )
+from services.unisync import mesh_authority as mesh_authority_module
 from services.unisync.mesh_authority import (
     EnrollmentRegistry,
     MeshCertificateAuthority,
     MeshEnrollmentRecord,
+    REGISTRY_LOCK_FILE,
 )
 from services.unisync.mesh_common import (
     MeshSecurityError,
@@ -107,6 +111,10 @@ def test_node_local_enrollment_registry_and_revocation_are_fail_closed(
     csr = x509.load_pem_x509_csr(enrollment["csr_pem"].encode("ascii"))
     assert csr.is_signature_valid
     assert csr.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[0].value == node_id
+    assert (
+        csr.subject.get_attributes_for_oid(x509.oid.NameOID.ORGANIZATION_NAME)[0].value
+        == account_id
+    )
 
     authority = MeshCertificateAuthority.create("Test Mesh CA")
     issued = authority.issue_node_certificate(
@@ -171,6 +179,127 @@ def test_node_local_enrollment_registry_and_revocation_are_fail_closed(
         EnrollmentRegistry(registry_dir).active_peer(account_id, node_id)
 
 
+def test_registry_lock_serializes_register_and_revoke_without_resurrection(
+    tmp_path: Path,
+) -> None:
+    account_id = "account:test:mesh"
+    authority = MeshCertificateAuthority.create("Concurrent Registry Test CA")
+
+    def issued_record(node_id: str) -> MeshEnrollmentRecord:
+        enrollment = create_tls_enrollment(
+            tmp_path / node_id.rsplit(":", 1)[-1],
+            account_id=account_id,
+            node_id=node_id,
+            sans=[f"{node_id.rsplit(':', 1)[-1]}.test"],
+        )
+        issued = authority.issue_node_certificate(
+            enrollment["csr_pem"],
+            account_id=account_id,
+            node_id=node_id,
+            sans=enrollment["sans"],
+        )
+        return _record(
+            account_id,
+            node_id,
+            issued,
+            enrolled_at=wire_time(datetime.now(UTC)),
+        )
+
+    first = issued_record("node:test:first")
+    second = issued_record("node:test:second")
+    registry_dir = tmp_path / "registry"
+    EnrollmentRegistry(registry_dir).register(first)
+    registering = EnrollmentRegistry(registry_dir)
+    revoking = EnrollmentRegistry(registry_dir)
+    process_context = get_context("fork")
+    save_entered = process_context.Event()
+    allow_save = process_context.Event()
+    revoke_started = process_context.Event()
+    revoke_lock_attempted = process_context.Event()
+    revoke_lock_blocked = process_context.Event()
+    revoke_lock_acquired_early = process_context.Event()
+    revoke_finished = process_context.Event()
+    results = process_context.Queue()
+    original_save = registering._save
+
+    def paused_save() -> None:
+        save_entered.set()
+        if not allow_save.wait(10):
+            raise AssertionError("timed out waiting to release registry save")
+        original_save()
+
+    registering._save = paused_save  # type: ignore[method-assign]
+
+    def register_second() -> None:
+        try:
+            registering.register(second)
+            results.put(("register", "ok"))
+        except BaseException as exc:
+            results.put(("register", repr(exc)))
+
+    def revoke_first() -> None:
+        revoke_started.set()
+        real_flock = mesh_authority_module.fcntl.flock
+
+        def observed_flock(descriptor: int, operation: int) -> object:
+            if operation == mesh_authority_module.fcntl.LOCK_EX:
+                revoke_lock_attempted.set()
+                try:
+                    return real_flock(
+                        descriptor,
+                        mesh_authority_module.fcntl.LOCK_EX
+                        | mesh_authority_module.fcntl.LOCK_NB,
+                    )
+                except BlockingIOError:
+                    revoke_lock_blocked.set()
+                    return real_flock(descriptor, operation)
+                finally:
+                    if not revoke_lock_blocked.is_set():
+                        revoke_lock_acquired_early.set()
+            return real_flock(descriptor, operation)
+
+        mesh_authority_module.fcntl.flock = observed_flock
+        try:
+            revoking.revoke(account_id, first.node_id, reason="concurrent revocation")
+            results.put(("revoke", "ok"))
+        except BaseException as exc:
+            results.put(("revoke", repr(exc)))
+        finally:
+            revoke_finished.set()
+
+    register_process = process_context.Process(target=register_second)
+    revoke_process = process_context.Process(target=revoke_first)
+    register_process.start()
+    revoke_started_by_parent = False
+    try:
+        assert save_entered.wait(2)
+        revoke_process.start()
+        revoke_started_by_parent = True
+        assert revoke_started.wait(2)
+        assert revoke_lock_attempted.wait(2)
+        assert revoke_lock_blocked.wait(2)
+        assert not revoke_lock_acquired_early.is_set()
+        assert not revoke_finished.is_set()
+    finally:
+        allow_save.set()
+        register_process.join(2)
+        if revoke_started_by_parent:
+            revoke_process.join(2)
+
+    assert not register_process.is_alive()
+    assert register_process.exitcode == 0
+    assert revoke_started_by_parent
+    assert not revoke_process.is_alive()
+    assert revoke_process.exitcode == 0
+    outcomes = sorted(results.get(timeout=2) for _ in range(2))
+    assert outcomes == [("register", "ok"), ("revoke", "ok")]
+    final = EnrollmentRegistry(registry_dir)
+    with pytest.raises(AuthorizationError, match="revoked"):
+        final.active_peer(account_id, first.node_id)
+    assert final.active_peer(account_id, second.node_id).node_id == second.node_id
+    assert _mode(registry_dir / REGISTRY_LOCK_FILE) == 0o600
+
+
 def test_enrollment_rejects_changed_identity_substituted_key_and_symlink(
     tmp_path: Path,
 ) -> None:
@@ -187,6 +316,13 @@ def test_enrollment_rejects_changed_identity_substituted_key_and_symlink(
             first["csr_pem"],
             account_id="account:test:mesh",
             node_id="node:test:changed",
+            sans=["first.test"],
+        )
+    with pytest.raises(MeshSecurityError, match="account"):
+        authority.issue_node_certificate(
+            first["csr_pem"],
+            account_id="account:test:other",
+            node_id="node:test:first",
             sans=["first.test"],
         )
 
@@ -244,6 +380,11 @@ def test_declared_vpn_cidr_cannot_widen_listener_to_public_space(cidr: str) -> N
 
 @pytest.fixture
 def local_mesh_evidence(tmp_path: Path) -> tuple[dict[str, object], MeshSmokeConfig]:
+    config = _local_mesh_config(tmp_path)
+    return run_mesh_mtls_smoke(config, LocalMeshCarrier(timeout_seconds=15)), config
+
+
+def _local_mesh_config(tmp_path: Path) -> MeshSmokeConfig:
     repo = Path(__file__).resolve().parents[2]
     source = MeshNodeConfig(
         node_id="node:test:source",
@@ -263,7 +404,7 @@ def local_mesh_evidence(tmp_path: Path) -> tuple[dict[str, object], MeshSmokeCon
         ssh_alias=None,
         ssh_host_fingerprint=None,
     )
-    config = MeshSmokeConfig(
+    return MeshSmokeConfig(
         account_id="account:test:mesh",
         subject_id="subject:test:owner",
         carrier="local",
@@ -282,7 +423,26 @@ def local_mesh_evidence(tmp_path: Path) -> tuple[dict[str, object], MeshSmokeCon
         server_hostname="127.0.0.1",
         declared_vpn_cidrs=(),
     )
-    return run_mesh_mtls_smoke(config, LocalMeshCarrier(timeout_seconds=15)), config
+
+
+class _FailingServeCarrier(LocalMeshCarrier):
+    def start_serve(self, *args: object, **kwargs: object) -> object:
+        raise MeshSecurityError("injected serve startup failure")
+
+
+def test_transfer_start_failure_durably_revokes_allocated_lease(tmp_path: Path) -> None:
+    config = _local_mesh_config(tmp_path)
+    with pytest.raises(MeshSecurityError, match="injected serve startup failure"):
+        run_mesh_mtls_smoke(
+            config,
+            _FailingServeCarrier(timeout_seconds=config.timeout_seconds),
+        )
+
+    with sqlite3.connect(config.state_db) as connection:
+        rows = connection.execute(
+            "SELECT state, terminal_state FROM leases"
+        ).fetchall()
+    assert rows == [("revoked", "revoked")]
 
 
 def test_real_tcp_tls13_gate_binds_signed_request_lease_and_both_peers(

@@ -14,14 +14,16 @@ distribution) are explicit non-claims and remain separate gates.
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import os
 import secrets
 import stat
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -48,6 +50,7 @@ from .mesh_identity import MAX_PEM_BYTES, validate_issued_certificate
 from .tls import EnrolledPeerIdentity
 
 REGISTRY_FILE = "enrollments.json"
+REGISTRY_LOCK_FILE = "enrollments.lock"
 REGISTRY_SCHEMA = "planetary.unisync.mesh_enrollment_registry.v1"
 RECORD_SCHEMA = "planetary.unisync.mesh_enrollment_record.v1"
 _RECORD_FIELDS = frozenset(
@@ -163,6 +166,9 @@ class MeshCertificateAuthority:
         common_names = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
         if len(common_names) != 1 or common_names[0].value != node_id:
             raise MeshSecurityError("CSR subject does not bind the enrolling node")
+        account_names = csr.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
+        if len(account_names) != 1 or account_names[0].value != account_id:
+            raise MeshSecurityError("CSR subject does not bind the enrolling account")
         public_key = csr.public_key()
         if not isinstance(public_key, ec.EllipticCurvePublicKey) or not isinstance(
             public_key.curve, ec.SECP256R1
@@ -223,6 +229,7 @@ class MeshCertificateAuthority:
         metadata = validate_issued_certificate(
             certificate,
             self._certificate,
+            account_id=account_id,
             node_id=node_id,
             expected_sans=expected_sans,
             expected_spki_sha256=hashlib.sha256(
@@ -344,20 +351,88 @@ class EnrollmentRegistry:
     def __init__(self, directory: Path) -> None:
         self._directory = safe_owned_directory(Path(directory))
         self._path = self._directory / REGISTRY_FILE
+        self._lock_path = self._directory / REGISTRY_LOCK_FILE
         self._records: dict[tuple[str, str], MeshEnrollmentRecord] = {}
-        try:
-            self._path.lstat()
-            exists = True
-        except FileNotFoundError:
-            exists = False
-        if exists:
-            self._load()
-        else:
-            self._save()
+        with self._locked(exclusive=True):
+            try:
+                self._path.lstat()
+                exists = True
+            except FileNotFoundError:
+                exists = False
+            if exists:
+                self._load()
+            else:
+                self._save()
 
     @property
     def path(self) -> Path:
         return self._path
+
+    @contextmanager
+    def _locked(self, *, exclusive: bool) -> Iterator[None]:
+        """Hold the stable registry lock across every read-modify-replace cycle."""
+
+        flags = os.O_RDWR
+        if hasattr(os, "O_CLOEXEC"):
+            flags |= os.O_CLOEXEC
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        descriptor: int | None = None
+        created = False
+        try:
+            for _ in range(3):
+                try:
+                    descriptor = os.open(
+                        self._lock_path,
+                        flags | os.O_CREAT | os.O_EXCL,
+                        0o600,
+                    )
+                    created = True
+                    break
+                except FileExistsError:
+                    try:
+                        descriptor = os.open(self._lock_path, flags)
+                        break
+                    except FileNotFoundError:
+                        continue
+        except OSError as exc:
+            raise MeshSecurityError("cannot open the enrollment registry lock") from exc
+        if descriptor is None:
+            raise MeshSecurityError("enrollment registry lock is unstable")
+        try:
+            opened = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or opened.st_uid != os.geteuid()
+                or opened.st_nlink != 1
+            ):
+                raise MeshSecurityError("enrollment registry lock is not a safe owned file")
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+            except OSError as exc:
+                raise MeshSecurityError("cannot acquire the enrollment registry lock") from exc
+            if created:
+                os.fchmod(descriptor, 0o600)
+                os.fsync(descriptor)
+                fsync_directory(self._directory)
+            opened = os.fstat(descriptor)
+            try:
+                linked = self._lock_path.lstat()
+            except FileNotFoundError as exc:
+                raise MeshSecurityError("enrollment registry lock disappeared") from exc
+            if (
+                not stat.S_ISREG(linked.st_mode)
+                or opened.st_dev != linked.st_dev
+                or opened.st_ino != linked.st_ino
+                or stat.S_IMODE(opened.st_mode) != 0o600
+                or opened.st_size != 0
+            ):
+                raise MeshSecurityError("enrollment registry lock integrity check failed")
+            yield
+        finally:
+            # Closing the unique open description releases flock without a
+            # second syscall that could mask the original fail-closed error.
+            os.close(descriptor)
 
     def _load(self) -> None:
         raw = read_private_file(self._path, max_bytes=MAX_REGISTRY_BYTES)
@@ -415,63 +490,65 @@ class EnrollmentRegistry:
     def register(self, record: MeshEnrollmentRecord) -> None:
         """Explicitly add one peer; duplicates and substitutions fail closed."""
 
-        self._load()
-        key = (record.account_id, record.node_id)
-        if key in self._records:
-            raise MeshSecurityError(
-                "node is already enrolled; re-enrollment/rotation is a separate gate"
-            )
-        for existing in self._records.values():
-            if existing.certificate_sha256 == record.certificate_sha256:
-                raise MeshSecurityError("certificate fingerprint is already enrolled")
-            if existing.public_key_sha256 == record.public_key_sha256:
-                raise MeshSecurityError("public-key fingerprint is already enrolled")
-        previous = self._records
-        self._records = {**previous, key: record}
-        try:
-            self._save()
-        except BaseException:
-            self._records = previous
-            raise
+        with self._locked(exclusive=True):
+            self._load()
+            key = (record.account_id, record.node_id)
+            if key in self._records:
+                raise MeshSecurityError(
+                    "node is already enrolled; re-enrollment/rotation is a separate gate"
+                )
+            for existing in self._records.values():
+                if existing.certificate_sha256 == record.certificate_sha256:
+                    raise MeshSecurityError("certificate fingerprint is already enrolled")
+                if existing.public_key_sha256 == record.public_key_sha256:
+                    raise MeshSecurityError("public-key fingerprint is already enrolled")
+            previous = self._records
+            self._records = {**previous, key: record}
+            try:
+                self._save()
+            except BaseException:
+                self._records = previous
+                raise
 
     def revoke(self, account_id: str, node_id: str, *, reason: str) -> None:
-        self._load()
-        key = (account_id, node_id)
-        record = self._records.get(key)
-        if record is None:
-            raise MeshSecurityError("cannot revoke an unknown enrollment")
-        if record.status != "active":
-            if record.revocation_reason == reason:
-                return
-            raise MeshSecurityError("enrollment is already revoked with a different reason")
-        replacement = MeshEnrollmentRecord(
-            **{
+        with self._locked(exclusive=True):
+            self._load()
+            key = (account_id, node_id)
+            record = self._records.get(key)
+            if record is None:
+                raise MeshSecurityError("cannot revoke an unknown enrollment")
+            if record.status != "active":
+                if record.revocation_reason == reason:
+                    return
+                raise MeshSecurityError("enrollment is already revoked with a different reason")
+            replacement = MeshEnrollmentRecord(
                 **{
-                    field: getattr(record, field)
-                    for field in (
-                        "account_id",
-                        "node_id",
-                        "sans",
-                        "certificate_sha256",
-                        "public_key_sha256",
-                        "serial_hex",
-                        "issuer",
-                        "not_before",
-                        "not_after",
-                        "enrolled_at",
-                    )
-                },
-                "status": "revoked",
-                "revocation_reason": reason,
-            }
-        )
-        previous = self._records
-        self._records = {**previous, key: replacement}
-        try:
-            self._save()
-        except BaseException:
-            self._records = previous
-            raise
+                    **{
+                        field: getattr(record, field)
+                        for field in (
+                            "account_id",
+                            "node_id",
+                            "sans",
+                            "certificate_sha256",
+                            "public_key_sha256",
+                            "serial_hex",
+                            "issuer",
+                            "not_before",
+                            "not_after",
+                            "enrolled_at",
+                        )
+                    },
+                    "status": "revoked",
+                    "revocation_reason": reason,
+                }
+            )
+            previous = self._records
+            self._records = {**previous, key: replacement}
+            try:
+                self._save()
+            except BaseException:
+                self._records = previous
+                raise
 
     def active_peer(
         self,
@@ -482,26 +559,29 @@ class EnrollmentRegistry:
     ) -> EnrolledPeerIdentity:
         """Return the active enrollment or fail closed."""
 
-        self._load()
-        record = self._records.get((account_id, node_id))
-        if record is None:
-            raise AuthorizationError("peer is not enrolled in the mesh registry")
-        if record.status != "active":
-            raise AuthorizationError("peer enrollment is revoked")
-        current = (now or datetime.now(UTC)).astimezone(UTC)
-        if current < parse_wire_time(record.not_before) or current >= parse_wire_time(
-            record.not_after
-        ):
-            raise AuthorizationError("peer enrollment is outside its validity window")
-        return record.peer_identity()
+        with self._locked(exclusive=False):
+            self._load()
+            record = self._records.get((account_id, node_id))
+            if record is None:
+                raise AuthorizationError("peer is not enrolled in the mesh registry")
+            if record.status != "active":
+                raise AuthorizationError("peer enrollment is revoked")
+            current = (now or datetime.now(UTC)).astimezone(UTC)
+            if current < parse_wire_time(record.not_before) or current >= parse_wire_time(
+                record.not_after
+            ):
+                raise AuthorizationError("peer enrollment is outside its validity window")
+            return record.peer_identity()
 
     def record(self, account_id: str, node_id: str) -> MeshEnrollmentRecord:
-        self._load()
-        record = self._records.get((account_id, node_id))
-        if record is None:
-            raise AuthorizationError("peer is not enrolled in the mesh registry")
-        return record
+        with self._locked(exclusive=False):
+            self._load()
+            record = self._records.get((account_id, node_id))
+            if record is None:
+                raise AuthorizationError("peer is not enrolled in the mesh registry")
+            return record
 
     def snapshot_wire(self) -> list[dict[str, Any]]:
-        self._load()
-        return [record.to_wire() for _, record in sorted(self._records.items())]
+        with self._locked(exclusive=False):
+            self._load()
+            return [record.to_wire() for _, record in sorted(self._records.items())]
