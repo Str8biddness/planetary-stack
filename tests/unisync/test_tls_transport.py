@@ -462,8 +462,8 @@ def test_loopback_mtls_transfer_moves_object(tmp_path, payload: bytes, certs: Ce
 @pytest.mark.parametrize(
     ("enrollment_changes", "message"),
     [
-        ({"node_id": "node:other"}, "source node"),
-        ({"account_id": "account:other"}, "account"),
+        ({"node_id": "node:other"}, "not enrolled"),
+        ({"account_id": "account:other"}, "not enrolled"),
     ],
 )
 def test_client_certificate_identity_must_match_transfer_context(
