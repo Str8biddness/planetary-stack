@@ -21,7 +21,9 @@ from aivm.admission import (
     AdmissionStatus,
     DocumentVerification,
     HostIsolationCapabilities,
+    StaticHostCapabilityProbe,
 )
+from aivm.isolation.guard import DeviceExecutionResult
 from contracts.aivm.v1 import AIVMWorkloadManifest, signing_bytes
 
 
@@ -47,6 +49,40 @@ class Ed25519FixtureVerifier:
         except InvalidSignature:
             return DocumentVerification(False, "invalid_signature", key_id=self.key_id)
         return DocumentVerification(True, "verified", key_id=self.key_id)
+
+
+class RaisingVerifier:
+    def verify_manifest(self, manifest: AIVMWorkloadManifest, payload: bytes) -> DocumentVerification:
+        raise RuntimeError("sensitive verifier backend detail")
+
+
+class RecordingHostProbe:
+    def __init__(self, capabilities: HostIsolationCapabilities | None = None, *, fail: bool = False):
+        self.capabilities = capabilities or _host()
+        self.fail = fail
+        self.calls = 0
+
+    def probe(self) -> HostIsolationCapabilities:
+        self.calls += 1
+        if self.fail:
+            raise RuntimeError("sensitive host probe detail")
+        return self.capabilities
+
+
+class RecordingGuard:
+    def __init__(self):
+        self.calls = 0
+
+    async def run(self, device_id, operation, *, timeout_ms, metadata=None):
+        self.calls += 1
+        return DeviceExecutionResult(
+            device_id=device_id,
+            ok=True,
+            status="ok",
+            latency_ms=0.0,
+            output=operation(),
+            metadata=metadata or {},
+        )
 
 
 def _b64_signature(signature: bytes) -> str:
@@ -133,7 +169,19 @@ def _policy() -> AdmissionPolicy:
         max_memory_bytes=536_870_912,
         max_time_limit_seconds=60,
         max_process_limit=32,
+        max_open_file_limit=128,
         max_output_bytes=2_097_152,
+        max_scratch_bytes=2_097_152,
+        max_gpu_count=0,
+        max_gpu_memory_bytes=0,
+        allowed_devices=frozenset(),
+        allowed_network_destinations=frozenset(),
+        max_devices=4,
+        max_writable_paths=4,
+        max_artifacts=4,
+        max_inputs=4,
+        max_outputs=4,
+        max_network_destinations=0,
     )
 
 
@@ -155,7 +203,7 @@ def _controller(private_key: Ed25519PrivateKey, **host_overrides: bool) -> AIVMA
     return AIVMAdmissionController(
         verifier=Ed25519FixtureVerifier(private_key.public_key()),
         policy=_policy(),
-        host=_host(**host_overrides),
+        host_probe=StaticHostCapabilityProbe(_host(**host_overrides)),
     )
 
 
@@ -213,10 +261,22 @@ def test_unknown_fields_are_rejected():
         (lambda p: p["runtime_image"].update({"host_pid": True}), "host_pid"),
         (lambda p: p["runtime_image"].update({"host_ipc": True}), "host_ipc"),
         (lambda p: p["runtime_image"].update({"devices": ["/dev/kvm"]}), "devices"),
+        (lambda p: p["runtime_image"].update({"devices": ["/dev/sda"]}), "devices"),
+        (lambda p: p["runtime_image"].update({"devices": ["dev/fuse"]}), "devices"),
+        (lambda p: p["runtime_image"].update({"devices": ["/dev/../dev/fuse"]}), "devices"),
         (lambda p: p["artifacts"][0].update({"mount_path": "/work/../secret"}), "mount_path"),
         (lambda p: p["filesystem"].update({"writable_paths": ["/home/user"]}), "writable_paths"),
+        (lambda p: p["filesystem"].update({"writable_paths": ["/workevil"]}), "writable_paths"),
+        (lambda p: p["filesystem"].update({"writable_paths": ["/scratchpad"]}), "writable_paths"),
+        (lambda p: p["filesystem"].update({"writable_paths": ["/tmp/aivm-evil"]}), "writable_paths"),
         (lambda p: p["filesystem"].update({"host_mounts": ["/"]}), "host mounts"),
         (lambda p: p["network"].update({"mode": "allowlist", "allowlist": []}), "allowlist"),
+        (
+            lambda p: p["network"].update(
+                {"mode": "allowlist", "allowlist": [{"protocol": "https", "host": "*", "port": 443}]}
+            ),
+            "network",
+        ),
         (lambda p: p["resources"].update({"cpu_millicores": 0}), "cpu"),
         (lambda p: p["resources"].update({"memory_bytes": 1}), "memory"),
         (lambda p: p["resources"].update({"time_limit_seconds": 0}), "time"),
@@ -279,12 +339,24 @@ def test_runtime_image_and_entrypoint_allowlists_are_enforced():
         max_memory_bytes=536_870_912,
         max_time_limit_seconds=60,
         max_process_limit=32,
+        max_open_file_limit=128,
         max_output_bytes=2_097_152,
+        max_scratch_bytes=2_097_152,
+        max_gpu_count=0,
+        max_gpu_memory_bytes=0,
+        allowed_devices=frozenset(),
+        allowed_network_destinations=frozenset(),
+        max_devices=0,
+        max_writable_paths=4,
+        max_artifacts=4,
+        max_inputs=4,
+        max_outputs=4,
+        max_network_destinations=0,
     )
     image_decision = AIVMAdmissionController(
         verifier=Ed25519FixtureVerifier(private_key.public_key()),
         policy=image_policy,
-        host=_host(),
+        host_probe=StaticHostCapabilityProbe(_host()),
     ).admit_sync(manifest, artifacts={"artifact://private/bundle": PAYLOAD}, now=NOW)
 
     entry_policy = AdmissionPolicy(
@@ -294,12 +366,24 @@ def test_runtime_image_and_entrypoint_allowlists_are_enforced():
         max_memory_bytes=536_870_912,
         max_time_limit_seconds=60,
         max_process_limit=32,
+        max_open_file_limit=128,
         max_output_bytes=2_097_152,
+        max_scratch_bytes=2_097_152,
+        max_gpu_count=0,
+        max_gpu_memory_bytes=0,
+        allowed_devices=frozenset(),
+        allowed_network_destinations=frozenset(),
+        max_devices=4,
+        max_writable_paths=4,
+        max_artifacts=4,
+        max_inputs=4,
+        max_outputs=4,
+        max_network_destinations=0,
     )
     entry_decision = AIVMAdmissionController(
         verifier=Ed25519FixtureVerifier(private_key.public_key()),
         policy=entry_policy,
-        host=_host(),
+        host_probe=StaticHostCapabilityProbe(_host()),
     ).admit_sync(manifest, artifacts={"artifact://private/bundle": PAYLOAD}, now=NOW)
 
     assert image_decision.status == AdmissionStatus.REJECTED
@@ -315,20 +399,37 @@ def test_runtime_image_and_entrypoint_allowlists_are_enforced():
         ("memory_bytes", 536_870_913, "memory budget exceeds host policy"),
         ("time_limit_seconds", 61, "time budget exceeds host policy"),
         ("process_limit", 33, "process budget exceeds host policy"),
+        ("open_file_limit", 129, "open file budget exceeds host policy"),
         ("output_bytes", 2_097_153, "output budget exceeds host policy"),
+        ("scratch_bytes", 2_097_153, "scratch budget exceeds host policy"),
+        ("gpu_count", 1, "gpu count exceeds host policy"),
+        ("gpu_memory_bytes", 1, "gpu memory budget exceeds host policy"),
+        ("open_file_limit", 1_048_576, "open file budget exceeds host policy"),
+        ("scratch_bytes", 9_007_199_254_740_991, "scratch budget exceeds host policy"),
+        ("gpu_count", 64, "gpu count exceeds host policy"),
+        ("gpu_memory_bytes", 9_007_199_254_740_991, "gpu memory budget exceeds host policy"),
     ],
 )
 def test_resource_limits_are_enforced_by_admission_policy(field, value, reason):
     private_key = Ed25519PrivateKey.generate()
     payload = _manifest_payload()
     payload["resources"][field] = value
+    policy = _policy()
+    host = _host()
+    if field == "gpu_count":
+        payload["resources"]["gpu_memory_bytes"] = 1
+        host = _host(gpu_isolation=True)
+    if field == "gpu_memory_bytes":
+        payload["resources"]["gpu_count"] = 1
+        host = _host(gpu_isolation=True)
+        policy = AdmissionPolicy(**{**policy.__dict__, "max_gpu_count": 1})
     manifest = _signed_manifest(private_key, payload)
 
-    decision = _controller(private_key).admit_sync(
-        manifest,
-        artifacts={"artifact://private/bundle": PAYLOAD},
-        now=NOW,
-    )
+    decision = AIVMAdmissionController(
+        verifier=Ed25519FixtureVerifier(private_key.public_key()),
+        policy=policy,
+        host_probe=StaticHostCapabilityProbe(host),
+    ).admit_sync(manifest, artifacts={"artifact://private/bundle": PAYLOAD}, now=NOW)
 
     assert decision.status == AdmissionStatus.REJECTED
     assert decision.reason == reason
@@ -337,7 +438,7 @@ def test_resource_limits_are_enforced_by_admission_policy(field, value, reason):
 def test_future_network_allowlist_descriptor_is_not_enabled_by_default():
     private_key = Ed25519PrivateKey.generate()
     payload = _manifest_payload()
-    payload["network"] = {"mode": "allowlist", "allowlist": ["artifact-plane.local"]}
+    payload["network"] = {"mode": "allowlist", "allowlist": [{"protocol": "https", "host": "artifact-plane.local", "port": 443}]}
     manifest = _signed_manifest(private_key, payload)
 
     decision = _controller(private_key).admit_sync(
@@ -348,6 +449,72 @@ def test_future_network_allowlist_descriptor_is_not_enabled_by_default():
 
     assert decision.status == AdmissionStatus.REJECTED
     assert decision.reason == "network is denied by admission policy"
+
+
+def test_network_requires_exact_policy_destination_even_when_network_enabled():
+    private_key = Ed25519PrivateKey.generate()
+    payload = _manifest_payload()
+    payload["network"] = {
+        "mode": "allowlist",
+        "allowlist": [{"protocol": "https", "host": "artifact-plane.local", "port": 443}],
+    }
+    manifest = _signed_manifest(private_key, payload)
+    policy = AdmissionPolicy(
+        **{
+            **_policy().__dict__,
+            "allow_network": True,
+            "max_network_destinations": 1,
+            "allowed_network_destinations": frozenset({"https://other.local:443"}),
+        }
+    )
+
+    decision = AIVMAdmissionController(
+        verifier=Ed25519FixtureVerifier(private_key.public_key()),
+        policy=policy,
+        host_probe=StaticHostCapabilityProbe(_host()),
+    ).admit_sync(manifest, artifacts={"artifact://private/bundle": PAYLOAD}, now=NOW)
+
+    assert decision.status == AdmissionStatus.REJECTED
+    assert decision.reason == "network destination is not allowlisted"
+
+
+def test_exact_policy_device_allowlist_denies_default_host_devices():
+    private_key = Ed25519PrivateKey.generate()
+    payload = _manifest_payload()
+    payload["runtime_image"]["devices"] = ["/dev/fuse"]
+    manifest = _signed_manifest(private_key, payload)
+
+    decision = _controller(private_key).admit_sync(
+        manifest,
+        artifacts={"artifact://private/bundle": PAYLOAD},
+        now=NOW,
+    )
+
+    assert decision.status == AdmissionStatus.REJECTED
+    assert decision.reason == "runtime device is not allowlisted"
+
+
+def test_allowed_device_must_be_exact_policy_match():
+    private_key = Ed25519PrivateKey.generate()
+    payload = _manifest_payload()
+    payload["runtime_image"]["devices"] = ["/dev/fuse"]
+    manifest = _signed_manifest(private_key, payload)
+    policy = AdmissionPolicy(
+        **{
+            **_policy().__dict__,
+            "allowed_devices": frozenset({"/dev/net/tun"}),
+            "max_devices": 1,
+        }
+    )
+
+    decision = AIVMAdmissionController(
+        verifier=Ed25519FixtureVerifier(private_key.public_key()),
+        policy=policy,
+        host_probe=StaticHostCapabilityProbe(_host()),
+    ).admit_sync(manifest, artifacts={"artifact://private/bundle": PAYLOAD}, now=NOW)
+
+    assert decision.status == AdmissionStatus.REJECTED
+    assert decision.reason == "runtime device is not allowlisted"
 
 
 def test_unsupported_host_returns_unavailable_without_admission():
@@ -368,7 +535,11 @@ def test_unsupported_host_returns_unavailable_without_admission():
 def test_missing_verifier_returns_unavailable_without_local_trust_store():
     private_key = Ed25519PrivateKey.generate()
     manifest = _signed_manifest(private_key)
-    controller = AIVMAdmissionController(verifier=None, policy=_policy(), host=_host())
+    controller = AIVMAdmissionController(
+        verifier=None,
+        policy=_policy(),
+        host_probe=StaticHostCapabilityProbe(_host()),
+    )
 
     decision = controller.admit_sync(
         manifest,
@@ -379,3 +550,150 @@ def test_missing_verifier_returns_unavailable_without_local_trust_store():
     assert decision.status == AdmissionStatus.UNAVAILABLE
     assert decision.degraded is True
     assert decision.evidence["missing"] == ["document_verifier"]
+
+
+def test_missing_host_probe_returns_unavailable_after_signature_verification():
+    private_key = Ed25519PrivateKey.generate()
+    manifest = _signed_manifest(private_key)
+    guard = RecordingGuard()
+
+    decision = AIVMAdmissionController(
+        verifier=Ed25519FixtureVerifier(private_key.public_key()),
+        policy=_policy(),
+        host_probe=None,
+        guard=guard,
+    ).admit_sync(manifest, artifacts={"artifact://private/bundle": PAYLOAD}, now=NOW)
+
+    assert decision.status == AdmissionStatus.UNAVAILABLE
+    assert decision.degraded is True
+    assert decision.evidence["missing"] == ["host_capability_probe"]
+    assert guard.calls == 0
+
+
+def test_host_probe_exception_is_bounded_unavailable_without_raw_detail():
+    private_key = Ed25519PrivateKey.generate()
+    manifest = _signed_manifest(private_key)
+    guard = RecordingGuard()
+
+    decision = AIVMAdmissionController(
+        verifier=Ed25519FixtureVerifier(private_key.public_key()),
+        policy=_policy(),
+        host_probe=RecordingHostProbe(fail=True),
+        guard=guard,
+    ).admit_sync(manifest, artifacts={"artifact://private/bundle": PAYLOAD}, now=NOW)
+
+    assert decision.status == AdmissionStatus.UNAVAILABLE
+    assert decision.degraded is True
+    assert decision.reason == "host capability probe unavailable"
+    assert "sensitive" not in json.dumps(decision.evidence)
+    assert guard.calls == 0
+
+
+def test_invalid_signature_is_checked_before_host_probe_or_guard():
+    private_key = Ed25519PrivateKey.generate()
+    manifest = _signed_manifest(private_key)
+    tampered = manifest.model_dump(mode="json", by_alias=True)
+    tampered["resources"]["cpu_millicores"] = 1500
+    tampered_manifest = AIVMWorkloadManifest.model_validate_json(json.dumps(tampered, separators=(",", ":")))
+    probe = RecordingHostProbe()
+    guard = RecordingGuard()
+
+    decision = AIVMAdmissionController(
+        verifier=Ed25519FixtureVerifier(private_key.public_key()),
+        policy=_policy(),
+        host_probe=probe,
+        guard=guard,
+    ).admit_sync(tampered_manifest, artifacts={"artifact://private/bundle": PAYLOAD}, now=NOW)
+
+    assert decision.status == AdmissionStatus.REJECTED
+    assert decision.reason == "manifest signature verification failed"
+    assert probe.calls == 0
+    assert guard.calls == 0
+
+
+def test_verifier_exception_is_bounded_unavailable_without_host_probe_or_raw_detail():
+    private_key = Ed25519PrivateKey.generate()
+    manifest = _signed_manifest(private_key)
+    probe = RecordingHostProbe()
+    guard = RecordingGuard()
+
+    decision = AIVMAdmissionController(
+        verifier=RaisingVerifier(),
+        policy=_policy(),
+        host_probe=probe,
+        guard=guard,
+    ).admit_sync(manifest, artifacts={"artifact://private/bundle": PAYLOAD}, now=NOW)
+
+    assert decision.status == AdmissionStatus.UNAVAILABLE
+    assert decision.degraded is True
+    assert decision.reason == "manifest verifier unavailable"
+    assert "sensitive" not in json.dumps(decision.evidence)
+    assert probe.calls == 0
+    assert guard.calls == 0
+
+
+def test_denied_policy_decision_does_not_call_execution_guard():
+    private_key = Ed25519PrivateKey.generate()
+    payload = _manifest_payload()
+    payload["resources"]["cpu_millicores"] = 2001
+    manifest = _signed_manifest(private_key, payload)
+    guard = RecordingGuard()
+
+    decision = AIVMAdmissionController(
+        verifier=Ed25519FixtureVerifier(private_key.public_key()),
+        policy=_policy(),
+        host_probe=StaticHostCapabilityProbe(_host()),
+        guard=guard,
+    ).admit_sync(manifest, artifacts={"artifact://private/bundle": PAYLOAD}, now=NOW)
+
+    assert decision.status == AdmissionStatus.REJECTED
+    assert guard.calls == 0
+
+
+def test_raw_json_parser_rejects_duplicate_keys_at_any_depth():
+    payload = json.dumps(_manifest_payload(), separators=(",", ":"))
+    duplicate_top = payload.replace('"manifest_id":"manifest:001"', '"manifest_id":"manifest:001","manifest_id":"manifest:002"')
+    duplicate_nested = payload.replace('"image_id":"aivm-python-safe"', '"image_id":"aivm-python-safe","image_id":"other"')
+
+    with pytest.raises(ValueError, match="duplicate JSON key"):
+        AIVMWorkloadManifest.model_validate_json_strict(duplicate_top)
+    with pytest.raises(ValueError, match="duplicate JSON key"):
+        AIVMWorkloadManifest.model_validate_json_strict(duplicate_nested)
+
+
+def test_raw_json_parser_rejects_nan_and_infinity_before_validation():
+    payload = json.dumps(_manifest_payload(), separators=(",", ":"))
+    payload = payload.replace('"cpu_millicores":1000', '"cpu_millicores":NaN')
+
+    with pytest.raises(ValueError, match="non-I-JSON"):
+        AIVMWorkloadManifest.model_validate_json_strict(payload)
+
+
+def test_collection_count_bounds_and_duplicate_artifact_bindings_are_rejected():
+    private_key = Ed25519PrivateKey.generate()
+
+    duplicate_uri = _manifest_payload()
+    duplicate_uri["artifacts"] = [_artifact_payload(), {**_artifact_payload(), "artifact_id": "artifact:other"}]
+    with pytest.raises(ValidationError, match="artifact URIs"):
+        _signed_manifest(private_key, duplicate_uri)
+
+    duplicate_mount = _manifest_payload()
+    duplicate_mount["artifacts"] = [
+        _artifact_payload(),
+        {**_artifact_payload(), "artifact_id": "artifact:other", "uri": "artifact://private/other"},
+    ]
+    with pytest.raises(ValidationError, match="artifact mount paths"):
+        _signed_manifest(private_key, duplicate_mount)
+
+    too_many_artifacts = _manifest_payload()
+    too_many_artifacts["artifacts"] = [
+        {**_artifact_payload(), "artifact_id": f"artifact:{idx}", "uri": f"artifact://private/{idx}", "mount_path": f"/work/input/{idx}"}
+        for idx in range(33)
+    ]
+    with pytest.raises(ValidationError, match="artifacts"):
+        _signed_manifest(private_key, too_many_artifacts)
+
+    too_many_paths = _manifest_payload()
+    too_many_paths["filesystem"]["writable_paths"] = [f"/scratch/{idx}" for idx in range(33)]
+    with pytest.raises(ValidationError, match="writable_paths"):
+        _signed_manifest(private_key, too_many_paths)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import json
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Annotated, Any, Literal
@@ -19,6 +20,15 @@ from pydantic import (
 )
 
 MAX_SAFE_INTEGER = 9_007_199_254_740_991
+MAX_DEVICES = 32
+MAX_WRITABLE_PATHS = 32
+MAX_ARTIFACTS = 32
+MAX_INPUTS = 64
+MAX_OUTPUTS = 64
+MAX_NETWORK_DESTINATIONS = 32
+APPROVED_WRITABLE_ROOTS = ("/work", "/scratch", "/tmp/aivm")
+RAW_HOST_DEVICE_PREFIXES = ("/dev/sd", "/dev/hd", "/dev/vd", "/dev/xvd", "/dev/nvme", "/dev/raw")
+RAW_HOST_DEVICES = {"/dev/mem", "/dev/kmem", "/dev/port", "/dev/kmsg"}
 
 
 def _normalize_json_integer(value: Any) -> Any:
@@ -45,6 +55,45 @@ def _require_canonical_timestamp(value: Any) -> Any:
             raise ValueError("timestamp datetime must be UTC with second precision")
         return value
     raise ValueError("timestamp must be a canonical UTC string or datetime")
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"non-I-JSON numeric value is not allowed: {value}")
+
+
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    seen: set[str] = set()
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in seen:
+            raise ValueError(f"duplicate JSON key is not allowed: {key}")
+        seen.add(key)
+        result[key] = value
+    return result
+
+
+def _parse_strict_json(raw: str | bytes | bytearray) -> Any:
+    try:
+        return json.loads(
+            raw,
+            object_pairs_hook=_reject_duplicate_keys,
+            parse_constant=_reject_json_constant,
+        )
+    except json.JSONDecodeError as exc:
+        raise ValueError("invalid JSON manifest") from exc
+
+
+def _normalized_posix_path(value: str, *, field_name: str) -> str:
+    if not value.startswith("/"):
+        raise ValueError(f"{field_name} must be an absolute POSIX path")
+    parts = value.split("/")
+    if "" in parts[1:] or "." in parts or ".." in parts:
+        raise ValueError(f"{field_name} must be normalized and cannot traverse")
+    return value
+
+
+def _is_path_at_or_under(path: str, root: str) -> bool:
+    return path == root or path.startswith(root + "/")
 
 
 JsonInteger = Annotated[int, BeforeValidator(_normalize_json_integer)]
@@ -84,6 +133,10 @@ class StrictContract(BaseModel):
         strict=True,
         validate_assignment=True,
     )
+
+    @classmethod
+    def model_validate_json_strict(cls, raw: str | bytes | bytearray) -> "StrictContract":
+        return cls.model_validate(_parse_strict_json(raw))
 
 
 class ArtifactKind(StrEnum):
@@ -142,9 +195,7 @@ class AIVMArtifactDescriptor(StrictContract):
     @field_validator("mount_path")
     @classmethod
     def reject_path_traversal(cls, value: str) -> str:
-        parts = value.split("/")
-        if "" in parts[1:] or "." in parts or ".." in parts:
-            raise ValueError("artifact mount_path must be normalized and cannot traverse")
+        _normalized_posix_path(value, field_name="artifact mount_path")
         if value.startswith(("/proc", "/sys", "/dev", "/run", "/var", "/etc", "/home", "/root", "/tmp")):
             raise ValueError("artifact mount_path cannot target host roots")
         return value
@@ -164,10 +215,18 @@ class RuntimeImage(StrictContract):
     @field_validator("devices")
     @classmethod
     def require_bounded_devices(cls, value: list[str]) -> list[str]:
+        if len(value) > MAX_DEVICES:
+            raise ValueError("devices exceeds bounded collection limit")
         if value != sorted(set(value)):
             raise ValueError("devices must be unique and lexicographically sorted")
-        if any(device in {"*", "all", "/dev", "/dev/kvm", "/dev/mem"} for device in value):
-            raise ValueError("runtime devices must be explicitly bounded")
+        for device in value:
+            _normalized_posix_path(device, field_name="runtime devices")
+            if not device.startswith("/dev/"):
+                raise ValueError("runtime devices must be normalized /dev paths")
+            if device in {"*", "all", "/dev", "/dev/kvm"} or device in RAW_HOST_DEVICES:
+                raise ValueError("runtime devices must be explicitly bounded")
+            if any(device.startswith(prefix) for prefix in RAW_HOST_DEVICE_PREFIXES):
+                raise ValueError("runtime devices must not expose raw host block devices")
         return value
 
 
@@ -200,20 +259,41 @@ class FilesystemPolicy(StrictContract):
     def require_safe_filesystem(self) -> "FilesystemPolicy":
         if self.host_mounts:
             raise ValueError("host mounts are not allowed in AIVM v1 admission")
+        if len(self.writable_paths) > MAX_WRITABLE_PATHS:
+            raise ValueError("writable_paths exceeds bounded collection limit")
         if self.writable_paths != sorted(set(self.writable_paths)):
             raise ValueError("writable_paths must be unique and lexicographically sorted")
         for path in self.writable_paths:
-            parts = path.split("/")
-            if "" in parts[1:] or "." in parts or ".." in parts:
-                raise ValueError("writable_paths must be normalized and cannot traverse")
-            if not path.startswith(("/work", "/tmp/aivm", "/scratch")):
+            _normalized_posix_path(path, field_name="writable_paths")
+            if not any(_is_path_at_or_under(path, root) for root in APPROVED_WRITABLE_ROOTS):
                 raise ValueError("writable_paths must stay inside admitted scratch roots")
         return self
 
 
+class NetworkDestination(StrictContract):
+    protocol: Literal["http", "https", "tcp"]
+    host: Annotated[str, Field(min_length=1, max_length=253)]
+    port: Annotated[JsonInteger, Field(ge=1, le=65535)]
+
+    @field_validator("host")
+    @classmethod
+    def reject_wildcard_or_ambiguous_host(cls, value: str) -> str:
+        if value in {"*", "0.0.0.0", "::", "::/0", "0.0.0.0/0"}:
+            raise ValueError("network host cannot be a wildcard")
+        if any(token in value for token in ("/", "\\", " ", "\t", "\n", "\r")):
+            raise ValueError("network host must be a host name or IP literal")
+        if value.startswith(".") or value.endswith(".") or ".." in value:
+            raise ValueError("network host must be normalized")
+        return value.lower()
+
+    @property
+    def policy_key(self) -> str:
+        return f"{self.protocol}://{self.host}:{self.port}"
+
+
 class NetworkPolicy(StrictContract):
     mode: Literal["deny", "allowlist"]
-    allowlist: list[Annotated[str, Field(min_length=3, max_length=253)]]
+    allowlist: list[NetworkDestination]
 
     @model_validator(mode="after")
     def require_bounded_network(self) -> "NetworkPolicy":
@@ -222,7 +302,10 @@ class NetworkPolicy(StrictContract):
         if self.mode == "allowlist":
             if not self.allowlist:
                 raise ValueError("allowlist network mode requires bounded descriptors")
-            if self.allowlist != sorted(set(self.allowlist)):
+            if len(self.allowlist) > MAX_NETWORK_DESTINATIONS:
+                raise ValueError("network allowlist exceeds bounded collection limit")
+            keys = [destination.policy_key for destination in self.allowlist]
+            if keys != sorted(set(keys)):
                 raise ValueError("network allowlist must be unique and lexicographically sorted")
         return self
 
@@ -263,11 +346,23 @@ class AIVMWorkloadManifest(StrictContract):
             raise ValueError("expires_at must be after issued_at")
         if (self.expires_at - self.issued_at).total_seconds() > 86_400:
             raise ValueError("AIVM workload TTL cannot exceed one day")
+        if len(self.artifacts) > MAX_ARTIFACTS:
+            raise ValueError("artifacts exceeds bounded collection limit")
+        if len(self.inputs) > MAX_INPUTS:
+            raise ValueError("inputs exceeds bounded collection limit")
+        if len(self.outputs) > MAX_OUTPUTS:
+            raise ValueError("outputs exceeds bounded collection limit")
         if self.signer_key_id != self.signature.key_id:
             raise ValueError("signer_key_id must match signature.key_id")
         artifact_ids = [artifact.artifact_id for artifact in self.artifacts]
         if artifact_ids != sorted(set(artifact_ids)):
             raise ValueError("artifacts must be unique and sorted by artifact_id")
+        artifact_uris = [artifact.uri for artifact in self.artifacts]
+        if len(artifact_uris) != len(set(artifact_uris)):
+            raise ValueError("artifact URIs must be unique")
+        artifact_mounts = [artifact.mount_path for artifact in self.artifacts]
+        if len(artifact_mounts) != len(set(artifact_mounts)):
+            raise ValueError("artifact mount paths must be unique")
         if self.inputs != sorted(set(self.inputs)):
             raise ValueError("inputs must be unique and lexicographically sorted")
         if self.outputs != sorted(set(self.outputs)):

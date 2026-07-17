@@ -7,7 +7,9 @@ from .controller import (
     AdmissionStatus,
     DocumentVerification,
     DocumentVerifier,
+    HostCapabilityProbe,
     HostIsolationCapabilities,
+    StaticHostCapabilityProbe,
 )
 
 __all__ = [
@@ -17,5 +19,7 @@ __all__ = [
     "AdmissionStatus",
     "DocumentVerification",
     "DocumentVerifier",
+    "HostCapabilityProbe",
     "HostIsolationCapabilities",
+    "StaticHostCapabilityProbe",
 ]

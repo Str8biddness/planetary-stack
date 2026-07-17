@@ -40,6 +40,13 @@ class DocumentVerifier(Protocol):
         """Verify canonical manifest bytes against enrollment/revocation policy."""
 
 
+class HostCapabilityProbe(Protocol):
+    """Production host capability probe for isolation and resource enforcement."""
+
+    def probe(self) -> "HostIsolationCapabilities":
+        """Return current host isolation capabilities or raise when unavailable."""
+
+
 @dataclass(frozen=True)
 class HostIsolationCapabilities:
     os_enforced_backend: bool
@@ -70,6 +77,16 @@ class HostIsolationCapabilities:
 
 
 @dataclass(frozen=True)
+class StaticHostCapabilityProbe:
+    """Deterministic probe for tests and explicitly injected fixtures."""
+
+    capabilities: HostIsolationCapabilities
+
+    def probe(self) -> HostIsolationCapabilities:
+        return self.capabilities
+
+
+@dataclass(frozen=True)
 class AdmissionPolicy:
     allowed_runtime_images: frozenset[str]
     allowed_entrypoints: frozenset[str]
@@ -77,7 +94,19 @@ class AdmissionPolicy:
     max_memory_bytes: int
     max_time_limit_seconds: int
     max_process_limit: int
+    max_open_file_limit: int
     max_output_bytes: int
+    max_scratch_bytes: int
+    max_gpu_count: int
+    max_gpu_memory_bytes: int
+    allowed_devices: frozenset[str]
+    allowed_network_destinations: frozenset[str]
+    max_devices: int
+    max_writable_paths: int
+    max_artifacts: int
+    max_inputs: int
+    max_outputs: int
+    max_network_destinations: int
     allow_network: bool = False
 
     @staticmethod
@@ -108,12 +137,12 @@ class AIVMAdmissionController:
         *,
         verifier: DocumentVerifier | None,
         policy: AdmissionPolicy,
-        host: HostIsolationCapabilities,
+        host_probe: HostCapabilityProbe | None,
         guard: AIVMExecutionGuard | None = None,
     ) -> None:
         self._verifier = verifier
         self._policy = policy
-        self._host = host
+        self._host_probe = host_probe
         self._guard = guard or AIVMExecutionGuard()
 
     async def admit(
@@ -139,22 +168,52 @@ class AIVMAdmissionController:
                 **identity,
             )
 
-        host_missing = self._host.missing_for(manifest)
+        try:
+            verification = self._verifier.verify_manifest(manifest, signing_bytes(manifest))
+        except Exception:
+            return AdmissionDecision(
+                AdmissionStatus.UNAVAILABLE,
+                "manifest verifier unavailable",
+                degraded=True,
+                evidence={"verifier": "unavailable"},
+                **identity,
+            )
+
+        if not verification.ok:
+            return AdmissionDecision(
+                AdmissionStatus.REJECTED,
+                "manifest signature verification failed",
+                evidence={"verifier_status": "failed"},
+                **identity,
+            )
+
+        if self._host_probe is None:
+            return AdmissionDecision(
+                AdmissionStatus.UNAVAILABLE,
+                "host capability probe unavailable",
+                degraded=True,
+                evidence={"missing": ["host_capability_probe"]},
+                **identity,
+            )
+
+        try:
+            host = self._host_probe.probe()
+        except Exception:
+            return AdmissionDecision(
+                AdmissionStatus.UNAVAILABLE,
+                "host capability probe unavailable",
+                degraded=True,
+                evidence={"host_probe": "unavailable"},
+                **identity,
+            )
+
+        host_missing = host.missing_for(manifest)
         if host_missing:
             return AdmissionDecision(
                 AdmissionStatus.UNAVAILABLE,
                 "host cannot prove required isolation",
                 degraded=True,
                 evidence={"missing": host_missing},
-                **identity,
-            )
-
-        verification = self._verifier.verify_manifest(manifest, signing_bytes(manifest))
-        if not verification.ok:
-            return AdmissionDecision(
-                AdmissionStatus.REJECTED,
-                "manifest signature verification failed",
-                evidence={"verifier_status": verification.status, "error": verification.error},
                 **identity,
             )
 
@@ -219,6 +278,24 @@ class AIVMAdmissionController:
             return "entrypoint_id is not allowlisted"
         if manifest.network.mode != "deny" and not self._policy.allow_network:
             return "network is denied by admission policy"
+        if len(manifest.runtime_image.devices) > self._policy.max_devices:
+            return "device count exceeds host policy"
+        for device in manifest.runtime_image.devices:
+            if device not in self._policy.allowed_devices:
+                return "runtime device is not allowlisted"
+        if len(manifest.filesystem.writable_paths) > self._policy.max_writable_paths:
+            return "writable path count exceeds host policy"
+        if len(manifest.artifacts) > self._policy.max_artifacts:
+            return "artifact count exceeds host policy"
+        if len(manifest.inputs) > self._policy.max_inputs:
+            return "input count exceeds host policy"
+        if len(manifest.outputs) > self._policy.max_outputs:
+            return "output count exceeds host policy"
+        if len(manifest.network.allowlist) > self._policy.max_network_destinations:
+            return "network destination count exceeds host policy"
+        for destination in manifest.network.allowlist:
+            if destination.policy_key not in self._policy.allowed_network_destinations:
+                return "network destination is not allowlisted"
         resources = manifest.resources
         if resources.cpu_millicores > self._policy.max_cpu_millicores:
             return "cpu budget exceeds host policy"
@@ -228,8 +305,16 @@ class AIVMAdmissionController:
             return "time budget exceeds host policy"
         if resources.process_limit > self._policy.max_process_limit:
             return "process budget exceeds host policy"
+        if resources.open_file_limit > self._policy.max_open_file_limit:
+            return "open file budget exceeds host policy"
         if resources.output_bytes > self._policy.max_output_bytes:
             return "output budget exceeds host policy"
+        if resources.scratch_bytes > self._policy.max_scratch_bytes:
+            return "scratch budget exceeds host policy"
+        if resources.gpu_count > self._policy.max_gpu_count:
+            return "gpu count exceeds host policy"
+        if resources.gpu_memory_bytes > self._policy.max_gpu_memory_bytes:
+            return "gpu memory budget exceeds host policy"
         return ""
 
     @staticmethod
