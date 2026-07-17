@@ -47,7 +47,7 @@ fi
 c "1/6  System packages (needs sudo)"
 # Runtime GTK/WebKit libs for pywebview + the -dev headers pip needs to BUILD
 # pygobject/pycairo from source, + zstd (Ollama's installer needs it), + a compiler.
-SYS_PKGS="python3 python3-venv python3-pip python3-dev git curl zstd gcc pkg-config \
+SYS_PKGS="python3 python3-venv python3-pip python3-dev git curl zstd gcc pkg-config zenity util-linux \
 python3-gi python3-gi-cairo gir1.2-gtk-3.0 libcairo2-dev libgirepository1.0-dev"
 # WebKit GTK: package name differs across releases (4.1 newer, 4.0 older)
 if apt-cache show gir1.2-webkit2-4.1 >/dev/null 2>&1; then SYS_PKGS="$SYS_PKGS gir1.2-webkit2-4.1"; else SYS_PKGS="$SYS_PKGS gir1.2-webkit2-4.0"; fi
@@ -135,6 +135,12 @@ rsync -a --delete --exclude '.git' --exclude '__pycache__' --exclude '*.pyc' \
 rsync -a --delete --exclude '.git' --exclude '__pycache__' --exclude '*.pyc' \
       --exclude '.venv' --exclude 'venv' --exclude 'node_modules' \
       "$SRC_DIR/runtime/" "$SYNTHESUS_HOME/runtime/"
+mkdir -p "$SYNTHESUS_HOME/tools"
+install -m 0755 "$SRC_DIR/launch.sh" "$SYNTHESUS_HOME/launch.sh"
+install -m 0755 "$SRC_DIR/tools/sudo_askpass.sh" \
+  "$SYNTHESUS_HOME/tools/sudo_askpass.sh"
+install -m 0755 "$SRC_DIR/tools/configure_agentic_elevation.sh" \
+  "$SYNTHESUS_HOME/tools/configure_agentic_elevation.sh"
 
 python3 -m venv "$SYNTHESUS_HOME/.venv"
 VPIP="$SYNTHESUS_HOME/.venv/bin/pip"
@@ -193,23 +199,11 @@ ok "unique secrets written to synthesus.env (API key + human session; localhost 
 # ---- 6. launcher + menu entry -------------------------------------------
 c "6/6  Launcher"
 mkdir -p "$BIN_DIR"
-cat > "$BIN_DIR/synthesus" <<'LAUNCH'
+cat > "$BIN_DIR/synthesus" <<LAUNCH
 #!/usr/bin/env bash
-# Synthesus launcher — boots terminal backend + runtime + desktop, together.
-set -uo pipefail
-H="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-HOME_DIR="${SYNTHESUS_HOME:-$HOME/.local/share/synthesus}"
-set -a; . "$HOME_DIR/synthesus.env"; set +a
-export SYNTHESUS_RUNTIME_URL="http://127.0.0.1:5010"
-export SYNTHESUS_RUNTIME_CMD="$HOME_DIR/run_runtime.sh"
-PY="$HOME_DIR/.venv/bin/python"
-
-pkill -f "production_server.py" 2>/dev/null; sleep 1
-# terminal backend (real pty, localhost)
-"$PY" "$HOME_DIR/desktop/terminal_server.py" >/dev/null 2>&1 &
-TPID=$!; trap 'kill $TPID 2>/dev/null' EXIT INT TERM
-cd "$HOME_DIR/desktop"
-exec "$PY" synthesus_native_shell.py
+set -euo pipefail
+export SYNTHESUS_HOME="\${SYNTHESUS_HOME:-$SYNTHESUS_HOME}"
+exec "\$SYNTHESUS_HOME/launch.sh" "\$@"
 LAUNCH
 # the runtime boot helper the desktop calls
 cat > "$SYNTHESUS_HOME/run_runtime.sh" <<RUNTIME
@@ -248,10 +242,19 @@ cat > "$APPS/synthesus.desktop" <<DESK
 [Desktop Entry]
 Name=Synthesus
 Comment=Local, private AI desktop
-Exec=$BIN_DIR/synthesus
+Exec=$BIN_DIR/synthesus --standard
 Terminal=false
 Type=Application
 Categories=Utility;
+DESK
+cat > "$APPS/synthesus-agentic.desktop" <<DESK
+[Desktop Entry]
+Name=Synthesus Agentic
+Comment=Local AI desktop with one-time, session-scoped sudo authorization
+Exec=$BIN_DIR/synthesus --agentic
+Terminal=false
+Type=Application
+Categories=Development;
 DESK
 ok "installed"
 

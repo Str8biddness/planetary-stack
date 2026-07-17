@@ -65,6 +65,8 @@ trees fail a repository audit.
   dependencies.
 - [ ] Pin supported Python, Node/Bun, compiler, Ollama, and CUDA versions.
 - [x] Add an initial root CI smoke workflow.
+- [x] Add an opt-in, one-password, session-scoped agentic elevation mode
+  without granting blanket `NOPASSWD` access.
 - [ ] Expand CI into path-filtered desktop, runtime, kernel, and knowledge
   planes.
 - [ ] Add formatting, linting, type checking, unit, integration, and security

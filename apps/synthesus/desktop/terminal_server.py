@@ -33,6 +33,7 @@ import struct
 import sys
 import termios
 import logging
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -52,6 +53,23 @@ PORT = 8082
 app = FastAPI(title="Synthesus God-Mode Terminal Backend")
 
 
+def terminal_root() -> Path:
+    """Return the validated working directory for every new terminal."""
+    configured = os.environ.get("SYNTHESUS_TERMINAL_ROOT")
+    if configured:
+        root = Path(configured).expanduser().resolve()
+    else:
+        source_path = Path(__file__).resolve()
+        root = next(
+            (parent for parent in source_path.parents if (parent / ".git").exists()),
+            Path(os.environ.get("SYNTHESUS_HOME", Path.home())).expanduser().resolve(),
+        )
+
+    if not root.is_dir():
+        raise RuntimeError(f"terminal root is not a directory: {root}")
+    return root
+
+
 class PtySession:
     """One real bash on one real pty."""
 
@@ -61,8 +79,10 @@ class PtySession:
         self.pid: int | None = None
         self.cols = 80
         self.rows = 24
+        self.cwd: Path | None = None
 
     def spawn(self):
+        working_directory = terminal_root()
         # pty.fork() gives us a controlling terminal in the child and a master
         # fd in the parent — a genuine pseudo-terminal, not a pipe.
         pid, master_fd = pty.fork()
@@ -71,8 +91,10 @@ class PtySession:
             env = os.environ.copy()
             env["TERM"] = "xterm-256color"
             env["SYNTHESUS_PTY"] = "1"
+            env["PWD"] = str(working_directory)
             shell = os.environ.get("SHELL", "/bin/bash")
             try:
+                os.chdir(working_directory)
                 # Login + interactive shell so profiles/prompt load like a real terminal.
                 os.execvpe(shell, [shell, "-l", "-i"], env)
             except Exception:
@@ -81,12 +103,19 @@ class PtySession:
         # ---- PARENT ----
         self.pid = pid
         self.master_fd = master_fd
+        self.cwd = working_directory
         # Non-blocking so the asyncio reader never stalls the event loop.
         flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
         fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
         self.set_winsize(self.rows, self.cols)
-        log.info("session %s: spawned %s pid=%d fd=%d",
-                 self.session_id, os.environ.get("SHELL", "/bin/bash"), pid, master_fd)
+        log.info(
+            "session %s: spawned %s pid=%d fd=%d cwd=%s",
+            self.session_id,
+            os.environ.get("SHELL", "/bin/bash"),
+            pid,
+            master_fd,
+            working_directory,
+        )
 
     def set_winsize(self, rows: int, cols: int):
         if self.master_fd is None:
@@ -228,7 +257,12 @@ async def resize(req: ResizeReq):
 
 @app.get("/api/terminal/health")
 async def health():
-    return {"ok": True, "sessions": list(SESSIONS.keys())}
+    return {
+        "ok": True,
+        "agentic_elevation": os.environ.get("SYNTHESUS_AGENTIC_ELEVATION") == "1",
+        "terminal_root": str(terminal_root()),
+        "sessions": list(SESSIONS.keys()),
+    }
 
 
 if __name__ == "__main__":
