@@ -17,8 +17,8 @@ test-contracts:
 	PYTHONHASHSEED=4 $(PYTHON) -m pytest -q tests/test_chal_vsource_contracts.py
 
 test-private-mesh:
-	PYTHONHASHSEED=1 $(PYTHON) -m pytest -q tests/vsource tests/unisync
-	PYTHONHASHSEED=4 $(PYTHON) -m pytest -q tests/vsource tests/unisync
+	PYTHONHASHSEED=1 $(PYTHON) -m pytest -q tests/vsource tests/unisync tests/private_mesh
+	PYTHONHASHSEED=4 $(PYTHON) -m pytest -q tests/vsource tests/unisync tests/private_mesh
 
 test-synthesus:
 	cd apps/synthesus/runtime && $(PYTHON) -m pytest -q

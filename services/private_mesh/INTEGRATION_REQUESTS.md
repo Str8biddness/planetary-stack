@@ -4,8 +4,9 @@ This wave intentionally edits only `services/private_mesh/**` and
 `tests/private_mesh/**`. The following shared changes are requested for the
 coordinator/integrator and are **not** applied here:
 
-1. **Makefile** — extend `test-private-mesh` to include `tests/private_mesh`
-   under both `PYTHONHASHSEED=1` and `PYTHONHASHSEED=4`:
+1. **Makefile — resolved by the coordinator.** `test-private-mesh` includes
+   `tests/private_mesh` under both `PYTHONHASHSEED=1` and
+   `PYTHONHASHSEED=4`:
 
    ```make
    test-private-mesh:
