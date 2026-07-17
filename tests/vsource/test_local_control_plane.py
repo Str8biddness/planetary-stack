@@ -18,6 +18,8 @@ from contracts.chal_vsource.v1.models import (
     ChalResponse,
     ContentReference,
     LeaseDocument,
+    LeaseRevocationReason,
+    LeaseState,
     LifecycleEvent,
     LifecycleState,
     ResourceInventory,
@@ -233,12 +235,14 @@ def capability_doc(
     *,
     resource_vector: dict[str, int] | None = None,
     nodes: list[str] | None = None,
+    nonce: str = "random-capability-nonce-001",
+    subject_id: str = SUBJECT,
 ) -> CapabilityDocument:
     payload = {
         "schema": "planetary.chal.capability.v1",
         "capability_id": "capability:001",
         "issuer_id": "controller:001",
-        "subject_id": SUBJECT,
+        "subject_id": subject_id,
         "account_id": ACCOUNT,
         "audience_node_ids": sorted(nodes or ["node:owner:a"]),
         "actions": ["execute", "reserve"],
@@ -251,7 +255,7 @@ def capability_doc(
         },
         "not_before": wire_time(ctx.clock.now()),
         "ttl_seconds": 600,
-        "nonce": "random-capability-nonce-001",
+        "nonce": nonce,
         "revocation_epoch": 0,
         "delegable": False,
     }
@@ -424,6 +428,65 @@ def test_restart_persists_inventory_idempotency_and_lease(tmp_path: Path) -> Non
     assert second.lease is None
 
 
+def test_no_inventory_idempotent_retry_remains_rejected(tmp_path: Path) -> None:
+    ctx = mesh_context(tmp_path)
+    request = request_doc(ctx)
+    capability = capability_doc(ctx)
+
+    first = allocate_once(ctx, request=request, capability=capability)
+    retry = allocate_once(ctx, request=request, capability=capability)
+
+    assert first.status == VSourceStatus.NO_PLACEMENT
+    assert first.accepted is False
+    assert first.lease is None
+    assert retry.status == VSourceStatus.NO_PLACEMENT
+    assert retry.accepted is False
+    assert retry.placement is None
+    assert retry.lease is None
+
+
+def test_idempotent_replay_rejects_attacker_subject(tmp_path: Path) -> None:
+    ctx = mesh_context(tmp_path)
+    assert_inventory_admitted(ctx)
+    request = request_doc(ctx)
+    capability = capability_doc(ctx)
+    accepted = allocate_once(ctx, request=request, capability=capability)
+    assert accepted.status == VSourceStatus.ACCEPTED
+
+    replay = ctx.service().allocate(
+        request,
+        capability,
+        authenticated_subject_id="node-agent:attacker",
+    )
+
+    assert replay.status == VSourceStatus.REJECTED
+    assert replay.accepted is False
+    assert replay.lease is None
+
+
+def test_idempotent_replay_rejects_wrong_capability_digest(tmp_path: Path) -> None:
+    ctx = mesh_context(tmp_path)
+    assert_inventory_admitted(ctx)
+    request = request_doc(ctx)
+    capability = capability_doc(ctx)
+    accepted = allocate_once(ctx, request=request, capability=capability)
+    assert accepted.status == VSourceStatus.ACCEPTED
+
+    different_capability = capability_doc(
+        ctx,
+        nonce="random-capability-nonce-002",
+    )
+    replay = allocate_once(
+        ctx,
+        request=request,
+        capability=different_capability,
+    )
+
+    assert replay.status == VSourceStatus.REPLAY
+    assert replay.accepted is False
+    assert replay.lease is None
+
+
 def test_concurrent_allocation_allows_one_winner(tmp_path: Path) -> None:
     ctx = mesh_context(tmp_path)
     assert_inventory_admitted(ctx)
@@ -445,6 +508,30 @@ def test_concurrent_allocation_allows_one_winner(tmp_path: Path) -> None:
 
     assert statuses.count(VSourceStatus.ACCEPTED) == 1
     assert statuses.count(VSourceStatus.NO_PLACEMENT) == 1
+
+
+def test_concurrent_identical_allocation_replays_complete_result(tmp_path: Path) -> None:
+    ctx = mesh_context(tmp_path)
+    assert_inventory_admitted(ctx)
+    request = request_doc(ctx)
+    capability = capability_doc(ctx)
+
+    def allocate() -> tuple[VSourceStatus, str | None]:
+        result = ctx.service().allocate(
+            request,
+            capability,
+            authenticated_subject_id=SUBJECT,
+        )
+        return result.status, result.lease.lease_id if result.lease else None
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: allocate(), range(2)))
+
+    statuses = [status for status, _ in results]
+    lease_ids = {lease_id for _, lease_id in results if lease_id is not None}
+    assert statuses.count(VSourceStatus.ACCEPTED) == 1
+    assert statuses.count(VSourceStatus.IDEMPOTENT_REPLAY) == 1
+    assert len(lease_ids) == 1
 
 
 @pytest.mark.parametrize(
@@ -507,6 +594,35 @@ def test_deterministic_placement_selects_lowest_node_independent_of_registration
     assert first == second == ("node:owner:a", ["node:owner:a", "node:owner:b"])
 
 
+def test_stale_inventory_digest_between_evaluation_and_commit_aborts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx = mesh_context(tmp_path)
+    stale_inventory = assert_inventory_admitted(ctx, cpu=1_000)
+    ctx.clock.advance(1)
+    assert_inventory_admitted(ctx, cpu=100)
+    request = request_doc(ctx, resource_vector=resources(cpu=1_000))
+    capability = capability_doc(ctx, resource_vector=resources(cpu=1_000))
+    service = ctx.service()
+    monkeypatch.setattr(
+        service,
+        "_load_current_inventories",
+        lambda conn, account_id, now: [stale_inventory],
+    )
+
+    result = service.allocate(
+        request,
+        capability,
+        authenticated_subject_id=SUBJECT,
+    )
+
+    assert result.status == VSourceStatus.LEASE_CONFLICT
+    assert result.accepted is False
+    assert result.lease is None
+    assert ctx.service().get_lease(service._stable_id("lease", document_sha256(request))) is None
+
+
 def test_idempotency_collision_rejects_different_digest(tmp_path: Path) -> None:
     ctx = mesh_context(tmp_path)
     assert_inventory_admitted(ctx)
@@ -537,6 +653,7 @@ def test_renewal_monotonicity_and_stale_digest_rejected(tmp_path: Path) -> None:
         old_lease.lease_id,
         lease_sha256=old_digest,
         fencing_token=old_lease.fencing_token,
+        renewal_sequence=old_lease.renewal_sequence,
     )
 
     assert renewed.status == VSourceStatus.ACCEPTED
@@ -549,8 +666,56 @@ def test_renewal_monotonicity_and_stale_digest_rejected(tmp_path: Path) -> None:
         old_lease.lease_id,
         lease_sha256=old_digest,
         fencing_token=old_lease.fencing_token,
+        renewal_sequence=old_lease.renewal_sequence,
     )
     assert stale.status == VSourceStatus.STALE_LEASE
+
+
+def test_concurrent_renewal_cas_allows_one_winner(tmp_path: Path) -> None:
+    ctx = mesh_context(tmp_path)
+    assert_inventory_admitted(ctx)
+    result = allocate_once(ctx)
+    assert result.lease is not None
+    lease = result.lease
+    digest = document_sha256(lease)
+
+    def renew() -> VSourceStatus:
+        return ctx.service().renew_lease(
+            lease.lease_id,
+            lease_sha256=digest,
+            fencing_token=lease.fencing_token,
+            renewal_sequence=lease.renewal_sequence,
+        ).status
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        statuses = list(pool.map(lambda _: renew(), range(2)))
+
+    assert statuses.count(VSourceStatus.ACCEPTED) == 1
+    assert statuses.count(VSourceStatus.STALE_LEASE) == 1
+
+
+def test_allocation_replay_after_renewal_is_stale(tmp_path: Path) -> None:
+    ctx = mesh_context(tmp_path)
+    assert_inventory_admitted(ctx)
+    request = request_doc(ctx)
+    capability = capability_doc(ctx)
+    result = allocate_once(ctx, request=request, capability=capability)
+    assert result.lease is not None
+    old_lease = result.lease
+
+    renewed = ctx.service().renew_lease(
+        old_lease.lease_id,
+        lease_sha256=document_sha256(old_lease),
+        fencing_token=old_lease.fencing_token,
+        renewal_sequence=old_lease.renewal_sequence,
+    )
+    assert renewed.status == VSourceStatus.ACCEPTED
+
+    replay = allocate_once(ctx, request=request, capability=capability)
+
+    assert replay.status == VSourceStatus.STALE_LEASE
+    assert replay.accepted is False
+    assert replay.lease is None
 
 
 def test_expired_lease_fails_closed_without_sleep(tmp_path: Path) -> None:
@@ -565,15 +730,104 @@ def test_expired_lease_fails_closed_without_sleep(tmp_path: Path) -> None:
         result.lease.lease_id,
         lease_sha256=digest,
         fencing_token=result.lease.fencing_token,
+        renewal_sequence=result.lease.renewal_sequence,
     )
     assert renewed.status == VSourceStatus.LEASE_EXPIRED
+
+
+def test_allocation_replay_after_expiry_returns_signed_expired_state(tmp_path: Path) -> None:
+    ctx = mesh_context(tmp_path)
+    assert_inventory_admitted(ctx)
+    request = request_doc(ctx)
+    capability = capability_doc(ctx)
+    result = allocate_once(ctx, request=request, capability=capability, ttl_seconds=60)
+    assert result.lease is not None
+
+    ctx.clock.advance(61)
+    replay = allocate_once(ctx, request=request, capability=capability)
+    persisted = ctx.service().get_lease(result.lease.lease_id)
+
+    assert replay.status == VSourceStatus.LEASE_EXPIRED
+    assert replay.accepted is False
+    assert replay.lease is not None
+    assert replay.lease.state == LeaseState.EXPIRED
+    assert persisted is not None
+    assert persisted.state == LeaseState.EXPIRED
+
+
+def test_allocation_replay_after_revocation_is_terminal(tmp_path: Path) -> None:
+    ctx = mesh_context(tmp_path)
+    assert_inventory_admitted(ctx)
+    request = request_doc(ctx)
+    capability = capability_doc(ctx)
+    result = allocate_once(ctx, request=request, capability=capability)
+    assert result.lease is not None
+    lease = result.lease
+
+    revoked = ctx.service().revoke_lease(
+        lease.lease_id,
+        lease_sha256=document_sha256(lease),
+        fencing_token=lease.fencing_token,
+        renewal_sequence=lease.renewal_sequence,
+        revocation_reason=LeaseRevocationReason.OWNER_REQUEST,
+    )
+    replay = allocate_once(ctx, request=request, capability=capability)
+    renewed = ctx.service().renew_lease(
+        lease.lease_id,
+        lease_sha256=document_sha256(lease),
+        fencing_token=lease.fencing_token,
+        renewal_sequence=lease.renewal_sequence,
+    )
+
+    assert revoked.status == VSourceStatus.ACCEPTED
+    assert revoked.lease is not None
+    assert revoked.lease.state == LeaseState.REVOKED
+    assert replay.status == VSourceStatus.TERMINAL_LEASE
+    assert replay.accepted is False
+    assert replay.lease is not None
+    assert replay.lease.state == LeaseState.REVOKED
+    assert renewed.status == VSourceStatus.TERMINAL_LEASE
+
+
+def test_explicit_release_requires_exact_prior_lease_tuple(tmp_path: Path) -> None:
+    ctx = mesh_context(tmp_path)
+    assert_inventory_admitted(ctx)
+    result = allocate_once(ctx)
+    assert result.lease is not None
+    lease = result.lease
+
+    stale = ctx.service().release_lease(
+        lease.lease_id,
+        lease_sha256=document_sha256(lease),
+        fencing_token=lease.fencing_token,
+        renewal_sequence=lease.renewal_sequence + 1,
+    )
+    released = ctx.service().release_lease(
+        lease.lease_id,
+        lease_sha256=document_sha256(lease),
+        fencing_token=lease.fencing_token,
+        renewal_sequence=lease.renewal_sequence,
+    )
+    resurrect = ctx.service().renew_lease(
+        lease.lease_id,
+        lease_sha256=document_sha256(lease),
+        fencing_token=lease.fencing_token,
+        renewal_sequence=lease.renewal_sequence,
+    )
+
+    assert stale.status == VSourceStatus.STALE_LEASE
+    assert released.status == VSourceStatus.ACCEPTED
+    assert released.lease is not None
+    assert released.lease.state == LeaseState.RELEASED
+    assert resurrect.status == VSourceStatus.TERMINAL_LEASE
 
 
 def test_terminal_lifecycle_releases_lease_and_blocks_renewal(tmp_path: Path) -> None:
     ctx = mesh_context(tmp_path)
     assert_inventory_admitted(ctx)
     request = request_doc(ctx)
-    result = allocate_once(ctx, request=request)
+    capability = capability_doc(ctx)
+    result = allocate_once(ctx, request=request, capability=capability)
     assert result.lease is not None
     lease = result.lease
 
@@ -600,8 +854,16 @@ def test_terminal_lifecycle_releases_lease_and_blocks_renewal(tmp_path: Path) ->
         lease.lease_id,
         lease_sha256=document_sha256(lease),
         fencing_token=lease.fencing_token,
+        renewal_sequence=lease.renewal_sequence,
     )
+    replay = allocate_once(ctx, request=request, capability=capability)
+    persisted = ctx.service().get_lease(lease.lease_id)
+
     assert renewed.status == VSourceStatus.TERMINAL_LEASE
+    assert replay.status == VSourceStatus.TERMINAL_LEASE
+    assert replay.accepted is False
+    assert persisted is not None
+    assert persisted.state == LeaseState.RELEASED
 
 
 def test_stale_response_and_lifecycle_binding_after_renewal(tmp_path: Path) -> None:
@@ -615,6 +877,7 @@ def test_stale_response_and_lifecycle_binding_after_renewal(tmp_path: Path) -> N
         old_lease.lease_id,
         lease_sha256=document_sha256(old_lease),
         fencing_token=old_lease.fencing_token,
+        renewal_sequence=old_lease.renewal_sequence,
     )
     assert renewed.status == VSourceStatus.ACCEPTED
 
@@ -680,6 +943,31 @@ def test_signature_admission_failures_reject_before_state_mutation(
     }[case]
     assert result.status == expected
     assert result.lease is None
+
+
+def test_sqlite_connections_use_durable_pragmas(tmp_path: Path) -> None:
+    ctx = mesh_context(tmp_path)
+    service = ctx.service()
+
+    with service._connect() as conn:
+        synchronous = conn.execute("PRAGMA synchronous").fetchone()[0]
+        foreign_keys = conn.execute("PRAGMA foreign_keys").fetchone()[0]
+        busy_timeout = conn.execute("PRAGMA busy_timeout").fetchone()[0]
+
+    assert synchronous == 2
+    assert foreign_keys == 1
+    assert busy_timeout == 5_000
+
+
+def test_database_corruption_refuses_start_without_reset(tmp_path: Path) -> None:
+    ctx = mesh_context(tmp_path)
+    ctx.db_path.write_bytes(b"not a sqlite database")
+
+    service = ctx.service()
+    result = service.register_inventory(inventory_doc(ctx))
+
+    assert result.status == VSourceStatus.UNAVAILABLE
+    assert ctx.db_path.read_bytes().startswith(b"not a sqlite database")
 
 
 def test_malformed_signature_and_missing_services_fail_closed(tmp_path: Path) -> None:

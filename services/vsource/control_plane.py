@@ -35,9 +35,11 @@ from contracts.chal_vsource.v1.models import (
     ErrorCode,
     ErrorFrame,
     LeaseDocument,
+    LeaseRevocationReason,
     LeaseState,
     LifecycleEvent,
     LifecycleState,
+    MAX_SAFE_INTEGER,
     NodeHealth,
     PlacementCandidate,
     PlacementDecision,
@@ -59,6 +61,7 @@ ModelT = TypeVar("ModelT", bound=BaseModel)
 _ZERO_SIGNATURE = base64.urlsafe_b64encode(b"\x00" * 64).rstrip(b"=").decode(
     "ascii"
 )
+_SQLITE_BUSY_TIMEOUT_MS = 5_000
 _TERMINAL_LIFECYCLE_STATES = {
     LifecycleState.COMPLETED,
     LifecycleState.FAILED,
@@ -316,7 +319,7 @@ class LocalVSourceControlPlane:
             with self._transaction() as conn:
                 existing = conn.execute(
                     """
-                    SELECT digest, observed_at
+                    SELECT digest, observed_at, account_id, node_id
                     FROM inventories
                     WHERE inventory_id = ?
                     """,
@@ -329,6 +332,11 @@ class LocalVSourceControlPlane:
                             True,
                             digest,
                         )
+                    if (
+                        existing["account_id"] != parsed.account_id
+                        or existing["node_id"] != parsed.node_id
+                    ):
+                        return AdmissionResult(VSourceStatus.REPLAY, False, digest)
                     existing_observed = _parse_wire_time(existing["observed_at"])
                     if parsed.observed_at <= existing_observed:
                         return AdmissionResult(VSourceStatus.REPLAY, False, digest)
@@ -345,36 +353,56 @@ class LocalVSourceControlPlane:
                         _wire_time(now),
                     ),
                 )
-                conn.execute(
-                    """
-                    INSERT INTO inventories
-                    (
-                        inventory_id, digest, document_json, account_id, node_id,
-                        observed_at, expires_at, health, admitted_at
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(inventory_id) DO UPDATE SET
-                        digest = excluded.digest,
-                        document_json = excluded.document_json,
-                        account_id = excluded.account_id,
-                        node_id = excluded.node_id,
-                        observed_at = excluded.observed_at,
-                        expires_at = excluded.expires_at,
-                        health = excluded.health,
-                        admitted_at = excluded.admitted_at
-                    """,
-                    (
-                        parsed.inventory_id,
-                        digest,
-                        parsed.model_dump_json(by_alias=True),
-                        parsed.account_id,
-                        parsed.node_id,
-                        _wire_time(parsed.observed_at),
-                        _wire_time(expires_at),
-                        parsed.health.value,
-                        _wire_time(now),
-                    ),
+                inventory_values = (
+                    digest,
+                    parsed.model_dump_json(by_alias=True),
+                    parsed.account_id,
+                    parsed.node_id,
+                    _wire_time(parsed.observed_at),
+                    _wire_time(expires_at),
+                    parsed.health.value,
+                    _wire_time(now),
                 )
+                if existing is None:
+                    conn.execute(
+                        """
+                        INSERT INTO inventories
+                        (
+                            inventory_id, digest, document_json, account_id, node_id,
+                            observed_at, expires_at, health, admitted_at
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (parsed.inventory_id, *inventory_values),
+                    )
+                else:
+                    cursor = conn.execute(
+                        """
+                        UPDATE inventories
+                        SET
+                            digest = ?,
+                            document_json = ?,
+                            account_id = ?,
+                            node_id = ?,
+                            observed_at = ?,
+                            expires_at = ?,
+                            health = ?,
+                            admitted_at = ?
+                        WHERE inventory_id = ?
+                          AND account_id = ?
+                          AND node_id = ?
+                          AND observed_at = ?
+                        """,
+                        (
+                            *inventory_values,
+                            parsed.inventory_id,
+                            parsed.account_id,
+                            parsed.node_id,
+                            existing["observed_at"],
+                        ),
+                    )
+                    if cursor.rowcount != 1:
+                        return AdmissionResult(VSourceStatus.REPLAY, False, digest)
             return AdmissionResult(VSourceStatus.ACCEPTED, True, digest)
         except sqlite3.Error as exc:
             return AdmissionResult(VSourceStatus.UNAVAILABLE, False, reason=str(exc))
@@ -413,6 +441,13 @@ class LocalVSourceControlPlane:
         assert request_verified is not None
         assert capability_verified is not None
         request_sha256 = request_verified.digest
+        capability_sha256 = capability_verified.digest
+        if (
+            parsed_request.account_id != parsed_capability.account_id
+            or parsed_request.capability_id != parsed_capability.capability_id
+            or authenticated_subject_id != parsed_capability.subject_id
+        ):
+            return AllocationResult(VSourceStatus.REJECTED, False, request_sha256)
         now, error = self._now()
         if error is not None:
             return AllocationResult(error, False, request_sha256)
@@ -427,43 +462,48 @@ class LocalVSourceControlPlane:
                     conn,
                     parsed_request,
                     request_sha256,
+                    parsed_capability,
+                    capability_sha256,
+                    authenticated_subject_id,
                     now,
                 )
                 if replay is not None:
                     return replay
-                conn.execute(
-                    """
-                    INSERT INTO capabilities
-                    (capability_id, digest, document_json, account_id, subject_id, admitted_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(capability_id) DO UPDATE SET
-                        digest = excluded.digest,
-                        document_json = excluded.document_json,
-                        account_id = excluded.account_id,
-                        subject_id = excluded.subject_id,
-                        admitted_at = excluded.admitted_at
-                    """,
-                    (
-                        parsed_capability.capability_id,
-                        capability_verified.digest,
-                        parsed_capability.model_dump_json(by_alias=True),
-                        parsed_capability.account_id,
-                        parsed_capability.subject_id,
-                        _wire_time(now),
-                    ),
+                capability_error = self._admit_capability(
+                    conn,
+                    parsed_capability,
+                    capability_sha256,
+                    now,
                 )
+                if capability_error is not None:
+                    return AllocationResult(
+                        capability_error,
+                        False,
+                        request_sha256,
+                    )
                 inventories = self._load_current_inventories(
                     conn,
                     parsed_request.account_id,
                     now,
                 )
                 if not inventories:
-                    return AllocationResult(
+                    result = AllocationResult(
                         VSourceStatus.NO_PLACEMENT,
                         False,
                         request_sha256,
                         reason="no current inventory",
                     )
+                    self._store_idempotency_result(
+                        conn,
+                        parsed_request,
+                        request_sha256,
+                        parsed_capability,
+                        capability_sha256,
+                        authenticated_subject_id,
+                        result,
+                        now,
+                    )
+                    return result
                 evaluations = [
                     self._evaluate_candidate(
                         conn,
@@ -489,18 +529,39 @@ class LocalVSourceControlPlane:
                         placement_id,
                     )
                     self._store_placement(conn, placement)
-                    return AllocationResult(
+                    result = AllocationResult(
                         VSourceStatus.NO_PLACEMENT,
                         False,
                         request_sha256,
                         placement=placement,
                     )
-                inventory = next(
-                    item
-                    for item in inventories
-                    if item.inventory_id == selected.candidate.inventory_id
-                    and document_sha256(item) == selected.candidate.inventory_sha256
+                    self._store_idempotency_result(
+                        conn,
+                        parsed_request,
+                        request_sha256,
+                        parsed_capability,
+                        capability_sha256,
+                        authenticated_subject_id,
+                        result,
+                        now,
+                    )
+                    return result
+                refreshed = self._refresh_selected_inventory(
+                    conn,
+                    parsed_request,
+                    parsed_capability,
+                    selected,
+                    authenticated_subject_id,
+                    now,
                 )
+                if refreshed is None:
+                    return AllocationResult(
+                        VSourceStatus.LEASE_CONFLICT,
+                        False,
+                        request_sha256,
+                        reason="inventory changed before commit",
+                    )
+                inventory, selected = refreshed
                 lease = self._build_lease(
                     parsed_request,
                     request_sha256,
@@ -528,14 +589,25 @@ class LocalVSourceControlPlane:
                     authenticated_subject_id=authenticated_subject_id,
                 )
                 self._store_placement(conn, placement)
-                self._store_lease(conn, lease, now)
-                return AllocationResult(
+                self._insert_lease(conn, lease, now)
+                result = AllocationResult(
                     VSourceStatus.ACCEPTED,
                     True,
                     request_sha256,
                     placement=placement,
                     lease=lease,
                 )
+                self._store_idempotency_result(
+                    conn,
+                    parsed_request,
+                    request_sha256,
+                    parsed_capability,
+                    capability_sha256,
+                    authenticated_subject_id,
+                    result,
+                    now,
+                )
+                return result
         except (sqlite3.Error, ValidationError, ValueError) as exc:
             if isinstance(exc, sqlite3.Error):
                 status = VSourceStatus.UNAVAILABLE
@@ -549,6 +621,7 @@ class LocalVSourceControlPlane:
         *,
         lease_sha256: str,
         fencing_token: int,
+        renewal_sequence: int,
         ttl_seconds: int | None = None,
     ) -> LeaseResult:
         ready = self._ready(require_signer=True)
@@ -576,10 +649,25 @@ class LocalVSourceControlPlane:
                     return LeaseResult(VSourceStatus.TERMINAL_LEASE, False)
                 if row["state"] != LeaseState.ACTIVE.value:
                     return LeaseResult(VSourceStatus.TERMINAL_LEASE, False)
-                if row["document_sha256"] != lease_sha256 or row["fencing_token"] != fencing_token:
+                if (
+                    row["document_sha256"] != lease_sha256
+                    or row["fencing_token"] != fencing_token
+                    or row["renewal_sequence"] != renewal_sequence
+                ):
                     return LeaseResult(VSourceStatus.STALE_LEASE, False)
                 current = LeaseDocument.model_validate_json(row["document_json"])
-                if current.renewals_remaining <= 0:
+                if (
+                    current.state != LeaseState.ACTIVE
+                    or document_sha256(current) != row["document_sha256"]
+                    or current.fencing_token != fencing_token
+                    or current.renewal_sequence != renewal_sequence
+                ):
+                    return LeaseResult(VSourceStatus.STALE_LEASE, False)
+                if (
+                    current.renewals_remaining <= 0
+                    or current.renewal_sequence >= 1024
+                    or current.fencing_token >= MAX_SAFE_INTEGER
+                ):
                     return LeaseResult(VSourceStatus.LEASE_CONFLICT, False)
                 payload = current.model_dump(mode="json", by_alias=True)
                 payload.update(
@@ -596,8 +684,132 @@ class LocalVSourceControlPlane:
                     or lease.renewal_sequence <= current.renewal_sequence
                 ):
                     return LeaseResult(VSourceStatus.LEASE_CONFLICT, False)
-                self._store_lease(conn, lease, now)
+                if (
+                    self._update_lease_document(
+                        conn,
+                        lease,
+                        now,
+                        previous_sha256=lease_sha256,
+                        previous_fencing_token=fencing_token,
+                        previous_renewal_sequence=renewal_sequence,
+                        terminal_state=None,
+                    )
+                    != 1
+                ):
+                    return LeaseResult(VSourceStatus.STALE_LEASE, False)
                 return LeaseResult(VSourceStatus.ACCEPTED, True, lease)
+        except (sqlite3.Error, ValidationError, ValueError) as exc:
+            status = VSourceStatus.UNAVAILABLE if isinstance(exc, sqlite3.Error) else VSourceStatus.REJECTED
+            return LeaseResult(status, False, reason=str(exc))
+
+    def release_lease(
+        self,
+        lease_id: str,
+        *,
+        lease_sha256: str,
+        fencing_token: int,
+        renewal_sequence: int,
+    ) -> LeaseResult:
+        return self._terminal_lease_transition(
+            lease_id,
+            lease_sha256=lease_sha256,
+            fencing_token=fencing_token,
+            renewal_sequence=renewal_sequence,
+            state=LeaseState.RELEASED,
+            terminal_state=LeaseState.RELEASED.value,
+        )
+
+    def revoke_lease(
+        self,
+        lease_id: str,
+        *,
+        lease_sha256: str,
+        fencing_token: int,
+        renewal_sequence: int,
+        revocation_reason: LeaseRevocationReason | str,
+    ) -> LeaseResult:
+        try:
+            reason = (
+                revocation_reason
+                if isinstance(revocation_reason, LeaseRevocationReason)
+                else LeaseRevocationReason(revocation_reason)
+            )
+        except ValueError:
+            return LeaseResult(VSourceStatus.REJECTED, False)
+        return self._terminal_lease_transition(
+            lease_id,
+            lease_sha256=lease_sha256,
+            fencing_token=fencing_token,
+            renewal_sequence=renewal_sequence,
+            state=LeaseState.REVOKED,
+            terminal_state=LeaseState.REVOKED.value,
+            revocation_reason=reason,
+        )
+
+    def _terminal_lease_transition(
+        self,
+        lease_id: str,
+        *,
+        lease_sha256: str,
+        fencing_token: int,
+        renewal_sequence: int,
+        state: LeaseState,
+        terminal_state: str,
+        revocation_reason: LeaseRevocationReason | None = None,
+    ) -> LeaseResult:
+        ready = self._ready(require_signer=True)
+        if ready is not None:
+            return LeaseResult(ready, False)
+        now, error = self._now()
+        if error is not None:
+            return LeaseResult(error, False)
+        assert now is not None
+        try:
+            with self._transaction() as conn:
+                self._expire_active_leases(conn, now)
+                row = conn.execute(
+                    "SELECT * FROM leases WHERE lease_id = ?",
+                    (lease_id,),
+                ).fetchone()
+                if row is None:
+                    return LeaseResult(VSourceStatus.REJECTED, False)
+                if row["state"] == LeaseState.EXPIRED.value:
+                    return LeaseResult(VSourceStatus.LEASE_EXPIRED, False)
+                if row["terminal_state"] is not None or row["state"] != LeaseState.ACTIVE.value:
+                    return LeaseResult(VSourceStatus.TERMINAL_LEASE, False)
+                if (
+                    row["document_sha256"] != lease_sha256
+                    or row["fencing_token"] != fencing_token
+                    or row["renewal_sequence"] != renewal_sequence
+                ):
+                    return LeaseResult(VSourceStatus.STALE_LEASE, False)
+                current = LeaseDocument.model_validate_json(row["document_json"])
+                if (
+                    current.state != LeaseState.ACTIVE
+                    or document_sha256(current) != lease_sha256
+                    or current.fencing_token != fencing_token
+                    or current.renewal_sequence != renewal_sequence
+                ):
+                    return LeaseResult(VSourceStatus.STALE_LEASE, False)
+                terminal = self._sign_lease_state(
+                    current,
+                    state,
+                    revocation_reason=revocation_reason,
+                )
+                if (
+                    self._update_lease_document(
+                        conn,
+                        terminal,
+                        now,
+                        previous_sha256=lease_sha256,
+                        previous_fencing_token=fencing_token,
+                        previous_renewal_sequence=renewal_sequence,
+                        terminal_state=terminal_state,
+                    )
+                    != 1
+                ):
+                    return LeaseResult(VSourceStatus.STALE_LEASE, False)
+                return LeaseResult(VSourceStatus.ACCEPTED, True, terminal)
         except (sqlite3.Error, ValidationError, ValueError) as exc:
             status = VSourceStatus.UNAVAILABLE if isinstance(exc, sqlite3.Error) else VSourceStatus.REJECTED
             return LeaseResult(status, False, reason=str(exc))
@@ -636,9 +848,14 @@ class LocalVSourceControlPlane:
                     return AdmissionResult(VSourceStatus.REJECTED, False, verified.digest)
                 if lease_row["state"] == LeaseState.EXPIRED.value:
                     return AdmissionResult(VSourceStatus.LEASE_EXPIRED, False, verified.digest)
-                if lease_row["state"] != LeaseState.ACTIVE.value:
+                if lease_row["state"] != LeaseState.ACTIVE.value or lease_row["terminal_state"] is not None:
                     return AdmissionResult(VSourceStatus.TERMINAL_LEASE, False, verified.digest)
                 lease = LeaseDocument.model_validate_json(lease_row["document_json"])
+                if (
+                    lease.state.value != lease_row["state"]
+                    or document_sha256(lease) != lease_row["document_sha256"]
+                ):
+                    return AdmissionResult(VSourceStatus.STALE_LEASE, False, verified.digest)
                 try:
                     validate_lease_bound_lifecycle(parsed, lease)
                 except ValueError:
@@ -693,19 +910,18 @@ class LocalVSourceControlPlane:
                     ),
                 )
                 if parsed.state in _TERMINAL_LIFECYCLE_STATES:
-                    conn.execute(
-                        """
-                        UPDATE leases
-                        SET state = ?, terminal_state = ?, updated_at = ?
-                        WHERE lease_id = ?
-                        """,
-                        (
-                            LeaseState.RELEASED.value,
-                            parsed.state.value,
-                            _wire_time(now),
-                            parsed.lease_id,
-                        ),
+                    released = self._sign_lease_state(lease, LeaseState.RELEASED)
+                    updated = self._update_lease_document(
+                        conn,
+                        released,
+                        now,
+                        previous_sha256=lease_row["document_sha256"],
+                        previous_fencing_token=lease_row["fencing_token"],
+                        previous_renewal_sequence=lease_row["renewal_sequence"],
+                        terminal_state=parsed.state.value,
                     )
+                    if updated != 1:
+                        raise sqlite3.OperationalError("terminal lease release CAS failed")
                 return AdmissionResult(VSourceStatus.ACCEPTED, True, verified.digest)
         except (sqlite3.Error, ValidationError, ValueError) as exc:
             status = VSourceStatus.UNAVAILABLE if isinstance(exc, sqlite3.Error) else VSourceStatus.REJECTED
@@ -745,9 +961,14 @@ class LocalVSourceControlPlane:
                     return AdmissionResult(VSourceStatus.REJECTED, False, verified.digest)
                 if lease_row["state"] == LeaseState.EXPIRED.value:
                     return AdmissionResult(VSourceStatus.LEASE_EXPIRED, False, verified.digest)
-                if lease_row["state"] != LeaseState.ACTIVE.value:
+                if lease_row["state"] != LeaseState.ACTIVE.value or lease_row["terminal_state"] is not None:
                     return AdmissionResult(VSourceStatus.TERMINAL_LEASE, False, verified.digest)
                 lease = LeaseDocument.model_validate_json(lease_row["document_json"])
+                if (
+                    lease.state.value != lease_row["state"]
+                    or document_sha256(lease) != lease_row["document_sha256"]
+                ):
+                    return AdmissionResult(VSourceStatus.STALE_LEASE, False, verified.digest)
                 try:
                     validate_lease_bound_response(parsed, lease)
                 except ValueError:
@@ -789,19 +1010,20 @@ class LocalVSourceControlPlane:
         try:
             with self._connect() as conn:
                 row = conn.execute(
-                    "SELECT document_json FROM leases WHERE lease_id = ?",
+                    "SELECT state, document_json FROM leases WHERE lease_id = ?",
                     (lease_id,),
                 ).fetchone()
                 if row is None:
                     return None
-                return LeaseDocument.model_validate_json(row["document_json"])
+                lease = LeaseDocument.model_validate_json(row["document_json"])
+                if lease.state.value != row["state"]:
+                    return None
+                return lease
         except (sqlite3.Error, ValidationError):
             return None
 
     def _initialize(self) -> None:
         with self._connect() as conn:
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA synchronous=NORMAL")
             conn.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS meta (
@@ -838,7 +1060,20 @@ class LocalVSourceControlPlane:
                     idempotency_key TEXT NOT NULL,
                     request_sha256 TEXT NOT NULL,
                     request_json TEXT NOT NULL,
+                    capability_id TEXT NOT NULL,
+                    capability_sha256 TEXT NOT NULL,
+                    capability_json TEXT NOT NULL,
+                    authenticated_subject_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    accepted INTEGER NOT NULL CHECK(accepted IN (0, 1)),
+                    placement_id TEXT,
+                    lease_id TEXT,
+                    lease_sha256 TEXT,
+                    fencing_token INTEGER,
+                    renewal_sequence INTEGER,
+                    reason TEXT,
                     created_at TEXT NOT NULL,
+                    completed_at TEXT NOT NULL,
                     PRIMARY KEY(account_id, idempotency_key)
                 );
 
@@ -915,6 +1150,11 @@ class LocalVSourceControlPlane:
                 );
                 """
             )
+            self._migrate_schema(conn)
+            integrity = conn.execute("PRAGMA integrity_check").fetchone()
+            if integrity is None or integrity[0] != "ok":
+                detail = "unknown" if integrity is None else str(integrity[0])
+                raise sqlite3.DatabaseError(f"sqlite integrity check failed: {detail}")
 
     @contextmanager
     def _transaction(self) -> Any:
@@ -933,13 +1173,50 @@ class LocalVSourceControlPlane:
             raise sqlite3.OperationalError("state service is not configured")
         conn = sqlite3.connect(
             str(self.db_path),
-            timeout=30.0,
+            timeout=_SQLITE_BUSY_TIMEOUT_MS / 1000,
             isolation_level=None,
         )
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("PRAGMA foreign_keys=ON")
-        conn.execute("PRAGMA busy_timeout=30000")
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=FULL")
         return conn
+
+    def _migrate_schema(self, conn: sqlite3.Connection) -> None:
+        self._ensure_columns(
+            conn,
+            "idempotency",
+            {
+                "capability_id": "TEXT NOT NULL DEFAULT ''",
+                "capability_sha256": "TEXT NOT NULL DEFAULT ''",
+                "capability_json": "TEXT NOT NULL DEFAULT ''",
+                "authenticated_subject_id": "TEXT NOT NULL DEFAULT ''",
+                "status": "TEXT NOT NULL DEFAULT ''",
+                "accepted": "INTEGER NOT NULL DEFAULT 0 CHECK(accepted IN (0, 1))",
+                "placement_id": "TEXT",
+                "lease_id": "TEXT",
+                "lease_sha256": "TEXT",
+                "fencing_token": "INTEGER",
+                "renewal_sequence": "INTEGER",
+                "reason": "TEXT",
+                "completed_at": "TEXT NOT NULL DEFAULT ''",
+            },
+        )
+
+    def _ensure_columns(
+        self,
+        conn: sqlite3.Connection,
+        table: str,
+        columns: Mapping[str, str],
+    ) -> None:
+        existing = {
+            row["name"]
+            for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+        for name, definition in columns.items():
+            if name not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
 
     def _ready(self, *, require_signer: bool) -> VSourceStatus | None:
         if self._state_error is not None:
@@ -1060,91 +1337,277 @@ class LocalVSourceControlPlane:
         return None
 
     def _expire_active_leases(self, conn: sqlite3.Connection, now: datetime) -> None:
-        conn.execute(
+        rows = conn.execute(
             """
-            UPDATE leases
-            SET state = ?, terminal_state = COALESCE(terminal_state, ?), updated_at = ?
+            SELECT *
+            FROM leases
             WHERE state = ? AND expires_at <= ?
             """,
             (
-                LeaseState.EXPIRED.value,
-                LeaseState.EXPIRED.value,
-                _wire_time(now),
                 LeaseState.ACTIVE.value,
                 _wire_time(now),
             ),
-        )
+        ).fetchall()
+        for row in rows:
+            current = LeaseDocument.model_validate_json(row["document_json"])
+            if current.state != LeaseState.ACTIVE or document_sha256(current) != row["document_sha256"]:
+                raise sqlite3.DatabaseError("lease document does not match durable active state")
+            expired = self._sign_lease_state(current, LeaseState.EXPIRED)
+            updated = self._update_lease_document(
+                conn,
+                expired,
+                now,
+                previous_sha256=row["document_sha256"],
+                previous_fencing_token=row["fencing_token"],
+                previous_renewal_sequence=row["renewal_sequence"],
+                terminal_state=LeaseState.EXPIRED.value,
+            )
+            if updated != 1:
+                raise sqlite3.OperationalError("lease expiry CAS failed")
 
     def _handle_idempotency(
         self,
         conn: sqlite3.Connection,
         request: ChalRequest,
         request_sha256: str,
+        capability: CapabilityDocument,
+        capability_sha256: str,
+        authenticated_subject_id: str,
         now: datetime,
     ) -> AllocationResult | None:
         existing = conn.execute(
             """
-            SELECT request_sha256
+            SELECT *
             FROM idempotency
             WHERE account_id = ? AND idempotency_key = ?
             """,
             (request.account_id, request.idempotency_key),
         ).fetchone()
-        if existing is not None:
-            if existing["request_sha256"] != request_sha256:
-                return AllocationResult(
-                    VSourceStatus.IDEMPOTENCY_COLLISION,
-                    False,
-                    request_sha256,
-                )
-            placement_row = conn.execute(
-                """
-                SELECT document_json
-                FROM placements
-                WHERE account_id = ? AND request_sha256 = ?
-                ORDER BY decided_at DESC
-                LIMIT 1
-                """,
-                (request.account_id, request_sha256),
-            ).fetchone()
-            lease_row = conn.execute(
-                """
-                SELECT document_json
-                FROM leases
-                WHERE account_id = ? AND request_sha256 = ?
-                ORDER BY updated_at DESC
-                LIMIT 1
-                """,
-                (request.account_id, request_sha256),
-            ).fetchone()
-            placement = (
-                PlacementDecision.model_validate_json(placement_row["document_json"])
-                if placement_row is not None
-                else None
-            )
-            lease = (
-                LeaseDocument.model_validate_json(lease_row["document_json"])
-                if lease_row is not None
-                else None
-            )
+        if existing is None:
+            return None
+        if existing["request_sha256"] != request_sha256:
             return AllocationResult(
-                VSourceStatus.IDEMPOTENT_REPLAY,
-                True,
+                VSourceStatus.IDEMPOTENCY_COLLISION,
+                False,
+                request_sha256,
+            )
+        if (
+            existing["capability_id"] != capability.capability_id
+            or existing["capability_sha256"] != capability_sha256
+            or existing["capability_json"] != capability.model_dump_json(by_alias=True)
+            or existing["authenticated_subject_id"] != authenticated_subject_id
+            or capability.subject_id != authenticated_subject_id
+            or capability.account_id != request.account_id
+            or request.capability_id != capability.capability_id
+        ):
+            return AllocationResult(VSourceStatus.REPLAY, False, request_sha256)
+        if not existing["status"]:
+            return AllocationResult(
+                VSourceStatus.UNAVAILABLE,
+                False,
+                request_sha256,
+                reason="incomplete idempotency record",
+            )
+        return self._allocation_from_idempotency_row(
+            conn,
+            existing,
+            request_sha256,
+            now,
+        )
+
+    def _allocation_from_idempotency_row(
+        self,
+        conn: sqlite3.Connection,
+        row: sqlite3.Row,
+        request_sha256: str,
+        now: datetime,
+    ) -> AllocationResult:
+        status = VSourceStatus(row["status"])
+        placement = self._placement_from_idempotency(conn, row)
+        if not row["accepted"]:
+            return AllocationResult(
+                status,
+                False,
+                request_sha256,
+                placement=placement,
+                reason=row["reason"],
+            )
+        lease_id = row["lease_id"]
+        if lease_id is None:
+            return AllocationResult(
+                VSourceStatus.UNAVAILABLE,
+                False,
+                request_sha256,
+                placement=placement,
+                reason="accepted idempotency record has no lease",
+            )
+        lease_row = conn.execute(
+            "SELECT * FROM leases WHERE lease_id = ?",
+            (lease_id,),
+        ).fetchone()
+        if lease_row is None:
+            return AllocationResult(
+                VSourceStatus.STALE_LEASE,
+                False,
+                request_sha256,
+                placement=placement,
+            )
+        lease = LeaseDocument.model_validate_json(lease_row["document_json"])
+        if lease_row["state"] != lease.state.value:
+            return AllocationResult(
+                VSourceStatus.STALE_LEASE,
+                False,
+                request_sha256,
+                placement=placement,
+                reason="lease document state differs from durable state",
+            )
+        if lease_row["state"] == LeaseState.EXPIRED.value:
+            return AllocationResult(
+                VSourceStatus.LEASE_EXPIRED,
+                False,
                 request_sha256,
                 placement=placement,
                 lease=lease,
             )
+        if lease_row["state"] != LeaseState.ACTIVE.value or lease_row["terminal_state"] is not None:
+            return AllocationResult(
+                VSourceStatus.TERMINAL_LEASE,
+                False,
+                request_sha256,
+                placement=placement,
+                lease=lease,
+            )
+        if lease.not_before + timedelta(seconds=lease.ttl_seconds) <= now:
+            return AllocationResult(
+                VSourceStatus.LEASE_EXPIRED,
+                False,
+                request_sha256,
+                placement=placement,
+                lease=lease,
+            )
+        if (
+            lease_row["document_sha256"] != row["lease_sha256"]
+            or lease_row["fencing_token"] != row["fencing_token"]
+            or lease_row["renewal_sequence"] != row["renewal_sequence"]
+        ):
+            return AllocationResult(
+                VSourceStatus.STALE_LEASE,
+                False,
+                request_sha256,
+                placement=placement,
+            )
+        return AllocationResult(
+            VSourceStatus.IDEMPOTENT_REPLAY,
+            True,
+            request_sha256,
+            placement=placement,
+            lease=lease,
+        )
+
+    def _placement_from_idempotency(
+        self,
+        conn: sqlite3.Connection,
+        row: sqlite3.Row,
+    ) -> PlacementDecision | None:
+        placement_id = row["placement_id"]
+        if placement_id is None:
+            return None
+        placement_row = conn.execute(
+            "SELECT document_json FROM placements WHERE placement_id = ?",
+            (placement_id,),
+        ).fetchone()
+        if placement_row is None:
+            return None
+        return PlacementDecision.model_validate_json(placement_row["document_json"])
+
+    def _store_idempotency_result(
+        self,
+        conn: sqlite3.Connection,
+        request: ChalRequest,
+        request_sha256: str,
+        capability: CapabilityDocument,
+        capability_sha256: str,
+        authenticated_subject_id: str,
+        result: AllocationResult,
+        now: datetime,
+    ) -> None:
+        placement_id = result.placement.placement_id if result.placement is not None else None
+        lease_id = result.lease.lease_id if result.lease is not None else None
+        lease_sha256 = document_sha256(result.lease) if result.lease is not None else None
+        fencing_token = result.lease.fencing_token if result.lease is not None else None
+        renewal_sequence = result.lease.renewal_sequence if result.lease is not None else None
+        if result.accepted and (placement_id is None or lease_id is None):
+            raise ValueError("accepted allocation requires persisted placement and lease")
         conn.execute(
             """
             INSERT INTO idempotency
-            (account_id, idempotency_key, request_sha256, request_json, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            (
+                account_id, idempotency_key, request_sha256, request_json,
+                capability_id, capability_sha256, capability_json,
+                authenticated_subject_id, status, accepted, placement_id,
+                lease_id, lease_sha256, fencing_token, renewal_sequence,
+                reason, created_at, completed_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 request.account_id,
                 request.idempotency_key,
                 request_sha256,
                 request.model_dump_json(by_alias=True),
+                capability.capability_id,
+                capability_sha256,
+                capability.model_dump_json(by_alias=True),
+                authenticated_subject_id,
+                result.status.value,
+                1 if result.accepted else 0,
+                placement_id,
+                lease_id,
+                lease_sha256,
+                fencing_token,
+                renewal_sequence,
+                result.reason,
+                _wire_time(now),
+                _wire_time(now),
+            ),
+        )
+
+    def _admit_capability(
+        self,
+        conn: sqlite3.Connection,
+        capability: CapabilityDocument,
+        capability_sha256: str,
+        now: datetime,
+    ) -> VSourceStatus | None:
+        existing = conn.execute(
+            """
+            SELECT digest, account_id, subject_id, document_json
+            FROM capabilities
+            WHERE capability_id = ?
+            """,
+            (capability.capability_id,),
+        ).fetchone()
+        if existing is not None:
+            if (
+                existing["digest"] == capability_sha256
+                and existing["account_id"] == capability.account_id
+                and existing["subject_id"] == capability.subject_id
+                and existing["document_json"] == capability.model_dump_json(by_alias=True)
+            ):
+                return None
+            return VSourceStatus.REPLAY
+        conn.execute(
+            """
+            INSERT INTO capabilities
+            (capability_id, digest, document_json, account_id, subject_id, admitted_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                capability.capability_id,
+                capability_sha256,
+                capability.model_dump_json(by_alias=True),
+                capability.account_id,
+                capability.subject_id,
                 _wire_time(now),
             ),
         )
@@ -1170,6 +1633,52 @@ class LocalVSourceControlPlane:
             for row in rows
         ]
 
+    def _refresh_selected_inventory(
+        self,
+        conn: sqlite3.Connection,
+        request: ChalRequest,
+        capability: CapabilityDocument,
+        selected: _CandidateEvaluation,
+        authenticated_subject_id: str,
+        now: datetime,
+    ) -> tuple[ResourceInventory, _CandidateEvaluation] | None:
+        candidate = selected.candidate
+        row = conn.execute(
+            """
+            SELECT digest, document_json
+            FROM inventories
+            WHERE account_id = ?
+              AND node_id = ?
+              AND inventory_id = ?
+              AND expires_at > ?
+            """,
+            (
+                request.account_id,
+                candidate.node_id,
+                candidate.inventory_id,
+                _wire_time(now),
+            ),
+        ).fetchone()
+        if row is None or row["digest"] != candidate.inventory_sha256:
+            return None
+        inventory = ResourceInventory.model_validate_json(row["document_json"])
+        if document_sha256(inventory) != candidate.inventory_sha256:
+            return None
+        refreshed = self._evaluate_candidate(
+            conn,
+            request,
+            capability,
+            inventory,
+            authenticated_subject_id,
+            now,
+        )
+        if (
+            not refreshed.candidate.eligible
+            or refreshed.candidate.inventory_sha256 != candidate.inventory_sha256
+        ):
+            return None
+        return inventory, refreshed
+
     def _evaluate_candidate(
         self,
         conn: sqlite3.Connection,
@@ -1189,6 +1698,8 @@ class LocalVSourceControlPlane:
             reasons.add("capability")
         if authenticated_subject_id != capability.subject_id:
             reasons.add("subject")
+        if inventory.node_id not in capability.audience_node_ids:
+            reasons.add("audience")
         if _ATTESTATION_RANK[inventory.attestation] < _ATTESTATION_RANK[
             capability.constraints.minimum_attestation
         ]:
@@ -1460,29 +1971,32 @@ class LocalVSourceControlPlane:
         conn: sqlite3.Connection,
         placement: PlacementDecision,
     ) -> None:
+        document_json = placement.model_dump_json(by_alias=True)
+        existing = conn.execute(
+            "SELECT document_json FROM placements WHERE placement_id = ?",
+            (placement.placement_id,),
+        ).fetchone()
+        if existing is not None:
+            if existing["document_json"] == document_json:
+                return
+            raise sqlite3.IntegrityError("placement identity collision")
         conn.execute(
             """
             INSERT INTO placements
             (placement_id, request_sha256, account_id, document_json, result, decided_at)
             VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(placement_id) DO UPDATE SET
-                request_sha256 = excluded.request_sha256,
-                account_id = excluded.account_id,
-                document_json = excluded.document_json,
-                result = excluded.result,
-                decided_at = excluded.decided_at
             """,
             (
                 placement.placement_id,
                 placement.request_sha256,
                 placement.account_id,
-                placement.model_dump_json(by_alias=True),
+                document_json,
                 placement.result.value,
                 _wire_time(placement.decided_at),
             ),
         )
 
-    def _store_lease(
+    def _insert_lease(
         self,
         conn: sqlite3.Connection,
         lease: LeaseDocument,
@@ -1501,31 +2015,6 @@ class LocalVSourceControlPlane:
                 ingress_bps, egress_bps, gpu_ids_json, updated_at
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(lease_id) DO UPDATE SET
-                placement_id = excluded.placement_id,
-                request_sha256 = excluded.request_sha256,
-                account_id = excluded.account_id,
-                node_id = excluded.node_id,
-                inventory_id = excluded.inventory_id,
-                inventory_sha256 = excluded.inventory_sha256,
-                document_sha256 = excluded.document_sha256,
-                document_json = excluded.document_json,
-                state = excluded.state,
-                terminal_state = excluded.terminal_state,
-                fencing_token = excluded.fencing_token,
-                renewal_sequence = excluded.renewal_sequence,
-                renewals_remaining = excluded.renewals_remaining,
-                not_before = excluded.not_before,
-                expires_at = excluded.expires_at,
-                cpu_millicores = excluded.cpu_millicores,
-                memory_bytes = excluded.memory_bytes,
-                gpu_count = excluded.gpu_count,
-                gpu_memory_bytes = excluded.gpu_memory_bytes,
-                storage_bytes = excluded.storage_bytes,
-                ingress_bps = excluded.ingress_bps,
-                egress_bps = excluded.egress_bps,
-                gpu_ids_json = excluded.gpu_ids_json,
-                updated_at = excluded.updated_at
             """,
             (
                 lease.lease_id,
@@ -1555,6 +2044,104 @@ class LocalVSourceControlPlane:
                 _wire_time(now),
             ),
         )
+
+    def _update_lease_document(
+        self,
+        conn: sqlite3.Connection,
+        lease: LeaseDocument,
+        now: datetime,
+        *,
+        previous_sha256: str,
+        previous_fencing_token: int,
+        previous_renewal_sequence: int,
+        terminal_state: str | None,
+    ) -> int:
+        expires_at = lease.not_before + timedelta(seconds=lease.ttl_seconds)
+        cursor = conn.execute(
+            """
+            UPDATE leases
+            SET
+                placement_id = ?,
+                request_sha256 = ?,
+                account_id = ?,
+                node_id = ?,
+                inventory_id = ?,
+                inventory_sha256 = ?,
+                document_sha256 = ?,
+                document_json = ?,
+                state = ?,
+                terminal_state = ?,
+                fencing_token = ?,
+                renewal_sequence = ?,
+                renewals_remaining = ?,
+                not_before = ?,
+                expires_at = ?,
+                cpu_millicores = ?,
+                memory_bytes = ?,
+                gpu_count = ?,
+                gpu_memory_bytes = ?,
+                storage_bytes = ?,
+                ingress_bps = ?,
+                egress_bps = ?,
+                gpu_ids_json = ?,
+                updated_at = ?
+            WHERE lease_id = ?
+              AND document_sha256 = ?
+              AND fencing_token = ?
+              AND renewal_sequence = ?
+              AND state = ?
+              AND terminal_state IS NULL
+            """,
+            (
+                lease.placement_id,
+                lease.request_sha256,
+                lease.account_id,
+                lease.node_id,
+                lease.inventory_id,
+                lease.inventory_sha256,
+                document_sha256(lease),
+                lease.model_dump_json(by_alias=True),
+                lease.state.value,
+                terminal_state,
+                lease.fencing_token,
+                lease.renewal_sequence,
+                lease.renewals_remaining,
+                _wire_time(lease.not_before),
+                _wire_time(expires_at),
+                lease.resources.cpu_millicores,
+                lease.resources.memory_bytes,
+                lease.resources.gpu_count,
+                lease.resources.gpu_memory_bytes,
+                lease.resources.storage_bytes,
+                lease.resources.ingress_bps,
+                lease.resources.egress_bps,
+                json.dumps(lease.gpu_ids, separators=(",", ":")),
+                _wire_time(now),
+                lease.lease_id,
+                previous_sha256,
+                previous_fencing_token,
+                previous_renewal_sequence,
+                LeaseState.ACTIVE.value,
+            ),
+        )
+        return cursor.rowcount
+
+    def _sign_lease_state(
+        self,
+        lease: LeaseDocument,
+        state: LeaseState,
+        *,
+        revocation_reason: LeaseRevocationReason | None = None,
+    ) -> LeaseDocument:
+        if self.signer is None:
+            raise sqlite3.OperationalError("signer unavailable for lease state transition")
+        payload = lease.model_dump(mode="json", by_alias=True)
+        payload.update(
+            state=state.value,
+            revocation_reason=revocation_reason.value if revocation_reason else None,
+        )
+        payload.pop("signature", None)
+        return sign_contract_document(LeaseDocument, payload, self.signer)
 
     def _stable_id(self, prefix: str, digest_material: str) -> str:
         import hashlib
