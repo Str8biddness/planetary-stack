@@ -5,6 +5,8 @@ import time
 import json
 import subprocess
 import uuid
+import atexit
+import secrets
 # pywebview is only needed for the GRAPHICAL desktop window. A headless server
 # (SYNTHESUS_HEADLESS=1) may not have a GTK/WebKit backend at all, so import it
 # lazily/optionally — the module must still load and serve the UI in headless mode.
@@ -78,7 +80,17 @@ else:
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(__name__, static_folder=SCRIPT_DIR)
-CORS(app)
+SHELL_PORT = int(os.environ.get("SYNTHESUS_SHELL_PORT", "8081"))
+CONTROLLER_PORT = int(os.environ.get("SYNTHESUS_CONTROLLER_PORT", "5011"))
+CONTROLLER_ORIGINS = (
+    f"http://127.0.0.1:{SHELL_PORT}",
+    f"http://localhost:{SHELL_PORT}",
+)
+CORS(
+    app,
+    resources={r"/api/*": {"origins": list(CONTROLLER_ORIGINS)}},
+    supports_credentials=False,
+)
 
 # Ensure the accounts database/tables exist before serving any requests.
 accounts.init_db()
@@ -99,11 +111,57 @@ def serve_index():
 def serve_static(path):
     return send_from_directory(SCRIPT_DIR, path)
 
-SYNTHESUS_RUNTIME_URL = os.environ.get("SYNTHESUS_RUNTIME_URL", "http://127.0.0.1:5010")
+SYNTHESUS_RUNTIME_UPSTREAM_URL = (
+    os.environ.get("SYNTHESUS_RUNTIME_UPSTREAM_URL")
+    or os.environ.get("SYNTHESUS_RUNTIME_URL")
+    or "http://127.0.0.1:5010"
+).rstrip("/")
+SYNTHESUS_CONTROLLER_URL = os.environ.get(
+    "SYNTHESUS_CONTROLLER_URL",
+    f"http://127.0.0.1:{CONTROLLER_PORT}",
+).rstrip("/")
+SYNTHESUS_RUNTIME_URL = f"{SYNTHESUS_CONTROLLER_URL}/runtime"
+SYNTHESUS_TERMINAL_SOCKET = os.path.expanduser(
+    os.environ.get(
+        "SYNTHESUS_TERMINAL_SOCKET",
+        "~/.synthesus/ipc/terminal.sock",
+    )
+)
+SYNTHESUS_TERMINAL_TOKEN = os.environ.get(
+    "SYNTHESUS_TERMINAL_TOKEN",
+) or secrets.token_urlsafe(32)
+SYNTHESUS_CONTROLLER_SESSION_ID = secrets.token_hex(16)
+_CHILD_PROCESSES: list[subprocess.Popen] = []
 
 # Pending chat answers keyed by answer_id — used so 👍 confirm can stage + upgrade
 # a specific assistant message. Server-side only; not exposed as a dump endpoint.
 _pending_chat_answers: dict = {}
+
+
+def _track_child(process: subprocess.Popen) -> subprocess.Popen:
+    _CHILD_PROCESSES.append(process)
+    return process
+
+
+def _stop_child_processes() -> None:
+    for process in reversed(_CHILD_PROCESSES):
+        if process.poll() is not None:
+            continue
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=2)
+    try:
+        os.unlink(SYNTHESUS_TERMINAL_SOCKET)
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        print(f"[terminal] could not remove socket during shutdown: {exc}")
+
+
+atexit.register(_stop_child_processes)
 
 
 def _runtime_api_headers(*, include_human_session: bool = False) -> dict:
@@ -118,6 +176,22 @@ def _runtime_api_headers(*, include_human_session: bool = False) -> dict:
             # Injected only on the shell→runtime hop. Frontend never sees this value.
             headers["X-Synthesus-Human-Session"] = secret
     return headers
+
+
+@app.route('/api/ipc/session', methods=['GET'])
+def ipc_session():
+    """Return only the short-lived browser capability for terminal IPC."""
+    identity = _human_identity_from_request()
+    if not identity:
+        return jsonify({"error": "authenticated_user_required"}), 401
+    return jsonify({
+        "controller_port": CONTROLLER_PORT,
+        "terminal_token": SYNTHESUS_TERMINAL_TOKEN,
+        "terminal_http_path": "/terminal",
+        "terminal_ws_path": "/ws/terminal",
+        "transport": "authenticated_loopback_to_unix_socket",
+        "user": identity,
+    })
 
 
 def _human_identity_from_request():
@@ -409,7 +483,7 @@ def chat_with_llm():
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/query",
             json={"query": user_message, "mode": "chal", "character": "synthesus"},
             headers=_runtime_api_headers(),
-            timeout=90,
+            timeout=180,
         )
         r.raise_for_status()
         payload = r.json()
@@ -1110,7 +1184,7 @@ def ensure_runtime():
     works via the loud-degraded direct path.
     """
     import urllib.request
-    health = f"{SYNTHESUS_RUNTIME_URL}/api/v1/health"
+    health = f"{SYNTHESUS_RUNTIME_UPSTREAM_URL}/api/v1/health"
     key = os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")
 
     def _up():
@@ -1133,8 +1207,14 @@ def ensure_runtime():
     try:
         runtime_log = os.path.expanduser("~/.synthesus/runtime.log")
         os.makedirs(os.path.dirname(runtime_log), exist_ok=True)
-        subprocess.Popen(cmd, shell=True,
-                         stdout=open(runtime_log, "a"), stderr=subprocess.STDOUT)
+        _track_child(
+            subprocess.Popen(
+                cmd,
+                shell=True,
+                stdout=open(runtime_log, "a"),
+                stderr=subprocess.STDOUT,
+            )
+        )
     except Exception as e:
         print(f"[runtime] failed to launch ({e}); desktop will degrade to the direct path.")
         return
@@ -1147,19 +1227,23 @@ def ensure_runtime():
 
 
 def start_flask():
-    app.run(host='127.0.0.1', port=8081, debug=False, use_reloader=False)
+    app.run(host='127.0.0.1', port=SHELL_PORT, debug=False, use_reloader=False)
 
 def ensure_terminal():
-    """Start the god-mode terminal PTY backend (:8082) if it isn't already up.
-    Makes the terminal work no matter how the desktop was launched — not only via
-    start_synthesus.sh. Without this, the terminal WebSocket is refused and the UI
-    loops connect/disconnect forever."""
-    import socket, subprocess, sys, os
+    """Start the private PTY backend on its user-only Unix socket."""
+    import httpx
+
     try:
-        with socket.create_connection(("127.0.0.1", 8082), timeout=1):
-            print("[terminal] PTY backend already up on :8082")
-            return
-    except OSError:
+        transport = httpx.HTTPTransport(uds=SYNTHESUS_TERMINAL_SOCKET)
+        with httpx.Client(
+            transport=transport,
+            base_url="http://synthesus-terminal",
+            timeout=1,
+        ) as client:
+            if client.get("/api/terminal/health").status_code == 200:
+                print(f"[terminal] PTY backend already up on {SYNTHESUS_TERMINAL_SOCKET}")
+                return
+    except Exception:
         pass
     server = os.path.join(os.path.dirname(os.path.abspath(__file__)), "terminal_server.py")
     if not os.path.exists(server):
@@ -1168,11 +1252,85 @@ def ensure_terminal():
     try:
         log = os.path.expanduser("~/.synthesus/terminal_server.log")
         os.makedirs(os.path.dirname(log), exist_ok=True)
-        subprocess.Popen([sys.executable, server], stdout=open(log, "a"),
-                         stderr=subprocess.STDOUT, start_new_session=True)
-        print("[terminal] launched PTY backend on :8082")
+        env = os.environ.copy()
+        env["SYNTHESUS_TERMINAL_SOCKET"] = SYNTHESUS_TERMINAL_SOCKET
+        _track_child(
+            subprocess.Popen(
+                [sys.executable, server],
+                stdout=open(log, "a"),
+                stderr=subprocess.STDOUT,
+                env=env,
+            )
+        )
+        print(f"[terminal] launched PTY backend on {SYNTHESUS_TERMINAL_SOCKET}")
     except Exception as e:
         print(f"[terminal] failed to launch PTY backend: {e}")
+
+
+def ensure_controller():
+    """Start authenticated synthesusd and wait for its loopback readiness endpoint."""
+    import urllib.error
+    import urllib.request
+
+    health = f"{SYNTHESUS_CONTROLLER_URL}/ready"
+    key = os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")
+
+    def _up():
+        try:
+            req = urllib.request.Request(health, headers={"X-API-Key": key})
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                if resp.status != 200:
+                    return False
+                payload = json.loads(resp.read().decode("utf-8"))
+                return payload.get("session_id") == SYNTHESUS_CONTROLLER_SESSION_ID
+        except (OSError, urllib.error.URLError):
+            return False
+
+    if _up():
+        print(f"[controller] synthesusd already up on 127.0.0.1:{CONTROLLER_PORT}")
+        return True
+
+    daemon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "synthesusd.py")
+    if not os.path.exists(daemon):
+        print(f"[controller] synthesusd.py not found at {daemon}; desktop cannot start")
+        return False
+
+    controller_log = os.path.expanduser("~/.synthesus/synthesusd.log")
+    os.makedirs(os.path.dirname(controller_log), exist_ok=True)
+    env = os.environ.copy()
+    env.update({
+        "SYNTHESUS_CONTROLLER_PORT": str(CONTROLLER_PORT),
+        "SYNTHESUS_CONTROLLER_PARENT_PID": str(os.getpid()),
+        "SYNTHESUS_CONTROLLER_SESSION_ID": SYNTHESUS_CONTROLLER_SESSION_ID,
+        "SYNTHESUS_RUNTIME_UPSTREAM_URL": SYNTHESUS_RUNTIME_UPSTREAM_URL,
+        "SYNTHESUS_TERMINAL_SOCKET": SYNTHESUS_TERMINAL_SOCKET,
+        "SYNTHESUS_TERMINAL_TOKEN": SYNTHESUS_TERMINAL_TOKEN,
+        "SYNTHESUS_SHELL_PORT": str(SHELL_PORT),
+        "SYNTHESUS_CONTROLLER_ALLOWED_ORIGINS": ",".join(CONTROLLER_ORIGINS),
+    })
+    try:
+        _track_child(
+            subprocess.Popen(
+                [sys.executable, daemon],
+                stdout=open(controller_log, "a"),
+                stderr=subprocess.STDOUT,
+                env=env,
+            )
+        )
+    except Exception as e:
+        print(f"[controller] failed to launch synthesusd: {e}")
+        return False
+
+    for _ in range(60):
+        if _up():
+            print(
+                f"[controller] synthesusd READY on 127.0.0.1:{CONTROLLER_PORT}; "
+                "runtime and terminal traffic are authenticated"
+            )
+            return True
+        time.sleep(0.25)
+    print("[controller] synthesusd failed its authenticated startup check")
+    return False
 
 
 if __name__ == '__main__':
@@ -1191,16 +1349,21 @@ if __name__ == '__main__':
     print("[*] Booting Synthesus Planetary OS Shell"
           + (" (headless)…" if headless else "…"))
 
-    # Bring up the merged CHAL runtime + the terminal PTY backend in the background.
+    # Bring up private services, then place authenticated synthesusd in front of them.
     threading.Thread(target=ensure_runtime, daemon=True).start()
     threading.Thread(target=ensure_terminal, daemon=True).start()
+    if not ensure_controller():
+        raise SystemExit("Synthesus refuses to start without authenticated synthesusd")
 
     if headless:
         # Serve the OS in the foreground so the process stays alive; the user
         # points a browser at it. Nothing is exposed beyond localhost.
         print("[*] HEADLESS — open Synthesus in your browser:")
-        print("[*]     http://localhost:8081")
-        print("[*] Remote access: SSH-tunnel it (docs/HEADLESS.md); never expose :8081/:8082 directly.")
+        print(f"[*]     http://localhost:{SHELL_PORT}")
+        print(
+            "[*] Remote access: SSH-tunnel the documented shell/controller ports; "
+            "the PTY itself has no TCP listener."
+        )
         start_flask()  # blocking — keeps the process running
     else:
         threading.Thread(target=start_flask, daemon=True).start()
@@ -1209,12 +1372,21 @@ if __name__ == '__main__':
         import urllib.request
         for _ in range(30):
             try:
-                with urllib.request.urlopen("http://127.0.0.1:8081/", timeout=1) as resp:
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{SHELL_PORT}/",
+                    timeout=1,
+                ) as resp:
                     if resp.status == 200:
                         break
             except Exception:
                 time.sleep(0.5)
 
         print("[*] Hooking into Host OS via PyWebView (Frameless Mode)...")
-        webview.create_window('Synthesus Planetary OS', 'http://127.0.0.1:8081', frameless=True, fullscreen=True, text_select=True)
+        webview.create_window(
+            'Synthesus Planetary OS',
+            f'http://127.0.0.1:{SHELL_PORT}',
+            frameless=True,
+            fullscreen=True,
+            text_select=True,
+        )
         webview.start()

@@ -191,3 +191,59 @@ Keep entries chronological. Do not rewrite history; append new sessions.
   runtime; evolving NPC knowledge is a writeback overlay, not an artifact edit.
 - A missing or invalid manifest produces an explicit degraded controller and
   cannot silently become an empty successful Knowledge Cloud.
+
+## Current Session — 2026-07-16 (Authenticated synthesusd Boundary)
+
+### Summary
+- Extracted `synthesusd` as the loopback controller between the WebSocket
+  desktop and private runtime/terminal services.
+- Required the per-install API key for runtime proxy traffic and a distinct
+  per-launch capability plus authenticated desktop user and local-origin
+  checks for browser terminal traffic.
+- Removed the PTY backend's TCP listener and routed controller traffic through
+  a mode-0600 Unix socket inside a mode-0700 user directory.
+- Added bounded child-process ownership, a fast session-specific readiness
+  check, downstream health telemetry, explicit unavailable responses, and
+  isolated-port development overrides.
+- Added a shared high-contrast Synthesus icon for the web favicon and installed
+  Linux desktop entry.
+- Advanced Synthesus 5 Phase 9 product runtime polish and Planetary Stack
+  Phase 4 service-boundary work without modifying the frozen memory contract.
+
+### Verified
+- Focused controller suite: `4 passed`.
+- Python byte compilation passed for `synthesusd.py`,
+  `synthesus_native_shell.py`, `terminal_server.py`, and `self_test.py`.
+- `node --check script.js` passed.
+- `bash -n install.sh` passed; the generated desktop icon is a square
+  1254-by-1254 RGB PNG and both application references resolve to its bundled
+  path.
+- Live controller without an API key returned HTTP 401; authenticated health
+  reported the runtime and terminal online.
+- The shell returned HTTP 401 for anonymous terminal-capability minting and
+  HTTP 200 only after a real register/login JWT flow.
+- Live terminal proof rejected an unauthenticated WebSocket, then ran
+  `echo SYNTHESUSD_PTY_OK` and an authenticated resize through the controller.
+- The final WebSocket proof carried the capability through the negotiated
+  subprotocol and confirmed the capability did not appear in access logs.
+- Live permissions were directory `0700` and Unix socket `0600`.
+- An isolated headless desktop request traversed
+  shell → `synthesusd` → CHAL runtime and returned
+  `source="chal_runtime"`.
+- Shutdown removed the isolated listeners, child processes, and socket.
+
+### Left Off / Next Steps
+- An independent reviewer must adversarially test the controller/terminal
+  boundary before merge.
+- After the service-boundary PR lands, freeze the CHAL/vSource capability,
+  lease, telemetry, and error schemas before implementing remote placement.
+- The live controller proof validated routing; the one-sentence Duke Aldric
+  response echoed the prompt, so answer-quality evaluation remains a separate
+  runtime/CGPU concern.
+
+### Architectural Notes
+- The browser never receives the runtime API key or human-attestation secret.
+- Loopback is a transport restriction, not authentication; both controller
+  surfaces require an explicit capability.
+- The PTY is an internal user-owned service behind `synthesusd`, not a network
+  service.

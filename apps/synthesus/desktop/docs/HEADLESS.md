@@ -19,7 +19,8 @@ If pywebview has no display backend, Synthesus **falls back to headless automati
 ```bash
 SYNTHESUS_HEADLESS=1 synthesus
 ```
-It starts the runtime + terminal backend + the web UI and prints:
+It starts the runtime, authenticated `synthesusd` controller, private terminal
+backend, and web UI, then prints:
 ```
 [*] HEADLESS — open Synthesus in your browser:
 [*]     http://localhost:8081
@@ -37,10 +38,14 @@ This is the **standard, secure** way to use a headless server's web UI remotely,
 it needs **no configuration in Synthesus** — it stays localhost-only, and SSH does the
 encryption + authentication for you.
 
-On your **laptop**, forward the port over SSH to the box running Synthesus:
+On your **laptop**, forward the shell and authenticated controller ports over
+SSH to the box running Synthesus:
 
 ```bash
-ssh -L 8081:localhost:8081 you@your-synthesus-box
+ssh \
+  -L 8081:localhost:8081 \
+  -L 5011:localhost:5011 \
+  you@your-synthesus-box
 ```
 
 Leave that running, then on your laptop open:
@@ -53,7 +58,8 @@ You're now using the headless box's Synthesus, over an encrypted, authenticated 
 channel. When you close the SSH session, the tunnel closes with it. Nothing on the
 box was ever exposed to the network.
 
-> Tip: keep the tunnel up in the background with `ssh -fN -L 8081:localhost:8081 you@box`.
+> Tip: keep the tunnel up in the background with
+> `ssh -fN -L 8081:localhost:8081 -L 5011:localhost:5011 you@box`.
 
 ---
 
@@ -62,16 +68,17 @@ box was ever exposed to the network.
 Do **not** bind Synthesus to `0.0.0.0`, port-forward it on your router, or put it on a
 public IP without a proper authenticating reverse proxy. Here's why, specifically:
 
-- **`:8082` is the god-mode terminal — a real shell.** It spawns `bash` as your user
-  over a WebSocket. Bound to localhost it's fine; reachable from a network it is an
-  **unauthenticated remote shell** — anyone who can reach the port gets a terminal on
-  your machine. Internet-facing, it will be found by automated scanners and abused.
+- The PTY backend is a real shell. It no longer has a TCP listener; it is
+  reachable only through a mode-0600 Unix socket behind `synthesusd`.
+- `:5011` is the authenticated controller. Runtime traffic requires the
+  per-install API key and browser terminal traffic requires a separate
+  per-launch capability.
 - Agentic elevation intentionally makes the current user's short sudo timestamp
   available to all local PTYs while that desktop session is active. Any process
   already running as that user can potentially use the same ticket. Enable it only
   on a trusted workstation, and never combine it with network-exposed Synthesus ports.
-- `:8081` (UI + proxied APIs) and `:5010` (the runtime) are also built for a trusted
-  local environment, not the open network.
+- `:8081` (UI) and `:5010` (the private runtime behind the controller) are
+  still built for a trusted local environment, not the open network.
 
 **The SSH tunnel above gives you remote access without any of this risk** — the ports
 stay on `127.0.0.1` and only your authenticated SSH session can reach them.
