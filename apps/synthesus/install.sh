@@ -168,6 +168,9 @@ ok "environment ready (scikit-learn pinned 1.8.0 for SwarmEmbedder pickle compat
 # ---- 5. per-install key + human-session secret ---------------------------
 c "5/6  Generating private per-install secrets"
 KEY="$(python3 -c 'import secrets; print("syn_"+secrets.token_urlsafe(32))')"
+# Separate signing secret for local account JWTs. Reusing the controller API
+# key would unnecessarily couple two trust boundaries.
+JWT_SECRET_VALUE="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
 # Human attestation boundary: desktop shell injects this as X-Synthesus-Human-Session.
 # NEVER expose to frontend JS. Same value must be visible to runtime + shell.
 HUMAN_SESSION_SECRET="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
@@ -177,12 +180,14 @@ if [ -f "$SYNTHESUS_HOME/synthesus.env" ]; then
   # shellcheck disable=SC1090
   set -a; . "$SYNTHESUS_HOME/synthesus.env"; set +a
   KEY="${SYNTHESUS_API_KEY:-$KEY}"
+  JWT_SECRET_VALUE="${SYNTHESUS_JWT_SECRET:-${JWT_SECRET:-$JWT_SECRET_VALUE}}"
   HUMAN_SESSION_SECRET="${SYNTHESUS_HUMAN_SESSION_SECRET:-$HUMAN_SESSION_SECRET}"
-  warn "preserving existing synthesus.env secrets (API key / human session)"
+  warn "preserving existing synthesus.env secrets (API key / JWT / human session)"
 fi
 cat > "$SYNTHESUS_HOME/synthesus.env" <<ENV
 # Auto-generated at install. Do not share. Never ship to the browser.
 SYNTHESUS_API_KEY=$KEY
+SYNTHESUS_JWT_SECRET=$JWT_SECRET_VALUE
 SYNTHESUS_MODEL=$SYNTHESUS_MODEL
 SYNTHESUS_HOST=127.0.0.1
 # The current published Knowledge Cloud bundle is not release-valid. Keep
@@ -194,7 +199,7 @@ SYNTHESUS_HUMAN_SESSION_SECRET=$HUMAN_SESSION_SECRET
 # SYNTHESUS_KERNEL_BIN=$SYNTHESUS_HOME/runtime/packages/kernel/build/zo_kernel
 ENV
 chmod 600 "$SYNTHESUS_HOME/synthesus.env"
-ok "unique secrets written to synthesus.env (API key + human session; localhost only)"
+ok "unique secrets written to synthesus.env (API key + JWT + human session; localhost only)"
 
 # ---- 6. launcher + menu entry -------------------------------------------
 c "6/6  Launcher"

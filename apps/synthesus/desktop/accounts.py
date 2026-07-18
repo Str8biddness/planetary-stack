@@ -8,6 +8,7 @@ Self-contained on purpose: uses only stdlib sqlite3 + Werkzeug (ships with Flask
 
 import os
 import re
+import stat
 import time
 import sqlite3
 import jwt
@@ -17,9 +18,11 @@ from werkzeug.security import generate_password_hash, check_password_hash
 DB_DIR = os.path.expanduser("~/.synthesus")
 DB_PATH = os.environ.get("SYNTHESUS_DB", os.path.join(DB_DIR, "synthesus.db"))
 
-JWT_SECRET = os.environ.get("JWT_SECRET", "dev_secret_change_me")
 JWT_ALGO = "HS256"
 TOKEN_TTL_MINUTES = 60 * 24 * 7  # 7 days
+
+_KNOWN_DEFAULT_JWT_SECRETS = frozenset({"dev_secret_change_me"})
+_MIN_JWT_SECRET_BYTES = 32
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -31,9 +34,79 @@ class AccountError(Exception):
     """Raised for any expected, user-facing account problem (bad input, dup email, etc.)."""
 
 
+def _jwt_secret():
+    """Return the private install secret or refuse insecure account operation.
+
+    ``JWT_SECRET`` remains a compatibility input for existing private installs,
+    but new installs use the namespaced ``SYNTHESUS_JWT_SECRET`` variable.
+    There is deliberately no source-tree default: a public fallback would let
+    any local process forge a login and mint a terminal capability.
+    """
+    secret = (
+        os.environ.get("SYNTHESUS_JWT_SECRET")
+        or os.environ.get("JWT_SECRET")
+        or ""
+    ).strip()
+    if secret in _KNOWN_DEFAULT_JWT_SECRETS or len(secret.encode("utf-8")) < _MIN_JWT_SECRET_BYTES:
+        raise RuntimeError(
+            "Synthesus accounts require a unique per-install JWT secret of at least "
+            f"{_MIN_JWT_SECRET_BYTES} bytes; run install.sh or set "
+            "SYNTHESUS_JWT_SECRET."
+        )
+    return secret
+
+
+def require_secure_configuration():
+    """Fail closed during desktop startup if account signing is insecure."""
+    _jwt_secret()
+
+
+def _confine_database_path():
+    """Create/check the SQLite path without following a database symlink."""
+    path = os.path.abspath(os.path.expanduser(DB_PATH))
+    parent = os.path.dirname(path)
+    parent_existed = os.path.lexists(parent)
+    os.makedirs(parent, mode=0o700, exist_ok=True)
+
+    parent_stat = os.lstat(parent)
+    if not stat.S_ISDIR(parent_stat.st_mode):
+        raise RuntimeError(f"Synthesus account database parent is not a directory: {parent}")
+    if parent_stat.st_uid != os.geteuid():
+        raise RuntimeError(f"Synthesus account database parent is not owned by this user: {parent}")
+    parent_mode = stat.S_IMODE(parent_stat.st_mode)
+    default_parent = os.path.abspath(os.path.expanduser(DB_DIR))
+    if parent_mode & 0o077:
+        if parent == default_parent:
+            # Tighten the legacy default directory in place during upgrade.
+            os.chmod(parent, 0o700)
+        elif parent_existed:
+            # Never chmod an arbitrary configured parent such as /tmp or $HOME.
+            raise RuntimeError(
+                f"Synthesus account database parent must be owner-only (0700): {parent}"
+            )
+
+    flags = os.O_RDWR | os.O_CREAT
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        fd = os.open(path, flags, 0o600)
+    except OSError as exc:
+        raise RuntimeError(f"Synthesus account database path is unsafe: {path}: {exc}") from exc
+    try:
+        file_stat = os.fstat(fd)
+        if not stat.S_ISREG(file_stat.st_mode):
+            raise RuntimeError(f"Synthesus account database is not a regular file: {path}")
+        if file_stat.st_uid != os.geteuid():
+            raise RuntimeError(f"Synthesus account database is not owned by this user: {path}")
+        os.fchmod(fd, 0o600)
+    finally:
+        os.close(fd)
+    return path
+
+
 def _connect():
-    os.makedirs(DB_DIR, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    path = _confine_database_path()
+    conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -72,7 +145,7 @@ def _issue_token(user_id, email):
         "email": email,
         "exp": int(time.time()) + TOKEN_TTL_MINUTES * 60,
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
+    return jwt.encode(payload, _jwt_secret(), algorithm=JWT_ALGO)
 
 
 def _public(row):
@@ -130,7 +203,7 @@ def authenticate(email, password):
 def verify_token(token):
     """Returns the decoded payload, or None if invalid/expired."""
     try:
-        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
+        return jwt.decode(token, _jwt_secret(), algorithms=[JWT_ALGO])
     except jwt.InvalidTokenError:
         return None
 
@@ -164,6 +237,7 @@ def list_users():
 #   python3 accounts.py                                    -> run self-test
 if __name__ == "__main__":
     import sys
+    import tempfile
 
     _args = sys.argv[1:]
     if _args and _args[0] == "upgrade":
@@ -190,9 +264,8 @@ if __name__ == "__main__":
         sys.exit(0)
 
     # Use a throwaway DB so the real one isn't touched during the test.
-    DB_PATH = "/tmp/synthesus_accounts_test.db"
-    if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
+    DB_PATH = os.path.join(tempfile.mkdtemp(prefix="synthesus_accounts_test_"), "accounts.db")
+    os.environ.setdefault("SYNTHESUS_JWT_SECRET", "accounts-self-test-" + ("x" * 32))
 
     init_db()
     print("DB initialized at", DB_PATH)
