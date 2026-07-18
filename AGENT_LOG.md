@@ -13,7 +13,7 @@ Planetary Stack. Read this file, `AGENTS.md`, `docs/ARCHITECTURE.md`,
 - Current continuation branch: `agent/finish-readiness`.
 - Current continuation checkout: `/home/dakin/planetary-stack-finish`.
 - Draft handoff PR: [#9](https://github.com/Str8biddness/planetary-stack/pull/9).
-- Latest independently reviewed implementation head: `4c464eec441c7befea38c54b5ae5b93d01b0ca9e`.
+- Latest independently reviewed implementation head: `9259129fc99f0e291f7286bc36c187c78843721b`.
 - Release target: the paid same-account private-mesh product defined in
   `FINISH_CHECKLIST.md`. The public subscriber fabric is a later release.
 - Current truth: the security/control-plane foundation is merged and tested,
@@ -291,7 +291,8 @@ to this log.
 
 ### Remaining blockers / next exact action
 
-- Push the complete handoff to PR #9 and require its GitHub check before merge.
+- This candidate's push/check action was completed and then superseded by the
+  later final-review closure below.
 - Start `F-020` with one production-shaped, useful CPU model profile wired
   end-to-end from authenticated desktop intent to verified result. Do not add
   writable host mounts or bypass the signed lease/execution-authority chain.
@@ -302,6 +303,66 @@ to this log.
   but must be retired or updated under F-010/F-100.
 - No end-to-end model job, SSI namespace, certificate lifecycle, recovery,
   signed updater, or paid-beta evidence is claimed by this local security gate.
+
+## 2026-07-17 — PR #9 final adversarial closure
+
+- Prior published handoff: `712aa175b4fd8ba347cc3b58b806a0d9c7c27a0d`.
+- Accepted implementation head: `9259129fc99f0e291f7286bc36c187c78843721b`.
+- PR: [#9](https://github.com/Str8biddness/planetary-stack/pull/9),
+  `agent/finish-readiness` into `main`.
+
+### Findings discovered and superseded
+
+- Final whole-PR review reproduced a long-whitespace upgrade bug: install and
+  redeploy preserved API/JWT values that passed raw shell length checks but
+  were stripped and rejected at runtime. `3b34439` made both paths rotate
+  known-default, short, or whitespace-containing values and added a real
+  redeploy regression. Exact desktop/controller result: `29 passed`.
+- Review also found that the GitHub Drive connector embedded its token in the
+  clone URL, allowing Git to persist it as origin metadata and exceptions to
+  echo it. The first attempted correction was rejected three times:
+  - `13bc2ba` missed mixed-case URL schemes.
+  - `69a9aec` missed password/query credentials on non-HTTP schemes.
+  - `dcdeaf6` still accepted passwordless userinfo outside SSH.
+- Accepted `9259129` passes only a credential-free URL to `git clone`, supplies
+  the token through a one-process Git configuration header scoped to exact
+  HTTPS `github.com`, rejects HTTP/misdirected-token/userinfo/password/query/
+  fragment variants, discards clone stderr, returns bounded generic errors,
+  redacts sync/async API and job errors, removes failed temporary trees, and
+  tells the user that the token is sent to GitHub for the fetch but is not
+  saved in the clone URL.
+
+### Exact accepted-head validation
+
+- Independent connector/runtime-auth review: `21 passed` plus a manual hostile
+  URL/token matrix; APPROVE `9259129`.
+- Second independent connector/UI review: `33 passed`; APPROVE `9259129`.
+- Local connector adversarial suite after all parser fixes: `14 passed`.
+- Local desktop/controller suite: `29 passed`.
+- Full runtime suite from `apps/synthesus/runtime` with monorepo `PYTHONPATH`:
+  `1811 passed, 49 skipped, 3 xfailed, 39 warnings` in 119.61 seconds.
+- `py_compile`, `bash -n`, `node --check`, `git diff --check`, `make doctor`,
+  contracts (42 + 42), private mesh (143 + 143), and AIVM execution
+  (21 passed / 1 opt-in skip under each seed) passed during this branch.
+- GitHub `integration-smoke` passed on intermediate exact pushed head
+  `3b34439` in run `29626442550`; the final documentation head must receive its
+  own green check before ready/merge.
+
+### Deferred advisories and exact next action
+
+- Reconcile the memory-feature-specific `C-NNN`/disjoint-ownership language in
+  `apps/synthesus/AGENTS.md` with root `F-*` integration gates before another
+  cross-cutting Synthesus change. This PR does not modify the frozen memory
+  contract; the full runtime suite preserves its tests.
+- Explicit control-character rejection and clearing the password DOM field
+  immediately after request submission are defense-in-depth follow-ups. Git
+  rejected tested malformed control-character remotes before transmission.
+- Same-UID observation of the transient Git child environment remains outside
+  the documented threat boundary and must be revisited if the connector moves
+  into a shared service identity.
+- Push this doc-only closure, require exact-head GitHub CI, then mark PR #9
+  ready for human/authorized merge. After merge, branch from the new `main` and
+  begin `F-020`; do not represent Release A as finished.
 
 ## Session entry template
 

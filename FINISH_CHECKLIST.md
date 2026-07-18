@@ -39,7 +39,8 @@ economics. Release B is not required to call Release A a finished product.
 
 - [x] Remove the public desktop JWT fallback, generate a unique owner-only
   secret during installation, and refuse startup when the secret is absent or
-  known-default. Evidence: `7866482`, `f07fece`, `967e651`; PR #9 review.
+  known-default. Evidence: `7866482`, `f07fece`, `967e651`, `3b34439`; PR #9
+  review.
 - [x] Remove or disable the unauthenticated legacy `/api/terminal/run`
   `shell=True` endpoint; all browser terminal operations must use the
   authenticated controller capability and Unix-socket PTY boundary. Evidence:
@@ -56,6 +57,10 @@ economics. Release B is not required to call Release A a finished product.
 - [x] Require the exact unique install key on every private runtime HTTP and
   WebSocket surface, enforce the actual loopback socket, and prevent an
   imported-ASGI wildcard-bind bypass. Evidence: `215a49b`, `d338056`.
+- [x] Keep GitHub access tokens out of clone URLs/origin metadata and
+  logs/errors; restrict ephemeral token delivery to exact HTTPS `github.com`
+  and accurately disclose the network fetch. Evidence: `9259129`; two
+  independent adversarial approvals.
 
 Acceptance: focused adversarial tests prove JWT forgery, legacy shell execution,
 unauthenticated grid access, and simulated update success are impossible in the
