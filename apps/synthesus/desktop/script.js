@@ -1659,7 +1659,7 @@ function renderConnectBody() {
           '<label style="color:#cbd5e1;font-size:.82rem;">Repository</label>' +
           '<input id="drive-in-primary" class="glass-input" placeholder="owner/repo, git URL, or local path">' +
           '<label style="color:#cbd5e1;font-size:.82rem;">Access token <span style="color:#64748b;">(only for private repos)</span></label>' +
-          '<input id="drive-in-token" type="password" class="glass-input" placeholder="ghp_… — stays local, never stored">';
+          '<input id="drive-in-token" type="password" class="glass-input" placeholder="ghp_… — sent to GitHub for this fetch; not saved in the clone URL">';
     } else if (key === 'folder') {
         html =
           '<label style="color:#cbd5e1;font-size:.82rem;">Folder path</label>' +

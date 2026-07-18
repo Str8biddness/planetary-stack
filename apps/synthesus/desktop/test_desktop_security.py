@@ -325,6 +325,8 @@ def test_release_ui_has_no_legacy_grid_kvm_or_simulated_update_path():
     assert "ready · local SI larynx" not in markup
     assert "availability is verified when SPEAK runs" in markup
     assert "not checked · press SPEAK to verify backend" in markup
+    assert "stays local, never stored" not in script
+    assert "sent to GitHub for this fetch; not saved in the clone URL" in script
 
 
 def test_native_status_does_not_claim_unimplemented_ssi_or_kvm():

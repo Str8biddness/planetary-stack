@@ -2311,6 +2311,13 @@ async def drive_ingest(req: Request, auth=Depends(get_auth)):
         kwargs["namespace"] = requested_name  # user's name AS-IS, no connector prefix
     if connector == "github" and body.get("token"):
         kwargs["token"] = body["token"]
+
+    def _safe_ingest_error(error: Exception) -> str:
+        message = str(error)
+        supplied_token = body.get("token")
+        if isinstance(supplied_token, str) and supplied_token:
+            message = message.replace(supplied_token, "[REDACTED]")
+        return message[:512]
         
     is_async = body.get("async", False)
     if is_async:
@@ -2351,10 +2358,11 @@ async def drive_ingest(req: Request, auth=Depends(get_auth)):
                     }
                 })
             except Exception as ex:
-                logger.error(f"Async ingest failed: {ex}")
+                safe_error = _safe_ingest_error(ex)
+                logger.error("Async ingest failed (%s): %s", connector, safe_error)
                 _ingest_jobs[job_id].update({
                     "status": "error",
-                    "error": str(ex)
+                    "error": safe_error
                 })
 
         import threading
@@ -2364,10 +2372,11 @@ async def drive_ingest(req: Request, auth=Depends(get_auth)):
         try:
             res, label = loader(rag, target, **kwargs)
         except ValueError as e:
-            raise HTTPException(400, str(e))
+            raise HTTPException(400, _safe_ingest_error(e))
         except Exception as e:
-            logger.error(f"drive ingest failed ({connector}:{target}): {e}")
-            raise HTTPException(500, f"ingest failed: {e}")
+            safe_error = _safe_ingest_error(e)
+            logger.error("drive ingest failed (%s): %s", connector, safe_error)
+            raise HTTPException(500, f"ingest failed: {safe_error}")
 
         return {
             "status": "ok",
