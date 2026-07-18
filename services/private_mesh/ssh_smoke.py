@@ -64,6 +64,7 @@ from services.vsource import (
 
 ACCOUNT_DEFAULT = "account:owner:private-mesh"
 SUBJECT_DEFAULT = "node-agent:private-mesh"
+AIVM_EVIDENCE_MEDIA_TYPE = "application/vnd.planetary.aivm-evidence+json"
 MAX_SSH_OUTPUT_BYTES = 4 * 1024 * 1024
 _SAFE_ALIAS_RE = re.compile(r"^[A-Za-z0-9_.@:-]{1,255}$")
 _SAFE_REMOTE_PATH_RE = re.compile(r"^/[A-Za-z0-9_./:+@-]{1,1023}$")
@@ -668,6 +669,65 @@ def _require_accepted(label: str, result: Any) -> None:
         raise RuntimeError(f"{label} was rejected: {result.status} {result.reason}")
 
 
+def _bundle_manifest_sha256(bundle: bytes) -> str:
+    """AIVM manifest digest (signature-omitted signing bytes) of the bundle."""
+
+    from contracts.aivm.v1.canonical import document_sha256 as aivm_document_sha256
+
+    return aivm_document_sha256(_strict_json(bundle))
+
+
+def _validate_executor_outputs(
+    *,
+    response: ChalResponse,
+    execution: dict[str, Any],
+    request: ChalRequest,
+    lease: LeaseDocument,
+    target: NodeTarget,
+    bundle: bytes,
+) -> tuple[str, bytes, dict[str, Any]]:
+    """Validate real-executor outputs: model result reference plus evidence."""
+
+    report = _b64url_decode(execution["report_base64"])
+    report_payload = _strict_json(report)
+    report_sha256 = hashlib.sha256(report).hexdigest()
+    if len(response.outputs) != 2:
+        raise ValueError("executor response must contain result and evidence outputs")
+    result_output, evidence_output = response.outputs
+    if (
+        evidence_output.sha256 != report_sha256
+        or evidence_output.size_bytes != len(report)
+        or evidence_output.media_type != AIVM_EVIDENCE_MEDIA_TYPE
+    ):
+        raise ValueError("executor evidence output does not match the returned report")
+    if (
+        result_output.media_type != "application/json"
+        or result_output.uri != f"artifact://aivm/result/{result_output.sha256}"
+    ):
+        raise ValueError("executor result output is not a content-addressed result")
+    if (
+        report_payload.get("account_id") != lease.account_id
+        or report_payload.get("node_id") != target.node_id
+        or report_payload.get("lease_id") != lease.lease_id
+        or report_payload.get("lease_sha256") != document_sha256(lease)
+        or report_payload.get("fencing_token") != lease.fencing_token
+        or report_payload.get("manifest_sha256") != _bundle_manifest_sha256(bundle)
+        or not report_payload.get("workload_id")
+        or not report_payload.get("entrypoint_id")
+    ):
+        raise ValueError("executor evidence does not bind the exact signed job")
+    outputs = report_payload.get("outputs")
+    if (
+        not isinstance(outputs, list)
+        or not outputs
+        or outputs[0].get("sha256") != result_output.sha256
+    ):
+        raise ValueError("executor evidence outputs do not match the signed response")
+    if request.workload_manifest.sha256 != hashlib.sha256(bundle).hexdigest():
+        raise ValueError("signed request does not pin the executed bundle")
+    return report_sha256, report, report_payload
+
+
 def _ingest_result(
     *,
     service: LocalVSourceControlPlane,
@@ -681,6 +741,7 @@ def _ingest_result(
     scheduler_key_id: str,
     scheduler_public_key: bytes,
     worker_trust_records: list[dict[str, Any]],
+    workload_mode: str = "hash_report",
 ) -> dict[str, Any]:
     if set(result) != _RESULT_FIELDS or result["schema"] != "planetary.private_mesh.ssh_result.v1":
         raise ValueError("worker returned an unsupported result envelope")
@@ -710,30 +771,40 @@ def _ingest_result(
     for event in lifecycle:
         validate_lease_bound_lifecycle(event, lease)
 
-    report = _b64url_decode(execution["report_base64"])
-    report_payload = _strict_json(report)
-    if rfc8785.dumps(report_payload) != report:
-        raise ValueError("worker hash report is not RFC 8785 canonical JSON")
-    report_sha256 = hashlib.sha256(report).hexdigest()
-    if len(response.outputs) != 1:
-        raise ValueError("worker response must contain exactly one bounded hash report")
-    output = response.outputs[0]
-    if (
-        output.sha256 != report_sha256
-        or output.size_bytes != len(report)
-        or output.media_type != HASH_REPORT_MEDIA_TYPE
-        or report_payload.get("schema") != HASH_REPORT_SCHEMA
-        or report_payload.get("account_id") != lease.account_id
-        or report_payload.get("node_id") != target.node_id
-        or report_payload.get("request_id") != request.request_id
-        or report_payload.get("request_sha256") != document_sha256(request)
-        or report_payload.get("lease_id") != lease.lease_id
-        or report_payload.get("lease_sha256") != document_sha256(lease)
-        or report_payload.get("fencing_token") != lease.fencing_token
-        or report_payload.get("bundle_sha256") != hashlib.sha256(bundle).hexdigest()
-        or report_payload.get("bundle_size_bytes") != len(bundle)
-    ):
-        raise ValueError("worker hash report does not bind the exact physical-smoke job")
+    if workload_mode == "executor_evidence":
+        report_sha256, report, report_payload = _validate_executor_outputs(
+            response=response,
+            execution=execution,
+            request=request,
+            lease=lease,
+            target=target,
+            bundle=bundle,
+        )
+    else:
+        report = _b64url_decode(execution["report_base64"])
+        report_payload = _strict_json(report)
+        if rfc8785.dumps(report_payload) != report:
+            raise ValueError("worker hash report is not RFC 8785 canonical JSON")
+        report_sha256 = hashlib.sha256(report).hexdigest()
+        if len(response.outputs) != 1:
+            raise ValueError("worker response must contain exactly one bounded hash report")
+        output = response.outputs[0]
+        if (
+            output.sha256 != report_sha256
+            or output.size_bytes != len(report)
+            or output.media_type != HASH_REPORT_MEDIA_TYPE
+            or report_payload.get("schema") != HASH_REPORT_SCHEMA
+            or report_payload.get("account_id") != lease.account_id
+            or report_payload.get("node_id") != target.node_id
+            or report_payload.get("request_id") != request.request_id
+            or report_payload.get("request_sha256") != document_sha256(request)
+            or report_payload.get("lease_id") != lease.lease_id
+            or report_payload.get("lease_sha256") != document_sha256(lease)
+            or report_payload.get("fencing_token") != lease.fencing_token
+            or report_payload.get("bundle_sha256") != hashlib.sha256(bundle).hexdigest()
+            or report_payload.get("bundle_size_bytes") != len(bundle)
+        ):
+            raise ValueError("worker hash report does not bind the exact physical-smoke job")
 
     _require_accepted("admitted lifecycle", service.record_lifecycle_event(admitted))
     _require_accepted("staged lifecycle", service.record_lifecycle_event(lifecycle[0]))
@@ -1092,6 +1163,208 @@ def _write_evidence(path: Path, evidence: dict[str, Any]) -> None:
         os.close(descriptor)
     if stat.S_IMODE(path.stat().st_mode) != 0o600:
         raise RuntimeError("physical-smoke evidence file mode is not 0600")
+
+
+@dataclass(frozen=True)
+class RemoteWorkload:
+    """One real executor workload to run on a single enrolled worker.
+
+    ``bundle`` must be the exact canonical signed AIVM workload manifest.
+    ``objects`` are ``(sha256, payload)`` artifacts the carrier must place in
+    the worker's mesh inbox before execution; pass an empty tuple when the
+    objects were already delivered over the Unisync mTLS transfer boundary
+    and record that delivery separately.
+    """
+
+    bundle: bytes
+    executor: dict[str, Any]
+    objects: tuple[tuple[str, bytes], ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.bundle, bytes) or not self.bundle:
+            raise ValueError("remote workload bundle must be non-empty bytes")
+        for digest, payload in self.objects:
+            if hashlib.sha256(payload).hexdigest() != digest:
+                raise ValueError("remote workload object digest mismatch")
+
+
+def run_remote_workload(
+    target: NodeTarget,
+    *,
+    account_id: str,
+    subject_id: str,
+    carrier: SshCarrier,
+    workload: RemoteWorkload,
+    object_delivery: str = "carrier_seeded_inbox",
+) -> dict[str, Any]:
+    """Run one useful executor workload on one enrolled physical worker.
+
+    The flow is the two-node smoke's admission chain for a single node with
+    a v2 executor job: signed request/capability/lease from a real vSource
+    control plane, artifact objects in the worker mesh inbox, node-agent
+    admission, real AIVM execution behind the worker's Podman boundary, and
+    coordinator-side validation of the signed response, lifecycle, result
+    reference, and execution evidence.
+    """
+
+    _require_identifier("account_id", account_id)
+    _require_identifier("subject_id", subject_id)
+    if object_delivery not in {"carrier_seeded_inbox", "unisync_mtls"}:
+        raise ValueError("object_delivery must name a supported mechanism")
+
+    pin = carrier.verify_pinned_host(target)
+    enrollment = carrier.enroll(target, account_id=account_id, subject_id=subject_id)
+    inventory, public_key = _validate_enrollment(
+        target, enrollment, account_id=account_id
+    )
+
+    if workload.objects:
+        deliver = getattr(carrier, "deliver_objects", None)
+        if deliver is None:
+            raise RuntimeError(
+                "carrier cannot deliver objects; transfer them over the Unisync "
+                "mTLS boundary first and pass objects=()"
+            )
+        deliver(target, workload.objects)
+
+    run_token = secrets.token_hex(8)
+    scheduler_id = f"scheduler:private-mesh:{run_token}"
+    controller = _signer(f"key:controller:private-mesh:{run_token}")
+    scheduler = _signer(f"key:scheduler:private-mesh:{run_token}")
+    clock = SystemClock()
+    resolver = MemoryResolver()
+    resolver.add(
+        KeyRecord(
+            key_id=controller.key_id,
+            public_key=_signer_public_bytes(controller),
+            account_id=account_id,
+            audiences=(scheduler_id,),
+            subject_id=subject_id,
+        )
+    )
+    node_record = KeyRecord(
+        key_id=enrollment["key_id"],
+        public_key=public_key,
+        account_id=account_id,
+        audiences=(scheduler_id,),
+        subject_id=subject_id,
+        node_id=target.node_id,
+    )
+    resolver.add(node_record)
+
+    with tempfile.TemporaryDirectory(prefix="planetary-remote-workload-") as directory:
+        service = LocalVSourceControlPlane(
+            Path(directory) / "vsource.sqlite3",
+            key_resolver=resolver,
+            signer=scheduler,
+            clock=clock,
+            scheduler_id=scheduler_id,
+        )
+        _require_accepted("signed inventory", service.register_inventory(inventory))
+        now = clock.now()
+        request = _build_request(
+            account_id=account_id,
+            node_id=target.node_id,
+            controller=controller,
+            now=now,
+            run_token=run_token,
+            bundle=workload.bundle,
+        )
+        capability = _build_capability(
+            account_id=account_id,
+            subject_id=subject_id,
+            node_id=target.node_id,
+            controller=controller,
+            now=now,
+            run_token=run_token,
+        )
+        allocation = service.allocate(
+            request,
+            capability,
+            authenticated_subject_id=subject_id,
+            lease_ttl_seconds=300,
+        )
+        _require_accepted("private-cell allocation", allocation)
+        if allocation.lease is None or allocation.lease.node_id != target.node_id:
+            raise RuntimeError("scheduler did not allocate the exact intended node")
+        job = {
+            "schema": "planetary.private_mesh.ssh_job.v2",
+            "account_id": account_id,
+            "node_id": target.node_id,
+            "audience": target.node_id,
+            "keys": sorted(
+                [
+                    _key_payload(
+                        KeyRecord(
+                            key_id=controller.key_id,
+                            public_key=_signer_public_bytes(controller),
+                            account_id=account_id,
+                            audiences=(target.node_id,),
+                            subject_id=subject_id,
+                        )
+                    ),
+                    _key_payload(
+                        KeyRecord(
+                            key_id=scheduler.key_id,
+                            public_key=_signer_public_bytes(scheduler),
+                            account_id=account_id,
+                            audiences=(target.node_id,),
+                        )
+                    ),
+                    _key_payload(
+                        KeyRecord(
+                            key_id=node_record.key_id,
+                            public_key=node_record.public_key_bytes(),
+                            account_id=account_id,
+                            audiences=(target.node_id,),
+                            subject_id=subject_id,
+                            node_id=target.node_id,
+                        )
+                    ),
+                ],
+                key=lambda value: value["key_id"],
+            ),
+            "inventory": inventory.model_dump(mode="json", by_alias=True),
+            "request": request.model_dump(mode="json", by_alias=True),
+            "capability": capability.model_dump(mode="json", by_alias=True),
+            "lease": allocation.lease.model_dump(mode="json", by_alias=True),
+            "bundle_base64": _b64url_encode(workload.bundle),
+            "executor": dict(workload.executor),
+        }
+        remote_result = carrier.execute(target, job)
+        node_evidence = _ingest_result(
+            service=service,
+            target=target,
+            enrollment=enrollment,
+            result=remote_result,
+            request=request,
+            capability=capability,
+            lease=allocation.lease,
+            bundle=workload.bundle,
+            scheduler_key_id=scheduler.key_id,
+            scheduler_public_key=_signer_public_bytes(scheduler),
+            worker_trust_records=job["keys"],
+            workload_mode="executor_evidence",
+        )
+
+    return {
+        "schema": "planetary.private_mesh.remote_workload_evidence.v1",
+        "passed": True,
+        "completed_at": _wire_time(clock.now()),
+        "run_token": run_token,
+        "account_id": account_id,
+        "subject_id": subject_id,
+        "carrier": "ssh_stdio",
+        "object_delivery": object_delivery,
+        "implementation_sha256": implementation_sha256(),
+        "ssh_pin": pin,
+        "executor_profile": workload.executor.get("profile"),
+        "bundle_sha256": hashlib.sha256(workload.bundle).hexdigest(),
+        "claims": {
+            "unisync_mtls_object_delivery": object_delivery == "unisync_mtls",
+        },
+        "node": node_evidence,
+    }
 
 
 def _parser() -> argparse.ArgumentParser:
