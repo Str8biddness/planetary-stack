@@ -28,6 +28,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import sys
 
 MAX_DOCUMENT_BYTES = 65_536
@@ -37,8 +38,35 @@ DEFAULT_FEATURE_DIMS = 256
 RESULT_SCHEMA = "planetary.aivm.result.text-classification.v1"
 
 
+_REAL_STDERR_FD: int | None = None
+
+
+def _silence_library_stderr() -> None:
+    """Point fd 2 at /dev/null so third-party runtimes can never leak bytes.
+
+    The executor's success contract is exactly one JSON line on stdout and
+    zero stderr bytes; onnxruntime writes environment-level device-discovery
+    warnings to fd 2 outside any configurable session logger. Intentional
+    failure reasons still reach the executor through a saved duplicate of
+    the original stderr.
+    """
+
+    global _REAL_STDERR_FD
+    _REAL_STDERR_FD = os.dup(2)
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull, 2)
+    os.close(devnull)
+
+
 def _fail(reason: str) -> "NoReturn":  # noqa: F821 - annotation only
-    print(reason, file=sys.stderr)
+    message = (reason + "\n").encode("ascii", "replace")
+    if _REAL_STDERR_FD is not None:
+        try:
+            os.write(_REAL_STDERR_FD, message)
+        except OSError:
+            pass
+    else:
+        sys.stderr.write(reason + "\n")
     raise SystemExit(1)
 
 
@@ -83,6 +111,7 @@ def _hashing_features(tokens: list[str], dims: int) -> "np.ndarray":  # noqa: F8
 
 
 def main() -> int:
+    _silence_library_stderr()
     if len(sys.argv) != 3:
         _fail("usage_model_and_document_required")
     model_path, document_path = sys.argv[1], sys.argv[2]
@@ -100,6 +129,10 @@ def main() -> int:
     except ImportError:
         _fail("runtime_dependencies_missing")
 
+    # The executor fails closed on any stderr byte; environment-level
+    # onnxruntime logging (e.g. GPU device discovery warnings) must be
+    # silenced globally, not only on the session.
+    onnxruntime.set_default_logger_severity(4)
     options = onnxruntime.SessionOptions()
     options.intra_op_num_threads = 1
     options.inter_op_num_threads = 1
