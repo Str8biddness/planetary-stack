@@ -189,9 +189,7 @@ class AdmittedExecutionRequest:
             raise InvalidExecutionRequest("manifest_not_strict_model")
         try:
             manifest_document = canonical_document_bytes(source_manifest)
-            manifest = AIVMWorkloadManifest.model_validate_json_strict(
-                manifest_document
-            )
+            manifest = AIVMWorkloadManifest.model_validate_json(manifest_document)
         except (TypeError, ValueError) as exc:
             raise InvalidExecutionRequest("manifest_snapshot_invalid") from exc
         if (
@@ -244,9 +242,7 @@ class AdmittedExecutionRequest:
     def manifest(self) -> AIVMWorkloadManifest:
         """Return a new strict model parsed from the sealed canonical document."""
 
-        return AIVMWorkloadManifest.model_validate_json_strict(
-            self._manifest_document
-        )
+        return AIVMWorkloadManifest.model_validate_json(self._manifest_document)
 
 
 class AuthorityStatus(StrEnum):
