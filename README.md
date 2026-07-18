@@ -68,8 +68,10 @@ make doctor PYTHON=/path/to/.venv/bin/python
 make test PYTHON=/path/to/.venv/bin/python
 ```
 
-The full consolidation and launch sequence is in
-[`MIGRATION_CHECKLIST.md`](MIGRATION_CHECKLIST.md).
+The full consolidation sequence is in
+[`MIGRATION_CHECKLIST.md`](MIGRATION_CHECKLIST.md). The evidence-backed product
+definition of done is in [`FINISH_CHECKLIST.md`](FINISH_CHECKLIST.md), and the
+append-only continuation record is in [`AGENT_LOG.md`](AGENT_LOG.md).
 
 ## Licensing
 
