@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import stat
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,7 +25,7 @@ from aivm.execution import (
     TrustedEntrypoint,
     text_classification_entrypoint,
 )
-from contracts.aivm.v1 import AIVMWorkloadManifest
+from contracts.aivm.v1 import AIVMWorkloadManifest, document_sha256
 
 
 MODEL_PAYLOAD = b"onnx model artifact bytes"
@@ -453,3 +454,190 @@ def test_corrupt_result_store_entry_fails_unavailable(tmp_path):
 
     assert result.status is ExecutionStatus.UNAVAILABLE
     assert result.reason == "result_persist_failed"
+
+
+def _physical_manifest(
+    *,
+    ordinal: int,
+    image_digest: str,
+    model_sha256: str,
+    model_size: int,
+    issued_at: str,
+    expires_at: str,
+) -> AIVMWorkloadManifest:
+    wire = {
+        "schema": "planetary.aivm.workload.v1",
+        "manifest_id": f"manifest:model:phys{ordinal}",
+        "account_id": "account:owner:001",
+        "workload_id": f"workload:model:phys{ordinal}",
+        "issued_at": issued_at,
+        "expires_at": expires_at,
+        "signer_key_id": "key:owner:001",
+        "runtime_image": {
+            "image_id": "aivm-text-classify",
+            "digest": image_digest,
+            "media_type": "application/vnd.oci.image.manifest.v1+json",
+            "user": "aivm",
+            "privileged": False,
+            "host_network": False,
+            "host_pid": False,
+            "host_ipc": False,
+            "devices": [],
+        },
+        "entrypoint_id": "aivm.model.text-classify.v1",
+        "resources": {
+            "cpu_millicores": 1000,
+            "memory_bytes": 1_073_741_824,
+            "time_limit_seconds": 120,
+            "process_limit": 64,
+            "open_file_limit": 1024,
+            "output_bytes": 4096,
+            "scratch_bytes": 0,
+            "gpu_count": 0,
+            "gpu_memory_bytes": 0,
+        },
+        "filesystem": {"rootfs": "readonly", "writable_paths": [], "host_mounts": []},
+        "network": {"mode": "deny", "allowlist": []},
+        "artifacts": [
+            {
+                "schema": "planetary.aivm.artifact.v1",
+                "artifact_id": DOCUMENT_ARTIFACT_ID,
+                "uri": "artifact://private/document",
+                "kind": "input",
+                "sha256": hashlib.sha256(DOCUMENT_PAYLOAD).hexdigest(),
+                "size_bytes": len(DOCUMENT_PAYLOAD),
+                "media_type": "text/plain",
+                "content_encoding": "identity",
+                "created_at": issued_at,
+                "mount_path": "/work/input/document.txt",
+                "readonly": True,
+            },
+            {
+                "schema": "planetary.aivm.artifact.v1",
+                "artifact_id": MODEL_ARTIFACT_ID,
+                "uri": "artifact://private/model",
+                "kind": "model",
+                "sha256": model_sha256,
+                "size_bytes": model_size,
+                "media_type": "application/octet-stream",
+                "content_encoding": "identity",
+                "created_at": issued_at,
+                "mount_path": "/work/input/model.onnx",
+                "readonly": True,
+            },
+        ],
+        "inputs": [DOCUMENT_ARTIFACT_ID, MODEL_ARTIFACT_ID],
+        "outputs": [OUTPUT_ID],
+        "signature": {
+            "algorithm": "ed25519",
+            "key_id": "key:owner:001",
+            "value": "A" * 86,
+        },
+    }
+    return AIVMWorkloadManifest.model_validate_json(json.dumps(wire, separators=(",", ":")))
+
+
+@pytest.mark.skipif(
+    not os.environ.get("AIVM_RUN_PODMAN_PHYSICAL")
+    or not os.environ.get("AIVM_TEXT_CLASSIFY_IMAGE_REF")
+    or not os.environ.get("AIVM_TEXT_CLASSIFY_MODEL"),
+    reason=(
+        "set AIVM_RUN_PODMAN_PHYSICAL=1, AIVM_TEXT_CLASSIFY_IMAGE_REF, and "
+        "AIVM_TEXT_CLASSIFY_MODEL to run"
+    ),
+)
+def test_physical_rootless_podman_model_profile(tmp_path):
+    from datetime import timedelta
+
+    from aivm.execution import PersistentExecutionAuthority
+
+    immutable_ref = os.environ["AIVM_TEXT_CLASSIFY_IMAGE_REF"]
+    image_digest = immutable_ref.rsplit("@", 1)[1]
+    model_bytes = Path(os.environ["AIVM_TEXT_CLASSIFY_MODEL"]).read_bytes()
+    model_sha256 = hashlib.sha256(model_bytes).hexdigest()
+
+    now = datetime.now(UTC).replace(microsecond=0)
+    issued_at = (now - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    expires_at = (now + timedelta(minutes=25)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    expires_dt = now + timedelta(minutes=25)
+
+    state = _private_directory(tmp_path / "state")
+    artifacts = _private_directory(tmp_path / "artifacts")
+    results = _private_directory(tmp_path / "results")
+    authority_dir = _private_directory(tmp_path / "authority")
+    for payload in (model_bytes, DOCUMENT_PAYLOAD):
+        artifact = artifacts / hashlib.sha256(payload).hexdigest()
+        artifact.write_bytes(payload)
+        artifact.chmod(0o600)
+
+    logical = f"aivm-text-classify@{image_digest}"
+    entrypoint = _entrypoint()
+    authority = PersistentExecutionAuthority(
+        authority_dir, verifier_id="verifier:node:001"
+    )
+    executor = PodmanExecutor(
+        ExecutorPolicy(
+            state_dir=state,
+            artifact_dir=artifacts,
+            result_dir=results,
+            trusted_images={logical: immutable_ref},
+            trusted_entrypoints={entrypoint.entrypoint_id: entrypoint},
+            account_id="account:owner:001",
+            node_id="node:local:001",
+            stdout_limit_bytes=4096,
+            max_input_file_bytes=64 * 1024 * 1024,
+        ),
+        authority_verifier=authority,
+        clock=lambda: datetime.now(UTC),
+    )
+
+    result_digests = []
+    for ordinal in (1, 2):
+        manifest = _physical_manifest(
+            ordinal=ordinal,
+            image_digest=image_digest,
+            model_sha256=model_sha256,
+            model_size=len(model_bytes),
+            issued_at=issued_at,
+            expires_at=expires_at,
+        )
+        lease = LeaseAuthority(
+            account_id="account:owner:001",
+            workload_id=manifest.workload_id,
+            node_id="node:local:001",
+            lease_id=f"lease:model:phys{ordinal}",
+            lease_sha256=str(ordinal) * 64,
+            fencing_token=ordinal,
+        )
+        authority.register(
+            account_id=lease.account_id,
+            node_id=lease.node_id,
+            lease_id=lease.lease_id,
+            lease_sha256=lease.lease_sha256,
+            fencing_token=lease.fencing_token,
+            manifest_sha256=document_sha256(manifest),
+            workload_id=manifest.workload_id,
+            expires_at=expires_dt,
+            now=now,
+        )
+        result = executor.execute(
+            AdmittedExecutionRequest(manifest, _admitted_physical(manifest), lease)
+        )
+        assert result.status is ExecutionStatus.SUCCEEDED, result.reason
+        output = result.evidence.outputs[0]
+        assert output["result_schema"] == TEXT_CLASSIFICATION_RESULT_SCHEMA
+        stored = results / output["sha256"]
+        document = json.loads(stored.read_bytes())
+        assert document["schema"] == TEXT_CLASSIFICATION_RESULT_SCHEMA
+        assert document["model_sha256"] == model_sha256
+        assert document["document_sha256"] == hashlib.sha256(DOCUMENT_PAYLOAD).hexdigest()
+        assert document["label"] in document["scores"]
+        assert abs(sum(document["scores"].values()) - 1.0) < 1e-3
+        result_digests.append(output["sha256"])
+
+    # Identical artifacts must produce byte-identical results across runs.
+    assert result_digests[0] == result_digests[1]
+
+
+def _admitted_physical(manifest: AIVMWorkloadManifest) -> AdmissionDecision:
+    return _admitted(manifest)
