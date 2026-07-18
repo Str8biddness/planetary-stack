@@ -13,17 +13,26 @@ warn(){ printf "\033[1;33m  ! %s\033[0m\n" "$*"; }
 die(){ printf "\033[1;31m  ✗ %s\033[0m\n" "$*" >&2; exit 1; }
 
 replace_env_value() {
-  local path="$1" key="$2" value="$3" tmp="${1}.tmp.$$"
-  ( umask 077
-    grep -v "^${key}=" "$path" > "$tmp" || true
-    printf '%s=%s\n' "$key" "$value" >> "$tmp"
-  )
+  local path="$1" key="$2" value="$3" tmp
+  tmp="$(mktemp "${path}.tmp.XXXXXX")"
+  grep -v "^${key}=" "$path" > "$tmp" || true
+  printf '%s=%s\n' "$key" "$value" >> "$tmp"
   chmod 600 "$tmp"
   mv -f "$tmp" "$path"
 }
 
 [ -d "$SRC/runtime" ] && [ -d "$SRC/desktop" ] || die "SRC must contain runtime/ and desktop/ ($SRC)"
-mkdir -p "$DEST"
+if [ -L "$DEST" ]; then
+  die "refusing symlinked install directory: $DEST"
+fi
+if [ -e "$DEST" ] && [ ! -d "$DEST" ]; then
+  die "install path is not a directory: $DEST"
+fi
+install -d -m 0700 "$DEST"
+if [ "$(stat -c '%u' "$DEST")" != "$(id -u)" ]; then
+  die "install directory is not owned by the redeploy user"
+fi
+chmod 700 "$DEST"
 
 c "Redeploy Synthesus code → install dir"
 echo "  source:  $SRC"
@@ -60,7 +69,9 @@ if [ ! -f "$DEST/synthesus.env" ]; then
   KEY="$(python3 -c 'import secrets; print("syn_"+secrets.token_urlsafe(32))')"
   JWTSEC="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
   HSEC="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
-  cat > "$DEST/synthesus.env" <<ENV
+  ENV_TMP="$(mktemp "$DEST/.synthesus.env.tmp.XXXXXX")"
+  trap 'rm -f "$ENV_TMP"' EXIT
+  cat > "$ENV_TMP" <<ENV
 SYNTHESUS_API_KEY=$KEY
 SYNTHESUS_JWT_SECRET=$JWTSEC
 SYNTHESUS_MODEL=${SYNTHESUS_MODEL:-llama3.2:3b}
@@ -68,7 +79,9 @@ SYNTHESUS_HOST=127.0.0.1
 SYNTHESUS_KNOWLEDGE_SYNC_MODE=off
 SYNTHESUS_HUMAN_SESSION_SECRET=$HSEC
 ENV
-  chmod 600 "$DEST/synthesus.env"
+  chmod 600 "$ENV_TMP"
+  mv -f "$ENV_TMP" "$DEST/synthesus.env"
+  trap - EXIT
 else
   if [ "$(stat -c '%u' "$DEST/synthesus.env")" != "$(id -u)" ]; then
     die "secret file is not owned by the redeploy user"

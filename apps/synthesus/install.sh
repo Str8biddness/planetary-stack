@@ -128,7 +128,17 @@ _gpu_detect_ollama
 
 # ---- 4. copy code + create venv -----------------------------------------
 c "4/6  Installing app + Python environment"
-mkdir -p "$SYNTHESUS_HOME"
+if [ -L "$SYNTHESUS_HOME" ]; then
+  die "refusing symlinked install directory: $SYNTHESUS_HOME"
+fi
+if [ -e "$SYNTHESUS_HOME" ] && [ ! -d "$SYNTHESUS_HOME" ]; then
+  die "install path is not a directory: $SYNTHESUS_HOME"
+fi
+install -d -m 0700 "$SYNTHESUS_HOME"
+if [ "$(stat -c '%u' "$SYNTHESUS_HOME")" != "$(id -u)" ]; then
+  die "install directory is not owned by the installing user"
+fi
+chmod 700 "$SYNTHESUS_HOME"
 rsync -a --delete --exclude '.git' --exclude '__pycache__' --exclude '*.pyc' \
       --exclude '.venv' --exclude 'venv' --exclude 'node_modules' \
       "$SRC_DIR/desktop/" "$SYNTHESUS_HOME/desktop/"
@@ -174,7 +184,6 @@ JWT_SECRET_VALUE="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))
 # Human attestation boundary: desktop shell injects this as X-Synthesus-Human-Session.
 # NEVER expose to frontend JS. Same value must be visible to runtime + shell.
 HUMAN_SESSION_SECRET="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
-mkdir -p "$SYNTHESUS_HOME"
 # Preserve existing secrets if re-running install over an existing tree.
 if [ -L "$SYNTHESUS_HOME/synthesus.env" ]; then
   die "refusing symlinked secret file: $SYNTHESUS_HOME/synthesus.env"
@@ -202,8 +211,9 @@ if [ "$JWT_SECRET_VALUE" = "dev_secret_change_me" ] || [ "${#JWT_SECRET_VALUE}" 
   warn "replacing missing, known-default, or short JWT secret"
   JWT_SECRET_VALUE="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
 fi
-ENV_TMP="$SYNTHESUS_HOME/.synthesus.env.tmp.$$"
-( umask 077; cat > "$ENV_TMP" <<ENV
+ENV_TMP="$(mktemp "$SYNTHESUS_HOME/.synthesus.env.tmp.XXXXXX")"
+trap 'rm -f "$ENV_TMP"' EXIT
+cat > "$ENV_TMP" <<ENV
 # Auto-generated at install. Do not share. Never ship to the browser.
 SYNTHESUS_API_KEY=$KEY
 SYNTHESUS_JWT_SECRET=$JWT_SECRET_VALUE
@@ -217,9 +227,9 @@ SYNTHESUS_HUMAN_SESSION_SECRET=$HUMAN_SESSION_SECRET
 # Optional: absolute path to C++ kernel IPC binary (zo_kernel)
 # SYNTHESUS_KERNEL_BIN=$SYNTHESUS_HOME/runtime/packages/kernel/build/zo_kernel
 ENV
-)
 chmod 600 "$ENV_TMP"
 mv -f "$ENV_TMP" "$SYNTHESUS_HOME/synthesus.env"
+trap - EXIT
 ok "unique secrets written to synthesus.env (API key + JWT + human session; localhost only)"
 
 # ---- 6. launcher + menu entry -------------------------------------------

@@ -243,5 +243,7 @@ def test_redeploy_refuses_unsafe_secret_path(tmp_path, unsafe_kind):
 def test_full_installer_writes_secrets_atomically_and_owner_only():
     source = (Path(__file__).parents[1] / "install.sh").read_text(encoding="utf-8")
     assert 'if [ -e "$SYNTHESUS_HOME/synthesus.env" ] && [ ! -f' in source
-    assert '( umask 077; cat > "$ENV_TMP"' in source
+    assert 'install -d -m 0700 "$SYNTHESUS_HOME"' in source
+    assert 'mktemp "$SYNTHESUS_HOME/.synthesus.env.tmp.XXXXXX"' in source
     assert 'mv -f "$ENV_TMP" "$SYNTHESUS_HOME/synthesus.env"' in source
+    assert '.synthesus.env.tmp.$$' not in source
