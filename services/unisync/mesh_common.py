@@ -104,6 +104,35 @@ def wire_time(value: datetime) -> str:
     return value.astimezone(UTC).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def certificate_not_valid_before_utc(certificate: Any) -> datetime:
+    """Return a certificate's lower validity bound as an aware UTC datetime.
+
+    cryptography 42 introduced the timezone-aware ``*_utc`` properties.  The
+    project supports older packaged releases too, so normalize their legacy
+    naive-UTC property without weakening any validity checks.
+    """
+
+    try:
+        value = certificate.not_valid_before_utc
+    except AttributeError:
+        value = certificate.not_valid_before
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def certificate_not_valid_after_utc(certificate: Any) -> datetime:
+    """Return a certificate's upper validity bound as an aware UTC datetime."""
+
+    try:
+        value = certificate.not_valid_after_utc
+    except AttributeError:
+        value = certificate.not_valid_after
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 def parse_wire_time(value: object) -> datetime:
     if not isinstance(value, str) or not value.endswith("Z"):
         raise MeshSecurityError("timestamps must be UTC second precision with a Z suffix")

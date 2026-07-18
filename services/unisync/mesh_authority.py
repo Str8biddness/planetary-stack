@@ -32,6 +32,7 @@ from .errors import AuthorizationError
 from .mesh_common import (
     SERIAL_HEX_RE,
     MeshSecurityError,
+    certificate_not_valid_after_utc,
     compact_json,
     fsync_directory,
     normalize_san_set,
@@ -198,7 +199,7 @@ class MeshCertificateAuthority:
             .not_valid_after(
                 min(
                     now + timedelta(days=validity_days),
-                    self._certificate.not_valid_after_utc,
+                    certificate_not_valid_after_utc(self._certificate),
                 )
             )
             .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
