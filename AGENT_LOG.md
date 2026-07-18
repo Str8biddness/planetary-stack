@@ -579,6 +579,56 @@ to this log.
   (mTLS object delivery + Podman execution) recording evidence here, then
   the fresh three-node cell acceptance for the remaining F-020 boxes.
 
+## 2026-07-18 — F-020 physical mesh-delivered useful workload gate
+
+- Base SHA: `c2ec301c981e2a3c75ed13316c35621df650a6c2` (post-PR-#13 `main`).
+- Branch: `agent/f020-physical-mtls-workload`, exact tested head
+  `7c92bb33df5859a1252d678ae05afb64f2442471` on both physical machines.
+- Objective: prove the F-020 transport chain physically — workload
+  artifacts delivered between enrolled machines exclusively over Unisync
+  mTLS, then real Podman model execution on the receiving node.
+- Files changed:
+  - `services/unisync/mesh_node_cli.py`: `prepare-artifact` — the source
+    reproduces a repo-pinned artifact (demo ONNX model via
+    `build_demo_model.build()` or the fixed demo document) locally into
+    its outbox; only digest and size cross the administrative channel.
+  - `services/unisync/mesh_smoke.py`: config `prepare_mode`
+    (`random` | `workload_model` | `workload_document`) with the exact
+    object size declared upfront; evidence records the mechanism.
+  - `services/aivm_profiles/text_classification/build_demo_model.py`:
+    `DEMO_DOCUMENT` constant; package `__init__` files.
+  - `docs/evidence/F020_MESH_WORKLOAD_PHYSICAL_2026-07-18.md`: full
+    physical evidence with all digests.
+- Security decisions: artifact mode preserves the gate's core claim
+  (workload bytes reach the destination only via `lan_mtls` and are never
+  provisioned over SSH) by deriving artifacts from pinned repository
+  content on the source; TLS enrollment stays create-once, so the two
+  gate runs used separate state directories and the document object was
+  unified into the executing inbox by a same-machine digest-verified CAS
+  move, recorded honestly.
+- Commands and exact results:
+  - Local: `tests/unisync` 70 passed (68 prior + artifact-mode transfer
+    and wrong-declared-size fail-closed).
+  - Physical gate run 1 (model): passed; object `575d5666…` (2,354 B),
+    TLSv1.3, verified receipt, lease released; evidence sha256
+    `e05ed7a7…7890`.
+  - Physical gate run 2 (document): passed; object `07a1c31c…` (41 B);
+    evidence sha256 `fe5d0dac…2fad`.
+  - Physical remote workload (`run_remote_workload`,
+    `object_delivery="unisync_mtls"`, image
+    `sha256:4933984e…3f5b`): passed on `dakin-MS-7C95`; signed response
+    outputs = content-addressed result `5df96635…57b1` (real ONNX
+    classification, byte-identical to the single-node physical gate —
+    cross-machine determinism) + execution evidence `b4e06639…c6ae`;
+    coordinator evidence sha256 `27b0accb…76c2`.
+- Physical evidence and artifact digests: see the evidence document; all
+  transcripts retained coordinator-side at mode 0600.
+- Review verdict: pending on the PR.
+- PR and final SHA: recorded on the PR after push.
+- Remaining blockers / next exact command: desktop-initiated submission
+  against the physical worker, result return over mTLS, then the fresh
+  three-node cell acceptance to close F-020.
+
 ## Session entry template
 
 ```markdown

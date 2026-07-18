@@ -733,3 +733,42 @@ def test_contract_and_tls_private_keys_are_distinct(tmp_path: Path) -> None:
     assert (state / TLS_KEY_FILE).read_bytes() != (state / CONTRACT_KEY_FILE).read_bytes()
     assert _mode(state / CONTRACT_KEY_FILE) == 0o600
     assert _mode(state / CONTRACT_IDENTITY_FILE) == 0o600
+
+
+def test_workload_document_artifact_mode_transfers_pinned_bytes(tmp_path: Path) -> None:
+    import hashlib
+
+    from services.aivm_profiles.text_classification.build_demo_model import (
+        DEMO_DOCUMENT,
+    )
+    from services.unisync.storage import ContentAddressedStore
+
+    config = replace(
+        _local_mesh_config(tmp_path),
+        object_bytes=len(DEMO_DOCUMENT),
+        prepare_mode="workload_document",
+    )
+
+    evidence = run_mesh_mtls_smoke(config, LocalMeshCarrier(timeout_seconds=15))
+
+    document_sha256 = hashlib.sha256(DEMO_DOCUMENT).hexdigest()
+    assert evidence["transfer"]["prepare_mode"] == "workload_document"
+    assert evidence["transfer"]["object_sha256"] == document_sha256
+    assert evidence["transfer"]["byte_length"] == len(DEMO_DOCUMENT)
+    inbox = ContentAddressedStore(Path(config.destination.state_dir) / "inbox")
+    assert inbox.read_bytes(document_sha256) == DEMO_DOCUMENT
+
+
+def test_artifact_mode_with_wrong_declared_size_fails_closed(tmp_path: Path) -> None:
+    from services.aivm_profiles.text_classification.build_demo_model import (
+        DEMO_DOCUMENT,
+    )
+
+    config = replace(
+        _local_mesh_config(tmp_path),
+        object_bytes=len(DEMO_DOCUMENT) + 1,
+        prepare_mode="workload_document",
+    )
+
+    with pytest.raises(MeshSecurityError, match="exact bounded local object"):
+        run_mesh_mtls_smoke(config, LocalMeshCarrier(timeout_seconds=15))

@@ -84,6 +84,7 @@ from .mesh_node_cli import (
     ENROLL_INSTALL_RESULT_SCHEMA,
     ENROLL_INSTALL_SCHEMA,
     MAX_OBJECT_BYTES,
+    PREPARE_ARTIFACT_SCHEMA,
     PREPARE_RESULT_SCHEMA,
     PREPARE_SCHEMA,
     SEND_RESULT_SCHEMA,
@@ -119,8 +120,10 @@ _CONFIG_FIELDS = frozenset(
         "output",
         "source",
         "destination",
+        "prepare_mode",
     }
 )
+_PREPARE_MODES = frozenset({"random", "workload_model", "workload_document"})
 _NODE_FIELDS = frozenset(
     {
         "node_id",
@@ -188,6 +191,7 @@ class MeshSmokeConfig:
     port: int
     server_hostname: str
     declared_vpn_cidrs: tuple[str, ...]
+    prepare_mode: str = "random"
 
 
 def _require_bounded_int(value: object, name: str, low: int, high: int) -> int:
@@ -288,7 +292,14 @@ def parse_config(payload: dict[str, Any]) -> MeshSmokeConfig:
         port=_require_bounded_int(destination_raw["port"], "destination.port", 0, 65535),
         server_hostname=server_hostname,
         declared_vpn_cidrs=tuple(vpn_cidrs),
+        prepare_mode=_require_prepare_mode(payload["prepare_mode"]),
     )
+
+
+def _require_prepare_mode(value: object) -> str:
+    if value not in _PREPARE_MODES:
+        raise MeshSecurityError("prepare_mode must name a supported mechanism")
+    return value
 
 
 class ServeHandle:
@@ -997,18 +1008,38 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
             )
         )
 
-    prepare_result = carrier.run_cli(
-        config.source,
-        ["prepare", "--state-dir", config.source.state_dir],
-        stdin=_job_json(
-            {
-                "schema": PREPARE_SCHEMA,
-                "account_id": config.account_id,
-                "node_id": config.source.node_id,
-                "byte_length": config.object_bytes,
-            }
-        ),
-    )
+    if config.prepare_mode == "random":
+        prepare_result = carrier.run_cli(
+            config.source,
+            ["prepare", "--state-dir", config.source.state_dir],
+            stdin=_job_json(
+                {
+                    "schema": PREPARE_SCHEMA,
+                    "account_id": config.account_id,
+                    "node_id": config.source.node_id,
+                    "byte_length": config.object_bytes,
+                }
+            ),
+        )
+    else:
+        # The source reproduces the repo-pinned workload artifact locally;
+        # config.object_bytes declares its exact expected size upfront.
+        prepare_result = carrier.run_cli(
+            config.source,
+            ["prepare-artifact", "--state-dir", config.source.state_dir],
+            stdin=_job_json(
+                {
+                    "schema": PREPARE_ARTIFACT_SCHEMA,
+                    "account_id": config.account_id,
+                    "node_id": config.source.node_id,
+                    "artifact": (
+                        "model"
+                        if config.prepare_mode == "workload_model"
+                        else "document"
+                    ),
+                }
+            ),
+        )
     if (
         prepare_result.get("schema") != PREPARE_RESULT_SCHEMA
         or prepare_result.get("account_id") != config.account_id
@@ -1216,6 +1247,7 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
             "transfer_context": context.to_wire(),
             "object_sha256": object_sha256,
             "byte_length": config.object_bytes,
+            "prepare_mode": config.prepare_mode,
             "verified_receipt_sha256": expected_receipt,
             "send_result": send_result,
             "serve_result": serve_result,

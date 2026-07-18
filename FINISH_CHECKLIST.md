@@ -101,8 +101,12 @@ matrix from one documented command.
 - [ ] Wire authenticated Web Desktop intent through `synthesusd`, CHAL,
   vSource placement, signed fenced lease, Unisync transfer, node agent, AIVM,
   verified result, and desktop presentation.
-- [ ] Replace the test authority verifier with persistent production issuer,
-  scheduler, and node-agent verification/consumption wiring.
+- [x] Replace the test authority verifier with persistent production issuer,
+  scheduler, and node-agent verification/consumption wiring. Evidence:
+  PR #10 (`PersistentExecutionAuthority`, node-agent executor wiring);
+  physical use on `dakin-MS-7C95` with scheduler-signed leases in the
+  2026-07-18 mesh-workload gate
+  (`docs/evidence/F020_MESH_WORKLOAD_PHYSICAL_2026-07-18.md`).
 - [x] Support at least one useful bounded model workload, not only SHA-256.
   Evidence: PR #10 execution spine; physical rootless-Podman ONNX
   classification on worker `dakin-MS-7C95` at exact head `f38a149`, image
