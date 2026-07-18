@@ -9,19 +9,22 @@ description = "Versioned CHAL and vSource private-cell wire contracts"
 readme = "contracts/chal_vsource/v1/README.md"
 requires-python = ">=3.12"
 dependencies = [
+  "cryptography>=41.0.0",
   "jsonschema[format]==4.26.0",
   "pydantic==2.13.4",
   "rfc8785==0.1.4",
 ]
 
 [project.optional-dependencies]
-test = ["pytest==9.1.1"]
+test = ["pytest==9.1.1", "cryptography>=41.0.0"]
 
 [project.scripts]
 planetary-contracts = "contracts.chal_vsource.v1.schema_tool:main"
+planetary-mesh-node = "services.unisync.mesh_node_cli:main"
+planetary-mesh-smoke = "services.unisync.mesh_smoke:main"
 
 [tool.setuptools.packages.find]
-include = ["contracts*"]
+include = ["contracts*", "services*"]
 
 [tool.setuptools.package-data]
 "contracts.chal_vsource.v1" = ["README.md", "schemas/*.json"]

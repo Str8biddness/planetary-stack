@@ -1,7 +1,7 @@
 SHELL := /usr/bin/env bash
 PYTHON ?= python3
 
-.PHONY: doctor status test test-contracts test-synthesus test-knowledge test-knowledge-source test-planetary test-planetary-iso
+.PHONY: doctor status test test-contracts test-private-mesh test-aivm-execution test-synthesus test-knowledge test-knowledge-source test-planetary test-planetary-iso
 
 doctor:
 	PYTHON_BIN="$(PYTHON)" ./scripts/doctor.sh
@@ -15,6 +15,14 @@ test-contracts:
 	$(PYTHON) -m contracts.chal_vsource.v1.schema_tool --check
 	PYTHONHASHSEED=1 $(PYTHON) -m pytest -q tests/test_chal_vsource_contracts.py
 	PYTHONHASHSEED=4 $(PYTHON) -m pytest -q tests/test_chal_vsource_contracts.py
+
+test-private-mesh:
+	PYTHONHASHSEED=1 $(PYTHON) -m pytest -q tests/vsource tests/unisync tests/private_mesh
+	PYTHONHASHSEED=4 $(PYTHON) -m pytest -q tests/vsource tests/unisync tests/private_mesh
+
+test-aivm-execution:
+	cd apps/synthesus/runtime && PYTHONPATH="$(CURDIR)" PYTHONHASHSEED=1 $(PYTHON) -m pytest -q tests/aivm/test_podman_execution.py
+	cd apps/synthesus/runtime && PYTHONPATH="$(CURDIR)" PYTHONHASHSEED=4 $(PYTHON) -m pytest -q tests/aivm/test_podman_execution.py
 
 test-synthesus:
 	cd apps/synthesus/runtime && $(PYTHON) -m pytest -q

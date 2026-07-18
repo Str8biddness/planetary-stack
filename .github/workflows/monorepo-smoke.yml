@@ -33,6 +33,12 @@ jobs:
       - name: Validate CHAL and vSource protocol contracts
         run: make test-contracts PYTHON=python
 
+      - name: Validate private-mesh control planes
+        run: make test-private-mesh PYTHON=python
+
+      - name: Validate the AIVM execution boundary
+        run: make test-aivm-execution PYTHON=python
+
       - name: Hydrate Knowledge Cloud source fixtures
         run: git lfs pull --include='knowledge/knowledge-cloud/patterns/characters/**'
 

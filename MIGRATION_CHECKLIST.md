@@ -107,11 +107,27 @@ changed-component test matrix from documented commands.
   Draft 2020-12 validator, pinned generator manifest, strict reference model,
   and RFC 8785 digest probes close the cross-language contract gate.
 - [ ] Implement vSource resource inventory, leases, placement, and lifecycle.
-  The v1 message shapes are frozen; the registry, allocator, persistent lease
-  state machine, signature verification, and node-agent integration remain.
+  Progress: 2026-07-17 the local SQLite control plane admits signed inventory,
+  performs same-account capability-constrained placement, issues fenced
+  leases, verifies signed results/lifecycle, and releases terminal leases.
+  Two physical Linux nodes completed the bounded signed hash gate at
+  `2d01c5e`. A subsequent physical Unisync gate at `be1e649` bound a signed
+  request and active fenced lease to one content-addressed object, persisted
+  the admitted fence on both nodes, rejected its replay, and durably released
+  the central lease. Persistent service/API wiring and production recovery
+  remain.
 - [ ] Define Unisync backends for local memory/PCIe, trusted LAN, and Internet
   task/object transport.
+  Progress: the trusted-LAN slice now moves a bounded source-local object over
+  a real private-address TCP TLS 1.3 socket with mutual account/node-bound
+  certificates, exact peer fingerprint admission, content verification, and a
+  context-bound verified receipt. Local memory/PCIe and Internet/relay
+  backends remain.
 - [ ] Define AIVM workload and artifact manifests.
+  Progress: strict signed v1 workload/artifact models are admitted against
+  allowlisted images, fixed entrypoint identifiers, bounded resources, and
+  verified artifact bytes. Production issuer enrollment and end-to-end
+  controller/node integration remain.
 - [x] Mount the Knowledge Cloud through a versioned manifest-verified client.
   Evidence: 2026-07-16 production startup resolves the monorepo/standalone
   artifact root, validates hashes, 501,819-vector retrieval semantics,
@@ -127,8 +143,24 @@ Cloud artifact without private in-process shortcuts.
 ## Phase 5 — secure personal mesh MVP
 
 - [ ] Build a cross-platform node agent with explicit opt-in resource limits.
+  Progress: a fail-closed Linux node boundary admits exact signed
+  request/capability/inventory/lease joins and executes only a bounded
+  deterministic hash operation. Cross-platform packaging, user controls, and
+  general workload isolation remain.
 - [ ] Implement device enrollment using per-node keys and revocation.
+  Progress: physical gates create distinct node-local contract and TLS keys in
+  mode-0700/0600 state and never export private keys. The mTLS gate persists an
+  account/node/SAN/certificate/SPKI enrollment registry, serializes concurrent
+  writers, and exposes a fail-closed revocation transition. Persistent issuer
+  key custody, rotation/renewal, and online revocation distribution remain.
 - [ ] Use mutually authenticated encrypted transport for every node.
+  Progress: on 2026-07-17 two distinct pinned physical Linux endpoints used
+  administrative SSH only for fixed enrollment/control commands; the opaque
+  workload bytes were generated on the source and reached the destination only
+  over `lan_mtls`. TLS 1.3 mutual authentication, account/node identity,
+  content digest, receipt, and persistent replay fencing were verified.
+  Certificate lifecycle, recovery, and coverage across every supported node
+  remain before this item can close.
 - [ ] Add NAT traversal with a relay fallback; never require unsafe router
   configuration.
 - [ ] Schedule only among machines owned by the same account.
@@ -144,6 +176,17 @@ indexing, and inference jobs while tolerating a worker disappearing.
 - [ ] Replace raw marshal, pickle, eval, and arbitrary-shell execution at every
   network boundary.
 - [ ] Run untrusted work in a hardened container, microVM, or WASM sandbox.
+  Progress: a 2026-07-17 CPU-only acceptance slice executes one admitted,
+  fixed operator-owned entrypoint in rootless Podman with a digest-pinned
+  cached image, no network, read-only rootfs, no capabilities, no-new-
+  privileges, seccomp availability, a non-root keep-id user, and cgroup v2
+  CPU/memory/PID limits. Owner-only durable replay claims, bounded process
+  output, a canonical digest-only result, exact operator-owned input mounts,
+  mandatory exact manifest/lease authority consumption, and timeout container
+  cleanup fail closed. No writable host output mount is exposed to the workload.
+  The physical gate passed on one enrolled Linux worker; arbitrary untrusted
+  workloads, GPU/device isolation, cross-node dispatch, and public
+  multi-tenancy remain explicitly unimplemented.
 - [ ] Enforce signed workload manifests and allowlisted runtime images.
 - [ ] Add node health, capability, benchmark, and reputation records.
 - [ ] Add deterministic result hashes where possible.

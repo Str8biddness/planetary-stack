@@ -76,10 +76,28 @@ commands, raw prompt/output telemetry, implicit delegation, and public-fabric
 placement are not part of the protocol. Unisync will implement transport
 beneath this boundary; it cannot grant authority or weaken validation.
 
-The schemas define messages, not a claim of runtime completion. Signature
-verification, enrollment/revocation, the inventory registry, allocator,
-lease-state persistence, node agent, transport, and AIVM sandbox remain gated
-implementation work.
+The schemas alone do not claim runtime completion. The first local runtime
+slice provides an SQLite inventory registry, deterministic same-account
+allocator, signed fenced leases, lifecycle/result admission, and a node-local
+agent restricted to a bounded hash operation. Its first two-Linux-node gate
+uses exact-host-key-pinned administrative SSH while the signed contract records
+`local_process`.
+
+The next physical gate adds the first trusted-LAN Unisync backend. SSH remains
+bootstrap control only: the source creates an opaque content-addressed object
+locally, and its bytes reach the second physical node only over a private TCP
+TLS 1.3 socket. Both endpoints use distinct node-local keys and verify the
+account/node-bound certificate subject, CA chain, SAN, certificate and SPKI
+fingerprints, controller-signed request, scheduler-signed active lease, exact
+fence, object membership, digest, size, and receipt. A persistent node-local
+lease-use record rejects replay, and a cross-process-locked enrollment registry
+prevents stale writers from resurrecting revoked certificates. This is accepted
+private-LAN transport evidence, not completion of the entire Unisync plane.
+
+Persistent production issuer custody, certificate rotation/renewal, online
+revocation distribution, local memory/PCIe and Internet/relay transports,
+general workload execution, resource controls, failure recovery, and the AIVM
+sandbox remain gated work.
 
 ## Local controller boundary
 
