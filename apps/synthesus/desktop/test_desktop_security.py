@@ -184,6 +184,26 @@ def test_redeploy_migrates_missing_or_insecure_secrets(tmp_path):
     assert stat.S_IMODE(env_path.stat().st_mode) == 0o600
 
 
+def test_redeploy_rotates_long_whitespace_secrets_that_runtime_rejects(tmp_path):
+    initial = "\n".join(
+        (
+            f"SYNTHESUS_API_KEY={' ' * 32}",
+            f"SYNTHESUS_JWT_SECRET={' ' * 48}",
+            f"SYNTHESUS_HUMAN_SESSION_SECRET={_TEST_HUMAN_SECRET}",
+            "",
+        )
+    )
+    completed, env_path = _run_redeploy(tmp_path, initial)
+    assert completed.returncode == 0, completed.stderr
+
+    values = _env_values(env_path)
+    assert len(values["SYNTHESUS_API_KEY"]) >= 24
+    assert not any(character.isspace() for character in values["SYNTHESUS_API_KEY"])
+    assert len(values["SYNTHESUS_JWT_SECRET"]) >= 32
+    assert not any(character.isspace() for character in values["SYNTHESUS_JWT_SECRET"])
+    assert values["SYNTHESUS_HUMAN_SESSION_SECRET"] == _TEST_HUMAN_SECRET
+
+
 def test_redeploy_preserves_valid_install_identity(tmp_path):
     jwt_secret = "existing-jwt-" + ("s" * 40)
     initial = "\n".join(
@@ -246,6 +266,8 @@ def test_full_installer_writes_secrets_atomically_and_owner_only():
     assert 'install -d -m 0700 "$SYNTHESUS_HOME"' in source
     assert 'mktemp "$SYNTHESUS_HOME/.synthesus.env.tmp.XXXXXX"' in source
     assert 'mv -f "$ENV_TMP" "$SYNTHESUS_HOME/synthesus.env"' in source
+    assert 'secret_needs_rotation "$KEY" "dev-key-change-me" 24' in source
+    assert 'secret_needs_rotation "$JWT_SECRET_VALUE" "dev_secret_change_me" 32' in source
     assert '.synthesus.env.tmp.$$' not in source
 
 

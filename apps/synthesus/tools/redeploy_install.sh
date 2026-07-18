@@ -12,6 +12,17 @@ ok() { printf "\033[1;32m  ✓ %s\033[0m\n" "$*"; }
 warn(){ printf "\033[1;33m  ! %s\033[0m\n" "$*"; }
 die(){ printf "\033[1;31m  ✗ %s\033[0m\n" "$*" >&2; exit 1; }
 
+secret_needs_rotation() {
+  local value="$1" known_default="$2" minimum_length="$3"
+  if [ "$value" = "$known_default" ] || [ "${#value}" -lt "$minimum_length" ]; then
+    return 0
+  fi
+  case "$value" in
+    *[[:space:]]*) return 0 ;;
+  esac
+  return 1
+}
+
 replace_env_value() {
   local path="$1" key="$2" value="$3" tmp
   tmp="$(mktemp "${path}.tmp.XXXXXX")"
@@ -89,16 +100,16 @@ else
   chmod 600 "$DEST/synthesus.env"
   # Ensure new secrets exist without clobbering established identities.
   CURRENT_KEY="$(sed -n 's/^SYNTHESUS_API_KEY=//p' "$DEST/synthesus.env" | tail -n 1)"
-  if [ "$CURRENT_KEY" = "dev-key-change-me" ] || [ "${#CURRENT_KEY}" -lt 24 ]; then
+  if secret_needs_rotation "$CURRENT_KEY" "dev-key-change-me" 24; then
     KEY="$(python3 -c 'import secrets; print("syn_"+secrets.token_urlsafe(32))')"
     replace_env_value "$DEST/synthesus.env" SYNTHESUS_API_KEY "$KEY"
-    warn "replaced missing, known-default, or short SYNTHESUS_API_KEY"
+    warn "replaced missing, known-default, short, or whitespace-containing SYNTHESUS_API_KEY"
   fi
   CURRENT_JWT="$(sed -n 's/^SYNTHESUS_JWT_SECRET=//p' "$DEST/synthesus.env" | tail -n 1)"
-  if [ "$CURRENT_JWT" = "dev_secret_change_me" ] || [ "${#CURRENT_JWT}" -lt 32 ]; then
+  if secret_needs_rotation "$CURRENT_JWT" "dev_secret_change_me" 32; then
     JWTSEC="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
     replace_env_value "$DEST/synthesus.env" SYNTHESUS_JWT_SECRET "$JWTSEC"
-    warn "replaced missing, known-default, or short SYNTHESUS_JWT_SECRET"
+    warn "replaced missing, known-default, short, or whitespace-containing SYNTHESUS_JWT_SECRET"
   fi
   if ! grep -q '^SYNTHESUS_HUMAN_SESSION_SECRET=' "$DEST/synthesus.env" 2>/dev/null; then
     HSEC="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"

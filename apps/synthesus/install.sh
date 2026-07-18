@@ -29,6 +29,17 @@ ok() { printf "\033[1;32m  ✓ %s\033[0m\n" "$*"; }
 warn(){ printf "\033[1;33m  ! %s\033[0m\n" "$*"; }
 die(){ printf "\033[1;31m  ✗ %s\033[0m\n" "$*" >&2; exit 1; }
 
+secret_needs_rotation() {
+  local value="$1" known_default="$2" minimum_length="$3"
+  if [ "$value" = "$known_default" ] || [ "${#value}" -lt "$minimum_length" ]; then
+    return 0
+  fi
+  case "$value" in
+    *[[:space:]]*) return 0 ;;
+  esac
+  return 1
+}
+
 c "Synthesus installer"
 echo "  install dir: $SYNTHESUS_HOME"
 echo "  model:       $SYNTHESUS_MODEL"
@@ -203,12 +214,12 @@ if [ -f "$SYNTHESUS_HOME/synthesus.env" ]; then
   HUMAN_SESSION_SECRET="${SYNTHESUS_HUMAN_SESSION_SECRET:-$HUMAN_SESSION_SECRET}"
   warn "preserving existing synthesus.env secrets (API key / JWT / human session)"
 fi
-if [ "$KEY" = "dev-key-change-me" ] || [ "${#KEY}" -lt 24 ]; then
-  warn "replacing missing, known-default, or short API key"
+if secret_needs_rotation "$KEY" "dev-key-change-me" 24; then
+  warn "replacing missing, known-default, short, or whitespace-containing API key"
   KEY="$(python3 -c 'import secrets; print("syn_"+secrets.token_urlsafe(32))')"
 fi
-if [ "$JWT_SECRET_VALUE" = "dev_secret_change_me" ] || [ "${#JWT_SECRET_VALUE}" -lt 32 ]; then
-  warn "replacing missing, known-default, or short JWT secret"
+if secret_needs_rotation "$JWT_SECRET_VALUE" "dev_secret_change_me" 32; then
+  warn "replacing missing, known-default, short, or whitespace-containing JWT secret"
   JWT_SECRET_VALUE="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
 fi
 ENV_TMP="$(mktemp "$SYNTHESUS_HOME/.synthesus.env.tmp.XXXXXX")"
