@@ -441,6 +441,63 @@ to this log.
   classifier artifact, wire desktop UI presentation of job records, then a
   fresh three-node cell acceptance before checking any F-020 box.
 
+## 2026-07-18 — F-020 physical gate: useful model workload in rootless Podman
+
+- Base SHA: `8dbf222f5d2dd38bbb511f409aec453a6f37c128` (post-PR-#10 `main`).
+- Branch: `agent/f020-physical-gate`, exact tested head
+  `f38a149d575eeea6d73453cd810367fb6461e48e` (bundle-transferred to a fresh
+  worker clone; identical SHA verified on the worker).
+- Objective: physical evidence for the useful model profile — build the
+  pinned profile image on the Podman worker and execute the real ONNX
+  classifier through the full executor boundary.
+- Files changed:
+  - `services/aivm_profiles/text_classification/build_demo_model.py`:
+    deterministic demo ONNX classifier builder (weights derived from
+    SHA-256 of a fixed seed; reproducible artifact bytes).
+  - `services/aivm_profiles/text_classification/aivm_text_classify.py`:
+    the physical gate exposed that onnxruntime writes environment-level
+    GPU device-discovery warnings to fd 2 outside any session logger; the
+    runner now points fd 2 at /dev/null before importing the runtime and
+    reports intentional failure reasons through a saved duplicate of the
+    real stderr. The executor's zero-stderr success contract is unchanged.
+  - `apps/synthesus/runtime/tests/aivm/test_model_profile.py`: opt-in
+    `test_physical_rootless_podman_model_profile` (env-gated like the
+    SHA-256 physical test) using `PersistentExecutionAuthority`, two
+    distinct workload/lease executions, and a byte-identical
+    content-addressed result determinism assertion.
+- Security decisions: the stderr fix silences only third-party library
+  noise inside the trusted runner; the executor still fails closed on any
+  stderr byte, as proven by the first physical run failing exactly there.
+- Commands and exact results (worker `dakin-MS-7C95`, rootless Podman
+  4.9.3, cgroups v2, seccomp enabled, fresh clone of the exact head):
+  - `build_demo_model.py` → model sha256
+    `575d566648d21bcfae72241fb0d74e3d95ae22f3d44c28baab0cd579e38b817d`
+    (2,354 bytes).
+  - Base image pinned:
+    `docker.io/library/python@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de`.
+  - Built immutable profile image digest:
+    `sha256:4933984efd51622d198bab953d5011cdc6b94155a2467e85acbd8e1e581a3f5b`.
+  - `AIVM_RUN_PODMAN_PHYSICAL=1 AIVM_TEXT_CLASSIFY_IMAGE_REF=localhost/aivm-text-classify@sha256:4933984e… AIVM_TEXT_CLASSIFY_MODEL=~/f020-model.onnx pytest tests/aivm/test_model_profile.py -v`:
+    `15 passed` including the physical test.
+  - Two failed physical iterations are recorded honestly: image
+    `sha256:ae6d942e…` and `sha256:a9c624ee…` both failed the gate with
+    `model_result_output_invalid` because of the onnxruntime stderr
+    warning; the session-logger-only mitigation was insufficient and was
+    superseded by the fd-2 redirect in the accepted head.
+- Physical evidence and artifact digests: physical run classified document
+  sha256 `07a1c31caa4e70ed6c41a318f9559bcb6780bf735fc6e6078a99565db1d12dd1`
+  with the demo model; result JSON content-addressed in the executor result
+  store and byte-identical across two distinct lease executions. This is a
+  one-node physical execution gate; it does not claim three-node cell
+  acceptance, Web Desktop presentation, or transport of artifacts over the
+  mesh.
+- Review verdict: pending on the PR.
+- PR and final SHA: recorded on the PR after push.
+- Remaining blockers / next exact command: wire desktop UI presentation of
+  job records; run the job pipeline against a physically enrolled worker
+  node over the mesh transport; then the fresh three-node cell acceptance
+  for the remaining F-020 boxes.
+
 ## Session entry template
 
 ```markdown
