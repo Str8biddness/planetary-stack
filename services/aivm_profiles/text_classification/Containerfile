@@ -1,0 +1,29 @@
+# Immutable AIVM text-classification profile image.
+#
+# Build on a Podman worker with an exact pinned base digest, then record the
+# built image digest into the node executor policy as the only trusted image
+# for the aivm.model.text-classify.v1 entrypoint:
+#
+#   podman build \
+#     --build-arg BASE_IMAGE=docker.io/library/python:3.12-slim@sha256:<digest> \
+#     --tag aivm-text-classify:v1 \
+#     services/aivm_profiles/text_classification
+#   podman image inspect aivm-text-classify:v1 --format '{{ .Digest }}'
+#
+# The runtime never pulls (--pull=never) and always runs read-only, without
+# network, as an unprivileged user, so this image must already be present and
+# its digest must match the workload manifest exactly.
+
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+RUN pip install --no-cache-dir --disable-pip-version-check \
+        onnxruntime==1.27.0 \
+        numpy==2.3.1 \
+    && useradd --system --create-home --shell /usr/sbin/nologin aivm
+
+COPY aivm_text_classify.py /opt/aivm/bin/aivm-text-classify
+RUN chmod 0555 /opt/aivm/bin/aivm-text-classify
+
+USER aivm
+ENTRYPOINT ["/opt/aivm/bin/aivm-text-classify"]
