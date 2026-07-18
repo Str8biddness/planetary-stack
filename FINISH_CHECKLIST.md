@@ -103,9 +103,14 @@ matrix from one documented command.
   verified result, and desktop presentation.
 - [ ] Replace the test authority verifier with persistent production issuer,
   scheduler, and node-agent verification/consumption wiring.
-- [ ] Support at least one useful bounded model workload, not only SHA-256.
-- [ ] Return a content-addressed, immutable result with provenance and resource
-  evidence.
+- [x] Support at least one useful bounded model workload, not only SHA-256.
+  Evidence: PR #10 execution spine; physical rootless-Podman ONNX
+  classification on worker `dakin-MS-7C95` at exact head `f38a149`, image
+  `sha256:4933984e…`, model `575d5666…` (AGENT_LOG 2026-07-18 physical gate).
+- [x] Return a content-addressed, immutable result with provenance and resource
+  evidence. Evidence: same physical gate — result JSON content-addressed
+  (0400, owner-only store), byte-identical across two leases, with signed
+  evidence including image/entrypoint/lease binding and `wall_time_ms`.
 - [ ] Implement cancel/stop and prove terminal cleanup at every layer.
 - [ ] Reject stale, duplicated, substituted, expired, cross-account, wrong-node,
   oversized, and unsupported requests before workload execution.
