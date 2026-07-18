@@ -319,6 +319,18 @@ def create_app(
             return JSONResponse(status_code=404, content={"error": "job_not_found"})
         return record.to_wire()
 
+    @app.get("/api/jobs/{job_id}/results/{output_sha256}")
+    async def job_result(job_id: str, output_sha256: str, request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        if job_pipeline is None:
+            return JSONResponse(status_code=503, content={"error": "jobs_unavailable"})
+        loaded = await asyncio.to_thread(job_pipeline.result, job_id, output_sha256)
+        if loaded is None:
+            return JSONResponse(status_code=404, content={"error": "result_not_found"})
+        payload, media_type = loaded
+        return Response(content=payload, media_type=media_type)
+
     @app.post("/api/jobs/{job_id}/cancel")
     async def cancel_job(job_id: str, request: Request):
         if not _runtime_authorized(request, settings):

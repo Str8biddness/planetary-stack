@@ -108,6 +108,7 @@ class LocalJobPipeline:
         resource_vector: Mapping[str, int],
         max_bundle_bytes: int = _DEFAULT_MAX_BUNDLE_BYTES,
         max_jobs: int = 1024,
+        result_loader: Callable[[str], bytes | None] | None = None,
     ) -> None:
         if control_plane is None or node_agent is None or request_signer is None:
             raise ValueError("control plane, node agent, and signer are required")
@@ -131,6 +132,7 @@ class LocalJobPipeline:
         self._resource_vector = dict(resource_vector)
         self._max_bundle_bytes = max_bundle_bytes
         self._max_jobs = max_jobs
+        self._result_loader = result_loader
         self._jobs: dict[str, JobRecord] = {}
         self._lock = RLock()
 
@@ -385,6 +387,46 @@ class LocalJobPipeline:
     def status(self, job_id: str) -> JobRecord | None:
         with self._lock:
             return self._jobs.get(job_id)
+
+    def result(self, job_id: str, output_sha256: str) -> tuple[bytes, str] | None:
+        """Return exact verified result bytes for one completed-job output.
+
+        Only digests recorded in the job's signed response outputs are
+        servable, and the loaded bytes must re-hash to the requested digest;
+        anything else returns None rather than unverified content.
+        """
+
+        if self._result_loader is None:
+            return None
+        if not isinstance(output_sha256, str) or not re.fullmatch(
+            r"[0-9a-f]{64}", output_sha256
+        ):
+            return None
+        with self._lock:
+            record = self._jobs.get(job_id)
+            if record is None or record.state is not JobState.COMPLETED:
+                return None
+            matching = next(
+                (
+                    output
+                    for output in record.outputs
+                    if output.get("sha256") == output_sha256
+                ),
+                None,
+            )
+        if matching is None:
+            return None
+        try:
+            payload = self._result_loader(output_sha256)
+        except Exception:
+            return None
+        if not isinstance(payload, (bytes, bytearray)):
+            return None
+        data = bytes(payload)
+        if hashlib.sha256(data).hexdigest() != output_sha256:
+            return None
+        media_type = str(matching.get("media_type") or "application/octet-stream")
+        return data, media_type
 
     def _release_lease_quietly(self, lease: LeaseDocument) -> None:
         try:
