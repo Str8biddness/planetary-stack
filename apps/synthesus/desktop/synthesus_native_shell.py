@@ -34,7 +34,7 @@ if not getattr(sys, 'frozen', False):
 
 class CognitiveKernelIPC:
     def __init__(self):
-        self.kernel_status = "Sub-1GB Reasoning Engine: ACTIVE (Ring-0)"
+        self.kernel_status = "Sub-1GB Reasoning Engine: LOCAL FALLBACK"
         self.quadbrain = None
         try:
             from core.quadbrain_master import QuadbrainMaster
@@ -243,7 +243,8 @@ def get_status():
         # distributed storage plane until a verified namespace is mounted.
         "3way_drive_active": False,
         "3way_drive_reason": "verified_planetary_drive_not_mounted",
-        "peripheral_bridge_active": True,
+        "peripheral_bridge_active": False,
+        "peripheral_bridge_reason": "browser_kvm_not_enabled",
         "llm_status": kernel_ipc.kernel_status
     }
     
@@ -973,7 +974,7 @@ def get_llm_settings():
 @app.route('/api/settings/llm', methods=['POST'])
 def post_llm_settings():
     # Pro gate applies ONLY to cloud backends. Local backends (Ollama, LM Studio) are
-    # free — nothing leaves the machine, so there's nothing to gate.
+    # free because they use an explicitly configured local inference endpoint.
     data = request.json or {}
     provider = data.get("provider", "ollama")
     LOCAL_BACKENDS = ("ollama", "lmstudio")

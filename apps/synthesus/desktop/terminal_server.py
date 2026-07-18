@@ -56,7 +56,7 @@ SOCKET_PATH = os.path.expanduser(
     )
 )
 
-app = FastAPI(title="Synthesus God-Mode Terminal Backend")
+app = FastAPI(title="Synthesus Authenticated Terminal Backend")
 
 
 def terminal_root() -> Path:

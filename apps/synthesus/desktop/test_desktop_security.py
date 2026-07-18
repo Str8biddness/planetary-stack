@@ -247,3 +247,57 @@ def test_full_installer_writes_secrets_atomically_and_owner_only():
     assert 'mktemp "$SYNTHESUS_HOME/.synthesus.env.tmp.XXXXXX"' in source
     assert 'mv -f "$ENV_TMP" "$SYNTHESUS_HOME/synthesus.env"' in source
     assert '.synthesus.env.tmp.$$' not in source
+
+
+def test_release_ui_has_no_legacy_grid_kvm_or_simulated_update_path():
+    desktop = Path(__file__).parent
+    script = (desktop / "script.js").read_text(encoding="utf-8")
+    markup = (desktop / "index.html").read_text(encoding="utf-8")
+
+    for forbidden in (
+        "127.0.0.1:8082",
+        "/api/grid/",
+        "ws/grid-state",
+        "gridSocket",
+        "initGridStateSync",
+        "node_index",
+        "requestPointerLock",
+        "virtual_mousedown",
+        "checkOTAUpdates",
+        "runOTASequence",
+        "Verifying cryptographic signatures",
+    ):
+        assert forbidden not in script
+
+    combined = f"{markup}\n{script}".lower()
+    for forbidden in (
+        "installer-modal",
+        "ota-modal",
+        "ring-0",
+        "nothing leaves this machine",
+        "never leave your machine",
+        "no personal data is ever transmitted",
+        "runs 100% offline",
+        "no cloud, no telemetry",
+        "operates unconditionally",
+        "kernel online",
+        "drive mounted",
+        "grid online",
+    ):
+        assert forbidden not in combined
+
+    disclosure = (
+        "Secure mesh enrollment, resource sharing, browser KVM, and Web Desktop "
+        "updates are not enabled in this release. Network behavior depends on the "
+        "feature used"
+    )
+    assert disclosure in markup
+    assert "Authenticated Terminal" in markup
+
+
+def test_native_status_does_not_claim_unimplemented_ssi_or_kvm():
+    source = Path(__file__).with_name("synthesus_native_shell.py").read_text(
+        encoding="utf-8"
+    )
+    assert '"3way_drive_active": False' in source
+    assert '"peripheral_bridge_active": False' in source
