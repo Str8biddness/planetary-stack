@@ -37,18 +37,25 @@ economics. Release B is not required to call Release A a finished product.
 
 ### Immediate stop-ship findings
 
-- [ ] Remove the public desktop JWT fallback, generate a unique owner-only
+- [x] Remove the public desktop JWT fallback, generate a unique owner-only
   secret during installation, and refuse startup when the secret is absent or
-  known-default.
-- [ ] Remove or disable the unauthenticated legacy `/api/terminal/run`
+  known-default. Evidence: `7866482`, `f07fece`, `967e651`; PR #9 review.
+- [x] Remove or disable the unauthenticated legacy `/api/terminal/run`
   `shell=True` endpoint; all browser terminal operations must use the
-  authenticated controller capability and Unix-socket PTY boundary.
-- [ ] Remove/hide simulated OTA and Ring-0 success UI until a signed update
-  transaction exists and reports verifiable state.
-- [ ] Replace unconditional privileged-daemon consent and universal no-egress
+  authenticated controller capability and Unix-socket PTY boundary. Evidence:
+  `7866482`; live nonexecution proof and exact-head review in `AGENT_LOG.md`.
+- [x] Remove/hide simulated OTA and Ring-0 success UI until a signed update
+  transaction exists and reports verifiable state. Evidence: `24a5b17`.
+- [x] Replace unconditional privileged-daemon consent and universal no-egress
   privacy language with accurate, feature-specific opt-in disclosure.
-- [ ] Remove direct browser calls to legacy optional grid endpoints or route
+  Evidence: `24a5b17`, `4a382cc`.
+- [x] Remove direct browser calls to legacy optional grid endpoints or route
   them through authenticated `synthesusd` APIs with no query-string secrets.
+  Evidence: `24a5b17`, `4a382cc`; exact-head review confirmed one remaining
+  WebSocket, the authenticated terminal capability.
+- [x] Require the exact unique install key on every private runtime HTTP and
+  WebSocket surface, enforce the actual loopback socket, and prevent an
+  imported-ASGI wildcard-bind bypass. Evidence: `215a49b`, `d338056`.
 
 Acceptance: focused adversarial tests prove JWT forgery, legacy shell execution,
 unauthenticated grid access, and simulated update success are impossible in the

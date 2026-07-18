@@ -12,6 +12,8 @@ Planetary Stack. Read this file, `AGENTS.md`, `docs/ARCHITECTURE.md`,
 - Verified main head: `ae64d31873c751eb6faa97da2310685e9d174dac`.
 - Current continuation branch: `agent/finish-readiness`.
 - Current continuation checkout: `/home/dakin/planetary-stack-finish`.
+- Draft handoff PR: [#9](https://github.com/Str8biddness/planetary-stack/pull/9).
+- Latest independently reviewed implementation head: `4c464eec441c7befea38c54b5ae5b93d01b0ca9e`.
 - Release target: the paid same-account private-mesh product defined in
   `FINISH_CHECKLIST.md`. The public subscriber fabric is a later release.
 - Current truth: the security/control-plane foundation is merged and tested,
@@ -176,6 +178,130 @@ to this log.
 - Next exact action: read the nested Synthesus agent contracts, trace route and
   installer callers, patch the smallest safe boundary, then run focused desktop
   security tests plus the monorepo regression matrix.
+
+## 2026-07-17 — F-090/F-120 desktop and runtime trust closure
+
+- Base SHA: `3f56b45d` (finish-readiness handoff commit).
+- Branch: `agent/finish-readiness`.
+- Candidate implementation head: `4c464eec441c7befea38c54b5ae5b93d01b0ca9e`.
+- Objective: close the forgeable desktop identity, legacy shell-execution, and
+  unauthenticated direct-runtime stop-ships without exposing secrets to the
+  browser.
+- Commits:
+  - `7866482` — unique account JWT secret, owner-confined SQLite state,
+    nonexecuting legacy terminal tombstone, no native-shell API-key fallback,
+    and honest unmounted Planetary Drive state.
+  - `a67cda4` — corrected the symlink regression fixture.
+  - `f07fece` — secure fresh install/redeploy secret generation and migration,
+    owner-only atomic env-file replacement, invalid/default secret rotation,
+    unsafe secret-path rejection, and script-level upgrade regressions.
+  - `215a49b` — exact install-key middleware for every runtime API/router,
+    defense-in-depth dependency authentication, pre-accept WebSocket
+    authentication, loopback-only runtime launch, fail-closed boot helper, and
+    removal of the Windows-specific pattern database default.
+  - `967e651` — closed installer/redeploy secret-path races found during
+    independent review; unsafe final paths now fail before replacement.
+  - `d338056` — closed imported-ASGI/wildcard-bind bypasses with actual socket
+    scope enforcement and no default module-level `app` export.
+  - `24a5b17` — removed the direct legacy grid/worker/KVM bridge, simulated
+    OTA/Ring-0 flow, invisible privileged-daemon consent, and universal
+    privacy/online/mounted claims from the release Web Desktop.
+  - `4a382cc` — made voice availability evidence-based, strengthened the
+    single authenticated-WebSocket regression, and removed dead modal helpers.
+  - `4c464ee` — normalized X.509 validity timestamps across packaged
+    `cryptography` 41 and newer timezone-aware certificate APIs.
+
+### Security decisions and review trail
+
+- `SYNTHESUS_JWT_SECRET` is separate from `SYNTHESUS_API_KEY`; the installer
+  generates both. A public, empty, or short JWT secret refuses desktop startup.
+- Existing secure secrets survive reinstall/redeploy. Missing, short, or known-
+  default API/JWT values are rotated. Secret files are regular, same-user,
+  mode `0600`, written through a same-directory `umask 077` temporary, and
+  atomically replaced. Symlink and nonregular paths are refused.
+- `~/.synthesus` is mode `0700` and its account database is a same-user regular
+  mode-`0600` file opened with `O_NOFOLLOW` where supported. A permissive
+  arbitrary custom parent is refused rather than chmodded.
+- `/api/terminal/run` remains only as HTTP `410` migration feedback and cannot
+  execute input. The per-launch synthesusd capability plus owner-only Unix-
+  socket PTY is the only browser terminal transport.
+- The runtime is not a public/demo API. Every `/api`, `/query`, `/control`, and
+  `/parameter-cloud/v2` path requires the exact per-install key in constant
+  time. Both runtime WebSockets reject before `accept()`. Browser traffic stays
+  keyless and reaches the runtime only through authenticated `synthesusd`.
+- Runtime HTTP remains loopback-only. CHAL/vSource/Unisync mTLS is the node
+  network plane; exposing the legacy FastAPI server is not a cluster method.
+- The first independent review returned `REQUEST CHANGES`: the documented
+  redeploy path omitted the new JWT secret, install creation had a pre-`chmod`
+  exposure window, and invalid preserved values could brick startup. Commit
+  `f07fece` superseded that rejected state.
+- A second review rejected the secret replacement sequence and imported-ASGI
+  bind bypass. Commits `967e651` and `d338056` superseded those states.
+- Independent desktop/runtime security review approved exact head `d338056`.
+- Independent UI truthfulness review rejected `24a5b17` because the initial
+  voice label claimed readiness without a provider check. `4a382cc` corrected
+  it. Exact-head re-review approved `4c464ee`; it confirmed that only one
+  browser WebSocket remains and it carries the authenticated terminal
+  subprotocol/capability.
+
+### Exact validation
+
+- `python3 -m py_compile` on changed Python modules: passed.
+- `bash -n` on `install.sh`, `run_runtime.sh`, `redeploy_install.sh`,
+  `launch_smoke.sh`, and `launch.sh`: passed.
+- `git diff --check`: passed.
+- Exact-head desktop/controller suite: `28 passed`; `node --check script.js`
+  passed. The same exact commit streamed to the ASUS worker also produced
+  `28 passed` with one fixture-only PyJWT warning.
+- Earlier focused desktop/controller/runtime and directly affected API slice:
+  `42 passed` with 5 existing deprecation warnings.
+- Live Flask-client adversarial proof: POSTing
+  `{"command":"touch /tmp/synthesus-legacy-terminal-must-not-exist",
+  "admin_override":true}` returned `410` with
+  `legacy_terminal_transport_removed`; the marker did not exist.
+- Full runtime attempt from monorepo root: `1742 passed, 40 skipped, 3 xfailed`,
+  plus two failures and two errors caused by tests resolving runtime-relative
+  paths against the root working directory. This failed invocation is retained
+  as evidence, not treated as a product regression.
+- Full runtime attempt from the runtime directory without the monorepo on
+  `PYTHONPATH`: collection stopped on two `contracts` import errors. This is the
+  known packaging gap recorded under F-010/F-100.
+- Correct installed-development invocation from `apps/synthesus/runtime` with
+  the canonical monorepo root on `PYTHONPATH`, after the imported-ASGI and UI
+  changes: `1747 passed, 40 skipped, 3 xfailed` in 112.10 seconds. No test
+  failed.
+- `make test-contracts`: 9 frozen schemas validated; `42 passed` under seed 1
+  and `42 passed` under seed 4.
+- The first local `make test-private-mesh` exposed use of the
+  `cryptography>=42`-only `Certificate.not_valid_*_utc` API in the installed
+  `cryptography 41.0.7` environment. `4c464ee` added an aware-UTC compatibility
+  adapter without weakening validity checks.
+- A subsequent sandboxed focused run reached the real listener but its child
+  process returned `PermissionError: [Errno 1] Operation not permitted`; the
+  sandbox was blocking the temporary loopback socket. This was not counted as
+  acceptance. With explicit loopback permission, the focused mTLS suite
+  produced `14 passed`.
+- Canonical post-fix `make test-private-mesh`: `143 passed` under seed 1 and
+  `143 passed` under seed 4.
+- Canonical exact-head `make test-aivm-execution`: `21 passed, 1 skipped` under
+  each seed. The skip is the explicitly opt-in physical Podman profile; all
+  required tests passed and the gate left no worktree artifacts.
+- `git diff --check` passed. Independent desktop/runtime and UI reviews both
+  returned APPROVE on the superseding exact implementation heads.
+
+### Remaining blockers / next exact action
+
+- Push the complete handoff to PR #9 and require its GitHub check before merge.
+- Start `F-020` with one production-shaped, useful CPU model profile wired
+  end-to-end from authenticated desktop intent to verified result. Do not add
+  writable host mounts or bypass the signed lease/execution-authority chain.
+- The installed runtime still depends on a developer-style root `PYTHONPATH`
+  for canonical `contracts`; this must be fixed by the release packaging gate.
+- Stale `run_web_server.py`, Docker/Procfile commands, and historical docs still
+  reference the intentionally disabled imported ASGI app. They fail loudly,
+  but must be retired or updated under F-010/F-100.
+- No end-to-end model job, SSI namespace, certificate lifecycle, recovery,
+  signed updater, or paid-beta evidence is claimed by this local security gate.
 
 ## Session entry template
 
