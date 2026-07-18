@@ -75,6 +75,7 @@ def test_account_database_symlink_is_rejected(monkeypatch, tmp_path):
 
     parent = tmp_path / "private"
     parent.mkdir()
+    os.chmod(parent, 0o700)
     target = tmp_path / "target.db"
     target.write_bytes(b"do-not-touch")
     database = parent / "accounts.db"
