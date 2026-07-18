@@ -279,7 +279,12 @@ def _admission_controller() -> AIVMAdmissionController:
     )
 
 
-def _wiring(tmp_path: Path, *, runner: FakeModelRunner | None = None) -> WiringHarness:
+def _wiring(
+    tmp_path: Path,
+    *,
+    runner: FakeModelRunner | None = None,
+    preadmit: bool = True,
+) -> WiringHarness:
     ctx = mesh_context(tmp_path)
     _add_scheduler_key(ctx)
     inventory = inventory_doc(ctx)
@@ -288,14 +293,18 @@ def _wiring(tmp_path: Path, *, runner: FakeModelRunner | None = None) -> WiringH
 
     manifest = _workload_manifest()
     bundle = canonical_document_bytes(manifest)
-    request = request_doc(
-        ctx,
-        workload_digest=hashlib.sha256(bundle).hexdigest(),
-        workload_size=len(bundle),
-    )
-    capability = capability_doc(ctx)
-    allocation = allocate_once(ctx, request=request, capability=capability)
-    assert allocation.lease is not None
+    request = None
+    capability = None
+    allocation = None
+    if preadmit:
+        request = request_doc(
+            ctx,
+            workload_digest=hashlib.sha256(bundle).hexdigest(),
+            workload_size=len(bundle),
+        )
+        capability = capability_doc(ctx)
+        allocation = allocate_once(ctx, request=request, capability=capability)
+        assert allocation.lease is not None
 
     state = _private_directory(tmp_path / "executor-state")
     artifacts = _private_directory(tmp_path / "executor-artifacts")
@@ -348,17 +357,21 @@ def _wiring(tmp_path: Path, *, runner: FakeModelRunner | None = None) -> WiringH
         clock=ctx.clock,
         workload_executor=adapter,
     )
-    admission = agent.admit_lease(
-        allocation.lease,
-        request,
-        capability,
-        authenticated_subject_id=SUBJECT,
-    )
-    assert admission.accepted
+    lease = None
+    if preadmit:
+        assert allocation is not None and request is not None and capability is not None
+        admission = agent.admit_lease(
+            allocation.lease,
+            request,
+            capability,
+            authenticated_subject_id=SUBJECT,
+        )
+        assert admission.accepted
+        lease = allocation.lease
     return WiringHarness(
         ctx=ctx,
         agent=agent,
-        lease=allocation.lease,
+        lease=lease,
         request=request,
         bundle=bundle,
         result_dir=results,

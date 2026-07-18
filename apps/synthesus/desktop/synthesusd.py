@@ -10,6 +10,8 @@ token, then crosses a user-only Unix socket to the PTY backend.
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import hmac
 import logging
 import os
@@ -43,6 +45,8 @@ _RESPONSE_HEADERS = {
     "etag",
 }
 _SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{1,96}$")
+# Base64 expansion of the 8 MiB pipeline bundle limit, with headroom.
+_MAX_JOB_BUNDLE_BASE64_CHARS = 12 * 1024 * 1024
 _LOOPBACK_BIND_HOSTS = {"127.0.0.1", "localhost", "::1"}
 _KNOWN_DEFAULT_API_KEY = "dev-key-change-me"
 log = logging.getLogger("synthesusd")
@@ -177,6 +181,7 @@ def create_app(
     *,
     runtime_transport: httpx.AsyncBaseTransport | None = None,
     terminal_transport: httpx.AsyncBaseTransport | None = None,
+    job_pipeline: Any = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -267,6 +272,66 @@ def create_app(
             "controller": "synthesusd",
             "session_id": settings.session_id,
         }
+
+    @app.post("/api/jobs")
+    async def submit_job(request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        if job_pipeline is None:
+            return JSONResponse(status_code=503, content={"error": "jobs_unavailable"})
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+        if not isinstance(body, dict):
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+        encoded = body.get("bundle_base64")
+        workload_kind = body.get("workload_kind", "inference")
+        if (
+            not isinstance(encoded, str)
+            or not encoded
+            or len(encoded) > _MAX_JOB_BUNDLE_BASE64_CHARS
+            or not isinstance(workload_kind, str)
+        ):
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+        try:
+            bundle = base64.b64decode(encoded, validate=True)
+        except (binascii.Error, ValueError):
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+        try:
+            record = await asyncio.to_thread(
+                job_pipeline.submit,
+                bundle=bundle,
+                workload_kind=workload_kind,
+            )
+        except Exception:
+            return JSONResponse(status_code=502, content={"error": "job_submit_failed"})
+        return record.to_wire()
+
+    @app.get("/api/jobs/{job_id}")
+    async def job_status(job_id: str, request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        if job_pipeline is None:
+            return JSONResponse(status_code=503, content={"error": "jobs_unavailable"})
+        record = await asyncio.to_thread(job_pipeline.status, job_id)
+        if record is None:
+            return JSONResponse(status_code=404, content={"error": "job_not_found"})
+        return record.to_wire()
+
+    @app.post("/api/jobs/{job_id}/cancel")
+    async def cancel_job(job_id: str, request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        if job_pipeline is None:
+            return JSONResponse(status_code=503, content={"error": "jobs_unavailable"})
+        try:
+            record = await asyncio.to_thread(job_pipeline.cancel, job_id)
+        except Exception:
+            return JSONResponse(status_code=502, content={"error": "job_cancel_failed"})
+        if record is None:
+            return JSONResponse(status_code=404, content={"error": "job_not_found"})
+        return record.to_wire()
 
     @app.api_route(
         "/runtime/{path:path}",
