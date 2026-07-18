@@ -18,6 +18,7 @@ import pytest
 # production_server intentionally has no development key fallback. Pytest sets
 # an explicit deterministic test-only install key before test modules import it.
 os.environ["SYNTHESUS_API_KEY"] = "syn_pytest_install_key_1234567890"
+os.environ["SYNTHESUS_INTERNAL_ASGI_IMPORT"] = "1"
 os.environ.setdefault("SYNTHESUS_DATA_DIR", tempfile.mkdtemp(prefix="synthesus_pytest_data_"))
 
 # Ensure project root and legacy flat package paths are importable.

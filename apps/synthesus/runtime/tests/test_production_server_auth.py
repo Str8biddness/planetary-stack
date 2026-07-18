@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 import httpx
 import pytest
@@ -50,7 +53,7 @@ def test_private_runtime_paths_are_globally_authenticated():
     async def exercise():
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=server.app),
-            base_url="http://runtime.test",
+            base_url="http://127.0.0.1",
         ) as client:
             for path in protected:
                 anonymous = await client.get(path)
@@ -67,6 +70,15 @@ def test_private_runtime_paths_are_globally_authenticated():
 
             public_static = await client.get("/definitely-not-a-route")
             assert public_static.status_code == 404
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=server.app),
+            base_url="http://192.168.1.9",
+            headers={"X-API-Key": server.ADMIN_KEY},
+        ) as client:
+            non_loopback = await client.get("/api/v1/health")
+            assert non_loopback.status_code == 403
+            assert non_loopback.json() == {"error": "runtime_loopback_required"}
 
     asyncio.run(exercise())
 
@@ -100,8 +112,9 @@ def test_get_auth_rejects_child_or_missing_keys():
 
 
 class _FakeWebSocket:
-    def __init__(self, key=None):
+    def __init__(self, key=None, host="127.0.0.1"):
         self.headers = {} if key is None else {"X-API-Key": key}
+        self.scope = {"server": (host, 5010)}
         self.accepted = False
         self.close_code = None
 
@@ -137,3 +150,41 @@ def test_runtime_websockets_authenticate_before_accept(endpoint):
     asyncio.run(endpoint(allowed))
     assert allowed.accepted
     assert allowed.close_code is None
+
+    remote = _FakeWebSocket(server.ADMIN_KEY, host="192.168.1.9")
+    asyncio.run(endpoint(remote))
+    assert remote.close_code == 1008
+    assert not remote.accepted
+
+
+def test_module_does_not_export_asgi_app_for_uvicorn_cli_bypass():
+    runtime_root = Path(__file__).resolve().parents[1]
+    monorepo_root = Path(__file__).resolve().parents[4]
+    env = os.environ.copy()
+    env.pop("SYNTHESUS_INTERNAL_ASGI_IMPORT", None)
+    env["SYNTHESUS_API_KEY"] = "syn_subprocess_install_key_123456789"
+    env["PYTHONPATH"] = os.pathsep.join(
+        (
+            str(monorepo_root),
+            str(runtime_root),
+            str(runtime_root / "packages"),
+            str(runtime_root / "packages" / "core"),
+            str(runtime_root / "packages" / "knowledge"),
+            str(runtime_root / "packages" / "reasoning"),
+            str(runtime_root / "packages" / "kernel"),
+        )
+    )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import api.production_server as module; "
+            "assert not hasattr(module, 'app'), 'module exported app'",
+        ],
+        cwd=runtime_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert completed.returncode == 0, completed.stderr

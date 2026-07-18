@@ -22,6 +22,7 @@ Endpoints:
 from __future__ import annotations
 import asyncio
 import hmac
+import ipaddress
 import json
 import logging
 import os
@@ -402,6 +403,20 @@ def _runtime_path_requires_auth(path: str) -> bool:
     )
 
 
+def _runtime_scope_is_loopback(scope: Dict[str, Any]) -> bool:
+    """Validate the actual ASGI socket address, not the spoofable Host header."""
+    server = scope.get("server")
+    if not isinstance(server, (tuple, list)) or not server:
+        return False
+    host = str(server[0]).strip().strip("[]")
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 ADMIN_KEY = _required_install_key()
 
 # ─── Control Plane ──────────────────────────────────────────────────────
@@ -438,6 +453,11 @@ app.add_middleware(
 @app.middleware("http")
 async def require_private_runtime_key(request: Request, call_next):
     """Keep the CHAL runtime private even when a route forgot a dependency."""
+    if not _runtime_scope_is_loopback(request.scope):
+        return JSONResponse(
+            status_code=403,
+            content={"error": "runtime_loopback_required"},
+        )
     if _runtime_path_requires_auth(request.url.path):
         if not _install_key_matches(request.headers.get(API_KEY_HEADER)):
             return JSONResponse(
@@ -945,7 +965,10 @@ security_ws_manager = ConnectionManager()
 @app.websocket("/ws/security")
 async def security_websocket(websocket: WebSocket):
     """WebSocket endpoint for real-time security dashboard updates."""
-    if not _install_key_matches(websocket.headers.get(API_KEY_HEADER)):
+    if (
+        not _runtime_scope_is_loopback(websocket.scope)
+        or not _install_key_matches(websocket.headers.get(API_KEY_HEADER))
+    ):
         await websocket.close(code=1008)
         return
     await security_ws_manager.connect(websocket)
@@ -3917,7 +3940,10 @@ async def monitoring_dashboard():
 @app.websocket("/api/v1/monitoring/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """Live WebSocket stream for all system metrics."""
-    if not _install_key_matches(websocket.headers.get(API_KEY_HEADER)):
+    if (
+        not _runtime_scope_is_loopback(websocket.scope)
+        or not _install_key_matches(websocket.headers.get(API_KEY_HEADER))
+    ):
         await websocket.close(code=1008)
         return
     await manager.connect(websocket)
@@ -4058,3 +4084,10 @@ class ChatMessage(BaseModel):
     role: str  # "user" or "assistant"
     content: str
     timestamp: Optional[str] = None
+
+
+# FastAPI decorators need an app while this module is evaluated, but exporting
+# it would let `uvicorn api.production_server:app --host 0.0.0.0` bypass the
+# canonical loopback launcher. Tests opt in explicitly before import.
+if __name__ != "__main__" and os.environ.get("SYNTHESUS_INTERNAL_ASGI_IMPORT") != "1":
+    del app

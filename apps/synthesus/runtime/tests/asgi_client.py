@@ -16,7 +16,7 @@ class MainThreadASGIClient:
         self,
         app: Any,
         *,
-        base_url: str = "http://synthesus.local",
+        base_url: str = "http://127.0.0.1",
         headers: Mapping[str, str] | None = None,
     ) -> None:
         self._app = app
