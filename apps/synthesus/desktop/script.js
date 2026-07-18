@@ -1481,27 +1481,6 @@ function changeWallpaper(event) {
     reader.readAsDataURL(file);
 }
 
-function triggerExpansionDriveInstaller() {
-    // Open the REAL guided creator (no simulated compile). One place to build a
-    // drive from any source, wired end-to-end to the runtime.
-    const modal = document.getElementById('expansion-modal');
-    if (modal) modal.style.display = 'none';
-    const win = document.getElementById('win-drive');
-    if (win && win.style.display === 'none') toggleWindow('win-drive');
-    else loadDriveSources();
-}
-
-function authenticateCloud(providerName) {
-    // Legacy entry point → route into the real creator instead of faking a build.
-    const modal = document.getElementById('expansion-modal');
-    if (modal) modal.style.display = 'none';
-    if (document.getElementById('win-drive').style.display === 'none') toggleWindow('win-drive');
-    // preselect the matching cloud source if it's loaded
-    const key = (providerName || '').toLowerCase();
-    setTimeout(() => { if (DRIVE_SOURCES.find(s => s.key === key)) driveSelectSource(key); }, 300);
-}
-
-
 function maximizeWindow(el) {
     let win;
     if (typeof el === 'string') {

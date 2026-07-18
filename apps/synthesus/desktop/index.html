@@ -469,7 +469,7 @@
                 </div>
             </div>
             <div class="window-content instr-panel" style="display:flex; flex-direction:column; gap:10px; overflow-y:auto;">
-                <div class="instr-caption" id="voice-caption">SI formant default · optional local Piper · check provider state in Vitals</div>
+                <div class="instr-caption" id="voice-caption">SI formant default · optional local Piper · availability is verified when SPEAK runs</div>
                 <label class="instr-label" for="voice-backend">BACKEND</label>
                 <select id="voice-backend" class="instr-input" title="formant = pure SI Klatt. piper = optional local neural (install required).">
                     <option value="formant" selected>formant — SI Klatt (robotic, no neural)</option>
@@ -490,7 +490,7 @@
                             onclick="document.getElementById('voice-text').value='the quick brown fox'">FOX</button>
                 </div>
                 <audio id="voice-audio" controls style="width:100%; margin-top:4px;"></audio>
-                <div class="instr-meta" id="voice-status">ready · local SI larynx</div>
+                <div class="instr-meta" id="voice-status">not checked · press SPEAK to verify backend</div>
                 <div class="instr-meta" id="voice-phonemes" style="white-space:pre-wrap; word-break:break-word; color:#8595a9;"></div>
                 <div class="instr-meta" id="voice-uid" style="color:#64748b;"></div>
             </div>

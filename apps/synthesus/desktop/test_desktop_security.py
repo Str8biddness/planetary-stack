@@ -293,6 +293,16 @@ def test_release_ui_has_no_legacy_grid_kvm_or_simulated_update_path():
     )
     assert disclosure in markup
     assert "Authenticated Terminal" in markup
+    assert script.count("new WebSocket(") == 1
+    assert "['synthesus-terminal', config.terminal_token]" in script
+    assert "URLSearchParams" not in script
+    assert "node_id=" not in script
+    assert "user_id=" not in script
+    assert "mode=worker" not in script
+    assert "check provider state in Vitals" not in markup
+    assert "ready · local SI larynx" not in markup
+    assert "availability is verified when SPEAK runs" in markup
+    assert "not checked · press SPEAK to verify backend" in markup
 
 
 def test_native_status_does_not_claim_unimplemented_ssi_or_kvm():
