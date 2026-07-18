@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+import os
 from unittest.mock import patch, MagicMock
 import httpx
 
@@ -56,6 +57,7 @@ async def test_sysops_query_triggers_correct_candidate_actions():
     async with httpx.AsyncClient(
         transport=transport,
         base_url="http://synthesus.local",
+        headers={"X-API-Key": os.environ["SYNTHESUS_API_KEY"]},
     ) as client:
         response = await client.post("/api/v1/query", json=payload)
     assert response.status_code == 200

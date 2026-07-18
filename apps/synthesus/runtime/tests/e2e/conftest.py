@@ -2,6 +2,7 @@
 E2E Test Suite - Shared Fixtures
 """
 import asyncio
+import os
 
 import pytest
 
@@ -14,6 +15,9 @@ def client():
     """Shared test client for all E2E tests."""
     asyncio.run(startup())
     try:
-        yield MainThreadASGIClient(app)
+        yield MainThreadASGIClient(
+            app,
+            headers={"X-API-Key": os.environ["SYNTHESUS_API_KEY"]},
+        )
     finally:
         asyncio.run(shutdown())

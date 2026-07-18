@@ -1,10 +1,14 @@
 import pytest
+import os
 import shutil
 
 from api.production_server import CHARACTERS_DIR, app
 from tests.asgi_client import MainThreadASGIClient
 
-client = MainThreadASGIClient(app)
+client = MainThreadASGIClient(
+    app,
+    headers={"X-API-Key": os.environ["SYNTHESUS_API_KEY"]},
+)
 
 def test_create_character():
     char_dir = CHARACTERS_DIR / "testbot"

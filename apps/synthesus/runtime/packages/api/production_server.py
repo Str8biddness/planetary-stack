@@ -21,6 +21,7 @@ Endpoints:
 """
 from __future__ import annotations
 import asyncio
+import hmac
 import json
 import logging
 import os
@@ -356,13 +357,52 @@ API_KEY_HEADER = "X-API-Key"
 DEMO_RATE_LIMIT = 10  # requests per minute for unauthenticated
 AUTH_RATE_LIMIT = 60   # requests per minute for authenticated
 
-# Admin key (mandatory via environment for safety)
-ADMIN_KEY = os.environ.get("SYNTHESUS_API_KEY")
-if not ADMIN_KEY:
-    logger.warning("SYNTHESUS_API_KEY not set in environment. API authentication may be disabled or fail.")
-elif ADMIN_KEY == "dev-key-change-me":
-    logger.warning("SYNTHESUS_API_KEY is the shared DEV default 'dev-key-change-me' — fine for "
-                   "localhost dev, but generate a per-install key before shipping.")
+_KNOWN_DEFAULT_API_KEY = "dev-key-change-me"
+_MIN_INSTALL_KEY_BYTES = 24
+_LOOPBACK_RUNTIME_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
+def _required_install_key(value: Optional[str] = None) -> str:
+    """Return the private per-install key or refuse an insecure runtime."""
+    key = (os.environ.get("SYNTHESUS_API_KEY") if value is None else value) or ""
+    key = key.strip()
+    if (
+        len(key.encode("utf-8")) < _MIN_INSTALL_KEY_BYTES
+        or hmac.compare_digest(key, _KNOWN_DEFAULT_API_KEY)
+    ):
+        raise RuntimeError(
+            "Synthesus runtime requires a unique per-install API key; run "
+            "install.sh or set SYNTHESUS_API_KEY."
+        )
+    return key
+
+
+def _install_key_matches(candidate: Optional[str]) -> bool:
+    value = (candidate or "").strip()
+    return bool(value) and hmac.compare_digest(value, ADMIN_KEY)
+
+
+def _required_runtime_host(value: Optional[str] = None) -> str:
+    host = (os.environ.get("SYNTHESUS_HOST", "127.0.0.1") if value is None else value).strip()
+    if host not in _LOOPBACK_RUNTIME_HOSTS:
+        raise RuntimeError(f"Synthesus runtime refuses non-loopback binding: {host!r}")
+    return host
+
+
+def _runtime_path_requires_auth(path: str) -> bool:
+    """Cover every private runtime API, including routers mounted later."""
+    return (
+        path == "/query"
+        or path == "/api"
+        or path.startswith("/api/")
+        or path == "/control"
+        or path.startswith("/control/")
+        or path == "/parameter-cloud/v2"
+        or path.startswith("/parameter-cloud/v2/")
+    )
+
+
+ADMIN_KEY = _required_install_key()
 
 # ─── Control Plane ──────────────────────────────────────────────────────
 ENABLE_CONTROL_PLANE = os.environ.get("ENABLE_CONTROL_PLANE", "false").lower() == "true"
@@ -393,6 +433,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def require_private_runtime_key(request: Request, call_next):
+    """Keep the CHAL runtime private even when a route forgot a dependency."""
+    if _runtime_path_requires_auth(request.url.path):
+        if not _install_key_matches(request.headers.get(API_KEY_HEADER)):
+            return JSONResponse(
+                status_code=401,
+                content={"error": "runtime_authentication_required"},
+            )
+    return await call_next(request)
 
 # --- C-301 Critic output screen ------------------------------------------
 # Final safety gate: every answer leaving a query endpoint is screened for
@@ -893,6 +945,9 @@ security_ws_manager = ConnectionManager()
 @app.websocket("/ws/security")
 async def security_websocket(websocket: WebSocket):
     """WebSocket endpoint for real-time security dashboard updates."""
+    if not _install_key_matches(websocket.headers.get(API_KEY_HEADER)):
+        await websocket.close(code=1008)
+        return
     await security_ws_manager.connect(websocket)
     try:
         while True:
@@ -1515,18 +1570,10 @@ async def _check_rate_limit(key: str, limit: int) -> bool:
 
 
 async def get_auth(request: Request, x_api_key: Optional[str] = Header(None)):
-    """Auth dependency — returns (is_authenticated, rate_limit_key)."""
-    if x_api_key:
-        db = SessionLocal()
-        key_record = db.query(APIKey).filter(APIKey.key == x_api_key, APIKey.status == "active").first()
-        db.close()
-        
-        if key_record:
-            x_trunc = str(x_api_key)[:8] # type: ignore
-            return True, f"auth:{x_trunc}"
-            
-    client_ip = request.client.host if request.client else "unknown"
-    return False, f"ip:{client_ip}"
+    """Defense-in-depth dependency for routes that also apply rate limits."""
+    if not _install_key_matches(x_api_key):
+        raise HTTPException(status_code=401, detail="runtime_authentication_required")
+    return True, "auth:install"
 
 
 # ─── Placeholder for Connection Management ───────────────────────────
@@ -3870,6 +3917,9 @@ async def monitoring_dashboard():
 @app.websocket("/api/v1/monitoring/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """Live WebSocket stream for all system metrics."""
+    if not _install_key_matches(websocket.headers.get(API_KEY_HEADER)):
+        await websocket.close(code=1008)
+        return
     await manager.connect(websocket)
     try:
         while True:
@@ -3991,20 +4041,13 @@ async def dashboard_ui():
 
 if __name__ == "__main__":
     import uvicorn # type: ignore
-    # Localhost-only by default: the desktop talks to the runtime on 127.0.0.1, so
-    # there is no reason to expose the brain to the network. Exposing non-locally
-    # (SYNTHESUS_HOST=0.0.0.0, e.g. for the cluster) REQUIRES a strong API key —
-    # otherwise the runtime is reachable network-wide with a known/absent key.
-    _host = os.environ.get("SYNTHESUS_HOST", "127.0.0.1")
-    _weak_key = (not ADMIN_KEY) or ADMIN_KEY == "dev-key-change-me"
-    if _host not in ("127.0.0.1", "localhost", "::1") and _weak_key:
-        logger.critical(
-            "Refusing to bind %s with a missing/default API key — that exposes the runtime to the "
-            "network with a known key. Set a strong SYNTHESUS_API_KEY to expose non-locally. "
-            "Falling back to 127.0.0.1.", _host)
-        _host = "127.0.0.1"
-    logger.info("Synthesus runtime binding %s:%s (set SYNTHESUS_HOST to change)", _host,
-                os.environ.get("PORT", 5010))
+    # Cluster traffic belongs on the mutually authenticated vSource/Unisync
+    # plane. This HTTP runtime remains a controller-private loopback service.
+    try:
+        _host = _required_runtime_host()
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
+    logger.info("Synthesus runtime binding %s:%s", _host, os.environ.get("PORT", 5010))
     uvicorn.run(app, host=_host, port=int(os.environ.get("PORT", 5010)), log_level="info")
 
 QueryResponse.model_rebuild()

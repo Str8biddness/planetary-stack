@@ -8,11 +8,17 @@ shared fixtures for the test harness.
 import json
 import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 import pytest
+
+# production_server intentionally has no development key fallback. Pytest sets
+# an explicit deterministic test-only install key before test modules import it.
+os.environ["SYNTHESUS_API_KEY"] = "syn_pytest_install_key_1234567890"
+os.environ.setdefault("SYNTHESUS_DATA_DIR", tempfile.mkdtemp(prefix="synthesus_pytest_data_"))
 
 # Ensure project root and legacy flat package paths are importable.
 ROOT = Path(__file__).resolve().parent.parent
@@ -63,7 +69,7 @@ def _build_api_client(server_url: str):
         app = getattr(module, "app", None)
         if app is None:
             raise RuntimeError(f"Test app module {server_path} did not expose app")
-        test_key = "test-api-key-for-pytest"
+        test_key = os.environ["SYNTHESUS_API_KEY"]
         if hasattr(module, "ADMIN_KEY"):
             module.ADMIN_KEY = test_key
         if hasattr(module, "AUTH_RATE_LIMIT"):
