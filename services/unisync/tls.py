@@ -695,21 +695,7 @@ class TrustedLanClient:
         with socket.create_connection((host, port), timeout=timeout) as raw_sock:
             raw_sock.settimeout(timeout)
             with ssl_context.wrap_socket(raw_sock, server_hostname=self.server_hostname) as tls_sock:
-                if tls_sock.version() != "TLSv1.3":
-                    raise TLSConfigurationError("negotiated TLS version is not TLSv1.3")
-                server_identity = _derive_authenticated_peer_identity(
-                    peer_cert=tls_sock.getpeercert(),
-                    der_bytes=tls_sock.getpeercert(binary_form=True),
-                    enrollments=self.enrolled_server_identities,
-                )
-                require_authorized(
-                    context,
-                    validator=self.validator,
-                    transport_id=self.transport_id,
-                    max_total_bytes=self.limits.max_total_bytes,
-                    peer_identity=server_identity,
-                    expected_peer_role="destination",
-                )
+                self._require_authenticated_destination(tls_sock, context)
                 return self._upload_over_socket(
                     tls_sock=tls_sock,
                     context=context,
@@ -729,12 +715,7 @@ class TrustedLanClient:
         deadline: Deadline | None = None,
         progress: ProgressCallback | None = None,
     ) -> TransferResult:
-        require_authorized(
-            context,
-            validator=self.validator,
-            transport_id=self.transport_id,
-            max_total_bytes=self.limits.max_total_bytes,
-        )
+        self._require_authenticated_destination(tls_sock, context)
         source = ContentAddressedStore(source_root)
         if source.stat_size(context.object_sha256) != context.byte_length:
             raise ValueError("source object size does not match transfer context")
@@ -747,6 +728,42 @@ class TrustedLanClient:
             deadline=deadline,
             progress=progress,
         )
+
+    def _require_authenticated_destination(
+        self,
+        tls_sock: ssl.SSLSocket,
+        context: TransferContext,
+    ) -> AuthenticatedPeerIdentity:
+        """Bind every TLS upload path to the enrolled destination node."""
+
+        if not self.enrolled_server_identities:
+            raise TLSConfigurationError(
+                "network mTLS requires an explicitly enrolled destination identity"
+            )
+        try:
+            version = tls_sock.version()
+            peer_cert = tls_sock.getpeercert()
+            peer_der = tls_sock.getpeercert(binary_form=True)
+        except (AttributeError, OSError, ssl.SSLError) as exc:
+            raise TLSConfigurationError(
+                "TLS socket cannot provide authenticated peer evidence"
+            ) from exc
+        if version != "TLSv1.3":
+            raise TLSConfigurationError("negotiated TLS version is not TLSv1.3")
+        server_identity = _derive_authenticated_peer_identity(
+            peer_cert=peer_cert,
+            der_bytes=peer_der,
+            enrollments=self.enrolled_server_identities,
+        )
+        require_authorized(
+            context,
+            validator=self.validator,
+            transport_id=self.transport_id,
+            max_total_bytes=self.limits.max_total_bytes,
+            peer_identity=server_identity,
+            expected_peer_role="destination",
+        )
+        return server_identity
 
     def _upload_over_socket(
         self,

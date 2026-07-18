@@ -241,6 +241,22 @@ def _client_enrollment(
     )
 
 
+def _server_enrollment(
+    certs: CertMaterial,
+    *,
+    account_id: str = "account:local",
+    node_id: str = "node:destination",
+) -> EnrolledPeerIdentity:
+    certificate_sha256, public_key_sha256 = _cert_fingerprints(certs.server_cert)
+    return EnrolledPeerIdentity(
+        account_id=account_id,
+        node_id=node_id,
+        sans=frozenset({"server.test", "127.0.0.1"}),
+        certificate_sha256=certificate_sha256,
+        public_key_sha256=public_key_sha256,
+    )
+
+
 def _server_instance(tmp_path, certs: CertMaterial, *, expired: bool = False, **kwargs) -> TrustedLanServer:
     enrolled_client_identities = kwargs.pop("enrolled_client_identities", {_client_enrollment(certs)})
     return TrustedLanServer(
@@ -296,6 +312,12 @@ class _MemoryTLSStream:
                     if time.monotonic() > deadline:
                         raise TimeoutError("memory TLS recv timed out")
                     self._pair.condition.wait(0.01)
+
+    def version(self) -> str | None:
+        return self._ssl_object.version()
+
+    def getpeercert(self, binary_form: bool = False):
+        return self._ssl_object.getpeercert(binary_form=binary_form)
 
 
 class _MemoryTLSPair:
@@ -439,6 +461,7 @@ def test_loopback_mtls_transfer_moves_object(tmp_path, payload: bytes, certs: Ce
         credentials=_client_credentials(certs),
         server_hostname="server.test",
         validator=StrictValidator(),
+        enrolled_server_identities={_server_enrollment(certs)},
         chunk_size=80,
     )
     context = make_context(payload, transport="lan_mtls")
@@ -457,6 +480,45 @@ def test_loopback_mtls_transfer_moves_object(tmp_path, payload: bytes, certs: Ce
     assert server.validator.peer_identities
     assert server.validator.peer_identities[-1] is not None
     assert server.validator.peer_identities[-1].node_id == "node:source"
+
+
+@pytest.mark.parametrize(
+    ("enrollments", "error", "message"),
+    [
+        ((), TLSConfigurationError, "explicitly enrolled destination"),
+        (
+            lambda certs: {_server_enrollment(certs, node_id="node:other")},
+            AuthorizationError,
+            "not enrolled",
+        ),
+    ],
+)
+def test_open_tls_socket_path_still_requires_exact_destination_enrollment(
+    tmp_path,
+    payload: bytes,
+    certs: CertMaterial,
+    enrollments,
+    error,
+    message: str,
+) -> None:
+    source = ContentAddressedStore(tmp_path / "source")
+    source.put_bytes(payload)
+    server = _server_instance(tmp_path, certs)
+    configured = enrollments(certs) if callable(enrollments) else enrollments
+    client = TrustedLanClient(
+        credentials=_client_credentials(certs),
+        server_hostname="server.test",
+        validator=StrictValidator(),
+        enrolled_server_identities=configured,
+    )
+    pair = _make_memory_tls_pair(server=server, client=client)
+
+    with pytest.raises(error, match=message):
+        client.upload_object_over_tls_socket(
+            tls_sock=pair.client_stream,
+            context=make_context(payload, transport="lan_mtls"),
+            source_root=source.root,
+        )
 
 
 @pytest.mark.parametrize(
@@ -484,6 +546,7 @@ def test_client_certificate_identity_must_match_transfer_context(
         credentials=_client_credentials(certs),
         server_hostname="server.test",
         validator=StrictValidator(),
+        enrolled_server_identities={_server_enrollment(certs)},
         chunk_size=80,
     )
 
@@ -520,6 +583,7 @@ def test_unknown_client_ca_is_refused(tmp_path, payload: bytes, certs: CertMater
         credentials=_client_credentials(certs, unknown_ca=True),
         server_hostname="server.test",
         validator=StrictValidator(),
+        enrolled_server_identities={_server_enrollment(certs)},
     )
     with pytest.raises(ssl.SSLError):
         _run_socketpair_upload(
@@ -538,6 +602,7 @@ def test_wrong_server_san_is_refused(tmp_path, payload: bytes, certs: CertMateri
         credentials=_client_credentials(certs),
         server_hostname="wrong.test",
         validator=StrictValidator(),
+        enrolled_server_identities={_server_enrollment(certs)},
     )
     with pytest.raises((ssl.SSLCertVerificationError, ssl.CertificateError)):
         _run_socketpair_upload(
@@ -556,6 +621,7 @@ def test_expired_server_certificate_is_refused(tmp_path, payload: bytes, certs: 
         credentials=_client_credentials(certs),
         server_hostname="server.test",
         validator=StrictValidator(),
+        enrolled_server_identities={_server_enrollment(certs)},
     )
     with pytest.raises(ssl.SSLCertVerificationError):
         _run_socketpair_upload(
