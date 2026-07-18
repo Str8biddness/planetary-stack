@@ -2,6 +2,7 @@
 # Safe sync of git tree → install dir WITHOUT destroying venv/env/user data.
 # Usage: ./tools/redeploy_install.sh [SOURCE_DIR] [INSTALL_DIR]
 set -euo pipefail
+umask 077
 
 SRC="${1:-$HOME/synthesus}"
 DEST="${2:-$HOME/.local/share/synthesus}"
@@ -10,6 +11,16 @@ c()  { printf "\033[1;36m%s\033[0m\n" "$*"; }
 ok() { printf "\033[1;32m  ✓ %s\033[0m\n" "$*"; }
 warn(){ printf "\033[1;33m  ! %s\033[0m\n" "$*"; }
 die(){ printf "\033[1;31m  ✗ %s\033[0m\n" "$*" >&2; exit 1; }
+
+replace_env_value() {
+  local path="$1" key="$2" value="$3" tmp="${1}.tmp.$$"
+  ( umask 077
+    grep -v "^${key}=" "$path" > "$tmp" || true
+    printf '%s=%s\n' "$key" "$value" >> "$tmp"
+  )
+  chmod 600 "$tmp"
+  mv -f "$tmp" "$path"
+}
 
 [ -d "$SRC/runtime" ] && [ -d "$SRC/desktop" ] || die "SRC must contain runtime/ and desktop/ ($SRC)"
 mkdir -p "$DEST"
@@ -38,12 +49,20 @@ mkdir -p "$DEST/tools"
 rsync -a "$SRC/tools/" "$DEST/tools/" 2>/dev/null || true
 
 # Preserve / create env secrets
+if [ -L "$DEST/synthesus.env" ]; then
+  die "refusing symlinked secret file: $DEST/synthesus.env"
+fi
+if [ -e "$DEST/synthesus.env" ] && [ ! -f "$DEST/synthesus.env" ]; then
+  die "secret path is not a regular file: $DEST/synthesus.env"
+fi
 if [ ! -f "$DEST/synthesus.env" ]; then
-  warn "no synthesus.env — generating API key + human session secret"
+  warn "no synthesus.env — generating API key + JWT + human session secrets"
   KEY="$(python3 -c 'import secrets; print("syn_"+secrets.token_urlsafe(32))')"
+  JWTSEC="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
   HSEC="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
   cat > "$DEST/synthesus.env" <<ENV
 SYNTHESUS_API_KEY=$KEY
+SYNTHESUS_JWT_SECRET=$JWTSEC
 SYNTHESUS_MODEL=${SYNTHESUS_MODEL:-llama3.2:3b}
 SYNTHESUS_HOST=127.0.0.1
 SYNTHESUS_KNOWLEDGE_SYNC_MODE=off
@@ -51,13 +70,29 @@ SYNTHESUS_HUMAN_SESSION_SECRET=$HSEC
 ENV
   chmod 600 "$DEST/synthesus.env"
 else
-  # Ensure human session secret exists without clobbering API key
+  if [ "$(stat -c '%u' "$DEST/synthesus.env")" != "$(id -u)" ]; then
+    die "secret file is not owned by the redeploy user"
+  fi
+  chmod 600 "$DEST/synthesus.env"
+  # Ensure new secrets exist without clobbering established identities.
+  CURRENT_KEY="$(sed -n 's/^SYNTHESUS_API_KEY=//p' "$DEST/synthesus.env" | tail -n 1)"
+  if [ "$CURRENT_KEY" = "dev-key-change-me" ] || [ "${#CURRENT_KEY}" -lt 24 ]; then
+    KEY="$(python3 -c 'import secrets; print("syn_"+secrets.token_urlsafe(32))')"
+    replace_env_value "$DEST/synthesus.env" SYNTHESUS_API_KEY "$KEY"
+    warn "replaced missing, known-default, or short SYNTHESUS_API_KEY"
+  fi
+  CURRENT_JWT="$(sed -n 's/^SYNTHESUS_JWT_SECRET=//p' "$DEST/synthesus.env" | tail -n 1)"
+  if [ "$CURRENT_JWT" = "dev_secret_change_me" ] || [ "${#CURRENT_JWT}" -lt 32 ]; then
+    JWTSEC="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
+    replace_env_value "$DEST/synthesus.env" SYNTHESUS_JWT_SECRET "$JWTSEC"
+    warn "replaced missing, known-default, or short SYNTHESUS_JWT_SECRET"
+  fi
   if ! grep -q '^SYNTHESUS_HUMAN_SESSION_SECRET=' "$DEST/synthesus.env" 2>/dev/null; then
     HSEC="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
     echo "SYNTHESUS_HUMAN_SESSION_SECRET=$HSEC" >> "$DEST/synthesus.env"
     ok "appended SYNTHESUS_HUMAN_SESSION_SECRET to existing synthesus.env"
   else
-    ok "synthesus.env preserved (includes human session secret)"
+    ok "synthesus.env preserved (includes JWT and human session secrets)"
   fi
   if ! grep -q '^SYNTHESUS_KNOWLEDGE_SYNC_MODE=' "$DEST/synthesus.env" 2>/dev/null; then
     echo "SYNTHESUS_KNOWLEDGE_SYNC_MODE=off" >> "$DEST/synthesus.env"

@@ -5,7 +5,11 @@
 set -uo pipefail
 
 URL="${RUNTIME_URL:-http://127.0.0.1:5010}"
-KEY="${API_KEY:-${SYNTHESUS_API_KEY:-dev-key-change-me}}"
+KEY="${API_KEY:-${SYNTHESUS_API_KEY:-}}"
+if [ -z "$KEY" ] || [ "$KEY" = "dev-key-change-me" ]; then
+  echo "[launch_smoke] set a unique SYNTHESUS_API_KEY; public defaults are refused" >&2
+  exit 1
+fi
 PY="${PYTHON:-$HOME/synthesus/.venv/bin/python}"
 ROOT="${SYNTHESUS_SRC:-$HOME/synthesus}"
 

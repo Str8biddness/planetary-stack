@@ -8,6 +8,7 @@ Branches: `feat/launch-smoke` (includes native-kernel + polish + module-audit).
 - [ ] `main` (or release tag) includes launch-smoke merges
 - [ ] Install dir synced with `tools/redeploy_install.sh` (preserves `.venv`, `synthesus.env`, `data/`)
 - [ ] `grep SYNTHESUS_HUMAN_SESSION_SECRET ~/.local/share/synthesus/synthesus.env` is set
+- [ ] `grep SYNTHESUS_JWT_SECRET ~/.local/share/synthesus/synthesus.env` is set
 - [ ] `scikit-learn==1.8.0` in install venv (`pip show scikit-learn`)
 
 ## B. Automated smoke
@@ -44,7 +45,7 @@ export SYNTHESUS_API_KEY=…   # from synthesus.env
 
 ## E. Security
 
-- [ ] Non-localhost: strong `SYNTHESUS_API_KEY` (not `dev-key-change-me`)  
+- [ ] Runtime remains loopback-only and uses a unique `SYNTHESUS_API_KEY` (not `dev-key-change-me`)
 - [ ] `/api/v1/security` imports (Dict/Any) — no silent NameError  
 
 ---

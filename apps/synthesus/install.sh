@@ -176,7 +176,17 @@ JWT_SECRET_VALUE="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))
 HUMAN_SESSION_SECRET="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 mkdir -p "$SYNTHESUS_HOME"
 # Preserve existing secrets if re-running install over an existing tree.
+if [ -L "$SYNTHESUS_HOME/synthesus.env" ]; then
+  die "refusing symlinked secret file: $SYNTHESUS_HOME/synthesus.env"
+fi
+if [ -e "$SYNTHESUS_HOME/synthesus.env" ] && [ ! -f "$SYNTHESUS_HOME/synthesus.env" ]; then
+  die "secret path is not a regular file: $SYNTHESUS_HOME/synthesus.env"
+fi
 if [ -f "$SYNTHESUS_HOME/synthesus.env" ]; then
+  if [ "$(stat -c '%u' "$SYNTHESUS_HOME/synthesus.env")" != "$(id -u)" ]; then
+    die "secret file is not owned by the installing user"
+  fi
+  chmod 600 "$SYNTHESUS_HOME/synthesus.env"
   # shellcheck disable=SC1090
   set -a; . "$SYNTHESUS_HOME/synthesus.env"; set +a
   KEY="${SYNTHESUS_API_KEY:-$KEY}"
@@ -184,7 +194,16 @@ if [ -f "$SYNTHESUS_HOME/synthesus.env" ]; then
   HUMAN_SESSION_SECRET="${SYNTHESUS_HUMAN_SESSION_SECRET:-$HUMAN_SESSION_SECRET}"
   warn "preserving existing synthesus.env secrets (API key / JWT / human session)"
 fi
-cat > "$SYNTHESUS_HOME/synthesus.env" <<ENV
+if [ "$KEY" = "dev-key-change-me" ] || [ "${#KEY}" -lt 24 ]; then
+  warn "replacing missing, known-default, or short API key"
+  KEY="$(python3 -c 'import secrets; print("syn_"+secrets.token_urlsafe(32))')"
+fi
+if [ "$JWT_SECRET_VALUE" = "dev_secret_change_me" ] || [ "${#JWT_SECRET_VALUE}" -lt 32 ]; then
+  warn "replacing missing, known-default, or short JWT secret"
+  JWT_SECRET_VALUE="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
+fi
+ENV_TMP="$SYNTHESUS_HOME/.synthesus.env.tmp.$$"
+( umask 077; cat > "$ENV_TMP" <<ENV
 # Auto-generated at install. Do not share. Never ship to the browser.
 SYNTHESUS_API_KEY=$KEY
 SYNTHESUS_JWT_SECRET=$JWT_SECRET_VALUE
@@ -198,7 +217,9 @@ SYNTHESUS_HUMAN_SESSION_SECRET=$HUMAN_SESSION_SECRET
 # Optional: absolute path to C++ kernel IPC binary (zo_kernel)
 # SYNTHESUS_KERNEL_BIN=$SYNTHESUS_HOME/runtime/packages/kernel/build/zo_kernel
 ENV
-chmod 600 "$SYNTHESUS_HOME/synthesus.env"
+)
+chmod 600 "$ENV_TMP"
+mv -f "$ENV_TMP" "$SYNTHESUS_HOME/synthesus.env"
 ok "unique secrets written to synthesus.env (API key + JWT + human session; localhost only)"
 
 # ---- 6. launcher + menu entry -------------------------------------------

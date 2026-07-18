@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import stat
+import subprocess
 
 import jwt
 import pytest
@@ -11,6 +12,45 @@ import accounts
 
 
 _TEST_JWT_SECRET = "test-only-" + ("j" * 40)
+_TEST_API_KEY = "syn_existing_test_key_1234567890"
+_TEST_HUMAN_SECRET = "human-session-" + ("h" * 32)
+
+
+def _env_values(path: Path):
+    return dict(
+        line.split("=", 1)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line and not line.startswith("#") and "=" in line
+    )
+
+
+def _run_redeploy(tmp_path: Path, initial_env: str | None = None):
+    source = tmp_path / "source"
+    destination = tmp_path / "install"
+    (source / "runtime").mkdir(parents=True)
+    (source / "desktop").mkdir()
+    destination.mkdir()
+    env_path = destination / "synthesus.env"
+    if initial_env is not None:
+        env_path.write_text(initial_env, encoding="utf-8")
+        os.chmod(env_path, 0o644)
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    for command in ("pkill", "sleep"):
+        tool = fake_bin / command
+        tool.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        tool.chmod(0o700)
+
+    script = Path(__file__).parents[1] / "tools" / "redeploy_install.sh"
+    completed = subprocess.run(
+        [str(script), str(source), str(destination)],
+        env={**os.environ, "PATH": f"{fake_bin}:/usr/bin:/bin"},
+        text=True,
+        capture_output=True,
+        timeout=30,
+    )
+    return completed, env_path
 
 
 @pytest.fixture
@@ -108,3 +148,100 @@ def test_native_shell_has_no_runtime_api_key_fallback():
     )
     assert 'os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")' not in source
     assert '"3way_drive_active": False' in source
+
+
+def test_redeploy_generates_all_owner_only_secrets(tmp_path):
+    completed, env_path = _run_redeploy(tmp_path)
+    assert completed.returncode == 0, completed.stderr
+
+    values = _env_values(env_path)
+    assert len(values["SYNTHESUS_API_KEY"]) >= 24
+    assert len(values["SYNTHESUS_JWT_SECRET"]) >= 32
+    assert len(values["SYNTHESUS_HUMAN_SESSION_SECRET"]) >= 32
+    assert stat.S_IMODE(env_path.stat().st_mode) == 0o600
+
+
+def test_redeploy_migrates_missing_or_insecure_secrets(tmp_path):
+    initial = "\n".join(
+        (
+            "SYNTHESUS_API_KEY=dev-key-change-me",
+            "SYNTHESUS_JWT_SECRET=dev_secret_change_me",
+            f"SYNTHESUS_HUMAN_SESSION_SECRET={_TEST_HUMAN_SECRET}",
+            "SYNTHESUS_MODEL=test-model",
+            "",
+        )
+    )
+    completed, env_path = _run_redeploy(tmp_path, initial)
+    assert completed.returncode == 0, completed.stderr
+
+    values = _env_values(env_path)
+    assert values["SYNTHESUS_API_KEY"] != "dev-key-change-me"
+    assert values["SYNTHESUS_JWT_SECRET"] != "dev_secret_change_me"
+    assert len(values["SYNTHESUS_API_KEY"]) >= 24
+    assert len(values["SYNTHESUS_JWT_SECRET"]) >= 32
+    assert values["SYNTHESUS_HUMAN_SESSION_SECRET"] == _TEST_HUMAN_SECRET
+    assert values["SYNTHESUS_MODEL"] == "test-model"
+    assert stat.S_IMODE(env_path.stat().st_mode) == 0o600
+
+
+def test_redeploy_preserves_valid_install_identity(tmp_path):
+    jwt_secret = "existing-jwt-" + ("s" * 40)
+    initial = "\n".join(
+        (
+            f"SYNTHESUS_API_KEY={_TEST_API_KEY}",
+            f"SYNTHESUS_JWT_SECRET={jwt_secret}",
+            f"SYNTHESUS_HUMAN_SESSION_SECRET={_TEST_HUMAN_SECRET}",
+            "SYNTHESUS_KNOWLEDGE_SYNC_MODE=off",
+            "",
+        )
+    )
+    completed, env_path = _run_redeploy(tmp_path, initial)
+    assert completed.returncode == 0, completed.stderr
+
+    values = _env_values(env_path)
+    assert values["SYNTHESUS_API_KEY"] == _TEST_API_KEY
+    assert values["SYNTHESUS_JWT_SECRET"] == jwt_secret
+    assert values["SYNTHESUS_HUMAN_SESSION_SECRET"] == _TEST_HUMAN_SECRET
+    assert stat.S_IMODE(env_path.stat().st_mode) == 0o600
+
+
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "directory"])
+def test_redeploy_refuses_unsafe_secret_path(tmp_path, unsafe_kind):
+    source = tmp_path / "source"
+    destination = tmp_path / "install"
+    (source / "runtime").mkdir(parents=True)
+    (source / "desktop").mkdir()
+    destination.mkdir()
+    env_path = destination / "synthesus.env"
+    target = tmp_path / "must-not-change"
+    target.write_text("sentinel", encoding="utf-8")
+    if unsafe_kind == "symlink":
+        env_path.symlink_to(target)
+    else:
+        env_path.mkdir()
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    for command in ("pkill", "sleep"):
+        tool = fake_bin / command
+        tool.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        tool.chmod(0o700)
+    script = Path(__file__).parents[1] / "tools" / "redeploy_install.sh"
+    completed = subprocess.run(
+        [str(script), str(source), str(destination)],
+        env={**os.environ, "PATH": f"{fake_bin}:/usr/bin:/bin"},
+        text=True,
+        capture_output=True,
+        timeout=30,
+    )
+
+    assert completed.returncode != 0
+    assert "secret" in completed.stderr.lower()
+    assert target.read_text(encoding="utf-8") == "sentinel"
+
+
+def test_full_installer_writes_secrets_atomically_and_owner_only():
+    source = (Path(__file__).parents[1] / "install.sh").read_text(encoding="utf-8")
+    assert 'if [ -e "$SYNTHESUS_HOME/synthesus.env" ] && [ ! -f' in source
+    assert '( umask 077; cat > "$ENV_TMP"' in source
+    assert 'mv -f "$ENV_TMP" "$SYNTHESUS_HOME/synthesus.env"' in source
