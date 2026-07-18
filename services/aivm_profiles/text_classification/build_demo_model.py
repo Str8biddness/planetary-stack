@@ -21,6 +21,11 @@ FEATURE_DIMS = 256
 CLASSES = ("negative", "positive")
 SEED = "planetary.aivm.demo.text-classification.v1"
 
+# Fixed demo document paired with the demo model for physical gates; the
+# bytes are repository-pinned so a source node can reproduce them locally
+# and no workload bytes ever cross the administrative channel.
+DEMO_DOCUMENT = b"planetary stack useful workload document\n"
+
 
 def _unit_float(tag: str, index: int) -> float:
     digest = hashlib.sha256(f"{SEED}:{tag}:{index}".encode("ascii")).digest()

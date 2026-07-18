@@ -69,6 +69,7 @@ ENROLL_INIT_SCHEMA = "planetary.unisync.mesh_enroll_init.v1"
 ENROLL_INSTALL_SCHEMA = "planetary.unisync.mesh_enroll_install.v1"
 ENROLL_INSTALL_RESULT_SCHEMA = "planetary.unisync.mesh_enroll_install_result.v1"
 PREPARE_SCHEMA = "planetary.unisync.mesh_prepare.v1"
+PREPARE_ARTIFACT_SCHEMA = "planetary.unisync.mesh_prepare_artifact.v1"
 PREPARE_RESULT_SCHEMA = "planetary.unisync.mesh_prepare_result.v1"
 SERVE_SCHEMA = "planetary.unisync.mesh_serve.v1"
 SERVE_READY_SCHEMA = "planetary.unisync.mesh_serve_ready.v1"
@@ -101,6 +102,7 @@ _INSTALL_FIELDS = frozenset(
     }
 )
 _PREPARE_FIELDS = frozenset({"schema", "account_id", "node_id", "byte_length"})
+_PREPARE_ARTIFACT_FIELDS = frozenset({"schema", "account_id", "node_id", "artifact"})
 _PEER_FIELDS = frozenset(
     {"account_id", "node_id", "sans", "certificate_sha256", "public_key_sha256"}
 )
@@ -349,6 +351,42 @@ def command_prepare(arguments: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def command_prepare_artifact(arguments: argparse.Namespace) -> dict[str, Any]:
+    """Reproduce one repo-pinned workload artifact locally; reveal only digest and size.
+
+    The artifact bytes are derived deterministically from the pinned repository
+    content on this node (the demo ONNX classifier builder or the fixed demo
+    document), so no workload bytes ever cross the administrative channel.
+    """
+
+    job = _read_stdin_job(MAX_PREPARE_JOB_BYTES)
+    if set(job) != _PREPARE_ARTIFACT_FIELDS or job["schema"] != PREPARE_ARTIFACT_SCHEMA:
+        raise MeshSecurityError("prepare-artifact job has unexpected fields")
+    account_id = require_identifier("account_id", job["account_id"])
+    node_id = require_identifier("node_id", job["node_id"])
+    artifact = job["artifact"]
+    if artifact not in {"model", "document"}:
+        raise MeshSecurityError("prepare-artifact kind is not allowlisted")
+    state_dir = Path(arguments.state_dir)
+    load_tls_credential_paths(state_dir, account_id=account_id, node_id=node_id)
+    from services.aivm_profiles.text_classification.build_demo_model import (
+        DEMO_DOCUMENT,
+        build,
+    )
+
+    payload = DEMO_DOCUMENT if artifact == "document" else build()
+    if not 1 <= len(payload) <= MAX_OBJECT_BYTES:
+        raise MeshSecurityError("artifact is outside the bounded object range")
+    digest = ContentAddressedStore(state_dir / OUTBOX_DIR).put_bytes(payload)
+    return {
+        "schema": PREPARE_RESULT_SCHEMA,
+        "account_id": account_id,
+        "node_id": node_id,
+        "object_sha256": digest,
+        "byte_length": len(payload),
+    }
+
+
 def command_serve(arguments: argparse.Namespace) -> dict[str, Any]:
     job = _read_stdin_job(MAX_SERVE_JOB_BYTES)
     if set(job) != _SERVE_FIELDS or job["schema"] != SERVE_SCHEMA:
@@ -551,7 +589,7 @@ def _parser() -> argparse.ArgumentParser:
     enroll_init.add_argument("--account-id", required=True)
     enroll_init.add_argument("--node-id", required=True)
     enroll_init.add_argument("--san", action="append", required=True)
-    for name in ("enroll-install", "prepare", "serve", "send"):
+    for name in ("enroll-install", "prepare", "prepare-artifact", "serve", "send"):
         sub = subparsers.add_parser(name)
         sub.add_argument("--state-dir", type=Path, required=True)
     return parser
@@ -561,6 +599,7 @@ _COMMANDS = {
     "enroll-init": command_enroll_init,
     "enroll-install": command_enroll_install,
     "prepare": command_prepare,
+    "prepare-artifact": command_prepare_artifact,
     "serve": command_serve,
     "send": command_send,
 }
