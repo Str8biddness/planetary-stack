@@ -39,6 +39,8 @@ from .mesh_common import (
     MeshSecurityError,
     b64url_decode,
     b64url_encode,
+    certificate_not_valid_after_utc,
+    certificate_not_valid_before_utc,
     compact_json,
     fsync_directory,
     normalize_san_set,
@@ -185,11 +187,15 @@ def validate_issued_certificate(
     account_names = certificate.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
     if len(account_names) != 1 or account_names[0].value != account_id:
         raise MeshSecurityError("certificate subject does not bind the enrolled account")
-    if certificate.not_valid_before_utc > current or current >= certificate.not_valid_after_utc:
+    certificate_not_before = certificate_not_valid_before_utc(certificate)
+    certificate_not_after = certificate_not_valid_after_utc(certificate)
+    issuer_not_before = certificate_not_valid_before_utc(issuer)
+    issuer_not_after = certificate_not_valid_after_utc(issuer)
+    if certificate_not_before > current or current >= certificate_not_after:
         raise MeshSecurityError("certificate is outside its validity window")
     if (
-        certificate.not_valid_before_utc < issuer.not_valid_before_utc
-        or certificate.not_valid_after_utc > issuer.not_valid_after_utc
+        certificate_not_before < issuer_not_before
+        or certificate_not_after > issuer_not_after
     ):
         raise MeshSecurityError("certificate validity exceeds the CA validity window")
     if _certificate_sans(certificate) != expected_sans:
@@ -206,8 +212,8 @@ def validate_issued_certificate(
         "public_key_sha256": _spki_sha256(certificate.public_key()),
         "serial_hex": format(certificate.serial_number, "x"),
         "issuer": issuer.subject.rfc4514_string(),
-        "not_before": wire_time(certificate.not_valid_before_utc),
-        "not_after": wire_time(certificate.not_valid_after_utc),
+        "not_before": wire_time(certificate_not_before),
+        "not_after": wire_time(certificate_not_after),
         "sans": list(expected_sans),
     }
 

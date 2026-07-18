@@ -2,7 +2,9 @@
 
 This is the controlling checklist for consolidating the repositories and
 shipping the first paid Planetary product. A checkbox is complete only when
-its acceptance gate has real evidence.
+its acceptance gate has real evidence. Product release readiness is defined in
+`FINISH_CHECKLIST.md`; exact progression and validation evidence are recorded
+in `AGENT_LOG.md`.
 
 ## Phase 0 — repository safety and decisions
 

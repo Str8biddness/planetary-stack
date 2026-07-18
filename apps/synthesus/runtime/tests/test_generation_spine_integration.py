@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 import inspect
+import os
 
 import pytest
 
@@ -120,7 +121,10 @@ def test_amplification_metrics_endpoint_contract():
 
     ps.HAS_GENERATION_SPINE = True
     ps._generation_spine = FakeSpine()
-    client = MainThreadASGIClient(ps.app)
+    client = MainThreadASGIClient(
+        ps.app,
+        headers={"X-API-Key": os.environ["SYNTHESUS_API_KEY"]},
+    )
     res = client.get("/api/v1/amplification/metrics")
     assert res.status_code == 200
     payload = res.json()

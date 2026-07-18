@@ -4,6 +4,7 @@ import threading
 import time
 import json
 import subprocess
+import shlex
 import uuid
 import atexit
 import secrets
@@ -33,7 +34,7 @@ if not getattr(sys, 'frozen', False):
 
 class CognitiveKernelIPC:
     def __init__(self):
-        self.kernel_status = "Sub-1GB Reasoning Engine: ACTIVE (Ring-0)"
+        self.kernel_status = "Sub-1GB Reasoning Engine: LOCAL FALLBACK"
         self.quadbrain = None
         try:
             from core.quadbrain_master import QuadbrainMaster
@@ -86,13 +87,30 @@ CONTROLLER_ORIGINS = (
     f"http://127.0.0.1:{SHELL_PORT}",
     f"http://localhost:{SHELL_PORT}",
 )
+_KNOWN_DEFAULT_API_KEYS = frozenset({"dev-key-change-me"})
+
+
+def _runtime_api_key():
+    """Return the installer-generated controller key or refuse startup."""
+    key = (os.environ.get("SYNTHESUS_API_KEY") or "").strip()
+    if key in _KNOWN_DEFAULT_API_KEYS or len(key.encode("utf-8")) < 24:
+        raise RuntimeError(
+            "Synthesus requires a unique per-install API key; run install.sh or "
+            "set SYNTHESUS_API_KEY."
+        )
+    return key
+
+
 CORS(
     app,
     resources={r"/api/*": {"origins": list(CONTROLLER_ORIGINS)}},
     supports_credentials=False,
 )
 
-# Ensure the accounts database/tables exist before serving any requests.
+# Fail before opening a listener if either local trust secret is missing, public,
+# or too short. The browser never receives these values.
+_runtime_api_key()
+accounts.require_secure_configuration()
 accounts.init_db()
 
 @app.after_request
@@ -167,7 +185,7 @@ atexit.register(_stop_child_processes)
 def _runtime_api_headers(*, include_human_session: bool = False) -> dict:
     """Headers for runtime calls. Human session secret is NEVER sent to the browser."""
     headers = {
-        "X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me"),
+        "X-API-Key": _runtime_api_key(),
         "Content-Type": "application/json",
     }
     if include_human_session:
@@ -221,8 +239,12 @@ def _human_identity_from_request():
 @app.route('/api/system/status', methods=['GET'])
 def get_status():
     status_data = {
-        "3way_drive_active": True,
-        "peripheral_bridge_active": True,
+        # Expansion Drive/RAG ingestion is not an SSI mount. Do not claim a
+        # distributed storage plane until a verified namespace is mounted.
+        "3way_drive_active": False,
+        "3way_drive_reason": "verified_planetary_drive_not_mounted",
+        "peripheral_bridge_active": False,
+        "peripheral_bridge_reason": "browser_kvm_not_enabled",
         "llm_status": kernel_ipc.kernel_status
     }
     
@@ -230,7 +252,7 @@ def get_status():
     try:
         r = requests.get(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/health",
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=2,
         )
         if r.status_code == 200:
@@ -248,7 +270,7 @@ def health_proxy():
     try:
         r = requests.get(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/health",
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=5,
         )
         return (r.text, r.status_code, {"Content-Type": "application/json"})
@@ -728,7 +750,7 @@ def drive_sources():
     try:
         r = requests.get(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/drive/sources",
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=15,
         )
         r.raise_for_status()
@@ -744,7 +766,7 @@ def drive_remotes():
     try:
         r = requests.get(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/drive/remotes",
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=20,
         )
         r.raise_for_status()
@@ -762,7 +784,7 @@ def drive_ingest():
         r = requests.post(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/drive/ingest",
             json=data,
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=600,
         )
         # Pass the runtime's status + body straight through — loud on errors,
@@ -778,7 +800,7 @@ def drive_progress(job_id):
     try:
         r = requests.get(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/drive/progress/{job_id}",
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=15,
         )
         return (r.text, r.status_code, {"Content-Type": "application/json"})
@@ -794,7 +816,7 @@ def drive_preview():
         r = requests.post(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/drive/preview",
             json=data,
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=30,
         )
         return (r.text, r.status_code, {"Content-Type": "application/json"})
@@ -808,7 +830,7 @@ def drive_rclone_status():
     try:
         r = requests.get(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/drive/rclone/status",
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=15,
         )
         return (r.text, r.status_code, {"Content-Type": "application/json"})
@@ -849,7 +871,7 @@ def drive_paste_local():
                 "namespace": name,
                 "async": False,
             },
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=120,
         )
         try:
@@ -942,7 +964,7 @@ def get_llm_settings():
     try:
         r = requests.get(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/settings/llm",
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=5,
         )
         return (r.text, r.status_code, {"Content-Type": "application/json"})
@@ -952,7 +974,7 @@ def get_llm_settings():
 @app.route('/api/settings/llm', methods=['POST'])
 def post_llm_settings():
     # Pro gate applies ONLY to cloud backends. Local backends (Ollama, LM Studio) are
-    # free — nothing leaves the machine, so there's nothing to gate.
+    # free because they use an explicitly configured local inference endpoint.
     data = request.json or {}
     provider = data.get("provider", "ollama")
     LOCAL_BACKENDS = ("ollama", "lmstudio")
@@ -963,7 +985,7 @@ def post_llm_settings():
         r = requests.post(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/settings/llm",
             json=data,
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=5,
         )
         return (r.text, r.status_code, {"Content-Type": "application/json"})
@@ -976,7 +998,7 @@ def export_conversation(sid):
     try:
         r = requests.get(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/conversations/{sid}/export?format={fmt}",
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=5,
         )
         return (r.text, r.status_code, {"Content-Type": r.headers.get("Content-Type", "text/markdown")})
@@ -988,7 +1010,7 @@ def pro_packs():
     try:
         r = requests.get(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/pro/packs",
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=5,
         )
         return (r.text, r.status_code, {"Content-Type": "application/json"})
@@ -1004,7 +1026,7 @@ def install_pro_pack():
         r = requests.post(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/pro/packs/install",
             json=data,
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=60,
         )
         return (r.text, r.status_code, {"Content-Type": "application/json"})
@@ -1016,7 +1038,7 @@ def get_foreman_queue():
     try:
         r = requests.get(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/foreman/queue",
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=5,
         )
         return (r.text, r.status_code, {"Content-Type": "application/json"})
@@ -1029,7 +1051,7 @@ def approve_foreman_step():
         r = requests.post(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/foreman/approve",
             json=request.json or {},
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=5,
         )
         return (r.text, r.status_code, {"Content-Type": "application/json"})
@@ -1042,7 +1064,7 @@ def deny_foreman_step():
         r = requests.post(
             f"{SYNTHESUS_RUNTIME_URL}/api/v1/foreman/deny",
             json=request.json or {},
-            headers={"X-API-Key": os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")},
+            headers={"X-API-Key": _runtime_api_key()},
             timeout=5,
         )
         return (r.text, r.status_code, {"Content-Type": "application/json"})
@@ -1141,38 +1163,18 @@ def read_ide_file():
 
 @app.route('/api/terminal/run', methods=['POST'])
 def run_command():
-    data = request.json
-    cmd = data.get('command', '')
-    override = data.get('admin_override', False)
-    
-    # -------------------------------------------------------------
-    # SYNTHESUS HIERARCHY APPROVAL PROTOCOL
-    # The AI actively evaluates the command's intent and risk profile.
-    # -------------------------------------------------------------
-    if not override:
-        # Route the command to the Quadbrain for deep contextual risk analysis
-        # (This replaces the cheap hardcoded string matching)
-        risk_evaluation = kernel_ipc.send_intent_to_kernel(f"Evaluate risk level of command: {cmd}")
-        
-        # If the AI deems the command a substrate-level modification, it prompts the user
-        if "HIGH_RISK" in risk_evaluation.upper() or "SUBSTRATE" in risk_evaluation.upper():
-            synthesus_query = f"Admin Dakin, you requested a substrate-level execution: '{cmd}'. My analysis indicates this modifies the core host hierarchy. Do I have your explicit authorization to proceed?"
-            return jsonify({
-                "status": "requires_approval",
-                "synthesus_query": synthesus_query,
-                "pending_command": cmd
-            })
-            
-    try:
-        # Route the shell command to the Host OS backend
-        # Increased timeout to 120 seconds to support long-running tasks like apt/npm
-        output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, text=True, timeout=120)
-    except subprocess.CalledProcessError as e:
-        output = e.output
-    except Exception as e:
-        output = str(e)
-        
-    return jsonify({"status": "success", "output": output})
+    """Reject the removed legacy shell-command transport.
+
+    Interactive terminal work is available only through the authenticated
+    synthesusd capability and its owner-only Unix-socket PTY backend. Keeping a
+    loud tombstone prevents old clients from silently falling back to a less
+    trusted path.
+    """
+    return jsonify({
+        "status": "disabled",
+        "error": "legacy_terminal_transport_removed",
+        "message": "Use the authenticated terminal WebSocket session.",
+    }), 410
 
 # ===================================================================
 # LAUNCHER
@@ -1185,7 +1187,7 @@ def ensure_runtime():
     """
     import urllib.request
     health = f"{SYNTHESUS_RUNTIME_UPSTREAM_URL}/api/v1/health"
-    key = os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")
+    key = _runtime_api_key()
 
     def _up():
         try:
@@ -1207,10 +1209,12 @@ def ensure_runtime():
     try:
         runtime_log = os.path.expanduser("~/.synthesus/runtime.log")
         os.makedirs(os.path.dirname(runtime_log), exist_ok=True)
+        argv = shlex.split(cmd)
+        if not argv:
+            raise ValueError("SYNTHESUS_RUNTIME_CMD is empty")
         _track_child(
             subprocess.Popen(
-                cmd,
-                shell=True,
+                argv,
                 stdout=open(runtime_log, "a"),
                 stderr=subprocess.STDOUT,
             )
@@ -1273,7 +1277,7 @@ def ensure_controller():
     import urllib.request
 
     health = f"{SYNTHESUS_CONTROLLER_URL}/ready"
-    key = os.environ.get("SYNTHESUS_API_KEY", "dev-key-change-me")
+    key = _runtime_api_key()
 
     def _up():
         try:

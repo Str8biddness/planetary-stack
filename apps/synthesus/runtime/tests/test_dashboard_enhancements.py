@@ -1,9 +1,13 @@
 import pytest
 import logging
+import os
 from api.production_server import app, logger
 from tests.asgi_client import MainThreadASGIClient
 
-client = MainThreadASGIClient(app)
+client = MainThreadASGIClient(
+    app,
+    headers={"X-API-Key": os.environ["SYNTHESUS_API_KEY"]},
+)
 
 def test_monitoring_dashboard_enhancements():
     # Trigger a warning log to see if it gets captured by MemoryLogHandler

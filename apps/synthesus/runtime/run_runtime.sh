@@ -17,7 +17,10 @@ fi
 
 cd "$RUNTIME_DIR"
 export PYTHONPATH="packages/reasoning:packages/kernel:packages/knowledge:packages/core:packages:.${PYTHONPATH:+:$PYTHONPATH}"
-export SYNTHESUS_API_KEY="${SYNTHESUS_API_KEY:-dev-key-change-me}"
+if [ -z "${SYNTHESUS_API_KEY:-}" ] || [ "${SYNTHESUS_API_KEY}" = "dev-key-change-me" ]; then
+  echo "[run_runtime] refusing startup without a unique SYNTHESUS_API_KEY; run install.sh" >&2
+  exit 1
+fi
 export PORT="${PORT:-5010}"
 export SYNTHESUS_CGPU_REALIZER="${SYNTHESUS_CGPU_REALIZER:-llm}"
 export SYNTHESUS_EMBEDDER="${SYNTHESUS_EMBEDDER:-semantic}"

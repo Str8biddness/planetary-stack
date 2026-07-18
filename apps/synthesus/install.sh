@@ -29,6 +29,17 @@ ok() { printf "\033[1;32m  ✓ %s\033[0m\n" "$*"; }
 warn(){ printf "\033[1;33m  ! %s\033[0m\n" "$*"; }
 die(){ printf "\033[1;31m  ✗ %s\033[0m\n" "$*" >&2; exit 1; }
 
+secret_needs_rotation() {
+  local value="$1" known_default="$2" minimum_length="$3"
+  if [ "$value" = "$known_default" ] || [ "${#value}" -lt "$minimum_length" ]; then
+    return 0
+  fi
+  case "$value" in
+    *[[:space:]]*) return 0 ;;
+  esac
+  return 1
+}
+
 c "Synthesus installer"
 echo "  install dir: $SYNTHESUS_HOME"
 echo "  model:       $SYNTHESUS_MODEL"
@@ -128,7 +139,17 @@ _gpu_detect_ollama
 
 # ---- 4. copy code + create venv -----------------------------------------
 c "4/6  Installing app + Python environment"
-mkdir -p "$SYNTHESUS_HOME"
+if [ -L "$SYNTHESUS_HOME" ]; then
+  die "refusing symlinked install directory: $SYNTHESUS_HOME"
+fi
+if [ -e "$SYNTHESUS_HOME" ] && [ ! -d "$SYNTHESUS_HOME" ]; then
+  die "install path is not a directory: $SYNTHESUS_HOME"
+fi
+install -d -m 0700 "$SYNTHESUS_HOME"
+if [ "$(stat -c '%u' "$SYNTHESUS_HOME")" != "$(id -u)" ]; then
+  die "install directory is not owned by the installing user"
+fi
+chmod 700 "$SYNTHESUS_HOME"
 rsync -a --delete --exclude '.git' --exclude '__pycache__' --exclude '*.pyc' \
       --exclude '.venv' --exclude 'venv' --exclude 'node_modules' \
       "$SRC_DIR/desktop/" "$SYNTHESUS_HOME/desktop/"
@@ -168,21 +189,45 @@ ok "environment ready (scikit-learn pinned 1.8.0 for SwarmEmbedder pickle compat
 # ---- 5. per-install key + human-session secret ---------------------------
 c "5/6  Generating private per-install secrets"
 KEY="$(python3 -c 'import secrets; print("syn_"+secrets.token_urlsafe(32))')"
+# Separate signing secret for local account JWTs. Reusing the controller API
+# key would unnecessarily couple two trust boundaries.
+JWT_SECRET_VALUE="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
 # Human attestation boundary: desktop shell injects this as X-Synthesus-Human-Session.
 # NEVER expose to frontend JS. Same value must be visible to runtime + shell.
 HUMAN_SESSION_SECRET="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
-mkdir -p "$SYNTHESUS_HOME"
 # Preserve existing secrets if re-running install over an existing tree.
+if [ -L "$SYNTHESUS_HOME/synthesus.env" ]; then
+  die "refusing symlinked secret file: $SYNTHESUS_HOME/synthesus.env"
+fi
+if [ -e "$SYNTHESUS_HOME/synthesus.env" ] && [ ! -f "$SYNTHESUS_HOME/synthesus.env" ]; then
+  die "secret path is not a regular file: $SYNTHESUS_HOME/synthesus.env"
+fi
 if [ -f "$SYNTHESUS_HOME/synthesus.env" ]; then
+  if [ "$(stat -c '%u' "$SYNTHESUS_HOME/synthesus.env")" != "$(id -u)" ]; then
+    die "secret file is not owned by the installing user"
+  fi
+  chmod 600 "$SYNTHESUS_HOME/synthesus.env"
   # shellcheck disable=SC1090
   set -a; . "$SYNTHESUS_HOME/synthesus.env"; set +a
   KEY="${SYNTHESUS_API_KEY:-$KEY}"
+  JWT_SECRET_VALUE="${SYNTHESUS_JWT_SECRET:-${JWT_SECRET:-$JWT_SECRET_VALUE}}"
   HUMAN_SESSION_SECRET="${SYNTHESUS_HUMAN_SESSION_SECRET:-$HUMAN_SESSION_SECRET}"
-  warn "preserving existing synthesus.env secrets (API key / human session)"
+  warn "preserving existing synthesus.env secrets (API key / JWT / human session)"
 fi
-cat > "$SYNTHESUS_HOME/synthesus.env" <<ENV
+if secret_needs_rotation "$KEY" "dev-key-change-me" 24; then
+  warn "replacing missing, known-default, short, or whitespace-containing API key"
+  KEY="$(python3 -c 'import secrets; print("syn_"+secrets.token_urlsafe(32))')"
+fi
+if secret_needs_rotation "$JWT_SECRET_VALUE" "dev_secret_change_me" 32; then
+  warn "replacing missing, known-default, short, or whitespace-containing JWT secret"
+  JWT_SECRET_VALUE="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
+fi
+ENV_TMP="$(mktemp "$SYNTHESUS_HOME/.synthesus.env.tmp.XXXXXX")"
+trap 'rm -f "$ENV_TMP"' EXIT
+cat > "$ENV_TMP" <<ENV
 # Auto-generated at install. Do not share. Never ship to the browser.
 SYNTHESUS_API_KEY=$KEY
+SYNTHESUS_JWT_SECRET=$JWT_SECRET_VALUE
 SYNTHESUS_MODEL=$SYNTHESUS_MODEL
 SYNTHESUS_HOST=127.0.0.1
 # The current published Knowledge Cloud bundle is not release-valid. Keep
@@ -193,8 +238,10 @@ SYNTHESUS_HUMAN_SESSION_SECRET=$HUMAN_SESSION_SECRET
 # Optional: absolute path to C++ kernel IPC binary (zo_kernel)
 # SYNTHESUS_KERNEL_BIN=$SYNTHESUS_HOME/runtime/packages/kernel/build/zo_kernel
 ENV
-chmod 600 "$SYNTHESUS_HOME/synthesus.env"
-ok "unique secrets written to synthesus.env (API key + human session; localhost only)"
+chmod 600 "$ENV_TMP"
+mv -f "$ENV_TMP" "$SYNTHESUS_HOME/synthesus.env"
+trap - EXIT
+ok "unique secrets written to synthesus.env (API key + JWT + human session; localhost only)"
 
 # ---- 6. launcher + menu entry -------------------------------------------
 c "6/6  Launcher"

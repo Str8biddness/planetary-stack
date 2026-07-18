@@ -13,10 +13,8 @@ function toggleWindow(id) {
         console.warn('toggleWindow: missing element', id);
         return;
     }
-    let displayState = 'none';
     if (win.style.display === 'none') {
         win.style.display = 'flex';
-        displayState = 'flex';
         clampIntoView(win);   // never open a window off-screen (unreachable title bar)
         focusWindow(win);
         
@@ -39,15 +37,6 @@ function toggleWindow(id) {
         }
     }
     try { syncDockActive(); } catch (_) {}
-    
-    // Broadcast to Grid
-    if (window.gridSocket && gridSocket.readyState === WebSocket.OPEN) {
-        gridSocket.send(JSON.stringify({
-            type: 'window_toggle',
-            id: id,
-            display: displayState
-        }));
-    }
 }
 
 function focusWindow(win) {
@@ -123,17 +112,6 @@ function onMouseMove(e) {
                 const newTop = Math.max(stripH, Math.min(currentMouseY - offsetY, window.innerHeight - 50));
                 currentWindow.style.left = newLeft + 'px';
                 currentWindow.style.top = newTop + 'px';
-                
-                // Broadcast to Grid Nodes
-                if (gridSocket && gridSocket.readyState === WebSocket.OPEN) {
-                    gridSocket.send(JSON.stringify({
-                        type: 'window_move',
-                        id: currentWindow.id,
-                        left: newLeft,
-                        top: newTop,
-                        zIndex: currentWindow.style.zIndex
-                    }));
-                }
             }
             animationFrameId = null;
         });
@@ -239,7 +217,7 @@ async function checkSystemStatus() {
             sysBridge.style.background = data.peripheral_bridge_active ? "#4ade80" : "#333";
         }
         
-        document.getElementById('status-quadbrain').textContent = data.llm_status.includes("ONLINE") ? "AI: ROOT SYNCED" : "AI: WAITING";
+        document.getElementById('status-quadbrain').textContent = data.llm_status.includes("ONLINE") ? "AI: ONLINE" : "AI: WAITING";
         document.getElementById('status-quadbrain').className = data.llm_status.includes("ONLINE") ? "status-indicator" : "status-indicator warning";
         
         document.getElementById('status-network').textContent = "NET: SECURE LINK";
@@ -318,13 +296,8 @@ async function fetchOSStatus() {
                     <div style="display:flex; justify-content:space-between;"><span>GPU VRAM:</span> <span style="color:#facc15;">Allocated (QuadBrain)</span></div>
                 `;
 
-                // Worker
-                const workerRes = await fetch('http://127.0.0.1:8082/api/system/status');
-                const workerData = await workerRes.json();
                 document.getElementById('pool-worker').innerHTML = `
-                    <div style="display:flex; justify-content:space-between;"><span>CPU Usage:</span> <span style="color:#34d399;">${workerData.cpu_percent != null ? workerData.cpu_percent + '%' : '—'}</span></div>
-                    <div style="display:flex; justify-content:space-between;"><span>RAM Usage:</span> <span style="color:#818cf8;">${workerData.ram_percent != null ? workerData.ram_percent + '%' : '—'}</span></div>
-                    <div style="display:flex; justify-content:space-between;"><span>SI Grid Load:</span> <span style="color:#facc15;">Synced via WebSocket</span></div>
+                    <div style="color:#94a3b8;">Secure mesh resource pooling is not enabled in this release.</div>
                 `;
             } catch(e) {
                 document.getElementById('pool-worker').innerText = 'Node Offline or Refused Connection';
@@ -1133,177 +1106,6 @@ async function runUSCL() {
 }
 
 // ==========================================
-// UNIFIED SYSTEM GRID SYNC
-// ==========================================
-function initGridStateSync() {
-    // Guard: the boot path and the login path both land here — never stack a
-    // second live socket on top of one that's already open/connecting.
-    if (window.gridSocket && (window.gridSocket.readyState === WebSocket.OPEN ||
-                              window.gridSocket.readyState === WebSocket.CONNECTING)) return;
-    window.gridSocket = new WebSocket(`ws://127.0.0.1:8082/ws/grid-state`);
-    
-    window.gridSocket.onmessage = (event) => {
-        try {
-            const data = JSON.parse(event.data);
-            const isWorker = new URLSearchParams(window.location.search).get("mode") === "worker";
-            if (isWorker) {
-                if (data.type === "virtual_mouse") {
-                    const cursor = document.getElementById("virtual-cursor");
-                    if (cursor) {
-                        cursor.style.display = "block";
-                        let nodeIndex = parseInt(new URLSearchParams(window.location.search).get('node_index') || "1");
-                        const viewportX = data.x - (nodeIndex * window.innerWidth);
-                        cursor.style.left = viewportX + "px";
-                        cursor.style.top = data.y + "px";
-                    }
-                }
-                if (data.type === "virtual_hide") {
-                    const cursor = document.getElementById("virtual-cursor");
-                    if (cursor) cursor.style.display = "none";
-                }
-                if (data.type === "virtual_mousedown") {
-                    let nodeIndex = parseInt(new URLSearchParams(window.location.search).get('node_index') || "1");
-                    const viewportX = data.x - (nodeIndex * window.innerWidth);
-                    const el = document.elementFromPoint(viewportX, data.y);
-                    if (el) el.click();
-                }
-            }
-            if (data.type === 'window_move') {
-                const win = document.getElementById(data.id);
-                if (win) {
-                    win.style.left = data.left + 'px';
-                    win.style.top = data.top + 'px';
-                    win.style.zIndex = data.zIndex;
-                }
-            } else if (data.type === 'window_toggle') {
-                const win = document.getElementById(data.id);
-                if (win) {
-                    win.style.display = data.display;
-                    if (data.display === 'flex') {
-                        // Trigger lazy load
-                        if (data.id === 'win-explorer') fetchIDEFiles();
-                        if (data.id === 'win-twin') startTwinSimulation();
-                    }
-                }
-            }
-        } catch (e) {
-            console.error("Grid Sync Error:", e);
-        }
-    };
-
-    window.gridSocket.onopen = () => {
-        console.log("🌌 CONNECTED TO AIVM GRID LAYER");
-    };
-    
-    window.gridSocket.onclose = () => {
-        // The grid/cluster server (:8082) is optional — chat + the expansion
-        // drive don't need it. Retry a few times with backoff, then go quiet
-        // instead of spamming a reconnect every 2s forever.
-        window._gridRetries = (window._gridRetries || 0) + 1;
-        if (window._gridRetries <= 3) {
-            setTimeout(connectGridSocket, 3000 * window._gridRetries);
-        } else if (window._gridRetries === 4) {
-            console.log("Grid layer offline — running standalone (chat + drive unaffected).");
-        }
-    };
-}
-
-// Reconnect entrypoint used by the onclose retry/backoff above.
-function connectGridSocket() { initGridStateSync(); }
-connectGridSocket();
-
-// ==========================================
-// SSI CONTIGUOUS DESKTOP EXTENSION
-// ==========================================
-document.addEventListener('DOMContentLoaded', () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('mode') === 'worker') {
-        // Shift entire UI to the left by the width of the Master monitor * node index
-        // so multiple monitors can be chained seamlessly!
-        let nodeIndex = parseInt(urlParams.get('node_index') || "1");
-        let offset = nodeIndex * 1920;
-        let totalWidth = (nodeIndex + 1) * 1920;
-        
-        const desktopArea = document.getElementById("desktop-area");
-        if (desktopArea) {
-            desktopArea.style.position = "absolute";
-            desktopArea.style.left = `-${offset}px`;
-            desktopArea.style.width = `${totalWidth}px`;
-            desktopArea.style.height = "100vh";
-        }
-        
-        document.body.style.overflow = "hidden";
-        
-        // Hide the local dock on the worker node, as the master has the dock
-        const dock = document.querySelector('.dock');
-        if (dock) dock.style.display = 'none';
-        
-        console.log("🌌 SSI Resource Node Mode Activated. Contiguous Desktop established.");
-    }
-});
-
-// ==========================================
-// VIRTUAL PERIPHERAL BRIDGE (Browser-Native KVM)
-// ==========================================
-let virtualX = 0;
-let virtualY = 0;
-let isPointerLocked = false;
-let screenWidth = window.innerWidth;
-
-document.addEventListener("DOMContentLoaded", () => {
-    const cursorEl = document.createElement("div");
-    cursorEl.id = "virtual-cursor";
-    cursorEl.style.position = "absolute";
-    cursorEl.style.width = "24px";
-    cursorEl.style.height = "24px";
-    cursorEl.style.background = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='white' stroke='black' stroke-width='1.5'%3E%3Cpath d='M3 3l7 19 3.5-7.5L21 11z'/%3E%3C/svg%3E\") no-repeat";
-    cursorEl.style.backgroundSize = "contain";
-    cursorEl.style.zIndex = "999999";
-    cursorEl.style.pointerEvents = "none";
-    cursorEl.style.display = "none";
-    const desktopArea = document.getElementById("desktop-area") || document.body;
-    desktopArea.appendChild(cursorEl);
-
-    const isWorker = new URLSearchParams(window.location.search).get("mode") === "worker";
-    if (!isWorker) {
-        // Right Hop Zone
-        const hopZoneRight = document.createElement("div");
-        hopZoneRight.style.position = "fixed";
-        hopZoneRight.style.right = "0";
-        hopZoneRight.style.top = "0";
-        hopZoneRight.style.width = "20px";
-        hopZoneRight.style.height = "100%";
-        hopZoneRight.style.background = "linear-gradient(90deg, rgba(56,189,248,0) 0%, rgba(56,189,248,0.3) 100%)";
-        hopZoneRight.style.cursor = "e-resize";
-        hopZoneRight.style.zIndex = "999998";
-        hopZoneRight.title = "Hop to Right Node";
-        hopZoneRight.onclick = () => { hopDirection = "right"; document.body.requestPointerLock(); };
-        document.body.appendChild(hopZoneRight);
-
-        // Left Hop Zone
-        const hopZoneLeft = document.createElement("div");
-        hopZoneLeft.style.position = "fixed";
-        hopZoneLeft.style.left = "0";
-        hopZoneLeft.style.top = "0";
-        hopZoneLeft.style.width = "20px";
-        hopZoneLeft.style.height = "100%";
-        hopZoneLeft.style.background = "linear-gradient(270deg, rgba(56,189,248,0) 0%, rgba(56,189,248,0.3) 100%)";
-        hopZoneLeft.style.cursor = "w-resize";
-        hopZoneLeft.style.zIndex = "999998";
-        hopZoneLeft.title = "Hop to Left Node";
-        hopZoneLeft.onclick = () => { hopDirection = "left"; document.body.requestPointerLock(); };
-        document.body.appendChild(hopZoneLeft);
-    }
-});
-
-document.addEventListener("pointerlockerror", () => {
-    alert("Browser blocked the mouse edge-hop! Ensure you are clicking the edge directly.");
-});
-
-let lastRealY = window.innerHeight / 2;
-let hopDirection = "right";
-
-// ==========================================
 // DESKTOP UI LOGIC
 // ==========================================
 
@@ -1408,12 +1210,6 @@ async function processLogin() {
     window.sessionId   = data.user.email;
     window.currentUser = data.user;
 
-    // Best-effort grid join (its server may be down) — fully isolated.
-    try {
-        const nid = encodeURIComponent(data.user.email);
-        fetch(`http://127.0.0.1:8082/api/grid/login?node_id=${nid}&user_id=${nid}`, { method: 'POST' }).catch(e => console.log(e));
-    } catch (e) { console.log(e); }
-
     btn.disabled = false; btn.innerText = original;
     document.getElementById('login-modal').style.display = 'none';
     if (isRegister) {
@@ -1440,7 +1236,6 @@ function enterDesktop() {
     flash.className = 'boot-flash';
     document.body.appendChild(flash);
     setTimeout(function () { flash.remove(); }, 900);
-    try { initGridStateSync(); } catch (e) { console.log(e); }
     try { startInstrStatusStrip(); } catch (e) {}
     // First boot: surface the two critical surfaces so the OS feels alive
     try {
@@ -1592,64 +1387,6 @@ async function activatePro() {
 
 
 
-function hideRegistration() {
-    const email = document.getElementById('user-email');
-    const pass = document.getElementById('user-pass');
-    
-    if (email && email.value.trim() === '') {
-        alert("Account Email is required for KYC & Casino access.");
-        return;
-    }
-    if (pass && pass.value.trim() === '') {
-        alert("Secure Password is required to harden your Node.");
-        return;
-    }
-    
-    // Auto-derive Node ID from the root identity (email prefix + hardware ID)
-    const emailPrefix = email.value.split('@')[0];
-    const hardwareId = Math.random().toString(36).substr(2, 4).toUpperCase();
-    window.nodeName = `ROOT-${emailPrefix}-${hardwareId}`;
-
-    document.getElementById('installer-modal').style.display = 'none';
-    document.getElementById('tier-modal').style.display = 'flex';
-}
-
-
-
-function completeInstall() {
-    try {
-        const nodeName = window.nodeName || `ROOT-Anonymous-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
-
-        const tosAgree = document.getElementById('tos-agree').checked;
-        
-        if (!tosAgree) {
-            alert("You must agree to the Liability Waiver to proceed.");
-            return;
-        }
-        
-        try {
-            localStorage.setItem('synthesus_user', nodeName);
-        } catch(e) {}
-        
-        window.sessionId = nodeName;
-        
-        let driveSize = "500"; // Handled post-boot now
-        
-        // Connect to SSI (We use 127.0.0.1 to avoid CORS or dns issues)
-        fetch(`http://127.0.0.1:8082/api/grid/login?node_id=${nodeName}&user_id=${nodeName}&drive_size=${driveSize}`, {method: 'POST'})
-            .catch(e=>console.log(e));
-        
-        // Check for OTA updates before fully booting
-        checkOTAUpdates(nodeName);
-        
-        // Init Desktop
-        initGridStateSync();
-    } catch(err) {
-        alert("Boot Error: " + err.message);
-        checkOTAUpdates(window.nodeName);
-    }
-}
-
 // ======================================================================
 // WALLPAPER SYSTEM
 // Add a new stock wallpaper by appending one entry below:
@@ -1743,155 +1480,6 @@ function changeWallpaper(event) {
     };
     reader.readAsDataURL(file);
 }
-
-document.addEventListener("pointerlockchange", () => {
-    isPointerLocked = (document.pointerLockElement === document.body);
-    if (!isPointerLocked) {
-        virtualX = hopDirection === "right" ? screenWidth - 30 : 30;
-        if(window.gridSocket && window.gridSocket.readyState === WebSocket.OPEN) {
-            window.gridSocket.send(JSON.stringify({ type: "virtual_hide" }));
-        }
-    } else {
-        virtualX = hopDirection === "right" ? screenWidth + 1 : -1;
-        virtualY = lastRealY; // Start at the height the mouse was at
-    }
-});
-
-document.addEventListener("mousemove", (e) => {
-    const isWorker = new URLSearchParams(window.location.search).get("mode") === "worker";
-    if (isWorker) return; 
-    
-    if (isPointerLocked) {
-        virtualX += e.movementX;
-        virtualY += e.movementY;
-        
-        if (virtualY < 0) virtualY = 0;
-        if (virtualY > window.innerHeight) virtualY = window.innerHeight;
-        if (hopDirection === "right") {
-            if (virtualX > screenWidth * 2) virtualX = screenWidth * 2;
-            if (virtualX <= screenWidth) {
-                document.exitPointerLock();
-                return;
-            }
-        } else {
-            if (virtualX < -screenWidth) virtualX = -screenWidth;
-            if (virtualX >= 0) {
-                document.exitPointerLock();
-                return;
-            }
-        }
-        
-        if(window.gridSocket && window.gridSocket.readyState === WebSocket.OPEN) {
-            if (!window.virtualMouseThrottle) {
-                window.virtualMouseThrottle = true;
-                requestAnimationFrame(() => {
-                    if(window.gridSocket && window.gridSocket.readyState === WebSocket.OPEN) {
-                        window.gridSocket.send(JSON.stringify({ 
-                            type: "virtual_mouse", 
-                            x: virtualX, 
-                            y: virtualY 
-                        }));
-                        
-                        // Send relative UDP Native KVM packet to the daemon
-                        window.gridSocket.send(JSON.stringify({
-                            type: "virtual_mouse_rel",
-                            dx: e.movementX,
-                            dy: e.movementY
-                        }));
-                    }
-                    window.virtualMouseThrottle = false;
-                });
-            }
-        }
-    } else {
-        virtualX = e.clientX;
-        virtualY = e.clientY;
-        lastRealY = e.clientY;
-    }
-});
-
-document.addEventListener("mousedown", (e) => {
-    if (isPointerLocked && window.gridSocket && window.gridSocket.readyState === WebSocket.OPEN) {
-        window.gridSocket.send(JSON.stringify({ type: "virtual_mousedown", x: virtualX, y: virtualY }));
-    }
-});
-
-// --- OTA Update Engine ---
-async function checkOTAUpdates(nodeId) {
-    try {
-        const response = await fetch(`http://127.0.0.1:8082/api/grid/ota?node_id=${nodeId}`);
-        const data = await response.json();
-        
-        if (data.has_update) {
-            runOTASequence(data);
-        } else {
-            document.getElementById('installer-modal').style.display = 'none';
-        }
-    } catch (e) {
-        console.error("OTA Check Failed", e);
-        document.getElementById('installer-modal').style.display = 'none';
-    }
-}
-
-function runOTASequence(updateData) {
-    document.getElementById('installer-modal').style.display = 'none';
-    const otaModal = document.getElementById('ota-modal');
-    const otaConsole = document.getElementById('ota-console');
-    const otaProgress = document.getElementById('ota-progress-bar');
-    
-    otaModal.style.display = 'flex';
-    
-    const logs = [
-        `> Found pending update: ${updateData.latest_version}`,
-        `> Payload size: ${updateData.update_size_mb} MB`,
-        `> Fetching binary deltas from nearest CDN node...`,
-        `> Applying AIOS Sports Betting Engine models...`,
-        `> Recompiling C++ Kernel for Waydroid VM Integration...`,
-        `> Patching God-Mode Multimodel Workspace...`,
-        `> Verifying cryptographic signatures...`,
-        `> Update compilation complete. Injecting into local Ring-0...`
-    ];
-    
-    let step = 0;
-    const interval = setInterval(() => {
-        if (step < logs.length) {
-            otaConsole.innerHTML += logs[step] + '<br>';
-            otaConsole.scrollTop = otaConsole.scrollHeight;
-            otaProgress.style.width = `${(step + 1) * (100 / logs.length)}%`;
-            step++;
-        } else {
-            clearInterval(interval);
-
-            setTimeout(() => {
-                otaModal.style.display = 'none';
-                triggerExpansionDriveInstaller();
-            }, 1000);
-
-        }
-    }, 600);
-}
-
-
-function triggerExpansionDriveInstaller() {
-    // Open the REAL guided creator (no simulated compile). One place to build a
-    // drive from any source, wired end-to-end to the runtime.
-    const modal = document.getElementById('expansion-modal');
-    if (modal) modal.style.display = 'none';
-    const win = document.getElementById('win-drive');
-    if (win && win.style.display === 'none') toggleWindow('win-drive');
-    else loadDriveSources();
-}
-
-function authenticateCloud(providerName) {
-    // Legacy entry point → route into the real creator instead of faking a build.
-    const modal = document.getElementById('expansion-modal');
-    if (modal) modal.style.display = 'none';
-    if (document.getElementById('win-drive').style.display === 'none') toggleWindow('win-drive');
-    // preselect the matching cloud source if it's loaded
-    const key = (providerName || '').toLowerCase();
-    setTimeout(() => { if (DRIVE_SOURCES.find(s => s.key === key)) driveSelectSource(key); }, 300);
-}
-
 
 function maximizeWindow(el) {
     let win;
@@ -2071,7 +1659,7 @@ function renderConnectBody() {
           '<label style="color:#cbd5e1;font-size:.82rem;">Repository</label>' +
           '<input id="drive-in-primary" class="glass-input" placeholder="owner/repo, git URL, or local path">' +
           '<label style="color:#cbd5e1;font-size:.82rem;">Access token <span style="color:#64748b;">(only for private repos)</span></label>' +
-          '<input id="drive-in-token" type="password" class="glass-input" placeholder="ghp_… — stays local, never stored">';
+          '<input id="drive-in-token" type="password" class="glass-input" placeholder="ghp_… — sent to GitHub for this fetch; not saved in the clone URL">';
     } else if (key === 'folder') {
         html =
           '<label style="color:#cbd5e1;font-size:.82rem;">Folder path</label>' +
@@ -2350,17 +1938,6 @@ async function previewDrive(namespace) {
 
 
 window.onload = function() {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('node') === 'expansion') {
-        // Automatically bypass login and sync auth from the parent node
-        const regOverlay = document.getElementById('registration-overlay');
-        if (regOverlay) regOverlay.style.display = 'none';
-        const loginModal = document.getElementById('login-modal');
-        if (loginModal) loginModal.style.display = 'none';
-        window.nodeId = urlParams.get('auth');
-        const nodeLabel = document.getElementById('nodeLabel');
-        if (nodeLabel) nodeLabel.innerText = `Connected: ${window.nodeId} (EXPANSION)`;
-    }
     loadLLMSettings();
 };
 
@@ -3552,7 +3129,7 @@ function startInstrStatusStrip() {
         '<span class="strip-item">MODEL <span id="strip-model">—</span></span>' +
         '<span class="strip-item"><span class="strip-dot" id="strip-llm-dot"></span> LLM</span>' +
         '<span class="strip-item">UP <span id="strip-up">—</span>s</span>' +
-        '<span class="strip-offline" title="Local SI — no cloud egress by design">⦸ OFFLINE — nothing leaves this machine</span>';
+        '<span class="strip-offline" title="Network use depends on enabled features">NETWORK: FEATURE-DEPENDENT</span>';
     document.body.insertBefore(strip, document.body.firstChild);
     document.body.classList.add('has-instr-strip');
     // offset main content slightly so strip doesn't cover window tops

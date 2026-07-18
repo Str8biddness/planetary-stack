@@ -10,7 +10,9 @@ language based on character-specific patterns found in KAL.
 from __future__ import annotations
 
 import logging
+import os
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ml.pattern_lm import PatternLM
@@ -19,19 +21,29 @@ from ml.dialogue_ranker import DialogueRanker
 logger = logging.getLogger(__name__)
 
 
+def _default_global_db_path() -> str:
+    data_root = os.environ.get("SYNTHESUS_DATA_DIR")
+    if not data_root:
+        install_root = os.environ.get(
+            "SYNTHESUS_HOME",
+            str(Path.home() / ".local" / "share" / "synthesus"),
+        )
+        data_root = str(Path(install_root) / "data")
+    return str(Path(data_root).expanduser() / "pattern_lm.db")
+
+
 class PatternEngine:
     """
     Cognitive module that generates responses by chaining pattern word-transitions.
     Mixes transient FAISS-retrieved patterns with a massive global out-of-core LM.
     """
 
-    def __init__(self, ranker: Optional[DialogueRanker] = None, global_db_path: str = "D:/synthesus_data/data/pattern_lm.db", substrate: Any = None):
+    def __init__(self, ranker: Optional[DialogueRanker] = None, global_db_path: Optional[str] = None, substrate: Any = None):
         self._ranker = ranker or DialogueRanker()
-        self.global_db_path = global_db_path
+        self.global_db_path = global_db_path or _default_global_db_path()
         self.substrate = substrate
         
         # Connect to the trillion-parameter out-of-core SQLite backend
-        import os
         self.global_lm = PatternLM(order=3, db_path=self.global_db_path, substrate=self.substrate)
         # If DB exists, it's considered fitted (avoids loading everything into memory to check)
         self.global_lm._fitted = os.path.exists(self.global_db_path) or (self.substrate is not None)
@@ -258,4 +270,3 @@ class PatternEngine:
         logger.debug(f"PatternEngine: Synthesized knowledge in {latency_ms:.1f}ms")
         
         return result
-
