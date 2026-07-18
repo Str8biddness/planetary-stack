@@ -20,14 +20,18 @@ import stat
 import subprocess
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import InitVar, asdict, dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from typing import Any, Protocol
 
-from contracts.aivm.v1 import AIVMWorkloadManifest, document_sha256
+from contracts.aivm.v1 import (
+    AIVMWorkloadManifest,
+    canonical_document_bytes,
+    document_sha256,
+)
 
 from ..admission import AdmissionDecision, AdmissionStatus
 
@@ -165,30 +169,40 @@ class LeaseAuthority:
 
 @dataclass(frozen=True)
 class AdmittedExecutionRequest:
-    """Manifest and lease authority that have passed earlier trust gates.
+    """Sealed manifest and lease authority that passed earlier trust gates.
 
     The executor intentionally requires an :class:`AdmissionDecision` rather
     than accepting a raw workload manifest.  It rechecks all identity and
-    policy bindings but does not claim to repeat signature verification.
+    policy bindings but does not claim to repeat signature verification.  The
+    caller-owned Pydantic graph is canonicalized once during construction and
+    is never retained; each ``manifest`` access reparses the immutable bytes.
     """
 
-    manifest: AIVMWorkloadManifest
+    source_manifest: InitVar[AIVMWorkloadManifest]
     admission: AdmissionDecision
     lease: LeaseAuthority
+    _manifest_document: bytes = field(init=False, repr=False)
     manifest_sha256: str = field(init=False)
 
-    def __post_init__(self) -> None:
-        if type(self.manifest) is not AIVMWorkloadManifest:
+    def __post_init__(self, source_manifest: AIVMWorkloadManifest) -> None:
+        if type(source_manifest) is not AIVMWorkloadManifest:
             raise InvalidExecutionRequest("manifest_not_strict_model")
+        try:
+            manifest_document = canonical_document_bytes(source_manifest)
+            manifest = AIVMWorkloadManifest.model_validate_json_strict(
+                manifest_document
+            )
+        except (TypeError, ValueError) as exc:
+            raise InvalidExecutionRequest("manifest_snapshot_invalid") from exc
         if (
             self.admission.status is not AdmissionStatus.ADMITTED
             or not self.admission.admitted
         ):
             raise InvalidExecutionRequest("manifest_not_admitted")
         expected_identity = (
-            self.manifest.manifest_id,
-            self.manifest.workload_id,
-            self.manifest.account_id,
+            manifest.manifest_id,
+            manifest.workload_id,
+            manifest.account_id,
         )
         admitted_identity = (
             self.admission.manifest_id,
@@ -198,26 +212,41 @@ class AdmittedExecutionRequest:
         if admitted_identity != expected_identity:
             raise InvalidExecutionRequest("admission_identity_mismatch")
         image_identity = (
-            f"{self.manifest.runtime_image.image_id}@"
-            f"{self.manifest.runtime_image.digest}"
+            f"{manifest.runtime_image.image_id}@"
+            f"{manifest.runtime_image.digest}"
         )
         if self.admission.evidence.get("runtime_image") != image_identity:
             raise InvalidExecutionRequest("admission_image_mismatch")
-        if self.admission.evidence.get("entrypoint_id") != self.manifest.entrypoint_id:
+        if self.admission.evidence.get("entrypoint_id") != manifest.entrypoint_id:
             raise InvalidExecutionRequest("admission_entrypoint_mismatch")
-        if self.lease.account_id != self.manifest.account_id:
+        if self.lease.account_id != manifest.account_id:
             raise InvalidExecutionRequest("lease_account_mismatch")
-        if self.lease.workload_id != self.manifest.workload_id:
+        if self.lease.workload_id != manifest.workload_id:
             raise InvalidExecutionRequest("lease_workload_mismatch")
-        if self.manifest.network.mode != "deny" or self.manifest.network.allowlist:
+        if manifest.network.mode != "deny" or manifest.network.allowlist:
             raise InvalidExecutionRequest("cpu_executor_requires_network_deny")
-        if self.manifest.runtime_image.devices:
+        if manifest.runtime_image.devices:
             raise InvalidExecutionRequest("cpu_executor_rejects_devices")
-        if self.manifest.resources.gpu_count or self.manifest.resources.gpu_memory_bytes:
+        if manifest.resources.gpu_count or manifest.resources.gpu_memory_bytes:
             raise InvalidExecutionRequest("cpu_executor_rejects_gpu")
-        if self.manifest.filesystem.rootfs != "readonly" or self.manifest.filesystem.host_mounts:
+        if manifest.filesystem.rootfs != "readonly" or manifest.filesystem.host_mounts:
             raise InvalidExecutionRequest("cpu_executor_requires_readonly_rootfs")
-        object.__setattr__(self, "manifest_sha256", document_sha256(self.manifest))
+        object.__setattr__(self, "_manifest_document", manifest_document)
+        object.__setattr__(self, "manifest_sha256", document_sha256(manifest))
+
+    @property
+    def manifest_document(self) -> bytes:
+        """Return the immutable canonical signed document consumed by authority."""
+
+        return self._manifest_document
+
+    @property
+    def manifest(self) -> AIVMWorkloadManifest:
+        """Return a new strict model parsed from the sealed canonical document."""
+
+        return AIVMWorkloadManifest.model_validate_json_strict(
+            self._manifest_document
+        )
 
 
 class AuthorityStatus(StrEnum):
@@ -257,7 +286,8 @@ class AuthorityVerification:
 class ExecutionAuthorityVerifier(Protocol):
     """Trust service that verifies and atomically consumes one active lease.
 
-    Implementations must cryptographically verify the exact manifest and
+    Implementations must cryptographically verify ``request.manifest_document``
+    as the exact manifest and
     active fenced lease revision, join them to the configured account/node,
     enforce the supplied validity instant, and durably consume the revision
     before returning ``VERIFIED``.  There is intentionally no permissive

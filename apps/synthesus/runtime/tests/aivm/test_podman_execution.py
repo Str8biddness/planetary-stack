@@ -158,9 +158,16 @@ def _request(
 
 
 class FakeAuthorityVerifier:
-    def __init__(self, *, status: AuthorityStatus = AuthorityStatus.VERIFIED, mutate=None):
+    def __init__(
+        self,
+        *,
+        status: AuthorityStatus = AuthorityStatus.VERIFIED,
+        mutate=None,
+        after_consume=None,
+    ):
         self.status = status
         self.mutate = mutate
+        self.after_consume = after_consume
         self.consumed: set[tuple[str, str, str]] = set()
 
     def verify_and_consume(
@@ -205,6 +212,8 @@ class FakeAuthorityVerifier:
             "consumed": True,
         }:
             self.consumed.add(scope)
+            if self.after_consume is not None:
+                self.after_consume()
         return verification
 
 
@@ -409,6 +418,35 @@ def test_authority_substitution_or_stale_fence_is_rejected(tmp_path, mutate):
     assert result.status is ExecutionStatus.REJECTED
     assert result.reason == "execution_authority_binding_mismatch"
     assert not any(command[1] == "run" for command in runner.commands)
+
+
+def test_caller_manifest_mutation_after_authority_cannot_change_execution(tmp_path):
+    manifest = _manifest()
+    original_digest = manifest.artifacts[0].sha256
+
+    def mutate_caller_owned_graph():
+        manifest.resources.cpu_millicores = 4_000
+        manifest.resources.memory_bytes = 4 * 1024 * 1024 * 1024
+        manifest.resources.time_limit_seconds = 900
+        manifest.artifacts[0].sha256 = "9" * 64
+
+    verifier = FakeAuthorityVerifier(after_consume=mutate_caller_owned_graph)
+    runner = FakePodmanRunner()
+    executor = _executor(tmp_path, runner, authority_verifier=verifier)
+    request = AdmittedExecutionRequest(manifest, _admitted(manifest), _lease())
+
+    result = executor.execute(request)
+
+    assert result.ok, result.reason
+    command = next(command for command in runner.commands if command[1] == "run")
+    assert command[command.index("--cpus") + 1] == "0.500"
+    assert command[command.index("--memory") + 1] == "67108864"
+    volume = command[command.index("--volume") + 1]
+    assert f"/{original_digest}:/work/input/payload:ro," in volume
+    assert "9" * 64 not in volume
+    assert request.manifest.resources.cpu_millicores == 500
+    assert request.manifest.artifacts[0].sha256 == original_digest
+    assert result.evidence.manifest_sha256 == request.manifest_sha256
 
 
 def test_wrong_node_and_expired_manifest_are_rejected_before_authority_use(tmp_path):
