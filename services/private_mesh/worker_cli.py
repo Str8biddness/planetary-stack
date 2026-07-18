@@ -59,6 +59,21 @@ _JOB_FIELDS = frozenset(
         "bundle_base64",
     }
 )
+_JOB_V2_FIELDS = _JOB_FIELDS | {"executor"}
+_EXECUTOR_FIELDS = frozenset(
+    {
+        "profile",
+        "artifact_sha256s",
+        "image_ref",
+        "image_digest",
+        "model_artifact_id",
+        "document_artifact_id",
+        "output_id",
+    }
+)
+_SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
+_IMAGE_DIGEST_RE = re.compile(r"^sha256:[a-f0-9]{64}$")
+AIVM_STATE_SUBDIRS = ("state", "artifacts", "results", "authority")
 _KEY_FIELDS = frozenset(
     {
         "key_id",
@@ -429,10 +444,214 @@ def _key_record(payload: object) -> KeyRecord:
     )
 
 
+def _validated_executor_spec(spec: object) -> dict[str, Any]:
+    if not isinstance(spec, dict) or set(spec) != _EXECUTOR_FIELDS:
+        raise ValueError("executor spec fields differ from the fixed schema")
+    if spec["profile"] != "text-classification.v1":
+        raise ValueError("unsupported executor profile")
+    digests = spec["artifact_sha256s"]
+    if (
+        not isinstance(digests, list)
+        or not digests
+        or len(digests) > 8
+        or len(set(digests)) != len(digests)
+        or not all(isinstance(item, str) and _SHA256_RE.fullmatch(item) for item in digests)
+    ):
+        raise ValueError("executor artifact digests must be a bounded unique list")
+    if not isinstance(spec["image_ref"], str) or "@sha256:" not in spec["image_ref"]:
+        raise ValueError("executor image_ref must be an immutable reference")
+    if not isinstance(spec["image_digest"], str) or not _IMAGE_DIGEST_RE.fullmatch(
+        spec["image_digest"]
+    ):
+        raise ValueError("executor image_digest must be a canonical digest")
+    if spec["image_ref"].rsplit("@", 1)[1] != spec["image_digest"]:
+        raise ValueError("executor image_ref digest must match image_digest")
+    for name in ("model_artifact_id", "document_artifact_id", "output_id"):
+        value = spec[name]
+        if not isinstance(value, str) or not _IDENTIFIER_RE.fullmatch(value):
+            raise ValueError(f"executor {name} must be a canonical identifier")
+    return spec
+
+
+def _stage_mesh_artifacts(state_dir: Path, digests: list[str]) -> Path:
+    """Copy digest-verified mesh-inbox objects into the flat executor CAS.
+
+    Objects reach the inbox only through the lease-bound Unisync mTLS
+    transfer boundary; staging re-verifies each digest and the executor
+    verifies every input a third time before mounting it read-only.
+    """
+
+    from services.unisync.mesh_node_cli import INBOX_DIR
+    from services.unisync.storage import ContentAddressedStore
+
+    inbox = ContentAddressedStore(state_dir / INBOX_DIR)
+    artifact_dir = state_dir / "aivm" / "artifacts"
+    artifact_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(artifact_dir, 0o700)
+    for digest in digests:
+        payload = inbox.read_bytes(digest)
+        target = artifact_dir / digest
+        try:
+            fd = os.open(
+                target,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+                0o600,
+            )
+        except FileExistsError:
+            existing = target.read_bytes()
+            if hashlib.sha256(existing).hexdigest() != digest:
+                raise ValueError("staged artifact store is corrupt") from None
+            continue
+        try:
+            os.write(fd, payload)
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    return artifact_dir
+
+
+class RequestBoundManifestVerifier:
+    """Bind the AIVM manifest to the signature-verified CHAL request digest.
+
+    The node agent verifies the controller signature over the request before
+    execution, and the request pins the exact workload bundle digest; the
+    canonical manifest bytes must hash to that digest, chaining manifest
+    authenticity to the controller signature without a second signer.
+    """
+
+    def __init__(self, expected_bundle_sha256: str) -> None:
+        if not _SHA256_RE.fullmatch(expected_bundle_sha256):
+            raise ValueError("expected bundle digest must be canonical")
+        self._expected = expected_bundle_sha256
+
+    def verify_manifest(self, manifest: Any, payload: bytes) -> Any:
+        from aivm.admission import DocumentVerification
+        from contracts.aivm.v1 import canonical_document_bytes
+
+        digest = hashlib.sha256(canonical_document_bytes(manifest)).hexdigest()
+        if digest != self._expected:
+            return DocumentVerification(
+                ok=False,
+                status="rejected",
+                error="manifest does not match the signed request bundle digest",
+            )
+        return DocumentVerification(
+            ok=True, status="verified", key_id=manifest.signer_key_id
+        )
+
+
+def _build_workload_executor(
+    *,
+    state_dir: Path,
+    spec: dict[str, Any],
+    account_id: str,
+    node_id: str,
+    expected_bundle_sha256: str,
+) -> Any:
+    runtime_packages = (
+        Path(__file__).resolve().parents[2] / "apps" / "synthesus" / "runtime" / "packages"
+    )
+    if str(runtime_packages) not in sys.path:
+        sys.path.insert(0, str(runtime_packages))
+    from aivm.admission import (
+        AIVMAdmissionController,
+        AdmissionPolicy,
+        HostIsolationCapabilities,
+        StaticHostCapabilityProbe,
+    )
+    from aivm.execution import (
+        ExecutorPolicy,
+        PersistentExecutionAuthority,
+        PodmanExecutor,
+        text_classification_entrypoint,
+    )
+    from aivm.execution.chal_adapter import ChalWorkloadExecutor
+
+    aivm_root = state_dir / "aivm"
+    for name in AIVM_STATE_SUBDIRS:
+        directory = aivm_root / name
+        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        os.chmod(directory, 0o700)
+    artifact_dir = _stage_mesh_artifacts(state_dir, spec["artifact_sha256s"])
+    entrypoint = text_classification_entrypoint(
+        model_artifact_id=spec["model_artifact_id"],
+        document_artifact_id=spec["document_artifact_id"],
+        output_id=spec["output_id"],
+    )
+    logical_image = f"aivm-text-classify@{spec['image_digest']}"
+    authority = PersistentExecutionAuthority(
+        aivm_root / "authority", verifier_id=f"verifier:{node_id.split(':', 1)[-1]}"
+    )
+    executor = PodmanExecutor(
+        ExecutorPolicy(
+            state_dir=aivm_root / "state",
+            artifact_dir=artifact_dir,
+            result_dir=aivm_root / "results",
+            trusted_images={logical_image: spec["image_ref"]},
+            trusted_entrypoints={entrypoint.entrypoint_id: entrypoint},
+            account_id=account_id,
+            node_id=node_id,
+            stdout_limit_bytes=4096,
+        ),
+        authority_verifier=authority,
+    )
+    policy = AdmissionPolicy(
+        allowed_runtime_images=frozenset({logical_image}),
+        allowed_entrypoints=frozenset({entrypoint.entrypoint_id}),
+        max_cpu_millicores=4_000,
+        max_memory_bytes=4 * 1024 * 1024 * 1024,
+        max_time_limit_seconds=900,
+        max_process_limit=256,
+        max_open_file_limit=4096,
+        max_output_bytes=65_536,
+        max_scratch_bytes=0,
+        max_gpu_count=0,
+        max_gpu_memory_bytes=0,
+        allowed_devices=frozenset(),
+        allowed_network_destinations=frozenset(),
+        max_devices=0,
+        max_writable_paths=0,
+        max_artifacts=8,
+        max_inputs=8,
+        max_outputs=8,
+        max_network_destinations=0,
+    )
+    probe = StaticHostCapabilityProbe(
+        HostIsolationCapabilities(
+            os_enforced_backend=True,
+            cgroup_control=True,
+            namespaces=True,
+            no_new_privileges=True,
+            container_runtime=True,
+            guard_available=True,
+        )
+    )
+    admission = AIVMAdmissionController(
+        verifier=RequestBoundManifestVerifier(expected_bundle_sha256),
+        policy=policy,
+        host_probe=probe,
+    )
+    return ChalWorkloadExecutor(
+        executor=executor,
+        authority=authority,
+        admission=admission,
+        artifact_dir=artifact_dir,
+    )
+
+
 def execute_job(*, state_dir: Path, payload: dict[str, Any]) -> dict[str, Any]:
-    if set(payload) != _JOB_FIELDS:
+    executor_spec: dict[str, Any] | None = None
+    if payload.get("schema") == "planetary.private_mesh.ssh_job.v2":
+        if set(payload) != _JOB_V2_FIELDS:
+            raise ValueError("job fields differ from the fixed physical-smoke schema")
+        if payload["executor"] is not None:
+            executor_spec = _validated_executor_spec(payload["executor"])
+        payload = {
+            key: value for key, value in payload.items() if key != "executor"
+        }
+    elif set(payload) != _JOB_FIELDS:
         raise ValueError("job fields differ from the fixed physical-smoke schema")
-    if payload["schema"] != "planetary.private_mesh.ssh_job.v1":
+    elif payload["schema"] != "planetary.private_mesh.ssh_job.v1":
         raise ValueError("unsupported private-mesh physical-smoke job schema")
     account_id = payload["account_id"]
     node_id = payload["node_id"]
@@ -467,6 +686,15 @@ def execute_job(*, state_dir: Path, payload: dict[str, Any]) -> dict[str, Any]:
     bundle = _b64url_decode(payload["bundle_base64"])
     clock = SystemClock()
     verifier = Ed25519DocumentVerifier(resolver, clock, audience)
+    workload_executor = None
+    if executor_spec is not None:
+        workload_executor = _build_workload_executor(
+            state_dir=state_dir,
+            spec=executor_spec,
+            account_id=account_id,
+            node_id=node_id,
+            expected_bundle_sha256=hashlib.sha256(bundle).hexdigest(),
+        )
     agent = NodeAgent(
         account_id=account_id,
         node_id=node_id,
@@ -474,6 +702,7 @@ def execute_job(*, state_dir: Path, payload: dict[str, Any]) -> dict[str, Any]:
         verifier=verifier,
         signer=identity.signer,
         clock=clock,
+        workload_executor=workload_executor,
     )
     admission = agent.admit_lease(
         payload["lease"],

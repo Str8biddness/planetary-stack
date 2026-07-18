@@ -349,3 +349,141 @@ def test_ssh_carrier_requires_one_raw_ed25519_pin_and_disables_other_sources(
     known_hosts.write_text(line + line, encoding="utf-8")
     with pytest.raises(RuntimeError, match="exactly the expected host key"):
         carrier.verify_pinned_host(target)
+
+
+def test_remote_workload_runs_real_executor_profile(tmp_path, monkeypatch):
+    from tests.private_mesh.test_execution_wiring import (
+        DOCUMENT_ARTIFACT_ID,
+        DOCUMENT_PAYLOAD,
+        FakeModelRunner,
+        IMAGE_DIGEST,
+        IMMUTABLE_IMAGE,
+        MODEL_ARTIFACT_ID,
+        MODEL_PAYLOAD,
+        OUTPUT_ID,
+        RESULT_DOCUMENT,
+        _workload_manifest,
+    )
+
+    import aivm.execution as aivm_execution
+    from contracts.aivm.v1 import AIVMWorkloadManifest, canonical_document_bytes
+    from datetime import UTC, datetime, timedelta
+    from services.private_mesh.ssh_smoke import RemoteWorkload, run_remote_workload
+    from services.unisync.mesh_node_cli import INBOX_DIR
+    from services.unisync.storage import ContentAddressedStore
+
+    now = datetime.now(UTC).replace(microsecond=0)
+    wire = _workload_manifest().model_dump(mode="json", by_alias=True)
+    wire["account_id"] = ACCOUNT
+    wire["issued_at"] = (now - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    wire["expires_at"] = (now + timedelta(minutes=25)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    manifest = AIVMWorkloadManifest.model_validate_json(
+        json.dumps(wire, separators=(",", ":"))
+    )
+    bundle = canonical_document_bytes(manifest)
+
+    model_sha = hashlib.sha256(MODEL_PAYLOAD).hexdigest()
+    document_sha = hashlib.sha256(DOCUMENT_PAYLOAD).hexdigest()
+    spec = {
+        "profile": "text-classification.v1",
+        "artifact_sha256s": [document_sha, model_sha],
+        "image_ref": IMMUTABLE_IMAGE,
+        "image_digest": IMAGE_DIGEST,
+        "model_artifact_id": MODEL_ARTIFACT_ID,
+        "document_artifact_id": DOCUMENT_ARTIFACT_ID,
+        "output_id": OUTPUT_ID,
+    }
+
+    real_executor = aivm_execution.PodmanExecutor
+
+    class RunnerInjectingExecutor(real_executor):
+        def __init__(self, policy, *, authority_verifier, runner=None, **kwargs):
+            super().__init__(
+                policy,
+                authority_verifier=authority_verifier,
+                runner=FakeModelRunner(),
+                **kwargs,
+            )
+
+    monkeypatch.setattr(aivm_execution, "PodmanExecutor", RunnerInjectingExecutor)
+
+    class DeliveringCarrier(LocalCarrier):
+        def deliver_objects(self, target, objects):
+            store = ContentAddressedStore(Path(target.remote_state_dir) / INBOX_DIR)
+            for digest, payload in objects:
+                assert store.put_bytes(payload) == digest
+
+    target = _targets(str(tmp_path))[0]
+    workload = RemoteWorkload(
+        bundle=bundle,
+        executor=spec,
+        objects=((document_sha, DOCUMENT_PAYLOAD), (model_sha, MODEL_PAYLOAD)),
+    )
+
+    evidence = run_remote_workload(
+        target,
+        account_id=ACCOUNT,
+        subject_id=SUBJECT,
+        carrier=DeliveringCarrier(),
+        workload=workload,
+    )
+
+    assert evidence["passed"] is True
+    assert evidence["executor_profile"] == "text-classification.v1"
+    assert evidence["bundle_sha256"] == hashlib.sha256(bundle).hexdigest()
+    assert evidence["claims"]["unisync_mtls_object_delivery"] is False
+
+    node = evidence["node"]
+    result_sha = hashlib.sha256(RESULT_DOCUMENT).hexdigest()
+    outputs = node["documents"]["response"]["outputs"]
+    assert outputs[0]["sha256"] == result_sha
+    assert outputs[0]["uri"] == f"artifact://aivm/result/{result_sha}"
+    assert node["report_sha256"] == outputs[1]["sha256"]
+
+    stored = (
+        Path(target.remote_state_dir) / "aivm" / "results" / result_sha
+    )
+    assert stored.read_bytes() == RESULT_DOCUMENT
+
+
+def test_remote_workload_rejects_missing_objects_and_bad_spec(tmp_path):
+    from tests.private_mesh.test_execution_wiring import (
+        DOCUMENT_ARTIFACT_ID,
+        IMAGE_DIGEST,
+        IMMUTABLE_IMAGE,
+        MODEL_ARTIFACT_ID,
+        OUTPUT_ID,
+    )
+    from services.private_mesh.ssh_smoke import RemoteWorkload, run_remote_workload
+
+    spec = {
+        "profile": "text-classification.v1",
+        "artifact_sha256s": ["a" * 64],
+        "image_ref": IMMUTABLE_IMAGE,
+        "image_digest": IMAGE_DIGEST,
+        "model_artifact_id": MODEL_ARTIFACT_ID,
+        "document_artifact_id": DOCUMENT_ARTIFACT_ID,
+        "output_id": OUTPUT_ID,
+    }
+    target = _targets(str(tmp_path))[0]
+
+    with pytest.raises(ValueError, match="object digest mismatch"):
+        RemoteWorkload(bundle=b"x", executor=spec, objects=(("f" * 64, b"y"),))
+
+    with pytest.raises(RuntimeError, match="cannot deliver objects"):
+        run_remote_workload(
+            target,
+            account_id=ACCOUNT,
+            subject_id=SUBJECT,
+            carrier=LocalCarrier(),
+            workload=RemoteWorkload(
+                bundle=b"not a manifest",
+                executor=spec,
+                objects=(
+                    (
+                        hashlib.sha256(b"payload").hexdigest(),
+                        b"payload",
+                    ),
+                ),
+            ),
+        )

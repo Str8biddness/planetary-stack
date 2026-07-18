@@ -534,6 +534,51 @@ to this log.
   the physically enrolled worker over the mesh transport, then the fresh
   three-node cell acceptance for the remaining F-020 boxes.
 
+## 2026-07-18 — F-020 mesh-side execution: v2 worker jobs and remote-workload coordinator
+
+- Base SHA: `490e45f79e06b0c4a718bc5da77eda1ed0d80eea` (post-PR-#12 `main`).
+- Branch: `agent/f020-mesh-transport`.
+- Objective: run the real executor boundary on an enrolled worker driven
+  over the pinned administrative carrier, with workload artifacts sourced
+  from the worker's Unisync mesh inbox.
+- Files changed:
+  - `services/private_mesh/worker_cli.py`: `ssh_job.v2` with an optional
+    executor spec (fixed profile allowlist, bounded unique artifact
+    digests, immutable image ref pinned to its digest). The worker stages
+    digest-verified objects from the mesh inbox CAS into the flat executor
+    CAS, composes `PersistentExecutionAuthority` + `PodmanExecutor` +
+    `AIVMAdmissionController` + `ChalWorkloadExecutor` under owner-only
+    `state/aivm/*` roots, and binds manifest authenticity to the
+    signature-verified request bundle digest
+    (`RequestBoundManifestVerifier`). The v1 hash job is unchanged.
+  - `services/private_mesh/ssh_smoke.py`: `RemoteWorkload` +
+    `run_remote_workload(target, …)` — single-worker coordinator reusing
+    the two-node smoke's signed admission chain, plus executor-evidence
+    validation: exactly result + evidence outputs, evidence bytes hashed
+    to the signed evidence reference, lease/account/node/fencing binding,
+    and `manifest_sha256` checked against the bundle's signature-omitted
+    AIVM signing digest. Evidence records the object-delivery mechanism
+    honestly (`carrier_seeded_inbox` vs `unisync_mtls`).
+- Security decisions: the worker accepts no entrypoint/command text in v2
+  jobs — only artifact digests and a fixed profile id; objects are digest
+  verified three times (inbox CAS read, staging, executor input
+  verification); manifest trust chains to the controller-signed request
+  rather than introducing an unauthenticated second signer.
+- Commands and exact results: worker CLI suite `15 passed` (new: full
+  remote-workload execution over the LocalCarrier with a fake Podman
+  runner, and delivery/spec rejection); combined
+  `tests/vsource tests/unisync tests/private_mesh`: `155 passed`.
+- Physical evidence and artifact digests: none claimed in this entry. The
+  physical run — objects transferred worker→worker over the Unisync mTLS
+  gate into the executing node's inbox, then `run_remote_workload` with
+  `object_delivery="unisync_mtls"` and the real Podman profile image —
+  is the next gate on the enrolled machines.
+- Review verdict: pending on the PR.
+- PR and final SHA: recorded on the PR after push.
+- Remaining blockers / next exact command: physical two-machine run
+  (mTLS object delivery + Podman execution) recording evidence here, then
+  the fresh three-node cell acceptance for the remaining F-020 boxes.
+
 ## Session entry template
 
 ```markdown
