@@ -142,11 +142,16 @@ def wire_time(value: datetime) -> str:
     return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def content(name: str = "workload", digest: str = HASH_A) -> dict[str, Any]:
+def content(
+    name: str = "workload",
+    digest: str = HASH_A,
+    *,
+    size_bytes: int = 128,
+) -> dict[str, Any]:
     return {
         "uri": f"artifact://private/{name}",
         "sha256": digest,
-        "size_bytes": 128,
+        "size_bytes": size_bytes,
         "media_type": "application/vnd.planetary.manifest+json",
         "classification": "private",
     }
@@ -197,6 +202,7 @@ def request_doc(
     resource_vector: dict[str, int] | None = None,
     issued_at: datetime | None = None,
     workload_digest: str = HASH_A,
+    workload_size: int = 128,
     signed_by: Ed25519DocumentSigner | None = None,
 ) -> ChalRequest:
     payload = {
@@ -211,7 +217,7 @@ def request_doc(
         "capability_id": "capability:001",
         "device_uri": "chal://aivm/inference",
         "workload_kind": "inference",
-        "workload_manifest": content("workload", workload_digest),
+        "workload_manifest": content("workload", workload_digest, size_bytes=workload_size),
         "inputs": [content("input")],
         "parameters": parameters(),
         "constraints": {

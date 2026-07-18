@@ -43,8 +43,14 @@ _IMMUTABLE_IMAGE = re.compile(
     r"^[a-z0-9][a-z0-9._/:~-]{1,255}@sha256:[a-f0-9]{64}$"
 )
 _CONTAINER_NAME = re.compile(r"^aivm-[a-f0-9]{16}-[a-f0-9]{8}$")
+_RESULT_SCHEMA = re.compile(r"^[a-z0-9][a-z0-9.-]{2,127}$")
 _MAX_SAFE_INTEGER = 9_007_199_254_740_991
 _READ_CHUNK = 65_536
+_OUTPUT_TRANSPORT_SHA256 = "bounded_stdout_sha256"
+_OUTPUT_TRANSPORT_JSON = "bounded_stdout_json"
+_OUTPUT_TRANSPORTS = (_OUTPUT_TRANSPORT_SHA256, _OUTPUT_TRANSPORT_JSON)
+_MAX_MODEL_PROFILE_INPUTS = 8
+_MIN_MODEL_RESULT_BYTES = 2
 
 
 class ExecutionStatus(StrEnum):
@@ -102,6 +108,35 @@ def _canonical_bytes(value: object) -> bytes:
 
 def _sha256_json(value: object) -> str:
     return hashlib.sha256(_canonical_bytes(value)).hexdigest()
+
+
+def _reject_duplicate_result_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    seen: set[str] = set()
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in seen:
+            raise ValueError(f"duplicate JSON key is not allowed: {key}")
+        seen.add(key)
+        result[key] = value
+    return result
+
+
+def _reject_result_constant(value: str) -> None:
+    raise ValueError(f"non-I-JSON numeric value is not allowed: {value}")
+
+
+def _parse_strict_result_json(payload: bytes) -> dict[str, Any]:
+    try:
+        parsed = json.loads(
+            payload.decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_result_keys,
+            parse_constant=_reject_result_constant,
+        )
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise OutputViolation("model_result_output_invalid") from exc
+    if not isinstance(parsed, dict):
+        raise OutputViolation("model_result_output_invalid")
+    return parsed
 
 
 def _write_all(fd: int, payload: bytes) -> None:
@@ -310,6 +345,8 @@ class TrustedEntrypoint:
     arguments: tuple[str, ...]
     input_mounts: tuple[tuple[str, str], ...]
     output_id: str
+    output_transport: str = _OUTPUT_TRANSPORT_SHA256
+    result_schema: str = ""
 
     def __post_init__(self) -> None:
         _require_identifier("entrypoint_id", self.entrypoint_id)
@@ -325,9 +362,27 @@ class TrustedEntrypoint:
         for argument in self.arguments:
             if not isinstance(argument, str) or len(argument) > 4096 or "\x00" in argument:
                 raise ValueError("trusted entrypoint argument is invalid")
+        if self.output_transport not in _OUTPUT_TRANSPORTS:
+            raise ValueError("trusted entrypoint output transport is not supported")
         input_ids = [artifact_id for artifact_id, _ in self.input_mounts]
-        if input_ids != sorted(set(input_ids)) or len(input_ids) != 1:
-            raise ValueError("the fixed CPU profile requires exactly one trusted input")
+        if input_ids != sorted(set(input_ids)):
+            raise ValueError("trusted inputs must be unique and lexicographically sorted")
+        if self.output_transport == _OUTPUT_TRANSPORT_SHA256:
+            if not isinstance(self.result_schema, str) or self.result_schema != "":
+                raise ValueError("the fixed hash profile does not declare a result schema")
+            if len(input_ids) != 1:
+                raise ValueError("the fixed CPU profile requires exactly one trusted input")
+        else:
+            if (
+                not isinstance(self.result_schema, str)
+                or _RESULT_SCHEMA.fullmatch(self.result_schema) is None
+            ):
+                raise ValueError("the model profile requires a canonical result schema id")
+            if not 1 <= len(input_ids) <= _MAX_MODEL_PROFILE_INPUTS:
+                raise ValueError(
+                    "the model profile requires between one and "
+                    f"{_MAX_MODEL_PROFILE_INPUTS} trusted inputs"
+                )
         destinations: list[str] = []
         for artifact_id, destination in self.input_mounts:
             _require_identifier("artifact_id", artifact_id)
@@ -351,7 +406,8 @@ class TrustedEntrypoint:
             "arguments": list(self.arguments),
             "input_mounts": [list(item) for item in self.input_mounts],
             "output_id": self.output_id,
-            "output_transport": "bounded_stdout_sha256",
+            "output_transport": self.output_transport,
+            "result_schema": self.result_schema,
         }
 
 
@@ -365,6 +421,7 @@ class ExecutorPolicy:
     trusted_entrypoints: Mapping[str, TrustedEntrypoint]
     account_id: str
     node_id: str
+    result_dir: Path | None = None
     podman_binary: str = "podman"
     stdout_limit_bytes: int = 65_536
     stderr_limit_bytes: int = 65_536
@@ -418,6 +475,12 @@ class ExecutorPolicy:
         for key, entrypoint in entrypoints.items():
             if key != entrypoint.entrypoint_id:
                 raise ValueError("trusted entrypoint map key mismatch")
+        needs_result_dir = any(
+            entrypoint.output_transport == _OUTPUT_TRANSPORT_JSON
+            for entrypoint in entrypoints.values()
+        )
+        if needs_result_dir and self.result_dir is None:
+            raise ValueError("model result entrypoints require a result directory")
         object.__setattr__(self, "trusted_images", MappingProxyType(images))
         object.__setattr__(self, "trusted_entrypoints", MappingProxyType(entrypoints))
 
@@ -765,6 +828,7 @@ class ExecutionEvidence:
     stderr_bytes: int
     stdout_sha256: str
     stderr_sha256: str
+    wall_time_ms: int
     host: HostCapabilityEvidence
 
     def to_record(self) -> dict[str, object]:
@@ -793,6 +857,7 @@ class ExecutionEvidence:
             "stderr_bytes": self.stderr_bytes,
             "stdout_sha256": self.stdout_sha256,
             "stderr_sha256": self.stderr_sha256,
+            "wall_time_ms": self.wall_time_ms,
             "host": self.host.to_record(),
         }
 
@@ -830,6 +895,11 @@ class PodmanExecutor:
         self._artifact_dir = _private_directory(policy.artifact_dir, create=True)
         if self._state_dir == self._artifact_dir:
             raise InvalidExecutionRequest("executor_roots_must_be_distinct")
+        self._result_dir: Path | None = None
+        if policy.result_dir is not None:
+            self._result_dir = _private_directory(policy.result_dir, create=True)
+            if self._result_dir in (self._state_dir, self._artifact_dir):
+                raise InvalidExecutionRequest("executor_roots_must_be_distinct")
         self._store = ReplayStore(self._state_dir)
         self._probe = PodmanHostProbe(
             self._runner,
@@ -921,8 +991,13 @@ class PodmanExecutor:
             raise InvalidExecutionRequest("stdout_profile_rejects_writable_paths")
         if manifest.resources.scratch_bytes != 0:
             raise InvalidExecutionRequest("scratch_is_not_supported_by_cpu_slice")
-        destination = entrypoint.input_mounts[0][1]
-        required_stdout_bytes = 64 + 2 + len(destination.encode("ascii")) + 1
+        if entrypoint.output_transport == _OUTPUT_TRANSPORT_SHA256:
+            destination = entrypoint.input_mounts[0][1]
+            required_stdout_bytes = 64 + 2 + len(destination.encode("ascii")) + 1
+        else:
+            if self._result_dir is None:
+                raise InvalidExecutionRequest("result_directory_unavailable")
+            required_stdout_bytes = _MIN_MODEL_RESULT_BYTES
         if not (
             required_stdout_bytes
             <= manifest.resources.output_bytes
@@ -1152,6 +1227,40 @@ class PodmanExecutor:
         ok = self._control("rm", "--force", "--ignore", name) and ok
         return ok
 
+    def _persist_result(self, result_sha256: str, payload: bytes) -> None:
+        """Store exact result bytes content-addressed, immutable, and durable."""
+
+        if self._result_dir is None:
+            raise HostUnavailable("result_directory_unavailable")
+        _require_sha256("result_sha256", result_sha256)
+        target = self._result_dir / result_sha256
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            fd = os.open(target, flags, 0o400)
+        except FileExistsError:
+            info = target.lstat()
+            if not stat.S_ISREG(info.st_mode) or info.st_size != len(payload):
+                raise HostUnavailable("result_store_corrupt") from None
+            existing_fd = os.open(target, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            digest = hashlib.sha256()
+            try:
+                while True:
+                    chunk = os.read(existing_fd, _READ_CHUNK)
+                    if not chunk:
+                        break
+                    digest.update(chunk)
+            finally:
+                os.close(existing_fd)
+            if digest.hexdigest() != result_sha256:
+                raise HostUnavailable("result_store_corrupt")
+            return
+        try:
+            _write_all(fd, payload)
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        _fsync_directory(self._result_dir)
+
     def _finalize_failure(self, authority_key: str, status: ExecutionStatus, reason: str) -> None:
         try:
             self._store.finalize(
@@ -1202,6 +1311,7 @@ class PodmanExecutor:
                 name=name,
                 cidfile=cidfile,
             )
+            run_started = time.monotonic()
             result = self._runner.run(
                 argv,
                 timeout_seconds=float(request.manifest.resources.time_limit_seconds),
@@ -1211,6 +1321,7 @@ class PodmanExecutor:
                 ),
                 stderr_limit=self._policy.stderr_limit_bytes,
             )
+            wall_time_ms = max(0, int((time.monotonic() - run_started) * 1000))
             cleanup_ok = self._cleanup(name, timed_out=result.timed_out)
             if not cleanup_ok:
                 reason = "container_cleanup_failed"
@@ -1228,20 +1339,44 @@ class PodmanExecutor:
                 reason = "container_exit_nonzero"
                 self._finalize_failure(authority_key, ExecutionStatus.FAILED, reason)
                 return ExecutionResult(ExecutionStatus.FAILED, reason)
-            artifact_id, destination = entrypoint.input_mounts[0]
-            descriptor = next(
-                item for item in request.manifest.artifacts if item.artifact_id == artifact_id
-            )
-            expected_stdout = f"{descriptor.sha256}  {destination}\n".encode("ascii")
-            if result.stdout != expected_stdout or result.stderr:
-                raise OutputViolation("fixed_entrypoint_output_invalid")
-            output_record = {
-                "output_id": entrypoint.output_id,
-                "algorithm": "sha256",
-                "input_artifact_id": artifact_id,
-                "sha256": descriptor.sha256,
-                "input_size_bytes": descriptor.size_bytes,
-            }
+            if entrypoint.output_transport == _OUTPUT_TRANSPORT_SHA256:
+                artifact_id, destination = entrypoint.input_mounts[0]
+                descriptor = next(
+                    item for item in request.manifest.artifacts if item.artifact_id == artifact_id
+                )
+                expected_stdout = f"{descriptor.sha256}  {destination}\n".encode("ascii")
+                if result.stdout != expected_stdout or result.stderr:
+                    raise OutputViolation("fixed_entrypoint_output_invalid")
+                output_record = {
+                    "output_id": entrypoint.output_id,
+                    "algorithm": "sha256",
+                    "input_artifact_id": artifact_id,
+                    "sha256": descriptor.sha256,
+                    "input_size_bytes": descriptor.size_bytes,
+                }
+            else:
+                if result.stderr or not result.stdout:
+                    raise OutputViolation("model_result_output_invalid")
+                parsed = _parse_strict_result_json(result.stdout)
+                if parsed.get("schema") != entrypoint.result_schema:
+                    raise OutputViolation("model_result_schema_mismatch")
+                result_sha256 = hashlib.sha256(result.stdout).hexdigest()
+                try:
+                    self._persist_result(result_sha256, result.stdout)
+                except (OSError, HostUnavailable):
+                    reason = "result_persist_failed"
+                    self._finalize_failure(authority_key, ExecutionStatus.UNAVAILABLE, reason)
+                    return ExecutionResult(ExecutionStatus.UNAVAILABLE, reason)
+                output_record = {
+                    "output_id": entrypoint.output_id,
+                    "transport": _OUTPUT_TRANSPORT_JSON,
+                    "result_schema": entrypoint.result_schema,
+                    "media_type": "application/json",
+                    "sha256": result_sha256,
+                    "size_bytes": len(result.stdout),
+                    "uri": f"artifact://aivm/result/{result_sha256}",
+                    "input_artifact_ids": list(request.manifest.inputs),
+                }
             outputs = (MappingProxyType(output_record),)
             output_set_sha256 = _sha256_json([output_record])
             evidence = ExecutionEvidence(
@@ -1269,6 +1404,7 @@ class PodmanExecutor:
                 stderr_bytes=len(result.stderr),
                 stdout_sha256=hashlib.sha256(result.stdout).hexdigest(),
                 stderr_sha256=hashlib.sha256(result.stderr).hexdigest(),
+                wall_time_ms=wall_time_ms,
                 host=host,
             )
             self._store.finalize(

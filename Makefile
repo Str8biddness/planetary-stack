@@ -21,8 +21,8 @@ test-private-mesh:
 	PYTHONHASHSEED=4 $(PYTHON) -m pytest -q tests/vsource tests/unisync tests/private_mesh
 
 test-aivm-execution:
-	cd apps/synthesus/runtime && PYTHONPATH="$(CURDIR)" PYTHONHASHSEED=1 $(PYTHON) -m pytest -q tests/aivm/test_podman_execution.py
-	cd apps/synthesus/runtime && PYTHONPATH="$(CURDIR)" PYTHONHASHSEED=4 $(PYTHON) -m pytest -q tests/aivm/test_podman_execution.py
+	cd apps/synthesus/runtime && PYTHONPATH="$(CURDIR)" PYTHONHASHSEED=1 $(PYTHON) -m pytest -q tests/aivm/test_podman_execution.py tests/aivm/test_model_profile.py tests/aivm/test_execution_authority.py
+	cd apps/synthesus/runtime && PYTHONPATH="$(CURDIR)" PYTHONHASHSEED=4 $(PYTHON) -m pytest -q tests/aivm/test_podman_execution.py tests/aivm/test_model_profile.py tests/aivm/test_execution_authority.py
 
 test-synthesus:
 	cd apps/synthesus/runtime && $(PYTHON) -m pytest -q

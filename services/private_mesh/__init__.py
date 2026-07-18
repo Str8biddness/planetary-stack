@@ -13,6 +13,8 @@ from .node_agent import (
     NodeAgentStatus,
     NodeExecutionResult,
     VerificationResult,
+    WorkloadExecutionOutcome,
+    WorkloadExecutor,
 )
 
 __all__ = [
@@ -28,4 +30,6 @@ __all__ = [
     "NodeAgentStatus",
     "NodeExecutionResult",
     "VerificationResult",
+    "WorkloadExecutionOutcome",
+    "WorkloadExecutor",
 ]

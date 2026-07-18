@@ -35,6 +35,7 @@ from contracts.chal_vsource.v1.models import (
     CapabilityDocument,
     ChalRequest,
     ChalResponse,
+    ContentReference,
     ErrorCode,
     ErrorFrame,
     LeaseDocument,
@@ -78,6 +79,8 @@ class NodeAgentStatus(StrEnum):
     ADMITTED = "admitted"
     RENEWED = "renewed"
     EXECUTED = "executed"
+    EXECUTION_FAILED = "execution_failed"
+    CANCELLED = "cancelled"
     UNAVAILABLE = "unavailable"
     MALFORMED_DOCUMENT = "malformed_document"
     UNKNOWN_KEY = "unknown_key"
@@ -125,6 +128,7 @@ _FRAME_ERROR_CODES: dict[NodeAgentStatus, ErrorCode] = {
     NodeAgentStatus.REPLAY: ErrorCode.LEASE_CONFLICT,
     NodeAgentStatus.DUPLICATE_TRANSITION: ErrorCode.LEASE_CONFLICT,
     NodeAgentStatus.BUNDLE_MISMATCH: ErrorCode.INTEGRITY_FAILURE,
+    NodeAgentStatus.EXECUTION_FAILED: ErrorCode.WORKLOAD_FAILED,
     NodeAgentStatus.REJECTED: ErrorCode.WORKLOAD_REJECTED,
 }
 
@@ -292,6 +296,41 @@ class NodeExecutionResult:
     reason: str | None = None
 
 
+@dataclass(frozen=True)
+class WorkloadExecutionOutcome:
+    """Result of one real workload execution behind the node agent.
+
+    ``outputs`` must be content references to immutable, content-addressed
+    result artifacts.  ``unavailable`` marks environmental failures where the
+    executor could not run at all; every other non-ok outcome is a terminal
+    workload failure.
+    """
+
+    ok: bool
+    outputs: tuple[Mapping[str, Any], ...] = ()
+    report: bytes | None = None
+    reason: str | None = None
+    unavailable: bool = False
+
+
+class WorkloadExecutor(Protocol):
+    """Isolated execution boundary invoked after every admission gate passed.
+
+    Implementations must never run manifest text as commands, must enforce
+    their own replay/authority consumption, and must return content-addressed
+    outputs with provenance evidence.
+    """
+
+    def execute_workload(
+        self,
+        *,
+        lease: LeaseDocument,
+        request: ChalRequest,
+        bundle: bytes,
+    ) -> WorkloadExecutionOutcome:
+        """Execute the admitted workload bundle exactly once."""
+
+
 @dataclass
 class _AdmittedWorkload:
     lease: LeaseDocument
@@ -365,6 +404,7 @@ class NodeAgent:
         max_clock_skew_seconds: int = 60,
         max_bundle_bytes: int = _DEFAULT_MAX_BUNDLE_BYTES,
         max_error_frames: int = _DEFAULT_MAX_ERROR_FRAMES,
+        workload_executor: WorkloadExecutor | None = None,
     ) -> None:
         if not _IDENTIFIER_RE.fullmatch(account_id):
             raise ValueError("account_id must be a valid contract identifier")
@@ -384,6 +424,7 @@ class NodeAgent:
         self.max_clock_skew = timedelta(seconds=max_clock_skew_seconds)
         self.max_bundle_bytes = max_bundle_bytes
         self.max_error_frames = max_error_frames
+        self.workload_executor = workload_executor
         self._inventory: ResourceInventory | None = None
         self._config_error: str | None = None
         if inventory is not None:
@@ -1044,6 +1085,8 @@ class NodeAgent:
         data: bytes,
         now: datetime,
     ) -> NodeExecutionResult:
+        if self.workload_executor is not None:
+            return self._complete_with_executor(entry, data, now)
         bundle_sha256 = hashlib.sha256(data).hexdigest()
         report_payload = {
             "schema": HASH_REPORT_SCHEMA,
@@ -1114,6 +1157,258 @@ class NodeAgent:
             lifecycle_events=(staged, running, completed),
             report=report_bytes,
         )
+
+    def _complete_with_executor(
+        self,
+        entry: _AdmittedWorkload,
+        data: bytes,
+        now: datetime,
+    ) -> NodeExecutionResult:
+        assert self.workload_executor is not None
+        try:
+            outcome = self.workload_executor.execute_workload(
+                lease=entry.lease,
+                request=entry.request,
+                bundle=data,
+            )
+        except Exception:
+            outcome = None
+        if type(outcome) is not WorkloadExecutionOutcome:
+            return NodeExecutionResult(
+                NodeAgentStatus.UNAVAILABLE,
+                False,
+                reason="workload executor failed",
+            )
+        if not outcome.ok:
+            if outcome.unavailable:
+                # The executor could not run at all; nothing was consumed, so
+                # the admitted lease remains retryable.  A retry after partial
+                # consumption is rejected by the execution authority and then
+                # terminalizes below.
+                return NodeExecutionResult(
+                    NodeAgentStatus.UNAVAILABLE,
+                    False,
+                    reason=outcome.reason or "workload executor unavailable",
+                )
+            return self._fail_workload_terminal(
+                entry,
+                now,
+                reason=outcome.reason or "workload execution failed",
+            )
+        outputs: list[Mapping[str, Any]] = []
+        for candidate in outcome.outputs:
+            if not isinstance(candidate, Mapping):
+                return self._fail_workload_terminal(
+                    entry, now, reason="executor returned an invalid output reference"
+                )
+            parsed, parse_error = _strict_parse(ContentReference, dict(candidate))
+            if parse_error is not None or parsed is None:
+                return self._fail_workload_terminal(
+                    entry, now, reason="executor returned an invalid output reference"
+                )
+            outputs.append(parsed.model_dump(mode="json"))
+        if not outputs:
+            return self._fail_workload_terminal(
+                entry, now, reason="executor returned no output references"
+            )
+        report = outcome.report
+        if report is not None and (
+            not isinstance(report, (bytes, bytearray, memoryview))
+            or len(bytes(report)) > self.max_bundle_bytes
+        ):
+            return self._fail_workload_terminal(
+                entry, now, reason="executor returned an invalid evidence report"
+            )
+        try:
+            staged = self._signed_lifecycle_event(
+                entry,
+                sequence=entry.sequence + 1,
+                previous_state=LifecycleState.ADMITTED,
+                state=LifecycleState.STAGED,
+                occurred_at=now,
+            )
+            running = self._signed_lifecycle_event(
+                entry,
+                sequence=entry.sequence + 2,
+                previous_state=LifecycleState.STAGED,
+                state=LifecycleState.RUNNING,
+                occurred_at=now,
+            )
+            completed = self._signed_lifecycle_event(
+                entry,
+                sequence=entry.sequence + 3,
+                previous_state=LifecycleState.RUNNING,
+                state=LifecycleState.COMPLETED,
+                occurred_at=now,
+                outputs=tuple(outputs),
+            )
+            response = self._signed_response(
+                entry,
+                status=ResponseStatus.SUCCEEDED,
+                completed_at=now,
+                outputs=tuple(outputs),
+                error=None,
+            )
+        except Exception:
+            return NodeExecutionResult(
+                NodeAgentStatus.UNAVAILABLE,
+                False,
+                reason="result signing failed",
+            )
+        entry.sequence += 3
+        entry.state = LifecycleState.COMPLETED
+        return NodeExecutionResult(
+            NodeAgentStatus.EXECUTED,
+            True,
+            response=response,
+            lifecycle_events=(staged, running, completed),
+            report=bytes(report) if report is not None else None,
+        )
+
+    def _fail_workload_terminal(
+        self,
+        entry: _AdmittedWorkload,
+        now: datetime,
+        *,
+        reason: str,
+    ) -> NodeExecutionResult:
+        error = self._signed_error_frame(
+            NodeAgentStatus.EXECUTION_FAILED,
+            request_id=entry.request.request_id,
+            request_sha256=entry.request_sha256,
+            trace_id=entry.request.trace_id,
+            device_uri=entry.request.device_uri,
+        )
+        if error is None:
+            # A signed FAILED transition requires an error frame; without one
+            # nothing durable can be recorded, so fail closed without claiming
+            # a state change.
+            return NodeExecutionResult(
+                NodeAgentStatus.UNAVAILABLE,
+                False,
+                reason="failure signing unavailable",
+            )
+        try:
+            failed = self._signed_lifecycle_event(
+                entry,
+                sequence=entry.sequence + 1,
+                previous_state=LifecycleState.ADMITTED,
+                state=LifecycleState.FAILED,
+                occurred_at=now,
+                error=error,
+            )
+            response = self._signed_response(
+                entry,
+                status=ResponseStatus.FAILED,
+                completed_at=now,
+                outputs=(),
+                error=error,
+            )
+        except Exception:
+            return NodeExecutionResult(
+                NodeAgentStatus.UNAVAILABLE,
+                False,
+                reason="result signing failed",
+            )
+        entry.sequence += 1
+        entry.state = LifecycleState.FAILED
+        return NodeExecutionResult(
+            NodeAgentStatus.EXECUTION_FAILED,
+            False,
+            response=response,
+            lifecycle_events=(failed,),
+            error=error,
+            reason=reason,
+        )
+
+    def cancel(
+        self,
+        *,
+        lease_id: str,
+        lease_sha256: str,
+        fencing_token: int,
+    ) -> NodeExecutionResult:
+        """Cancel one admitted workload before execution with a signed event."""
+
+        with self._lock:
+            if not isinstance(lease_id, str) or not _IDENTIFIER_RE.fullmatch(lease_id):
+                return NodeExecutionResult(
+                    NodeAgentStatus.REJECTED,
+                    False,
+                    reason="lease_id must be a canonical identifier",
+                )
+            if not isinstance(lease_sha256, str) or not re.fullmatch(
+                r"[0-9a-f]{64}", lease_sha256
+            ):
+                return NodeExecutionResult(
+                    NodeAgentStatus.REJECTED,
+                    False,
+                    reason="lease_sha256 must be a canonical SHA-256 digest",
+                )
+            if isinstance(fencing_token, bool) or not isinstance(fencing_token, int):
+                return NodeExecutionResult(
+                    NodeAgentStatus.REJECTED,
+                    False,
+                    reason="fencing_token must be an integer",
+                )
+            unavailable = self._unavailable_reason()
+            if unavailable is not None:
+                return NodeExecutionResult(
+                    NodeAgentStatus.UNAVAILABLE,
+                    False,
+                    reason=unavailable,
+                )
+            assert self.clock is not None
+            now = _normalized_now(self.clock)
+            if now is None:
+                return NodeExecutionResult(
+                    NodeAgentStatus.UNAVAILABLE,
+                    False,
+                    reason="clock service failed",
+                )
+            entry = self._workloads.get(lease_id)
+            if entry is None:
+                return NodeExecutionResult(
+                    NodeAgentStatus.REJECTED,
+                    False,
+                    reason="lease was never admitted on this node",
+                )
+            if (
+                entry.lease_sha256 != lease_sha256
+                or entry.lease.fencing_token != fencing_token
+            ):
+                return self._execution_rejection(
+                    NodeAgentStatus.STALE_LEASE,
+                    entry,
+                    reason="cancel context does not match the admitted lease revision",
+                )
+            if entry.state != LifecycleState.ADMITTED:
+                return self._execution_rejection(
+                    NodeAgentStatus.DUPLICATE_TRANSITION,
+                    entry,
+                    reason="workload already left the admitted state",
+                )
+            try:
+                cancelled = self._signed_lifecycle_event(
+                    entry,
+                    sequence=entry.sequence + 1,
+                    previous_state=LifecycleState.ADMITTED,
+                    state=LifecycleState.CANCELLED,
+                    occurred_at=now,
+                )
+            except Exception:
+                return NodeExecutionResult(
+                    NodeAgentStatus.UNAVAILABLE,
+                    False,
+                    reason="result signing failed",
+                )
+            entry.sequence += 1
+            entry.state = LifecycleState.CANCELLED
+            return NodeExecutionResult(
+                NodeAgentStatus.CANCELLED,
+                True,
+                lifecycle_events=(cancelled,),
+            )
 
     def _signed_lifecycle_event(
         self,

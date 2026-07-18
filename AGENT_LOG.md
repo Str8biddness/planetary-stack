@@ -6,20 +6,23 @@ Planetary Stack. Read this file, `AGENTS.md`, `docs/ARCHITECTURE.md`,
 
 ## Current handoff
 
-- Recorded: 2026-07-17, America/Chicago.
+- Recorded: 2026-07-18, America/Chicago.
 - Canonical repository: `Str8biddness/planetary-stack`.
 - Canonical branch: `main`.
-- Verified main head: `ae64d31873c751eb6faa97da2310685e9d174dac`.
-- Current continuation branch: `agent/finish-readiness`.
+- Verified main head: `9329a067e9fd0c9e906b01579633c466fd38b711` (PR #9 merge,
+  owner-authorized on 2026-07-18).
+- Current continuation branch: `agent/f020-useful-model-execution`.
 - Current continuation checkout: `/home/dakin/planetary-stack-finish`.
-- Draft handoff PR: [#9](https://github.com/Str8biddness/planetary-stack/pull/9).
-- Latest independently reviewed implementation head: `9259129fc99f0e291f7286bc36c187c78843721b`.
+- Prior handoff PR: [#9](https://github.com/Str8biddness/planetary-stack/pull/9)
+  (merged).
 - Release target: the paid same-account private-mesh product defined in
   `FINISH_CHECKLIST.md`. The public subscriber fabric is a later release.
-- Current truth: the security/control-plane foundation is merged and tested,
-  but the product is not finished. In particular, production end-to-end job
-  wiring, Planetary Drive, certificate lifecycle, recovery, useful model
-  execution, packaging, billing, and beta evidence remain open.
+- Current truth: the security/control-plane foundation is merged, and the
+  F-020 execution spine (useful model profile, durable execution authority,
+  node-agent executor wiring, authenticated job API) is implemented with
+  local signed-contract tests. Physical three-node acceptance, desktop UI
+  presentation, Planetary Drive, certificate lifecycle, recovery, packaging,
+  billing, and beta evidence remain open; F-020 is started, not closed.
 
 Do not continue from the closed stacked PRs #6 or #7. Their complete corrected
 history reached `main` atomically through PR #8. Start new work from current
@@ -363,6 +366,80 @@ to this log.
 - Push this doc-only closure, require exact-head GitHub CI, then mark PR #9
   ready for human/authorized merge. After merge, branch from the new `main` and
   begin `F-020`; do not represent Release A as finished.
+
+## 2026-07-18 — F-020 execution spine: useful model profile, durable authority, job API
+
+- Base SHA: `9329a067e9fd0c9e906b01579633c466fd38b711` (post-PR-#9 `main`).
+- Branch: `agent/f020-useful-model-execution`.
+- Objective: start F-020 exactly as directed by the prior closure — one
+  production-shaped useful CPU model profile wired end to end, replacing the
+  test authority verifier and the node agent's in-process completion
+  shortcut, with an authenticated desktop-facing job API.
+- Files changed:
+  - `apps/synthesus/runtime/packages/aivm/execution/podman.py`: second
+    operator-owned output transport `bounded_stdout_json` (strict I-JSON
+    stdout bound to a declared result schema, content-addressed and
+    persisted 0400 in a distinct owner-only `result_dir`, idempotent on
+    identical bytes, fail-closed on store corruption) plus `wall_time_ms`
+    resource evidence. The fixed SHA-256 profile is unchanged.
+  - `apps/synthesus/runtime/packages/aivm/execution/profiles.py` and
+    `services/aivm_profiles/text_classification/`: the
+    `aivm.model.text-classify.v1` entrypoint (fixed executable, fixed
+    mounts, two admitted artifacts: ONNX model + UTF-8 document) with its
+    deterministic in-image runner and digest-pinned Containerfile.
+  - `apps/synthesus/runtime/packages/aivm/execution/authority.py`:
+    `PersistentExecutionAuthority`, an owner-only SQLite implementation of
+    `ExecutionAuthorityVerifier`: one consumption per lease scope, newest
+    registered fence only, exact-binding UPDATE-guarded atomic consume,
+    survives restarts, rejects stale/conflicting/expired revisions.
+  - `services/private_mesh/node_agent.py`: injectable `WorkloadExecutor`
+    boundary. When configured, completion delegates to the real executor;
+    outputs are strict `ContentReference`s; failures produce signed
+    `FAILED` lifecycle + `FAILED` response with an error frame; new signed
+    `CANCELLED` transition via `NodeAgent.cancel`. Without an executor the
+    legacy hash-report behavior is unchanged (existing suites untouched).
+  - `apps/synthesus/runtime/packages/aivm/execution/chal_adapter.py`:
+    `ChalWorkloadExecutor` — the bundle must be the exact canonical signed
+    AIVM manifest; artifacts load digest-verified from the executor CAS;
+    real admission (`AIVMAdmissionController`), authority registration from
+    the verified lease revision, Podman execution, and outputs = model
+    result reference(s) + content-addressed execution-evidence report.
+  - `services/job_pipeline.py` and `apps/synthesus/desktop/synthesusd.py`:
+    `LocalJobPipeline` (controller-signed CHAL request → vSource allocate →
+    admit → execute → release; cancel → signed CANCELLED + lease revoke)
+    behind authenticated `POST /api/jobs`, `GET /api/jobs/{id}`,
+    `POST /api/jobs/{id}/cancel` with bounded base64 bundles.
+- Security decisions: no manifest text ever becomes argv; result bytes are
+  content-addressed before any reuse; the authority consumes exactly one
+  revision per lease scope durably; executor unavailability never
+  terminalizes a workload silently and never fabricates state; a FAILED
+  transition without a signable error frame fails closed as UNAVAILABLE;
+  the job API returns only signed-document-backed state.
+- Commands and exact results (this branch, exact head `74916a2`):
+  - `make test-contracts`: 42 passed under each seed.
+  - `make test-private-mesh`: 152 passed under each of seeds 1 and 4
+    (143 prior + 5 execution-wiring + 4 job-pipeline).
+  - `make test-aivm-execution` (now includes `test_model_profile.py` and
+    `test_execution_authority.py`): 41 passed, 1 opt-in physical skip under
+    each seed.
+  - Desktop/controller suite: 30 passed (29 prior + job API).
+  - Full runtime suite from `apps/synthesus/runtime` with monorepo
+    `PYTHONPATH` on exact code head `74916a2`: 1849 passed, 31 skipped,
+    3 xfailed in 412.70s (the docs-only handoff commit follows that head).
+- Physical evidence and artifact digests: none claimed. Container transport
+  in this session's tests uses the established fake-runner boundary; the
+  physical Podman path remains gated behind `AIVM_RUN_PODMAN_PHYSICAL` and
+  must be exercised on the Podman worker with the profile image built from
+  `services/aivm_profiles/text_classification/Containerfile` (pinned base
+  digest, recorded image digest) before F-020 boxes are checked.
+- Review verdict: pending; this PR requires independent adversarial review
+  of the executor transport branch, the authority store, and the node-agent
+  wiring before merge.
+- PR and final SHA: recorded on the PR after push.
+- Remaining blockers / next exact command: build and pin the profile image
+  on the Podman worker, run `AIVM_RUN_PODMAN_PHYSICAL=1` with a real ONNX
+  classifier artifact, wire desktop UI presentation of job records, then a
+  fresh three-node cell acceptance before checking any F-020 box.
 
 ## Session entry template
 

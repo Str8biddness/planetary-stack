@@ -18,8 +18,22 @@ from .podman import (
     SubprocessCommandRunner,
     TrustedEntrypoint,
 )
+from .authority import (
+    AuthorityRegistrationError,
+    PersistentExecutionAuthority,
+)
+from .profiles import (
+    TEXT_CLASSIFICATION_ENTRYPOINT_ID,
+    TEXT_CLASSIFICATION_RESULT_SCHEMA,
+    text_classification_entrypoint,
+)
 
 __all__ = [
+    "AuthorityRegistrationError",
+    "PersistentExecutionAuthority",
+    "TEXT_CLASSIFICATION_ENTRYPOINT_ID",
+    "TEXT_CLASSIFICATION_RESULT_SCHEMA",
+    "text_classification_entrypoint",
     "AdmittedExecutionRequest",
     "AuthorityStatus",
     "AuthorityVerification",

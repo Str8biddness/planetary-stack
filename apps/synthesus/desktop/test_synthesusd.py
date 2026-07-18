@@ -180,3 +180,105 @@ def test_module_does_not_export_an_app_for_uvicorn_cli_bypass():
 def test_terminal_resize_dimensions_are_bounded(cols, rows):
     with pytest.raises(ValidationError):
         terminal_server.ResizeReq(session_id="bounds", cols=cols, rows=rows)
+
+
+class _StubJobRecord:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def to_wire(self):
+        return dict(self.payload)
+
+
+class _StubJobPipeline:
+    def __init__(self):
+        self.submitted = []
+        self.cancelled = []
+
+    def submit(self, *, bundle, workload_kind):
+        self.submitted.append((bundle, workload_kind))
+        return _StubJobRecord(
+            {
+                "job_id": "job:stub:001",
+                "state": "completed",
+                "outputs": [{"sha256": "0" * 64}],
+            }
+        )
+
+    def status(self, job_id):
+        if job_id != "job:stub:001":
+            return None
+        return _StubJobRecord({"job_id": job_id, "state": "completed"})
+
+    def cancel(self, job_id):
+        self.cancelled.append(job_id)
+        if job_id != "job:stub:001":
+            return None
+        return _StubJobRecord({"job_id": job_id, "state": "cancelled"})
+
+
+def test_job_endpoints_require_auth_and_a_configured_pipeline(tmp_path):
+    import base64
+
+    terminal_socket = tmp_path / "terminal.sock"
+    terminal_socket.touch()
+    pipeline = _StubJobPipeline()
+    app_without_jobs = synthesusd.create_app(_settings(terminal_socket))
+    app_with_jobs = synthesusd.create_app(
+        _settings(terminal_socket),
+        job_pipeline=pipeline,
+    )
+    bundle = base64.b64encode(b"canonical manifest bytes").decode()
+
+    async def exercise():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app_without_jobs),
+            base_url="http://controller.test",
+        ) as client:
+            unauthorized = await client.post(
+                "/api/jobs", json={"bundle_base64": bundle}
+            )
+            assert unauthorized.status_code == 401
+            unavailable = await client.post(
+                "/api/jobs",
+                headers={"X-API-Key": "install-secret"},
+                json={"bundle_base64": bundle},
+            )
+            assert unavailable.status_code == 503
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app_with_jobs),
+            base_url="http://controller.test",
+        ) as client:
+            headers = {"X-API-Key": "install-secret"}
+            bad_body = await client.post(
+                "/api/jobs", headers=headers, json={"bundle_base64": "@@not-base64@@"}
+            )
+            assert bad_body.status_code == 400
+            missing_bundle = await client.post(
+                "/api/jobs", headers=headers, json={}
+            )
+            assert missing_bundle.status_code == 400
+
+            submitted = await client.post(
+                "/api/jobs", headers=headers, json={"bundle_base64": bundle}
+            )
+            assert submitted.status_code == 200
+            assert submitted.json()["job_id"] == "job:stub:001"
+            assert pipeline.submitted == [
+                (b"canonical manifest bytes", "inference")
+            ]
+
+            status = await client.get("/api/jobs/job:stub:001", headers=headers)
+            assert status.status_code == 200
+            assert status.json()["state"] == "completed"
+            unknown = await client.get("/api/jobs/job:stub:404", headers=headers)
+            assert unknown.status_code == 404
+
+            cancelled = await client.post(
+                "/api/jobs/job:stub:001/cancel", headers=headers
+            )
+            assert cancelled.status_code == 200
+            assert cancelled.json()["state"] == "cancelled"
+
+    asyncio.run(exercise())
