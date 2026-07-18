@@ -216,6 +216,11 @@ class _StubJobPipeline:
             return None
         return _StubJobRecord({"job_id": job_id, "state": "cancelled"})
 
+    def result(self, job_id, output_sha256):
+        if job_id != "job:stub:001" or output_sha256 != "0" * 64:
+            return None
+        return b'{"schema":"stub.result.v1"}', "application/json"
+
 
 def test_job_endpoints_require_auth_and_a_configured_pipeline(tmp_path):
     import base64
@@ -280,5 +285,22 @@ def test_job_endpoints_require_auth_and_a_configured_pipeline(tmp_path):
             )
             assert cancelled.status_code == 200
             assert cancelled.json()["state"] == "cancelled"
+
+            result = await client.get(
+                "/api/jobs/job:stub:001/results/" + "0" * 64,
+                headers=headers,
+            )
+            assert result.status_code == 200
+            assert result.headers["content-type"].startswith("application/json")
+            assert result.json()["schema"] == "stub.result.v1"
+
+            missing = await client.get(
+                "/api/jobs/job:stub:001/results/" + "f" * 64,
+                headers=headers,
+            )
+            assert missing.status_code == 404
+
+            denied = await client.get("/api/jobs/job:stub:001/results/" + "0" * 64)
+            assert denied.status_code == 401
 
     asyncio.run(exercise())

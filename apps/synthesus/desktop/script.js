@@ -3291,3 +3291,184 @@ async function runVoiceSpeak() {
         }
     }
 }
+
+// ===== Mesh Jobs — real private-mesh workload submission and results =====
+// Every state rendered here comes from the controller job pipeline, which is
+// backed by signed CHAL/vSource contract documents. Nothing is simulated.
+
+const meshJobs = { ids: [], timer: null };
+
+function jobsAuthHeaders(extra) {
+    const headers = Object.assign({}, extra || {});
+    const token = localStorage.getItem('synthesus_token');
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    return headers;
+}
+
+function jobsRememberId(jobId) {
+    if (!meshJobs.ids.includes(jobId)) meshJobs.ids.unshift(jobId);
+    try { localStorage.setItem('synthesus_mesh_jobs', JSON.stringify(meshJobs.ids.slice(0, 20))); } catch (e) {}
+}
+
+function jobsLoadRemembered() {
+    try {
+        meshJobs.ids = JSON.parse(localStorage.getItem('synthesus_mesh_jobs') || '[]');
+    } catch (e) { meshJobs.ids = []; }
+}
+
+async function jobsSubmit() {
+    const statusEl = document.getElementById('jobs-submit-status');
+    const fileEl = document.getElementById('jobs-bundle-file');
+    const btn = document.getElementById('jobs-submit-btn');
+    const file = fileEl && fileEl.files && fileEl.files[0];
+    if (!file) {
+        statusEl.style.color = '#fb7185';
+        statusEl.textContent = 'Choose a workload manifest bundle first.';
+        return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+        statusEl.style.color = '#fb7185';
+        statusEl.textContent = 'Bundle exceeds the 8 MiB policy limit.';
+        return;
+    }
+    btn.disabled = true;
+    statusEl.style.color = '#94a3b8';
+    statusEl.textContent = 'Submitting to the mesh scheduler…';
+    try {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        let binary = '';
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+        }
+        const resp = await fetch('/api/jobs', {
+            method: 'POST',
+            headers: jobsAuthHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ bundle_base64: btoa(binary), workload_kind: 'inference' }),
+        });
+        const record = await resp.json();
+        if (!resp.ok) {
+            statusEl.style.color = '#fb7185';
+            statusEl.textContent = 'Rejected: ' + (record.error || resp.status);
+            return;
+        }
+        jobsRememberId(record.job_id);
+        jobsRenderRecord(record);
+        statusEl.style.color = record.state === 'completed' ? '#4ade80' : '#94a3b8';
+        statusEl.textContent = 'Job ' + record.job_id + ' → ' + record.state +
+            (record.reason ? (' (' + record.reason + ')') : '');
+        jobsScheduleRefresh();
+    } catch (e) {
+        statusEl.style.color = '#fb7185';
+        statusEl.textContent = 'DEGRADED: ' + (e.message || e);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function jobsStateBadge(state) {
+    const palette = {
+        admitted: ['#facc15', 'ADMITTED'],
+        completed: ['#4ade80', 'COMPLETED'],
+        failed: ['#fb7185', 'FAILED'],
+        cancelled: ['#94a3b8', 'CANCELLED'],
+        rejected: ['#fb7185', 'REJECTED'],
+        unavailable: ['#f97316', 'UNAVAILABLE'],
+    };
+    const entry = palette[state] || ['#94a3b8', String(state || 'UNKNOWN').toUpperCase()];
+    return '<span style="color:' + entry[0] + '; font-weight:700; font-size:0.72rem;">' + entry[1] + '</span>';
+}
+
+function jobsRenderRecord(record) {
+    const list = document.getElementById('jobs-list');
+    if (!list) return;
+    const rowId = 'jobs-row-' + record.job_id.replace(/[^a-zA-Z0-9_-]/g, '_');
+    let row = document.getElementById(rowId);
+    if (!row) {
+        row = document.createElement('div');
+        row.id = rowId;
+        row.style.cssText = 'border:1px solid rgba(148,163,184,.2); border-radius:6px; padding:8px; display:flex; flex-direction:column; gap:4px;';
+        list.prepend(row);
+    }
+    const outputs = (record.outputs || []).map(function (output) {
+        return '<button class="glass-btn" style="font-size:0.7rem; margin-right:4px;" ' +
+            'onclick="jobsViewResult(\'' + record.job_id + '\',\'' + output.sha256 + '\')">' +
+            '📄 ' + (output.media_type || 'result') + ' · ' + output.sha256.slice(0, 12) + '…</button>';
+    }).join('');
+    row.innerHTML =
+        '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+            '<code style="font-size:0.7rem; color:#64748b;">' + record.job_id + '</code>' +
+            jobsStateBadge(record.state) +
+        '</div>' +
+        (record.reason ? '<div style="color:#fb7185; font-size:0.75rem;">' + record.reason + '</div>' : '') +
+        (outputs ? '<div>' + outputs + '</div>' : '') +
+        (record.state === 'admitted'
+            ? '<div><button class="glass-btn" style="font-size:0.72rem;" onclick="jobsCancel(\'' + record.job_id + '\')">■ Cancel</button></div>'
+            : '');
+}
+
+async function jobsRefreshOne(jobId) {
+    const resp = await fetch('/api/jobs/' + encodeURIComponent(jobId), {
+        headers: jobsAuthHeaders(),
+    });
+    if (!resp.ok) return null;
+    const record = await resp.json();
+    jobsRenderRecord(record);
+    return record;
+}
+
+async function jobsRefreshAll() {
+    jobsLoadRemembered();
+    let anyPending = false;
+    for (const jobId of meshJobs.ids) {
+        try {
+            const record = await jobsRefreshOne(jobId);
+            if (record && record.state === 'admitted') anyPending = true;
+        } catch (e) { /* controller offline; row keeps last honest state */ }
+    }
+    if (anyPending) jobsScheduleRefresh();
+}
+
+function jobsScheduleRefresh() {
+    if (meshJobs.timer) clearTimeout(meshJobs.timer);
+    meshJobs.timer = setTimeout(jobsRefreshAll, 3000);
+}
+
+async function jobsCancel(jobId) {
+    try {
+        const resp = await fetch('/api/jobs/' + encodeURIComponent(jobId) + '/cancel', {
+            method: 'POST',
+            headers: jobsAuthHeaders(),
+        });
+        if (resp.ok) jobsRenderRecord(await resp.json());
+    } catch (e) { /* leave last honest state */ }
+}
+
+async function jobsViewResult(jobId, sha256) {
+    const panel = document.getElementById('jobs-result-panel');
+    const body = document.getElementById('jobs-result-body');
+    const shaEl = document.getElementById('jobs-result-sha');
+    panel.style.display = 'block';
+    shaEl.textContent = sha256;
+    body.textContent = 'Fetching verified result…';
+    try {
+        const resp = await fetch(
+            '/api/jobs/' + encodeURIComponent(jobId) + '/results/' + encodeURIComponent(sha256),
+            { headers: jobsAuthHeaders() }
+        );
+        if (!resp.ok) {
+            body.textContent = 'Result unavailable (' + resp.status + ').';
+            return;
+        }
+        const text = await resp.text();
+        try {
+            body.textContent = JSON.stringify(JSON.parse(text), null, 2);
+        } catch (e) {
+            body.textContent = text;
+        }
+    } catch (e) {
+        body.textContent = 'DEGRADED: ' + (e.message || e);
+    }
+}
+
+jobsLoadRemembered();
+if (meshJobs.ids.length) setTimeout(jobsRefreshAll, 1500);

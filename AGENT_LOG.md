@@ -498,6 +498,42 @@ to this log.
   node over the mesh transport; then the fresh three-node cell acceptance
   for the remaining F-020 boxes.
 
+## 2026-07-18 — F-020 desktop presentation of mesh jobs
+
+- Base SHA: `e45d82c8eed5faecab1dc9b667d03be61a886cc2` (post-PR-#11 `main`).
+- Branch: `agent/f020-desktop-jobs`.
+- Objective: real Web Desktop presentation of job records — submit, poll,
+  cancel, and view verified results — with no simulated state.
+- Files changed:
+  - `services/job_pipeline.py`: `result(job_id, output_sha256)` serves only
+    digests recorded in the completed job's signed response outputs, via an
+    injected loader, and re-hashes loaded bytes before serving; anything
+    else returns nothing.
+  - `apps/synthesus/desktop/synthesusd.py`:
+    `GET /api/jobs/{id}/results/{sha256}` behind the per-install key.
+  - `apps/synthesus/desktop/synthesus_native_shell.py`: shell→controller
+    job proxies (`/api/jobs*`) requiring a logged-in human identity; the
+    install key is attached only on the server-side hop.
+  - `apps/synthesus/desktop/index.html` + `script.js`: Mesh Jobs window —
+    bundle file submission (8 MiB bound), per-job signed-state badges with
+    fail reasons, admitted-only cancel, 3s polling only while jobs are
+    pending, and a verified-result viewer keyed by content digest.
+- Security decisions: the browser never sees the install key; results are
+  served only after digest re-verification against the signed job record;
+  the UI renders rejection/failure reasons verbatim and never shows
+  synthetic success.
+- Commands and exact results: desktop/controller suite `30 passed`
+  (including the new results-endpoint auth/404 coverage); job pipeline
+  suite `5 passed` (including tamper-detection on the result store);
+  `node --check` on `script.js` and `py_compile` on all touched Python.
+- Physical evidence and artifact digests: none claimed; this is local UI
+  and API wiring over the already-proven execution spine.
+- Review verdict: pending on the PR.
+- PR and final SHA: recorded on the PR after push.
+- Remaining blockers / next exact command: run the job pipeline against
+  the physically enrolled worker over the mesh transport, then the fresh
+  three-node cell acceptance for the remaining F-020 boxes.
+
 ## Session entry template
 
 ```markdown

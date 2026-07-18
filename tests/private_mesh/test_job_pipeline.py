@@ -15,6 +15,17 @@ from tests.private_mesh.test_execution_wiring import (
 from tests.vsource.test_local_control_plane import ACCOUNT, SUBJECT, capability_doc
 
 
+def _result_loader(result_dir: Path):
+    def load(sha256: str) -> bytes | None:
+        path = result_dir / sha256
+        try:
+            return path.read_bytes()
+        except OSError:
+            return None
+
+    return load
+
+
 def _pipeline(tmp_path: Path):
     harness = _wiring(tmp_path, preadmit=False)
     ctx = harness.ctx
@@ -36,6 +47,7 @@ def _pipeline(tmp_path: Path):
             "ingress_bps": 0,
             "egress_bps": 0,
         },
+        result_loader=_result_loader(harness.result_dir),
     )
     return harness, pipeline
 
@@ -103,6 +115,28 @@ def test_garbage_bundle_fails_terminally_without_fabricated_success(tmp_path):
     assert [
         command for command in harness.runner.commands if command[1] == "run"
     ] == []
+
+
+def test_completed_job_result_is_served_only_verified(tmp_path):
+    harness, pipeline = _pipeline(tmp_path)
+    record = pipeline.submit(bundle=harness.bundle)
+    assert record.state is JobState.COMPLETED
+    result_sha256 = hashlib.sha256(RESULT_DOCUMENT).hexdigest()
+
+    loaded = pipeline.result(record.job_id, result_sha256)
+    assert loaded is not None
+    payload, media_type = loaded
+    assert payload == RESULT_DOCUMENT
+    assert media_type == "application/json"
+
+    assert pipeline.result("job:unknown:000", result_sha256) is None
+    assert pipeline.result(record.job_id, "f" * 64) is None
+    assert pipeline.result(record.job_id, "not-a-digest") is None
+
+    stored = harness.result_dir / result_sha256
+    stored.chmod(0o600)
+    stored.write_bytes(b"tampered result bytes")
+    assert pipeline.result(record.job_id, result_sha256) is None
 
 
 def test_out_of_policy_submissions_are_rejected_before_allocation(tmp_path):

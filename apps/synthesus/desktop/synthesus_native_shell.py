@@ -236,6 +236,66 @@ def _human_identity_from_request():
     return email or None
 
 
+_CONTROLLER_URL = f"http://127.0.0.1:{CONTROLLER_PORT}"
+
+
+def _proxy_controller_jobs(method, path, payload=None):
+    """Authenticated shell→controller hop for the private-mesh job API.
+
+    The per-install key is attached only on this server-side hop; the
+    browser never sees it, and job actions additionally require a
+    logged-in human identity.
+    """
+
+    try:
+        r = requests.request(
+            method,
+            f"{_CONTROLLER_URL}{path}",
+            headers={"X-API-Key": _runtime_api_key()},
+            json=payload,
+            timeout=650,
+        )
+    except Exception as e:
+        return jsonify({"error": "controller_unavailable", "message": str(e)}), 503
+    content_type = r.headers.get("Content-Type", "application/json")
+    return (r.content, r.status_code, {"Content-Type": content_type})
+
+
+@app.route('/api/jobs', methods=['POST'])
+def jobs_submit():
+    if not _human_identity_from_request():
+        return jsonify({"error": "authenticated_user_required"}), 401
+    body = request.get_json(silent=True) or {}
+    payload = {
+        "bundle_base64": body.get("bundle_base64"),
+        "workload_kind": body.get("workload_kind", "inference"),
+    }
+    return _proxy_controller_jobs("POST", "/api/jobs", payload)
+
+
+@app.route('/api/jobs/<job_id>', methods=['GET'])
+def jobs_status(job_id):
+    if not _human_identity_from_request():
+        return jsonify({"error": "authenticated_user_required"}), 401
+    return _proxy_controller_jobs("GET", f"/api/jobs/{job_id}")
+
+
+@app.route('/api/jobs/<job_id>/cancel', methods=['POST'])
+def jobs_cancel(job_id):
+    if not _human_identity_from_request():
+        return jsonify({"error": "authenticated_user_required"}), 401
+    return _proxy_controller_jobs("POST", f"/api/jobs/{job_id}/cancel")
+
+
+@app.route('/api/jobs/<job_id>/results/<output_sha256>', methods=['GET'])
+def jobs_result(job_id, output_sha256):
+    if not _human_identity_from_request():
+        return jsonify({"error": "authenticated_user_required"}), 401
+    return _proxy_controller_jobs(
+        "GET", f"/api/jobs/{job_id}/results/{output_sha256}"
+    )
+
+
 @app.route('/api/system/status', methods=['GET'])
 def get_status():
     status_data = {
