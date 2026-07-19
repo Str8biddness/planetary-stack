@@ -752,3 +752,55 @@ to this log.
 - Review verdict: pending.
 - PR and final SHA: pending.
 - Remaining blockers / next exact command: Report back to orchestrator for Step 3.
+
+## 2026-07-18 — F-020 remote backend, F-030 identity lifecycle, F-060 Planetary Drive scaffold, F-090 desktop UX
+
+- Recorded: 2026-07-18, America/Chicago.
+- Branch: `agent/f020-remote-job-pipeline`.
+- Commit: `916303b2675f36ae45fff59611dbaae61b2943d1`.
+- Pushed: `origin/agent/f020-remote-job-pipeline`.
+
+### Objective
+
+Wire the desktop-initiated job pipeline to a physical remote worker via SSH,
+return results exclusively over `unisync_mtls`, scaffold the Planetary Drive
+storage module, harden X.509 identity lifecycle, and bind the three F-090
+desktop UI windows.
+
+### Files changed
+
+- `services/remote_backend.py` (new): RemoteExecutionBackend implementing JobExecutionBackend via SshCarrier; `_coerce()` avoids lossy model_dump→model_validate enum roundtrips; `model_validate_json` used for ChalResponse/LifecycleEvent/ErrorFrame wire parsing.
+- `services/job_pipeline.py`: Extracted JobExecutionBackend Protocol; renamed `execution_backend→backend`; removed speculative F-080 retry loop.
+- `apps/synthesus/desktop/synthesusd.py`: `_build_job_pipeline()` wires RemoteExecutionBackend + per-launch ephemeral CA `result_loader` over `unisync_mtls` when `SYNTHESUS_WORKER_NODE` is set; no workload bytes touch SSH channel.
+- `services/unisync/mesh_authority.py`: `renew_certificate()` + `renew_peer()` preserving existing public key; `generate_crl()` with `revoked_at` timestamps.
+- `services/unisync/mesh_identity.py`: `check_certificate_expiry()` — raises MeshSecurityError on expired cert.
+- `services/planetary_drive/manifests.py` (new): Pydantic FileManifest with conflict/version/tombstone state.
+- `services/planetary_drive/local_cas.py` (new): LocalCASWrapper with os.path.commonpath path-traversal jail; atomic put/get.
+- `services/planetary_drive/namespace_manager.py` (new): SQLite-backed atomic put_file/get_file/delete_file (tombstone).
+- `services/planetary_drive/loopback_api.py` (new): FastAPI APIRouter GET/PUT/DELETE reusing `_runtime_authorized` HMAC from synthesusd.
+- `apps/synthesus/desktop/index.html`: Added win-account-setup, win-node-enroll, win-resources windows with accessible inputs/sliders.
+- `apps/synthesus/desktop/script.js`: localStorage state persistence for all three new windows.
+- `tests/private_mesh/test_remote_backend.py` (new): End-to-end RemoteExecutionBackend test with MockSshCarrier against live NodeAgent.
+- `tests/unisync/test_mesh_authority_renewal.py` (new): Certificate renewal lifecycle and fail-closed branch tests.
+- `tests/unisync/test_mesh_identity_expiry.py` (new): check_certificate_expiry unit tests.
+
+### Test evidence
+
+    PYTHONHASHSEED=1  163 passed in 172.58s (0:02:52)
+    PYTHONHASHSEED=4  163 passed in 184.78s (0:03:04)
+
+Command: PYTHON=/home/dakin/.local/share/synthesus/.venv/bin/python make test-private-mesh
+Zero failures. Both determinism seeds clean.
+
+### Security decisions
+
+- `_coerce()` uses direct model instance when type matches; falls back to model_validate_json for dict/string inputs to preserve enum fidelity.
+- LocalCASWrapper._resolve_path uses os.path.commonpath to guarantee no path escape from bounded root_dir; raises MeshSecurityError on traversal attempt.
+- result_loader in synthesusd.py uses per-launch ephemeral MeshCertificateAuthority; artifact received through TrustedLanServer over TLS 1.3 mTLS only. SSH used only for mesh_node_cli send invocation.
+- Loopback API reuses controller _runtime_authorized constant-time HMAC for every Drive request.
+
+### Remaining F-020 blockers
+
+- Cancel/stop and terminal cleanup at every layer.
+- Reject stale, duplicated, substituted, expired, cross-account, wrong-node, oversized, and unsupported requests before workload execution.
+- Fresh three-node cell acceptance run from Web Desktop to close the gate.
