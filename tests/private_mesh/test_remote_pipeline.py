@@ -166,3 +166,28 @@ def test_unreachable_worker_fails_closed(tmp_path):
         config, state_dir=tmp_path / "authority", clock=_clock, carrier=_DeadCarrier()
     )
     assert pipeline is None
+
+
+def test_two_jobs_reuse_one_session_capability(tmp_path, monkeypatch):
+    import aivm.execution as _aivm
+
+    class _Runner(_aivm.PodmanExecutor):
+        def __init__(self, policy, *, authority_verifier, runner=None, **kw):
+            super().__init__(policy, authority_verifier=authority_verifier, runner=FakeModelRunner(), **kw)
+
+    monkeypatch.setattr(_aivm, "PodmanExecutor", _Runner)
+    config = _config(tmp_path)
+    carrier = _DeliveringCarrier()
+    pipeline = build_remote_pipeline(config, state_dir=tmp_path / "authority", clock=_clock, carrier=carrier)
+    assert pipeline is not None
+    carrier.deliver_objects(
+        config.target,
+        (
+            (hashlib.sha256(DOCUMENT_PAYLOAD).hexdigest(), DOCUMENT_PAYLOAD),
+            (hashlib.sha256(MODEL_PAYLOAD).hexdigest(), MODEL_PAYLOAD),
+        ),
+    )
+    first = pipeline.submit(bundle=_bundle(), workload_kind="evaluation")
+    second = pipeline.submit(bundle=_bundle(), workload_kind="evaluation")
+    assert first.state is JobState.COMPLETED, first.reason
+    assert second.state is JobState.COMPLETED, second.reason
