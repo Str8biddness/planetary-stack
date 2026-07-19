@@ -696,6 +696,42 @@ to this log.
   control plane, lease-bound mTLS result return), then the three-node cell
   acceptance.
 
+## 2026-07-18 — Parallel scaffolds: SBOM (F-001), bootstrap (F-010), observability (F-110)
+
+- Base SHA: `de0a1d0` (post-PR-#15 `main`); branch
+  `agent/parallel-f001-f010-f110`.
+- Produced by three isolated parallel subagents, then verified and
+  integrated in the canonical checkout. None of these completes its gate;
+  no FINISH_CHECKLIST box is checked.
+- F-001 (partial): `scripts/generate_sbom.py` generates a CycloneDX-style
+  SBOM from the real installed environment plus a third-party notices
+  bundle under `docs/sbom/`. Regenerated here: 180 components, 8 with
+  undetectable licenses marked "UNKNOWN — needs manual review". Test:
+  `tests/test_sbom_generation.py`. NOT done: non-Python (system/JS) SBOM
+  coverage, license remediation of the 8 UNKNOWNs, signed provenance.
+- F-010 (partial): `scripts/bootstrap.sh` (idempotent, `set -euo pipefail`,
+  fail-closed on missing tooling), `versions.lock` (Python deps pinned to
+  detected versions; Podman/Ollama marked expected/tested, not detected on
+  this host), `docs/BOOTSTRAP.md`, and a `bootstrap` Makefile target.
+  Verified by `bash -n` and `make -n` only — the script was NOT executed
+  end-to-end (it installs packages). NOT done: reproducible
+  devcontainer/Nix, clean-runner artifact build, double-build determinism.
+- F-110 (partial): `services/observability/audit.py` (append-only,
+  0700 dir / 0600 files, RFC 8785 records, recursive secret redaction with
+  a denylist, bounded detail) and `metrics.py` (bounded counter/gauge
+  registry). Tests: `tests/observability/` (28 passed here). NOT done:
+  integration into live call sites (pipeline, node agent, transport);
+  these are standalone primitives with unit coverage only.
+- Commands and exact results (canonical checkout):
+  - `python scripts/generate_sbom.py` → 180 components, 8 UNKNOWN.
+  - `bash -n scripts/bootstrap.sh` clean; `make -n bootstrap` OK.
+  - `pytest tests/observability tests/test_sbom_generation.py` → 35 passed.
+- Physical evidence and artifact digests: N/A (tooling and primitives).
+- Review verdict: pending on the PR.
+- Remaining blockers / next exact command: integrate observability into
+  real call sites; complete SBOM signing + non-Python coverage; run
+  bootstrap end-to-end on a fresh supported machine.
+
 ## Session entry template
 
 ```markdown
