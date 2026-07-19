@@ -763,6 +763,36 @@ to this log.
   observability-into-pipeline subagent hit an account session limit and did
   not finish — resume/complete separately.
 
+## 2026-07-19 — Useful model job inside a physical three-node cell
+
+- Base SHA: `bf014e9` (post-PR-#17 `main`); branch
+  `agent/f020-cell-model-evidence`.
+- Objective: combine the three-node enrollment with the proven v2 model
+  execution — a useful model job placed and run in a real three-node cell.
+- Command and exact result: driver composing existing ssh_smoke helpers
+  enrolled `AIVM`, `dakin-MS-7C95` (execution), `dako-MS-7C89` (three
+  distinct hostnames + node keys), registered three signed inventories,
+  allocated one scheduler-signed fenced lease on the execution node, and
+  dispatched a `ssh_job.v2` executor job. Real ONNX execution in Podman
+  (image `sha256:4933984e…`) returned content-addressed result
+  `5df96635…57b1` (byte-identical to all prior physical paths) plus
+  evidence `117c92b1…`; coordinator validated the signed response and
+  execution evidence against the exact lease. Evidence
+  `cell-model-evidence.json` sha256 `67ada8a8…`.
+- Physical evidence: docs/evidence/F020_THREE_NODE_MODEL_CELL_PHYSICAL_2026-07-19.md.
+- Review verdict: pending on the PR.
+- Honest scope: demonstrates fresh three-node cell + useful model +
+  independent verification + no in-process shortcuts. Does NOT demonstrate
+  the literal Web-Desktop origin (synthesusd remote construction is
+  fail-closed), worker-outage survival/rescheduling (no redundancy for
+  single-node model execution — F-080 open), or physical controller
+  restart. No checklist box checked.
+- Remaining blockers / next exact command: secure `synthesusd` remote
+  construction (mesh enrollment + persistent signed control plane + mTLS
+  result return) to close the literal Web-Desktop origin; F-080
+  rescheduling/redundancy + physical outage to claim outage survival;
+  finish the observability-into-pipeline integration.
+
 ## Session entry template
 
 ```markdown
