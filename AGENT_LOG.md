@@ -650,6 +650,45 @@ to this log.
   `Base SHA: N/A` / `PR: pending` do not meet governing rule 2.
 - No other `916303b` claim checks a box; nothing else reverted.
 
+## 2026-07-18 — F-020 desktop→worker wiring: real remote backend + physical proof
+
+- Base SHA: `7fb0ef9` (branch `agent/f020-remote-job-pipeline`, after the
+  F-090 checklist correction).
+- Objective: make the desktop job pipeline's remote backend run the real
+  model on a physical worker, not the SHA-256 placeholder against a mock.
+- Context: commit `916303b` had added a `RemoteExecutionBackend` that built
+  a `ssh_job.v1` (hash) job and was tested only with a `MockSshCarrier`, so
+  it did not deliver useful-model execution. Rebuilt it.
+- Files changed:
+  - `services/remote_backend.py`: dispatches `ssh_job.v2` with an executor
+    spec **derived from the workload manifest** (artifact digests, model /
+    document artifact ids, output id), fails closed on a mutable or
+    mismatched image and on a non-model manifest, routes wire dicts through
+    JSON so strict enum fields parse, checks lease node == worker node, and
+    maps the worker's signed envelope back to node-agent result types
+    without fabricating success (carrier failure → UNAVAILABLE, worker
+    reject → REJECTED/FAILED with the worker's reason).
+  - `tests/private_mesh/test_remote_backend.py`: replaced the mock-only
+    test with 7 unit tests — spec derivation, fail-closed image/manifest,
+    v2 job construction, and honest completed/rejected/unavailable mapping.
+  - `docs/evidence/F020_DESKTOP_REMOTE_JOB_PHYSICAL_2026-07-18.md`.
+- Commands and exact results:
+  - `tests/private_mesh/test_remote_backend.py`: 7 passed.
+  - `tests/private_mesh/test_job_pipeline.py` + `test_worker_cli.py`: 20 passed.
+  - Physical: drove `RemoteExecutionBackend` against `dakin-MS-7C95` over
+    the pinned SSH carrier; worker ran the real ONNX profile in Podman
+    (image `sha256:4933984e…`) from mesh-inbox artifacts. Backend returned
+    `executed` / `succeeded` with content-addressed result
+    `5df96635…57b1` (byte-identical to the single-node and mesh-delivered
+    gates) plus evidence `ba7e385a…04b7`.
+- Physical evidence and artifact digests: see the evidence document.
+- Review verdict: pending on the PR.
+- PR and final SHA: recorded on the PR after push.
+- Remaining blockers / next exact command: wire `synthesusd` to select the
+  remote backend when a worker node is configured and present remote job
+  results in the desktop; then result-return-over-mTLS as a product flow
+  and the three-node cell acceptance.
+
 ## Session entry template
 
 ```markdown
