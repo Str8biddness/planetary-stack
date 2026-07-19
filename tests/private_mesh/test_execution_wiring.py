@@ -185,7 +185,7 @@ class FakeModelRunner:
         self.run_result = run_result
         self.commands: list[tuple[str, ...]] = []
 
-    def run(self, argv, *, timeout_seconds, stdout_limit, stderr_limit):
+    def run(self, argv, *, timeout_seconds, stdout_limit, stderr_limit, cancel_event=None):
         command = tuple(argv)
         self.commands.append(command)
         if command[1] == "info":

@@ -190,7 +190,7 @@ class LocalCarrier:
         result["hostname"] = f"host-{target.ssh_alias}"
         return result
 
-    def execute(self, target: NodeTarget, job: dict[str, Any]) -> dict[str, Any]:
+    def execute(self, target: NodeTarget, job: dict[str, Any], cancel_event: Any = None) -> dict[str, Any]:
         result = execute_job(state_dir=Path(target.remote_state_dir), payload=job)
         result["hostname"] = f"host-{target.ssh_alias}"
         return result
@@ -246,10 +246,10 @@ def test_two_node_coordinator_ingests_fenced_signed_results(tmp_path: Path) -> N
 
 def test_job_cannot_supply_its_own_authenticated_subject(tmp_path: Path) -> None:
     class SubjectInjectingCarrier(LocalCarrier):
-        def execute(self, target: NodeTarget, job: dict[str, Any]) -> dict[str, Any]:
+        def execute(self, target: NodeTarget, job: dict[str, Any], cancel_event: Any = None) -> dict[str, Any]:
             job = dict(job)
             job["authenticated_subject_id"] = "node-agent:attacker"
-            return super().execute(target, job)
+            return super().execute(target, job, cancel_event=cancel_event)
 
     with pytest.raises(ValueError, match="job fields differ"):
         run_two_node_smoke(
@@ -264,10 +264,10 @@ def test_bundle_mismatch_returns_a_signed_error_frame(tmp_path: Path) -> None:
     captured: list[dict[str, Any]] = []
 
     class BundleTamperingCarrier(LocalCarrier):
-        def execute(self, target: NodeTarget, job: dict[str, Any]) -> dict[str, Any]:
+        def execute(self, target: NodeTarget, job: dict[str, Any], cancel_event: Any = None) -> dict[str, Any]:
             job = dict(job)
             job["bundle_base64"] = "AA"
-            result = super().execute(target, job)
+            result = super().execute(target, job, cancel_event=cancel_event)
             captured.append(result)
             return result
 

@@ -392,10 +392,12 @@ class SshCarrier:
         command: str,
         *,
         stdin: bytes | None = None,
+        cancel_event: Event | None = None,
     ) -> dict[str, Any]:
         returncode, stdout, _stderr = self._run_bounded_process(
             [*self._base_argv(target.ssh_alias), command],
             stdin=stdin,
+            cancel_event=cancel_event,
         )
         output = _strict_json(stdout.strip()) if stdout.strip() else {}
         if returncode != 0:
@@ -408,6 +410,7 @@ class SshCarrier:
         argv: list[str],
         *,
         stdin: bytes | None,
+        cancel_event: Event | None = None,
     ) -> tuple[int, bytes, bytes]:
         overflow = Event()
         overflow_stream: list[str] = []
@@ -454,7 +457,23 @@ class SshCarrier:
             for reader in readers:
                 reader.start()
             try:
-                returncode = process.wait(timeout=self.timeout_seconds)
+                if cancel_event is not None:
+                    deadline = time.monotonic() + self.timeout_seconds
+                    returncode = None
+                    while time.monotonic() < deadline:
+                        if cancel_event.is_set():
+                            process.kill()
+                            process.wait(timeout=5)
+                            raise RuntimeError("worker SSH command was cancelled")
+                        try:
+                            returncode = process.wait(timeout=0.1)
+                            break
+                        except subprocess.TimeoutExpired:
+                            pass
+                    if returncode is None:
+                        raise subprocess.TimeoutExpired(process.args, self.timeout_seconds)
+                else:
+                    returncode = process.wait(timeout=self.timeout_seconds)
             except subprocess.TimeoutExpired as exc:
                 process.kill()
                 process.wait(timeout=5)
@@ -488,7 +507,7 @@ class SshCarrier:
         )
         return self._run(target, command)
 
-    def execute(self, target: NodeTarget, job: dict[str, Any]) -> dict[str, Any]:
+    def execute(self, target: NodeTarget, job: dict[str, Any], cancel_event: Event | None = None) -> dict[str, Any]:
         command = self._remote_command(
             target,
             "execute",
@@ -501,7 +520,7 @@ class SshCarrier:
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
-        return self._run(target, command, stdin=encoded)
+        return self._run(target, command, stdin=encoded, cancel_event=cancel_event)
 
 
 def _validate_enrollment(

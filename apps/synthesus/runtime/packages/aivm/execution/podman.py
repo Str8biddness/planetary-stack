@@ -504,6 +504,7 @@ class CommandRunner(Protocol):
         timeout_seconds: float,
         stdout_limit: int,
         stderr_limit: int,
+        cancel_event: Any = None,
     ) -> CommandResult:
         """Run argv without a shell and retain at most the requested bytes."""
 
@@ -518,6 +519,7 @@ class SubprocessCommandRunner:
         timeout_seconds: float,
         stdout_limit: int,
         stderr_limit: int,
+        cancel_event: Any = None,
     ) -> CommandResult:
         command = tuple(argv)
         if (
@@ -555,6 +557,13 @@ class SubprocessCommandRunner:
         try:
             while selector.get_map():
                 now = time.monotonic()
+                if cancel_event is not None and cancel_event.is_set() and not timed_out:
+                    timed_out = True
+                    killed_at = now
+                    try:
+                        os.killpg(process.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
                 if now >= deadline and not timed_out:
                     timed_out = True
                     killed_at = now
@@ -1274,7 +1283,7 @@ class PodmanExecutor:
         except OSError:
             pass
 
-    def execute(self, request: AdmittedExecutionRequest) -> ExecutionResult:
+    def execute(self, request: AdmittedExecutionRequest, cancel_event: Any = None) -> ExecutionResult:
         if type(request) is not AdmittedExecutionRequest:
             return ExecutionResult(ExecutionStatus.REJECTED, "validated_request_required")
         authority_key = ""
@@ -1320,6 +1329,7 @@ class PodmanExecutor:
                     request.manifest.resources.output_bytes,
                 ),
                 stderr_limit=self._policy.stderr_limit_bytes,
+                cancel_event=cancel_event,
             )
             wall_time_ms = max(0, int((time.monotonic() - run_started) * 1000))
             cleanup_ok = self._cleanup(name, timed_out=result.timed_out)
@@ -1438,6 +1448,12 @@ class PodmanExecutor:
             if authority_key:
                 self._finalize_failure(authority_key, ExecutionStatus.UNAVAILABLE, "execution_boundary_error")
             return ExecutionResult(ExecutionStatus.UNAVAILABLE, "execution_boundary_error")
+        except (KeyboardInterrupt, SystemExit):
+            if name:
+                self._cleanup(name, timed_out=True)
+            if authority_key:
+                self._finalize_failure(authority_key, ExecutionStatus.UNAVAILABLE, "execution_cancelled")
+            raise
         finally:
             if cidfile is not None:
                 try:

@@ -595,6 +595,7 @@ class NodeAgent:
         lease_sha256: str,
         fencing_token: int,
         bundle: bytes | bytearray | memoryview,
+        cancel_event: Any = None,
     ) -> NodeExecutionResult:
         with self._lock:
             return self._execute_locked(
@@ -602,6 +603,7 @@ class NodeAgent:
                 lease_sha256=lease_sha256,
                 fencing_token=fencing_token,
                 bundle=bundle,
+                cancel_event=cancel_event,
             )
 
     def _execute_locked(
@@ -611,6 +613,7 @@ class NodeAgent:
         lease_sha256: str,
         fencing_token: int,
         bundle: bytes | bytearray | memoryview,
+        cancel_event: Any = None,
     ) -> NodeExecutionResult:
         if not isinstance(lease_id, str) or not _IDENTIFIER_RE.fullmatch(lease_id):
             return NodeExecutionResult(
@@ -692,7 +695,7 @@ class NodeAgent:
                 entry,
                 reason="bundle bytes do not match the signed digest and size",
             )
-        return self._complete_workload(entry, data, now)
+        return self._complete_workload(entry, data, now, cancel_event=cancel_event)
 
     def _unavailable_reason(self) -> str | None:
         if self._config_error is not None:
@@ -1084,9 +1087,10 @@ class NodeAgent:
         entry: _AdmittedWorkload,
         data: bytes,
         now: datetime,
+        cancel_event: Any = None,
     ) -> NodeExecutionResult:
         if self.workload_executor is not None:
-            return self._complete_with_executor(entry, data, now)
+            return self._complete_with_executor(entry, data, now, cancel_event=cancel_event)
         bundle_sha256 = hashlib.sha256(data).hexdigest()
         report_payload = {
             "schema": HASH_REPORT_SCHEMA,
@@ -1163,6 +1167,7 @@ class NodeAgent:
         entry: _AdmittedWorkload,
         data: bytes,
         now: datetime,
+        cancel_event: Any = None,
     ) -> NodeExecutionResult:
         assert self.workload_executor is not None
         try:
@@ -1170,6 +1175,7 @@ class NodeAgent:
                 lease=entry.lease,
                 request=entry.request,
                 bundle=data,
+                cancel_event=cancel_event,
             )
         except Exception:
             outcome = None

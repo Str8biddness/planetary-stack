@@ -793,6 +793,12 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    import signal
+    def _sig_handler(signum: int, frame: Any) -> None:
+        sys.exit(128 + signum)
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        signal.signal(sig, _sig_handler)
+
     arguments = _parser().parse_args(argv)
     try:
         if arguments.command == "enroll":

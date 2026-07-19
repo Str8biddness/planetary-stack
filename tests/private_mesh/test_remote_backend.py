@@ -108,7 +108,7 @@ class _CapturingCarrier:
         self.response = response
         self.sent = None
 
-    def execute(self, target, job):
+    def execute(self, target, job, cancel_event=None):
         self.sent = job
         return self.response
 
@@ -202,7 +202,7 @@ def test_execute_reports_worker_rejection_without_fabrication(tmp_path):
 
 def test_execute_reports_carrier_failure_as_unavailable(tmp_path):
     class _FailingCarrier:
-        def execute(self, target, job):
+        def execute(self, target, job, cancel_event=None):
             raise OSError("ssh connection refused")
 
     backend = _backend(_FailingCarrier(), node_id=_WORKER_NODE)

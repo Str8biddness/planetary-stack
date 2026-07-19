@@ -18,7 +18,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from threading import RLock
+from threading import RLock, Event
 from typing import Any, Protocol
 
 from contracts.chal_vsource.v1.canonical import document_sha256
@@ -62,6 +62,7 @@ class JobExecutionBackend(Protocol):
         lease_sha256: str,
         fencing_token: int,
         bundle: bytes | bytearray | memoryview,
+        cancel_event: Any = None,
     ) -> NodeExecutionResult: ...
 
     def cancel(
@@ -107,6 +108,7 @@ class JobRecord:
     report: bytes | None = None
     _lease: LeaseDocument | None = field(default=None, repr=False)
     _bundle: bytes | None = field(default=None, repr=False)
+    _cancel_event: Any = field(default=None, repr=False)
 
     def to_wire(self) -> dict[str, Any]:
         return {
@@ -339,10 +341,11 @@ class LocalJobPipeline:
                 created_at=now_wire,
                 _lease=lease,
                 _bundle=data,
+                _cancel_event=Event(),
             )
             self._jobs[job_id] = record
             if start:
-                return self._run_locked(record)
+                return self._run_job(record)
             return record
 
     def run(self, job_id: str) -> JobRecord | None:
@@ -352,38 +355,45 @@ class LocalJobPipeline:
                 return None
             if record.state is not JobState.ADMITTED:
                 return record
-            return self._run_locked(record)
+            return self._run_job(record)
 
-    def _run_locked(self, record: JobRecord) -> JobRecord:
+    def _run_job(self, record: JobRecord) -> JobRecord:
         assert record._lease is not None and record._bundle is not None
         assert record.lease_sha256 is not None and record.fencing_token is not None
+        
+        # Release the pipeline lock while we wait for execution
+        # (the desktop runs this in a threadpool, and we need cancel() to not block)
         result = self._backend.execute(
             lease_id=record._lease.lease_id,
             lease_sha256=record.lease_sha256,
             fencing_token=record.fencing_token,
             bundle=record._bundle,
+            cancel_event=record._cancel_event,
         )
-        _, now_wire = self._now_wire()
-        if result.status is NodeAgentStatus.EXECUTED and result.response is not None:
-            record.state = JobState.COMPLETED
-            record.completed_at = now_wire
-            record.outputs = tuple(
-                output.model_dump(mode="json") for output in result.response.outputs
-            )
-            record.report = result.report
-            record.reason = None
-            self._release_lease_quietly(record._lease)
-        elif result.status is NodeAgentStatus.UNAVAILABLE:
-            record.state = JobState.ADMITTED
-            record.reason = result.reason or "execution unavailable"
-        else:
-            record.state = JobState.FAILED
-            record.completed_at = now_wire
-            record.reason = result.reason or result.status.value
-            self._release_lease_quietly(record._lease)
-        if record.state in _TERMINAL_STATES:
-            record._bundle = None
-        return record
+        with self._lock:
+            if record.state == JobState.CANCELLED:
+                return record
+            _, now_wire = self._now_wire()
+            if result.status is NodeAgentStatus.EXECUTED and result.response is not None:
+                record.state = JobState.COMPLETED
+                record.completed_at = now_wire
+                record.outputs = tuple(
+                    output.model_dump(mode="json") for output in result.response.outputs
+                )
+                record.report = result.report
+                record.reason = None
+                self._release_lease_quietly(record._lease)
+            elif result.status is NodeAgentStatus.UNAVAILABLE:
+                record.state = JobState.ADMITTED
+                record.reason = result.reason or "execution unavailable"
+            else:
+                record.state = JobState.FAILED
+                record.completed_at = now_wire
+                record.reason = result.reason or result.status.value
+                self._release_lease_quietly(record._lease)
+            if record.state in _TERMINAL_STATES:
+                record._bundle = None
+            return record
 
     def cancel(self, job_id: str) -> JobRecord | None:
         with self._lock:
@@ -399,6 +409,8 @@ class LocalJobPipeline:
                 lease_sha256=record.lease_sha256,
                 fencing_token=record.fencing_token,
             )
+            if record._cancel_event is not None:
+                record._cancel_event.set()
             if cancelled.status is not NodeAgentStatus.CANCELLED:
                 record.reason = cancelled.reason or cancelled.status.value
                 return record

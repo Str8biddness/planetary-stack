@@ -187,6 +187,7 @@ class RemoteExecutionBackend:
         lease_sha256: str,
         fencing_token: int,
         bundle: bytes | bytearray | memoryview,
+        cancel_event: Any = None,
     ) -> NodeExecutionResult:
         pending = self._pending_jobs.pop(lease_id, None)
         if not pending:
@@ -218,7 +219,7 @@ class RemoteExecutionBackend:
             "executor": executor,
         }
         try:
-            result = self.carrier.execute(self.target, job)
+            result = self.carrier.execute(self.target, job, cancel_event=cancel_event)
         except Exception as exc:
             return NodeExecutionResult(
                 status=NodeAgentStatus.UNAVAILABLE,

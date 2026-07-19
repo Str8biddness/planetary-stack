@@ -138,6 +138,7 @@ class ChalWorkloadExecutor:
         lease: LeaseDocument,
         request: ChalRequest,
         bundle: bytes,
+        cancel_event: Any = None,
     ) -> WorkloadExecutionOutcome:
         if type(lease) is not LeaseDocument or type(request) is not ChalRequest:
             return _failure("execution_context_invalid")
@@ -213,7 +214,7 @@ class ChalWorkloadExecutor:
         except InvalidExecutionRequest as exc:
             return _failure(str(exc))
 
-        result = self._executor.execute(admitted)
+        result = self._executor.execute(admitted, cancel_event=cancel_event)
         if result.status is ExecutionStatus.UNAVAILABLE:
             return _failure(result.reason, unavailable=True)
         if result.status is not ExecutionStatus.SUCCEEDED or result.evidence is None:
