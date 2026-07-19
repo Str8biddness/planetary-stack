@@ -793,6 +793,45 @@ to this log.
   rescheduling/redundancy + physical outage to claim outage survival;
   finish the observability-into-pipeline integration.
 
+## 2026-07-19 — Secure synthesusd remote pipeline construction (+ physical run)
+
+- Base SHA: `af3da5a` (post-PR-#18 `main`); branch
+  `agent/f020-synthesusd-remote-wiring`.
+- Objective: replace the fail-closed synthesusd remote stub with real,
+  secure controller-side construction (my work, not a subagent's, per the
+  security-sensitivity flag).
+- Files: `services/remote_pipeline.py` (+ test
+  `tests/private_mesh/test_remote_pipeline.py`), and
+  `apps/synthesus/desktop/synthesusd.py` `_build_job_pipeline` rewired to
+  `load_remote_worker_config` + `build_remote_pipeline`;
+  `docs/evidence/F020_SYNTHESUSD_REMOTE_PIPELINE_PHYSICAL_2026-07-19.md`.
+- `build_remote_pipeline`: persistent owner-only desktop Ed25519 identity
+  (controller + scheduler, 0600), real worker enrollment over the carrier,
+  persistent signed vSource control plane, real capability/request/lease,
+  real `RemoteExecutionBackend`. No placeholder keys/signatures. Fails
+  closed (returns None) when unconfigured or the worker is unreachable.
+- Commands and exact results:
+  - `pytest tests/private_mesh/test_remote_pipeline.py` → 3 passed
+    (real-signature end-to-end job via in-process worker + fake Podman;
+    persistent-key reuse at 0600; unreachable-worker fail-closed).
+  - Desktop/controller suite → 30 passed.
+  - Physical: `load_remote_worker_config` + `build_remote_pipeline` against
+    `dakin-MS-7C95` over real SSH, then `pipeline.submit()` → `completed`
+    with content-addressed result `5df96635…57b1` (deterministic) +
+    evidence `28431b2d…`. Real signed enrollment/control plane.
+- Physical evidence: the evidence document.
+- Review verdict: pending on the PR.
+- Honest scope: closes the controller-side construction gap (was
+  fail-closed). Combined with the tested desktop job API this is
+  browser→synthesusd→worker→verified result minus the literal browser and
+  minus result-BYTE return over mTLS (digest + evidence are returned; bytes
+  are a separate step). Installer-driven identity provisioning (F-030)
+  still uses a per-owner persistent key created on first run. No checklist
+  box checked.
+- Remaining blockers / next exact command: result-byte mTLS return to the
+  desktop; installer-driven enrollment; then the literal end-to-end
+  Web-Desktop origin closes the F-020 desktop-intent box.
+
 ## Session entry template
 
 ```markdown

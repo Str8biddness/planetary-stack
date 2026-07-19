@@ -179,29 +179,43 @@ async def _parent_watchdog(parent_pid: int | None) -> None:
 def _build_job_pipeline(settings: ControllerSettings) -> Any:
     """Build the job pipeline the controller serves, or None if unavailable.
 
-    Remote-worker execution is proven end-to-end at the backend level
-    (services/remote_backend.RemoteExecutionBackend; see
-    docs/evidence/F020_DESKTOP_REMOTE_JOB_PHYSICAL_2026-07-18.md), but the
-    productionized controller-side construction — installer-driven mesh
-    enrollment, a persistent signed control plane, and lease-bound mTLS
-    result return — is not wired here yet. Rather than construct a backend
-    with placeholder keys and signatures (which cannot pass the worker's
-    signature and lease checks and would misrepresent readiness), this fails
-    closed: when a worker is configured but the required real enrollment is
-    absent, remote jobs are reported unavailable.
+    Reads a strictly-validated remote-worker configuration and constructs a
+    real, fully-signed desktop->worker pipeline (persistent owner-only
+    controller identity, real worker enrollment, real signed control plane).
+    Returns None when no worker is configured or the worker cannot be reached
+    (fail closed). No placeholder keys or signatures are ever constructed.
+
+    Not yet productionized: returning the result *bytes* to the desktop over
+    mTLS. The signed response carries the content-addressed result digest and
+    execution evidence, which the desktop presents.
     """
 
-    target_node = os.environ.get("SYNTHESUS_WORKER_NODE")
-    if not target_node:
-        return None
-    log.warning(
-        "SYNTHESUS_WORKER_NODE=%s is set, but controller-side remote job "
-        "construction (mesh enrollment, signed control plane, mTLS result "
-        "return) is not wired yet; remote jobs are unavailable. The remote "
-        "execution backend itself is verified separately.",
-        target_node,
+    from datetime import UTC, datetime
+
+    from services.remote_pipeline import RemotePipelineError, build_remote_pipeline
+    from services.remote_worker_config import (
+        RemoteWorkerConfigError,
+        load_remote_worker_config,
     )
-    return None
+
+    try:
+        config = load_remote_worker_config(os.environ)
+    except RemoteWorkerConfigError as exc:
+        log.warning("remote worker config invalid; remote jobs unavailable: %s", exc)
+        return None
+    if config is None:
+        return None
+
+    state_dir = Path("~/.synthesus/remote-authority").expanduser()
+    try:
+        return build_remote_pipeline(
+            config,
+            state_dir=state_dir,
+            clock=lambda: datetime.now(UTC).replace(microsecond=0),
+        )
+    except RemotePipelineError as exc:
+        log.warning("remote pipeline state error; remote jobs unavailable: %s", exc)
+        return None
 
 
 def create_app(
