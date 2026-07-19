@@ -12,9 +12,10 @@ class FileManifest(BaseModel):
     path: str = Field(..., description="Logical path in the drive.")
     
     # Cryptographic state
-    content_hash: str = Field(..., description="Cryptographic hash of the file content.")
+    content_hash: str = Field(..., description="SHA-256 of the plaintext file content.")
+    storage_hash: str = Field(default="", description="SHA-256 of the encrypted object as stored in the CAS.")
     hash_alg: str = Field(default="sha256", description="Algorithm used for the content_hash.")
-    size_bytes: int = Field(..., description="Size of the file content in bytes.")
+    size_bytes: int = Field(..., description="Size of the plaintext file content in bytes.")
     
     # Versioning
     version: int = Field(default=1, description="Monotonically increasing version number.")
