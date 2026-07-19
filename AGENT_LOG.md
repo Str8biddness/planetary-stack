@@ -1007,3 +1007,27 @@ Zero failures. Both determinism seeds clean.
 - Cancel/stop and terminal cleanup at every layer.
 - Reject stale, duplicated, substituted, expired, cross-account, wrong-node, oversized, and unsupported requests before workload execution.
 - Fresh three-node cell acceptance run from Web Desktop to close the gate.
+
+## 2026-07-19 — F-030 physical lifecycle: partial proof + concrete gap finding
+
+- Base SHA: main; branch `agent/f030-physical-lifecycle-evidence`.
+- Motivation: F-030's five checked boxes cited only code (`18cb37a`) with no
+  physical evidence, though the gate's acceptance requires physical machines.
+- Ran the identity lifecycle across three real machines (AIVM, dakin-MS-7C95,
+  dako-MS-7C89, all on identical impl `e66fbec`) over the pinned SSH carrier.
+- Physically proven: enroll (3 distinct hosts/keys, private keys never leave
+  the node), issue + install, all-active, revoke → `active_peer` fail-closed,
+  CRL lists the revoked serial, rollback/resurrection blocked, replace with a
+  fresh key. Evidence: docs/evidence/F030_IDENTITY_LIFECYCLE_PHYSICAL_2026-07-19.md
+  (f030-evidence.json sha256 `f971d425…`).
+- FINDING (blocks F-030 acceptance): **renewal / key rotation and account
+  recovery are not physically executable** — the node CLI has no renewal
+  command and `create_tls_enrollment` refuses to reuse a key, so the CA-side
+  `renew_certificate`/`rotate_peer_key` have no node-side driver. F-030's
+  acceptance ("enroll, rotate, expire, revoke, recover, and replace") is
+  therefore NOT met; installer-driven enrollment (box 1) is also absent.
+- Recommendation: F-030 should not be treated as finished. Either implement
+  node-side `renew-init`/recovery commands and re-run the full lifecycle
+  including rotation, or downgrade the affected boxes. No boxes changed here
+  (owner set them); the gap is recorded with physical proof per governing
+  rule 6 (never erase a finding).
