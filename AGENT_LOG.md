@@ -1007,3 +1007,21 @@ Zero failures. Both determinism seeds clean.
 - Cancel/stop and terminal cleanup at every layer.
 - Reject stale, duplicated, substituted, expired, cross-account, wrong-node, oversized, and unsupported requests before workload execution.
 - Fresh three-node cell acceptance run from Web Desktop to close the gate.
+
+## 2026-07-19 — F-060 Planetary Drive encrypted storage foundation
+
+- Base SHA: `9e94e69` (clean `origin/main`); branch
+  `agent/f060-encrypted-storage-foundation`.
+- Replaced the untested, plaintext, world-readable planetary_drive scaffolds:
+  - `services/planetary_drive/encrypted_store.py`: ChaCha20-Poly1305 over the
+    hardened `unisync.ContentAddressedStore` (owner-only, O_NOFOLLOW, atomic,
+    digest + traversal checks); convergent nonce keeps objects
+    content-addressed; plaintext digest is the AAD so relabel/tamper/wrong-key
+    fail closed.
+  - `services/planetary_drive/namespace_manager.py`: encrypted objects + an
+    owner-only (0600) SQLite namespace with version history, restore,
+    tombstone deletion, atomic replacement.
+  - `manifests.py` gains `storage_hash`; removed the dead weak `local_cas.py`.
+- `pytest tests/planetary_drive/test_storage.py` → 11 passed.
+- Foundation only; no checklist box checked. Signed manifests, replica
+  placement, SSI-RO-001, quotas, repair, and key wrapping remain.
