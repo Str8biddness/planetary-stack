@@ -732,6 +732,37 @@ to this log.
   real call sites; complete SBOM signing + non-Python coverage; run
   bootstrap end-to-end on a fresh supported machine.
 
+## 2026-07-19 — Three-node cell harness + physical hash-cell run; remote config loader
+
+- Base SHA: `e14d467` (post-PR-#16 `main`); branch
+  `agent/f020-cell-and-remote-config`.
+- Objective: three-node cell orchestration and a strict remote-worker config
+  loader (both produced by parallel subagents), plus a real physical
+  three-node run of the bounded hash workload.
+- Files: `services/private_mesh/cell_smoke.py` (+ test),
+  `services/remote_worker_config.py` (+ test),
+  `docs/evidence/F080_THREE_NODE_HASH_CELL_PHYSICAL_2026-07-19.md`.
+- Commands and exact results:
+  - `pytest tests/private_mesh/test_cell_smoke.py tests/test_remote_worker_config.py`
+    → 27 passed (5 cell + 22 config).
+  - Physical three-node run over the pinned SSH carrier across `AIVM`,
+    `dakin-MS-7C95` (execution), `dako-MS-7C89`: `passed: true`,
+    `degraded: false`, `node_count: 3`, three distinct hostnames and node
+    keys, one fenced lease, verified signed response/lifecycle, lease
+    released. Evidence `cell-evidence.json` sha256 `685caaf8…`.
+- Physical evidence and artifact digests: see the evidence document.
+- Review verdict: pending on the PR.
+- Honest scope: this runs the model-free hash job, so it proves three-machine
+  enrollment + single-lease fenced scheduling + signed-result verification,
+  NOT a useful-model cell, NOT a physically triggered outage/restart, NOT
+  mTLS object delivery combined with three nodes. No checklist box checked.
+- Remaining blockers / next exact command: combine three-node orchestration
+  with the proven v2 model + mTLS delivery and a real mid-run node outage to
+  close the F-020 cell acceptance; separately, the config loader still needs
+  secure `synthesusd` integration (my work, not a subagent's); the
+  observability-into-pipeline subagent hit an account session limit and did
+  not finish — resume/complete separately.
+
 ## Session entry template
 
 ```markdown
