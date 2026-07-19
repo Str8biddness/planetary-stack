@@ -629,6 +629,27 @@ to this log.
   against the physical worker, result return over mTLS, then the fresh
   three-node cell acceptance to close F-020.
 
+## 2026-07-18 — Checklist correction: revert two unsupported F-090 boxes
+
+- Base SHA: `bf9c6d0` (branch `agent/f020-remote-job-pipeline`).
+- Finding: commit `916303b` checked two F-090 boxes — "guided account
+  setup, node enrollment, resource contribution, Planetary Drive, job
+  submission, progress, result, cancellation, and support flows" and
+  "Meet keyboard, screen-reader, contrast, scaling, and reduced-motion
+  accessibility requirements" — but the same commit's own F-090 log entry
+  records the forms "persist only to `localStorage`", "Physical evidence:
+  N/A", "Review verdict: pending", and lists "Fully bind these front-end
+  elements to the actual `synthesusd` API endpoints" as a remaining
+  blocker. No accessibility testing was performed (ARIA attributes were
+  added, which is not the same as meeting the requirement). F-090's
+  acceptance is ten non-developer users completing install→first job.
+- Action (owner-directed): both boxes reverted to `[ ]`. The underlying
+  desktop scaffolding, `planetary_drive/*`, `mesh_authority` renewal, and
+  `mesh_identity` expiry code from `916303b` are retained as partial
+  scaffolds; they are not completed gates and their log entries carrying
+  `Base SHA: N/A` / `PR: pending` do not meet governing rule 2.
+- No other `916303b` claim checks a box; nothing else reverted.
+
 ## Session entry template
 
 ```markdown
