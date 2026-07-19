@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from threading import RLock
-from typing import Any
+from typing import Any, Protocol
 
 from contracts.chal_vsource.v1.canonical import document_sha256
 from contracts.chal_vsource.v1.models import (
@@ -29,7 +29,11 @@ from contracts.chal_vsource.v1.models import (
     LeaseRevocationReason,
     WorkloadKind,
 )
-from services.private_mesh.node_agent import NodeAgent, NodeAgentStatus
+from services.private_mesh.node_agent import (
+    NodeAdmissionResult,
+    NodeAgentStatus,
+    NodeExecutionResult,
+)
 from services.vsource.control_plane import (
     DocumentSigner,
     LocalVSourceControlPlane,
@@ -39,6 +43,34 @@ from services.vsource.control_plane import (
 _IDENTIFIER_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._:-]{2,127}$")
 _DEFAULT_MAX_BUNDLE_BYTES = 8 * 1024 * 1024
 _WIRE_TIME = "%Y-%m-%dT%H:%M:%SZ"
+
+
+class JobExecutionBackend(Protocol):
+    def admit_lease(
+        self,
+        lease: LeaseDocument | Mapping[str, Any] | str | bytes,
+        request: ChalRequest | Mapping[str, Any] | str | bytes,
+        capability: CapabilityDocument | Mapping[str, Any] | str | bytes,
+        *,
+        authenticated_subject_id: str,
+    ) -> NodeAdmissionResult: ...
+
+    def execute(
+        self,
+        *,
+        lease_id: str,
+        lease_sha256: str,
+        fencing_token: int,
+        bundle: bytes | bytearray | memoryview,
+    ) -> NodeExecutionResult: ...
+
+    def cancel(
+        self,
+        *,
+        lease_id: str,
+        lease_sha256: str,
+        fencing_token: int,
+    ) -> NodeExecutionResult: ...
 
 
 class JobState(StrEnum):
@@ -97,7 +129,7 @@ class LocalJobPipeline:
         self,
         *,
         control_plane: LocalVSourceControlPlane,
-        node_agent: NodeAgent,
+        backend: JobExecutionBackend,
         request_signer: DocumentSigner,
         capability_provider: Callable[[], CapabilityDocument],
         authenticated_subject_id: str,
@@ -110,8 +142,8 @@ class LocalJobPipeline:
         max_jobs: int = 1024,
         result_loader: Callable[[str], bytes | None] | None = None,
     ) -> None:
-        if control_plane is None or node_agent is None or request_signer is None:
-            raise ValueError("control plane, node agent, and signer are required")
+        if control_plane is None or backend is None or request_signer is None:
+            raise ValueError("control plane, backend, and signer are required")
         if capability_provider is None or clock is None:
             raise ValueError("capability provider and clock are required")
         if not _IDENTIFIER_RE.fullmatch(account_id):
@@ -121,7 +153,7 @@ class LocalJobPipeline:
         if max_bundle_bytes < 1 or max_jobs < 1:
             raise ValueError("bundle and job limits must be positive")
         self._control_plane = control_plane
-        self._node_agent = node_agent
+        self._backend = backend
         self._request_signer = request_signer
         self._capability_provider = capability_provider
         self._subject_id = authenticated_subject_id
@@ -276,7 +308,7 @@ class LocalJobPipeline:
                 self._jobs[job_id] = record
                 return record
             lease = allocation.lease
-            admission = self._node_agent.admit_lease(
+            admission = self._backend.admit_lease(
                 lease,
                 request,
                 capability,
@@ -325,7 +357,7 @@ class LocalJobPipeline:
     def _run_locked(self, record: JobRecord) -> JobRecord:
         assert record._lease is not None and record._bundle is not None
         assert record.lease_sha256 is not None and record.fencing_token is not None
-        result = self._node_agent.execute(
+        result = self._backend.execute(
             lease_id=record._lease.lease_id,
             lease_sha256=record.lease_sha256,
             fencing_token=record.fencing_token,
@@ -362,7 +394,7 @@ class LocalJobPipeline:
                 return record
             assert record._lease is not None
             assert record.lease_sha256 is not None and record.fencing_token is not None
-            cancelled = self._node_agent.cancel(
+            cancelled = self._backend.cancel(
                 lease_id=record._lease.lease_id,
                 lease_sha256=record.lease_sha256,
                 fencing_token=record.fencing_token,

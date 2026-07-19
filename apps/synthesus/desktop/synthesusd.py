@@ -176,6 +176,34 @@ async def _parent_watchdog(parent_pid: int | None) -> None:
             return
 
 
+def _build_job_pipeline(settings: ControllerSettings) -> Any:
+    """Build the job pipeline the controller serves, or None if unavailable.
+
+    Remote-worker execution is proven end-to-end at the backend level
+    (services/remote_backend.RemoteExecutionBackend; see
+    docs/evidence/F020_DESKTOP_REMOTE_JOB_PHYSICAL_2026-07-18.md), but the
+    productionized controller-side construction — installer-driven mesh
+    enrollment, a persistent signed control plane, and lease-bound mTLS
+    result return — is not wired here yet. Rather than construct a backend
+    with placeholder keys and signatures (which cannot pass the worker's
+    signature and lease checks and would misrepresent readiness), this fails
+    closed: when a worker is configured but the required real enrollment is
+    absent, remote jobs are reported unavailable.
+    """
+
+    target_node = os.environ.get("SYNTHESUS_WORKER_NODE")
+    if not target_node:
+        return None
+    log.warning(
+        "SYNTHESUS_WORKER_NODE=%s is set, but controller-side remote job "
+        "construction (mesh enrollment, signed control plane, mTLS result "
+        "return) is not wired yet; remote jobs are unavailable. The remote "
+        "execution backend itself is verified separately.",
+        target_node,
+    )
+    return None
+
+
 def create_app(
     settings: ControllerSettings,
     *,
@@ -494,8 +522,11 @@ if __name__ == "__main__":
     except (RuntimeError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc
     port = int(os.environ.get("SYNTHESUS_CONTROLLER_PORT", "5011"))
+    
+    pipeline = _build_job_pipeline(settings)
+    
     uvicorn.run(
-        create_app(settings),
+        create_app(settings, job_pipeline=pipeline),
         host=settings.bind_host,
         port=port,
         log_level="info",
