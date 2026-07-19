@@ -1,7 +1,10 @@
 SHELL := /usr/bin/env bash
 PYTHON ?= python3
 
-.PHONY: doctor status test test-contracts test-private-mesh test-aivm-execution test-synthesus test-knowledge test-knowledge-source test-planetary test-planetary-iso
+.PHONY: bootstrap doctor status test test-contracts test-private-mesh test-aivm-execution test-synthesus test-knowledge test-knowledge-source test-planetary test-planetary-iso
+
+bootstrap:
+	PYTHON="$(PYTHON)" ./scripts/bootstrap.sh
 
 doctor:
 	PYTHON_BIN="$(PYTHON)" ./scripts/doctor.sh

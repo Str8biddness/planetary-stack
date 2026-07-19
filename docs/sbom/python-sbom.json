@@ -1,0 +1,3613 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-07-19T01:48:46+00:00",
+    "tools": [
+      {
+        "vendor": "Planetary Stack",
+        "name": "generate_sbom.py",
+        "version": "1.0.0"
+      }
+    ],
+    "properties": [
+      {
+        "name": "planetary:python_version",
+        "value": "3.12.3"
+      },
+      {
+        "name": "planetary:component_count",
+        "value": "180"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/annotated-doc@0.0.4",
+      "name": "annotated-doc",
+      "version": "0.0.4",
+      "purl": "pkg:pypi/annotated-doc@0.0.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/annotated-types@0.7.0",
+      "name": "annotated-types",
+      "version": "0.7.0",
+      "purl": "pkg:pypi/annotated-types@0.7.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/anyio@4.14.2",
+      "name": "anyio",
+      "version": "4.14.2",
+      "purl": "pkg:pypi/anyio@4.14.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/APScheduler@3.11.3",
+      "name": "APScheduler",
+      "version": "3.11.3",
+      "purl": "pkg:pypi/APScheduler@3.11.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/arrow@1.4.0",
+      "name": "arrow",
+      "version": "1.4.0",
+      "purl": "pkg:pypi/arrow@1.4.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache Software License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/asyncpg@0.31.0",
+      "name": "asyncpg",
+      "version": "0.31.0",
+      "purl": "pkg:pypi/asyncpg@0.31.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/attrs@26.1.0",
+      "name": "attrs",
+      "version": "26.1.0",
+      "purl": "pkg:pypi/attrs@26.1.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/Babel@2.10.3",
+      "name": "Babel",
+      "version": "2.10.3",
+      "purl": "pkg:pypi/Babel@2.10.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/beautifulsoup4@4.12.3",
+      "name": "beautifulsoup4",
+      "version": "4.12.3",
+      "purl": "pkg:pypi/beautifulsoup4@4.12.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/blinker@1.7.0",
+      "name": "blinker",
+      "version": "1.7.0",
+      "purl": "pkg:pypi/blinker@1.7.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/blinker@1.9.0",
+      "name": "blinker",
+      "version": "1.9.0",
+      "purl": "pkg:pypi/blinker@1.9.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/bottle@0.13.4",
+      "name": "bottle",
+      "version": "0.13.4",
+      "purl": "pkg:pypi/bottle@0.13.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/Brlapi@0.8.5",
+      "name": "Brlapi",
+      "version": "0.8.5",
+      "purl": "pkg:pypi/Brlapi@0.8.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "LGPL 2.1"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/Brotli@1.1.0",
+      "name": "Brotli",
+      "version": "1.1.0",
+      "purl": "pkg:pypi/Brotli@1.1.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/certifi@2023.11.17",
+      "name": "certifi",
+      "version": "2023.11.17",
+      "purl": "pkg:pypi/certifi@2023.11.17",
+      "licenses": [
+        {
+          "license": {
+            "name": "MPL-2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/chardet@5.2.0",
+      "name": "chardet",
+      "version": "5.2.0",
+      "purl": "pkg:pypi/chardet@5.2.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "LGPL"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/click@8.1.6",
+      "name": "click",
+      "version": "8.1.6",
+      "purl": "pkg:pypi/click@8.1.6",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/click@8.4.2",
+      "name": "click",
+      "version": "8.4.2",
+      "purl": "pkg:pypi/click@8.4.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/cmake@4.4.0",
+      "name": "cmake",
+      "version": "4.4.0",
+      "purl": "pkg:pypi/cmake@4.4.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache 2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/colorama@0.4.6",
+      "name": "colorama",
+      "version": "0.4.6",
+      "purl": "pkg:pypi/colorama@0.4.6",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/command-not-found@0.3",
+      "name": "command-not-found",
+      "version": "0.3",
+      "purl": "pkg:pypi/command-not-found@0.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "UNKNOWN \u2014 needs manual review"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "none"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/configobj@5.0.8",
+      "name": "configobj",
+      "version": "5.0.8",
+      "purl": "pkg:pypi/configobj@5.0.8",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD (2 clause)"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/cryptography@41.0.7",
+      "name": "cryptography",
+      "version": "41.0.7",
+      "purl": "pkg:pypi/cryptography@41.0.7",
+      "licenses": [
+        {
+          "expression": "Apache-2.0 OR BSD-3-Clause"
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/cupshelpers@1.0",
+      "name": "cupshelpers",
+      "version": "1.0",
+      "purl": "pkg:pypi/cupshelpers@1.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "UNKNOWN \u2014 needs manual review"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "none"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/dbus-python@1.3.2",
+      "name": "dbus-python",
+      "version": "1.3.2",
+      "purl": "pkg:pypi/dbus-python@1.3.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "Expat (MIT/X11)"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/defer@1.0.6",
+      "name": "defer",
+      "version": "1.0.6",
+      "purl": "pkg:pypi/defer@1.0.6",
+      "licenses": [
+        {
+          "license": {
+            "name": "GNU GPL"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/deprecation@2.0.7",
+      "name": "deprecation",
+      "version": "2.0.7",
+      "purl": "pkg:pypi/deprecation@2.0.7",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache 2"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/dill@0.3.8",
+      "name": "dill",
+      "version": "0.3.8",
+      "purl": "pkg:pypi/dill@0.3.8",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/distro@1.9.0",
+      "name": "distro",
+      "version": "1.9.0",
+      "purl": "pkg:pypi/distro@1.9.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache License, Version 2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/eyed3@0.9.7",
+      "name": "eyed3",
+      "version": "0.9.7",
+      "purl": "pkg:pypi/eyed3@0.9.7",
+      "licenses": [
+        {
+          "license": {
+            "name": "UNKNOWN \u2014 needs manual review"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "none"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/faiss-cpu@1.14.3",
+      "name": "faiss-cpu",
+      "version": "1.14.3",
+      "purl": "pkg:pypi/faiss-cpu@1.14.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/fastapi@0.139.0",
+      "name": "fastapi",
+      "version": "0.139.0",
+      "purl": "pkg:pypi/fastapi@0.139.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/fastapi@0.139.2",
+      "name": "fastapi",
+      "version": "0.139.2",
+      "purl": "pkg:pypi/fastapi@0.139.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/fastembed@0.8.0",
+      "name": "fastembed",
+      "version": "0.8.0",
+      "purl": "pkg:pypi/fastembed@0.8.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/filelock@3.13.1",
+      "name": "filelock",
+      "version": "3.13.1",
+      "purl": "pkg:pypi/filelock@3.13.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "Unlicense"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/filetype@1.2.0",
+      "name": "filetype",
+      "version": "1.2.0",
+      "purl": "pkg:pypi/filetype@1.2.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/Flask@3.1.3",
+      "name": "Flask",
+      "version": "3.1.3",
+      "purl": "pkg:pypi/Flask@3.1.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/flask-cors@6.0.5",
+      "name": "flask-cors",
+      "version": "6.0.5",
+      "purl": "pkg:pypi/flask-cors@6.0.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/flatbuffers@25.12.19",
+      "name": "flatbuffers",
+      "version": "25.12.19",
+      "purl": "pkg:pypi/flatbuffers@25.12.19",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache 2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/fqdn@1.5.1",
+      "name": "fqdn",
+      "version": "1.5.1",
+      "purl": "pkg:pypi/fqdn@1.5.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MPL 2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/fsspec@2026.4.0",
+      "name": "fsspec",
+      "version": "2026.4.0",
+      "purl": "pkg:pypi/fsspec@2026.4.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/greenlet@3.5.3",
+      "name": "greenlet",
+      "version": "3.5.3",
+      "purl": "pkg:pypi/greenlet@3.5.3",
+      "licenses": [
+        {
+          "expression": "MIT AND PSF-2.0"
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/h11@0.16.0",
+      "name": "h11",
+      "version": "0.16.0",
+      "purl": "pkg:pypi/h11@0.16.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/hf-xet@1.5.1",
+      "name": "hf-xet",
+      "version": "1.5.1",
+      "purl": "pkg:pypi/hf-xet@1.5.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/html2text@2024.2.26",
+      "name": "html2text",
+      "version": "2024.2.26",
+      "purl": "pkg:pypi/html2text@2024.2.26",
+      "licenses": [
+        {
+          "license": {
+            "name": "GNU GPL 3"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/httpcore@1.0.9",
+      "name": "httpcore",
+      "version": "1.0.9",
+      "purl": "pkg:pypi/httpcore@1.0.9",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/httplib2@0.20.4",
+      "name": "httplib2",
+      "version": "0.20.4",
+      "purl": "pkg:pypi/httplib2@0.20.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/httptools@0.8.0",
+      "name": "httptools",
+      "version": "0.8.0",
+      "purl": "pkg:pypi/httptools@0.8.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/httpx@0.28.1",
+      "name": "httpx",
+      "version": "0.28.1",
+      "purl": "pkg:pypi/httpx@0.28.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/huggingface_hub@1.23.0",
+      "name": "huggingface_hub",
+      "version": "1.23.0",
+      "purl": "pkg:pypi/huggingface_hub@1.23.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/idna@3.6",
+      "name": "idna",
+      "version": "3.6",
+      "purl": "pkg:pypi/idna@3.6",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/ifaddr@0.2.0",
+      "name": "ifaddr",
+      "version": "0.2.0",
+      "purl": "pkg:pypi/ifaddr@0.2.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/iniconfig@2.3.0",
+      "name": "iniconfig",
+      "version": "2.3.0",
+      "purl": "pkg:pypi/iniconfig@2.3.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/isoduration@20.11.0",
+      "name": "isoduration",
+      "version": "20.11.0",
+      "purl": "pkg:pypi/isoduration@20.11.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "ISC License (ISCL)"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/itsdangerous@2.2.0",
+      "name": "itsdangerous",
+      "version": "2.2.0",
+      "purl": "pkg:pypi/itsdangerous@2.2.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/Jinja2@3.1.6",
+      "name": "Jinja2",
+      "version": "3.1.6",
+      "purl": "pkg:pypi/Jinja2@3.1.6",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/joblib@1.5.3",
+      "name": "joblib",
+      "version": "1.5.3",
+      "purl": "pkg:pypi/joblib@1.5.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/jsonpointer@3.1.1",
+      "name": "jsonpointer",
+      "version": "3.1.1",
+      "purl": "pkg:pypi/jsonpointer@3.1.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "Modified BSD License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/jsonschema@4.26.0",
+      "name": "jsonschema",
+      "version": "4.26.0",
+      "purl": "pkg:pypi/jsonschema@4.26.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/jsonschema-specifications@2025.9.1",
+      "name": "jsonschema-specifications",
+      "version": "2025.9.1",
+      "purl": "pkg:pypi/jsonschema-specifications@2025.9.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/launchpadlib@1.11.0",
+      "name": "launchpadlib",
+      "version": "1.11.0",
+      "purl": "pkg:pypi/launchpadlib@1.11.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "LGPL v3"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/lazr.restfulclient@0.14.6",
+      "name": "lazr.restfulclient",
+      "version": "0.14.6",
+      "purl": "pkg:pypi/lazr.restfulclient@0.14.6",
+      "licenses": [
+        {
+          "license": {
+            "name": "LGPL v3"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/lazr.uri@1.0.6",
+      "name": "lazr.uri",
+      "version": "1.0.6",
+      "purl": "pkg:pypi/lazr.uri@1.0.6",
+      "licenses": [
+        {
+          "license": {
+            "name": "LGPL v3"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/libevdev@0.5",
+      "name": "libevdev",
+      "version": "0.5",
+      "purl": "pkg:pypi/libevdev@0.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/loguru@0.7.3",
+      "name": "loguru",
+      "version": "0.7.3",
+      "purl": "pkg:pypi/loguru@0.7.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/louis@3.29.0",
+      "name": "louis",
+      "version": "3.29.0",
+      "purl": "pkg:pypi/louis@3.29.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "LGPLv2.1+"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/lxml@5.2.1",
+      "name": "lxml",
+      "version": "5.2.1",
+      "purl": "pkg:pypi/lxml@5.2.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/Mako@1.3.2.dev0",
+      "name": "Mako",
+      "version": "1.3.2.dev0",
+      "purl": "pkg:pypi/Mako@1.3.2.dev0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/Markdown@3.5.2",
+      "name": "Markdown",
+      "version": "3.5.2",
+      "purl": "pkg:pypi/Markdown@3.5.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/markdown-it-py@3.0.0",
+      "name": "markdown-it-py",
+      "version": "3.0.0",
+      "purl": "pkg:pypi/markdown-it-py@3.0.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/MarkupSafe@2.1.5",
+      "name": "MarkupSafe",
+      "version": "2.1.5",
+      "purl": "pkg:pypi/MarkupSafe@2.1.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/mdurl@0.1.2",
+      "name": "mdurl",
+      "version": "0.1.2",
+      "purl": "pkg:pypi/mdurl@0.1.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/mmh3@5.2.1",
+      "name": "mmh3",
+      "version": "5.2.1",
+      "purl": "pkg:pypi/mmh3@5.2.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/mpmath@1.3.0",
+      "name": "mpmath",
+      "version": "1.3.0",
+      "purl": "pkg:pypi/mpmath@1.3.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/multiprocess@0.70.16",
+      "name": "multiprocess",
+      "version": "0.70.16",
+      "purl": "pkg:pypi/multiprocess@0.70.16",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/mutagen@1.46.0",
+      "name": "mutagen",
+      "version": "1.46.0",
+      "purl": "pkg:pypi/mutagen@1.46.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "GPL-2.0-or-later"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/nemo-emblems@6.6.0",
+      "name": "nemo-emblems",
+      "version": "6.6.0",
+      "purl": "pkg:pypi/nemo-emblems@6.6.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "GPL3"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/netaddr@0.8.0",
+      "name": "netaddr",
+      "version": "0.8.0",
+      "purl": "pkg:pypi/netaddr@0.8.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/netifaces@0.11.0",
+      "name": "netifaces",
+      "version": "0.11.0",
+      "purl": "pkg:pypi/netifaces@0.11.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/networkx@3.6.1",
+      "name": "networkx",
+      "version": "3.6.1",
+      "purl": "pkg:pypi/networkx@3.6.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/numpy@2.5.1",
+      "name": "numpy",
+      "version": "2.5.1",
+      "purl": "pkg:pypi/numpy@2.5.1",
+      "licenses": [
+        {
+          "expression": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0"
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/oauthlib@3.2.2",
+      "name": "oauthlib",
+      "version": "3.2.2",
+      "purl": "pkg:pypi/oauthlib@3.2.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/onboard@1.4.1",
+      "name": "onboard",
+      "version": "1.4.1",
+      "purl": "pkg:pypi/onboard@1.4.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "GPL-3+"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/onnxruntime@1.27.0",
+      "name": "onnxruntime",
+      "version": "1.27.0",
+      "purl": "pkg:pypi/onnxruntime@1.27.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/packaging@24.0",
+      "name": "packaging",
+      "version": "24.0",
+      "purl": "pkg:pypi/packaging@24.0",
+      "licenses": [
+        {
+          "expression": "Apache Software License OR BSD License"
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/PAM@0.4.2",
+      "name": "PAM",
+      "version": "0.4.2",
+      "purl": "pkg:pypi/PAM@0.4.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "UNKNOWN \u2014 needs manual review"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "none"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pexpect@4.9.0",
+      "name": "pexpect",
+      "version": "4.9.0",
+      "purl": "pkg:pypi/pexpect@4.9.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "ISC license"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pillow@10.2.0",
+      "name": "pillow",
+      "version": "10.2.0",
+      "purl": "pkg:pypi/pillow@10.2.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "HPND"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pillow@12.3.0",
+      "name": "pillow",
+      "version": "12.3.0",
+      "purl": "pkg:pypi/pillow@12.3.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT-CMU"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pip@26.1.2",
+      "name": "pip",
+      "version": "26.1.2",
+      "purl": "pkg:pypi/pip@26.1.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pluggy@1.6.0",
+      "name": "pluggy",
+      "version": "1.6.0",
+      "purl": "pkg:pypi/pluggy@1.6.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/protobuf@7.35.1",
+      "name": "protobuf",
+      "version": "7.35.1",
+      "purl": "pkg:pypi/protobuf@7.35.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "3-Clause BSD License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/proxy_tools@0.1.0",
+      "name": "proxy_tools",
+      "version": "0.1.0",
+      "purl": "pkg:pypi/proxy_tools@0.1.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/psutil@5.9.8",
+      "name": "psutil",
+      "version": "5.9.8",
+      "purl": "pkg:pypi/psutil@5.9.8",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/ptyprocess@0.7.0",
+      "name": "ptyprocess",
+      "version": "0.7.0",
+      "purl": "pkg:pypi/ptyprocess@0.7.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "ISC License (ISCL)"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/py_rust_stemmers@0.1.8",
+      "name": "py_rust_stemmers",
+      "version": "0.1.8",
+      "purl": "pkg:pypi/py_rust_stemmers@0.1.8",
+      "licenses": [
+        {
+          "license": {
+            "name": "UNKNOWN \u2014 needs manual review"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "none"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pyasyncore@1.0.2",
+      "name": "pyasyncore",
+      "version": "1.0.2",
+      "purl": "pkg:pypi/pyasyncore@1.0.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "Python Software Foundation License Version 2"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pybind11@3.0.4",
+      "name": "pybind11",
+      "version": "3.0.4",
+      "purl": "pkg:pypi/pybind11@3.0.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pycairo@1.25.1",
+      "name": "pycairo",
+      "version": "1.25.1",
+      "purl": "pkg:pypi/pycairo@1.25.1",
+      "licenses": [
+        {
+          "expression": "GNU Lesser General Public License v2 (LGPLv2) OR Mozilla Public License 1.1 (MPL 1.1)"
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pycryptodomex@3.20.0",
+      "name": "pycryptodomex",
+      "version": "3.20.0",
+      "purl": "pkg:pypi/pycryptodomex@3.20.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD, Public Domain"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pycups@2.0.1",
+      "name": "pycups",
+      "version": "2.0.1",
+      "purl": "pkg:pypi/pycups@2.0.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "GPLv2+"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pycurl@7.45.3",
+      "name": "pycurl",
+      "version": "7.45.3",
+      "purl": "pkg:pypi/pycurl@7.45.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "LGPL/MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pydantic@2.13.4",
+      "name": "pydantic",
+      "version": "2.13.4",
+      "purl": "pkg:pypi/pydantic@2.13.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pydantic_core@2.46.4",
+      "name": "pydantic_core",
+      "version": "2.46.4",
+      "purl": "pkg:pypi/pydantic_core@2.46.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pyelftools@0.30",
+      "name": "pyelftools",
+      "version": "0.30",
+      "purl": "pkg:pypi/pyelftools@0.30",
+      "licenses": [
+        {
+          "license": {
+            "name": "Public domain"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/Pygments@2.17.2",
+      "name": "Pygments",
+      "version": "2.17.2",
+      "purl": "pkg:pypi/Pygments@2.17.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-2-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/PyGObject@3.48.2",
+      "name": "PyGObject",
+      "version": "3.48.2",
+      "purl": "pkg:pypi/PyGObject@3.48.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "GNU LGPL"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/PyICU@2.12",
+      "name": "PyICU",
+      "version": "2.12",
+      "purl": "pkg:pypi/PyICU@2.12",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pyinotify@0.9.6",
+      "name": "pyinotify",
+      "version": "0.9.6",
+      "purl": "pkg:pypi/pyinotify@0.9.6",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/PyJWT@2.7.0",
+      "name": "PyJWT",
+      "version": "2.7.0",
+      "purl": "pkg:pypi/PyJWT@2.7.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/PyNaCl@1.5.0",
+      "name": "PyNaCl",
+      "version": "1.5.0",
+      "purl": "pkg:pypi/PyNaCl@1.5.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache License 2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pyparsing@3.1.1",
+      "name": "pyparsing",
+      "version": "3.1.1",
+      "purl": "pkg:pypi/pyparsing@3.1.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pyparted@3.12.0",
+      "name": "pyparted",
+      "version": "3.12.0",
+      "purl": "pkg:pypi/pyparted@3.12.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "GPLv2+"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pypng@0.20231004.0",
+      "name": "pypng",
+      "version": "0.20231004.0",
+      "purl": "pkg:pypi/pypng@0.20231004.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pytest@9.1.1",
+      "name": "pytest",
+      "version": "9.1.1",
+      "purl": "pkg:pypi/pytest@9.1.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pytest-asyncio@1.4.0",
+      "name": "pytest-asyncio",
+      "version": "1.4.0",
+      "purl": "pkg:pypi/pytest-asyncio@1.4.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/python-apt@2.7.7+ubuntu5.2",
+      "name": "python-apt",
+      "version": "2.7.7+ubuntu5.2",
+      "purl": "pkg:pypi/python-apt@2.7.7+ubuntu5.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "GNU GPL"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/python-dateutil@2.9.0.post0",
+      "name": "python-dateutil",
+      "version": "2.9.0.post0",
+      "purl": "pkg:pypi/python-dateutil@2.9.0.post0",
+      "licenses": [
+        {
+          "license": {
+            "name": "Dual License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/python-debian@0.1.49+ubuntu2",
+      "name": "python-debian",
+      "version": "0.1.49+ubuntu2",
+      "purl": "pkg:pypi/python-debian@0.1.49+ubuntu2",
+      "licenses": [
+        {
+          "license": {
+            "name": "GPL-2+"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/python-dotenv@1.2.2",
+      "name": "python-dotenv",
+      "version": "1.2.2",
+      "purl": "pkg:pypi/python-dotenv@1.2.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/python-gnupg@0.5.2",
+      "name": "python-gnupg",
+      "version": "0.5.2",
+      "purl": "pkg:pypi/python-gnupg@0.5.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/python-xlib@0.33",
+      "name": "python-xlib",
+      "version": "0.33",
+      "purl": "pkg:pypi/python-xlib@0.33",
+      "licenses": [
+        {
+          "license": {
+            "name": "LGPLv2+"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pytz@2024.1",
+      "name": "pytz",
+      "version": "2024.1",
+      "purl": "pkg:pypi/pytz@2024.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pyudev@0.24.0",
+      "name": "pyudev",
+      "version": "0.24.0",
+      "purl": "pkg:pypi/pyudev@0.24.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "LGPL 2.1+"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pywebview@6.2.1",
+      "name": "pywebview",
+      "version": "6.2.1",
+      "purl": "pkg:pypi/pywebview@6.2.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pyxdg@0.28",
+      "name": "pyxdg",
+      "version": "0.28",
+      "purl": "pkg:pypi/pyxdg@0.28",
+      "licenses": [
+        {
+          "license": {
+            "name": "GNU Lesser General Public License v2 (LGPLv2)"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/PyYAML@6.0.1",
+      "name": "PyYAML",
+      "version": "6.0.1",
+      "purl": "pkg:pypi/PyYAML@6.0.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/qiskit@2.5.0",
+      "name": "qiskit",
+      "version": "2.5.0",
+      "purl": "pkg:pypi/qiskit@2.5.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/qrcode@7.4.2",
+      "name": "qrcode",
+      "version": "7.4.2",
+      "purl": "pkg:pypi/qrcode@7.4.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/referencing@0.37.0",
+      "name": "referencing",
+      "version": "0.37.0",
+      "purl": "pkg:pypi/referencing@0.37.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/repolib@2.2.1",
+      "name": "repolib",
+      "version": "2.2.1",
+      "purl": "pkg:pypi/repolib@2.2.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "UNKNOWN \u2014 needs manual review"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "none"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/requests@2.31.0",
+      "name": "requests",
+      "version": "2.31.0",
+      "purl": "pkg:pypi/requests@2.31.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache 2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/requests-file@1.5.1",
+      "name": "requests-file",
+      "version": "1.5.1",
+      "purl": "pkg:pypi/requests-file@1.5.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache 2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/rfc3339-validator@0.1.4",
+      "name": "rfc3339-validator",
+      "version": "0.1.4",
+      "purl": "pkg:pypi/rfc3339-validator@0.1.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT license"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/rfc3987@1.3.8",
+      "name": "rfc3987",
+      "version": "1.3.8",
+      "purl": "pkg:pypi/rfc3987@1.3.8",
+      "licenses": [
+        {
+          "license": {
+            "name": "GNU GPLv3+"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/rfc8785@0.1.4",
+      "name": "rfc8785",
+      "version": "0.1.4",
+      "purl": "pkg:pypi/rfc8785@0.1.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache Software License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/rich@13.7.1",
+      "name": "rich",
+      "version": "13.7.1",
+      "purl": "pkg:pypi/rich@13.7.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/rpds-py@2026.6.3",
+      "name": "rpds-py",
+      "version": "2026.6.3",
+      "purl": "pkg:pypi/rpds-py@2026.6.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/rustworkx@0.18.0",
+      "name": "rustworkx",
+      "version": "0.18.0",
+      "purl": "pkg:pypi/rustworkx@0.18.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "UNKNOWN \u2014 needs manual review"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "none"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/scikit-learn@1.8.0",
+      "name": "scikit-learn",
+      "version": "1.8.0",
+      "purl": "pkg:pypi/scikit-learn@1.8.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/scipy@1.18.0",
+      "name": "scipy",
+      "version": "1.18.0",
+      "purl": "pkg:pypi/scipy@1.18.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/setproctitle@1.3.3",
+      "name": "setproctitle",
+      "version": "1.3.3",
+      "purl": "pkg:pypi/setproctitle@1.3.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/setuptools@78.1.0",
+      "name": "setuptools",
+      "version": "78.1.0",
+      "purl": "pkg:pypi/setuptools@78.1.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/six@1.16.0",
+      "name": "six",
+      "version": "1.16.0",
+      "purl": "pkg:pypi/six@1.16.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/soupsieve@2.5",
+      "name": "soupsieve",
+      "version": "2.5",
+      "purl": "pkg:pypi/soupsieve@2.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/SQLAlchemy@2.0.51",
+      "name": "SQLAlchemy",
+      "version": "2.0.51",
+      "purl": "pkg:pypi/SQLAlchemy@2.0.51",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/starlette@1.3.1",
+      "name": "starlette",
+      "version": "1.3.1",
+      "purl": "pkg:pypi/starlette@1.3.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/stevedore@5.9.0",
+      "name": "stevedore",
+      "version": "5.9.0",
+      "purl": "pkg:pypi/stevedore@5.9.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/sympy@1.14.0",
+      "name": "sympy",
+      "version": "1.14.0",
+      "purl": "pkg:pypi/sympy@1.14.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/systemd-python@235",
+      "name": "systemd-python",
+      "version": "235",
+      "purl": "pkg:pypi/systemd-python@235",
+      "licenses": [
+        {
+          "license": {
+            "name": "LGPLv2+"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/tenacity@9.1.4",
+      "name": "tenacity",
+      "version": "9.1.4",
+      "purl": "pkg:pypi/tenacity@9.1.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache 2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/threadpoolctl@3.6.0",
+      "name": "threadpoolctl",
+      "version": "3.6.0",
+      "purl": "pkg:pypi/threadpoolctl@3.6.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/tinycss2@1.2.1",
+      "name": "tinycss2",
+      "version": "1.2.1",
+      "purl": "pkg:pypi/tinycss2@1.2.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/tldextract@3.1.2",
+      "name": "tldextract",
+      "version": "3.1.2",
+      "purl": "pkg:pypi/tldextract@3.1.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/tokenizers@0.23.1",
+      "name": "tokenizers",
+      "version": "0.23.1",
+      "purl": "pkg:pypi/tokenizers@0.23.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache Software License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/torch@2.13.0+cpu",
+      "name": "torch",
+      "version": "2.13.0+cpu",
+      "purl": "pkg:pypi/torch@2.13.0+cpu",
+      "licenses": [
+        {
+          "expression": "Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND MIT"
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/tqdm@4.68.4",
+      "name": "tqdm",
+      "version": "4.68.4",
+      "purl": "pkg:pypi/tqdm@4.68.4",
+      "licenses": [
+        {
+          "expression": "MPL-2.0 AND MIT"
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/typing-inspection@0.4.2",
+      "name": "typing-inspection",
+      "version": "0.4.2",
+      "purl": "pkg:pypi/typing-inspection@0.4.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/typing_extensions@4.10.0",
+      "name": "typing_extensions",
+      "version": "4.10.0",
+      "purl": "pkg:pypi/typing_extensions@4.10.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "Python Software Foundation License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/typing_extensions@4.16.0",
+      "name": "typing_extensions",
+      "version": "4.16.0",
+      "purl": "pkg:pypi/typing_extensions@4.16.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "PSF-2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/tzdata@2026.3",
+      "name": "tzdata",
+      "version": "2026.3",
+      "purl": "pkg:pypi/tzdata@2026.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/tzlocal@5.4.4",
+      "name": "tzlocal",
+      "version": "5.4.4",
+      "purl": "pkg:pypi/tzlocal@5.4.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/ubuntu-drivers-common@0.0.0",
+      "name": "ubuntu-drivers-common",
+      "version": "0.0.0",
+      "purl": "pkg:pypi/ubuntu-drivers-common@0.0.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "gpl"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/ufw@0.36.2",
+      "name": "ufw",
+      "version": "0.36.2",
+      "purl": "pkg:pypi/ufw@0.36.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "GPL-3"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/Unidecode@1.3.8",
+      "name": "Unidecode",
+      "version": "1.3.8",
+      "purl": "pkg:pypi/Unidecode@1.3.8",
+      "licenses": [
+        {
+          "license": {
+            "name": "GPL"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/uri-template@1.3.0",
+      "name": "uri-template",
+      "version": "1.3.0",
+      "purl": "pkg:pypi/uri-template@1.3.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/urllib3@2.0.7",
+      "name": "urllib3",
+      "version": "2.0.7",
+      "purl": "pkg:pypi/urllib3@2.0.7",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/uvicorn@0.51.0",
+      "name": "uvicorn",
+      "version": "0.51.0",
+      "purl": "pkg:pypi/uvicorn@0.51.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/uvloop@0.22.1",
+      "name": "uvloop",
+      "version": "0.22.1",
+      "purl": "pkg:pypi/uvloop@0.22.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/wadllib@1.3.6",
+      "name": "wadllib",
+      "version": "1.3.6",
+      "purl": "pkg:pypi/wadllib@1.3.6",
+      "licenses": [
+        {
+          "license": {
+            "name": "LGPL v3"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/watchfiles@1.2.0",
+      "name": "watchfiles",
+      "version": "1.2.0",
+      "purl": "pkg:pypi/watchfiles@1.2.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/webcolors@25.10.0",
+      "name": "webcolors",
+      "version": "25.10.0",
+      "purl": "pkg:pypi/webcolors@25.10.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/webencodings@0.5.1",
+      "name": "webencodings",
+      "version": "0.5.1",
+      "purl": "pkg:pypi/webencodings@0.5.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/websockets@10.4",
+      "name": "websockets",
+      "version": "10.4",
+      "purl": "pkg:pypi/websockets@10.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/websockets@16.1",
+      "name": "websockets",
+      "version": "16.1",
+      "purl": "pkg:pypi/websockets@16.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/Werkzeug@3.1.8",
+      "name": "Werkzeug",
+      "version": "3.1.8",
+      "purl": "pkg:pypi/Werkzeug@3.1.8",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License-Expression"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/xdg@5",
+      "name": "xdg",
+      "version": "5",
+      "purl": "pkg:pypi/xdg@5",
+      "licenses": [
+        {
+          "license": {
+            "name": "UNKNOWN \u2014 needs manual review"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "none"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/xkit@0.0.0",
+      "name": "xkit",
+      "version": "0.0.0",
+      "purl": "pkg:pypi/xkit@0.0.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "GPL v2 or later"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/xlrd@2.0.1",
+      "name": "xlrd",
+      "version": "2.0.1",
+      "purl": "pkg:pypi/xlrd@2.0.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "License"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/yt-dlp@2024.4.9",
+      "name": "yt-dlp",
+      "version": "2024.4.9",
+      "purl": "pkg:pypi/yt-dlp@2024.4.9",
+      "licenses": [
+        {
+          "license": {
+            "name": "The Unlicense (Unlicense)"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "planetary:license_source",
+          "value": "Classifier"
+        }
+      ]
+    }
+  ]
+}

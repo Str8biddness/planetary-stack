@@ -1,0 +1,64 @@
+# versions.lock — Planetary Stack pinned toolchain (checklist gate F-010)
+#
+# Purpose: single source of truth for the reproducible bootstrap. Every pin
+# below was DETECTED on a real host with `python --version`, `pip show`,
+# `git/make/g++/ollama --version`, or is a documented EXPECTED/TESTED version
+# recorded in AGENT_LOG.md. Nothing here is invented.
+#
+# Detection host: this worktree's development machine.
+#   - Interpreter inspected: /home/dakin/.local/share/synthesus/.venv/bin/python
+#   - Detection date: 2026-07-18
+#
+# Machine-readable pip pins live between the BEGIN/END markers below;
+# scripts/bootstrap.sh extracts exactly those lines. Do not remove the markers.
+
+[interpreter]
+# DETECTED: `python --version` on the inspected venv, and /usr/bin/python3.
+# pyproject.toml requires-python = ">=3.12".
+python = "3.12.3"           # detected
+python_minimum = "3.12"     # required floor (pyproject requires-python >=3.12)
+
+[python-deps]
+# All versions below were DETECTED with `pip show <pkg>` against the inspected
+# venv. Where a config file also pins the package, the detected version matched
+# that pin (pydantic, rfc8785, jsonschema, pytest, setuptools). onnxruntime,
+# numpy, fastapi, and uvicorn are declared with `>=` floors in the repo's
+# requirements; the exact versions below are the ones this environment resolved
+# to and are what bootstrap installs for reproducibility.
+#
+# BEGIN pip-requirements
+pydantic==2.13.4
+cryptography==41.0.7
+rfc8785==0.1.4
+jsonschema[format]==4.26.0
+onnxruntime==1.27.0
+numpy==2.5.1
+fastapi==0.139.0
+uvicorn==0.51.0
+pytest==9.1.1
+setuptools==78.1.0
+# END pip-requirements
+
+[system-tools-detected]
+# DETECTED on the inspected host with `<tool> --version`.
+git = "2.43.0"              # detected — `git version 2.43.0`
+make = "4.3"                # detected — GNU Make 4.3
+gxx = "13.3.0"              # detected — g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1)
+ollama = "0.32.0"           # detected — ollama client version 0.32.0 (server was not running)
+
+[system-tools-expected]
+# NOT detected on the inspected host. Values are the EXPECTED/TESTED versions
+# recorded in this repository's evidence; verify with `<tool> --version` on a
+# node that runs workloads.
+podman = "4.9.3"            # expected/tested — AGENT_LOG.md F-020 physical gate (worker dakin-MS-7C95, rootless Podman 4.9.3, cgroups v2)
+ollama = "0.32.0"           # expected/tested — client detected here (0.32.0); server + `llama3.2:3b` model required at runtime per apps/synthesus/INSTALLATION.md
+
+[notes]
+# - cryptography is declared `>=41.0.0` across the repo; 41.0.7 is what this host
+#   resolved to. AGENT_LOG.md records compatibility handling between the
+#   cryptography 41 and >=42 certificate-timestamp APIs, so 41.0.7 is a known
+#   validated point and is pinned here deliberately.
+# - Podman is only required on nodes that execute AIVM workloads (rootless,
+#   cgroups v2, seccomp). It is "not detected on this host" and marked expected.
+# - Ollama's server and the `llama3.2:3b` model are runtime dependencies of the
+#   Synthesus desktop chat path, not of the contract/test bootstrap.
