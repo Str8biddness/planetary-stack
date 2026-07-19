@@ -43,6 +43,7 @@ from .mesh_common import (
     strict_json,
 )
 from .mesh_identity import (
+    create_renewal_csr,
     build_signed_inventory,
     create_tls_enrollment,
     install_certificate,
@@ -66,6 +67,7 @@ from .tls import (
 from .errors import TLSConfigurationError
 
 ENROLL_INIT_SCHEMA = "planetary.unisync.mesh_enroll_init.v1"
+RENEW_INIT_SCHEMA = "planetary.unisync.mesh_renew_init.v1"
 ENROLL_INSTALL_SCHEMA = "planetary.unisync.mesh_enroll_install.v1"
 ENROLL_INSTALL_RESULT_SCHEMA = "planetary.unisync.mesh_enroll_install_result.v1"
 PREPARE_SCHEMA = "planetary.unisync.mesh_prepare.v1"
@@ -271,6 +273,25 @@ def command_enroll_init(arguments: argparse.Namespace) -> dict[str, Any]:
         "contract": public_contract_record(contract),
         "inventory": inventory_wire(inventory),
         "inventory_sha256": inventory_sha256(inventory),
+        "implementation_sha256": implementation_sha256(),
+    }
+
+
+def command_renew_init(arguments: argparse.Namespace) -> dict[str, Any]:
+    """Produce a renewal CSR from the node's existing key (same-key renewal)."""
+
+    account_id = require_identifier("account_id", arguments.account_id)
+    node_id = require_identifier("node_id", arguments.node_id)
+    state_dir = Path(arguments.state_dir)
+    renewal = create_renewal_csr(state_dir, account_id=account_id, node_id=node_id)
+    return {
+        "schema": RENEW_INIT_SCHEMA,
+        "hostname": platform.node(),
+        "account_id": account_id,
+        "node_id": node_id,
+        "sans": renewal["sans"],
+        "csr_pem": renewal["csr_pem"],
+        "tls_public_key_sha256": renewal["tls_public_key_sha256"],
         "implementation_sha256": implementation_sha256(),
     }
 
@@ -589,6 +610,10 @@ def _parser() -> argparse.ArgumentParser:
     enroll_init.add_argument("--account-id", required=True)
     enroll_init.add_argument("--node-id", required=True)
     enroll_init.add_argument("--san", action="append", required=True)
+    renew_init = subparsers.add_parser("renew-init")
+    renew_init.add_argument("--state-dir", type=Path, required=True)
+    renew_init.add_argument("--account-id", required=True)
+    renew_init.add_argument("--node-id", required=True)
     for name in ("enroll-install", "prepare", "prepare-artifact", "serve", "send"):
         sub = subparsers.add_parser(name)
         sub.add_argument("--state-dir", type=Path, required=True)
@@ -597,6 +622,7 @@ def _parser() -> argparse.ArgumentParser:
 
 _COMMANDS = {
     "enroll-init": command_enroll_init,
+    "renew-init": command_renew_init,
     "enroll-install": command_enroll_install,
     "prepare": command_prepare,
     "prepare-artifact": command_prepare_artifact,

@@ -305,6 +305,49 @@ def create_tls_enrollment(
     }
 
 
+def create_renewal_csr(
+    state_dir: Path,
+    *,
+    account_id: str,
+    node_id: str,
+) -> dict[str, Any]:
+    """Produce a renewal CSR from the node's EXISTING TLS key (same key).
+
+    Enables same-key certificate renewal (`MeshCertificateAuthority.renew_certificate`)
+    without generating or copying a new private key. The private key never
+    leaves the node; only the CSR is returned.
+    """
+
+    _directory, identity, private_key = _load_tls_identity(
+        state_dir, account_id=account_id, node_id=node_id
+    )
+    normalized = normalize_san_set(identity["sans"])
+    san_entries: list[x509.GeneralName] = []
+    for value in normalized:
+        try:
+            san_entries.append(x509.IPAddress(ipaddress.ip_address(value)))
+        except ValueError:
+            san_entries.append(x509.DNSName(value))
+    csr = (
+        x509.CertificateSigningRequestBuilder()
+        .subject_name(
+            x509.Name(
+                [
+                    x509.NameAttribute(NameOID.ORGANIZATION_NAME, account_id),
+                    x509.NameAttribute(NameOID.COMMON_NAME, node_id),
+                ]
+            )
+        )
+        .add_extension(x509.SubjectAlternativeName(san_entries), critical=False)
+        .sign(private_key, hashes.SHA256())
+    )
+    return {
+        "csr_pem": csr.public_bytes(serialization.Encoding.PEM).decode("ascii"),
+        "sans": list(normalized),
+        "tls_public_key_sha256": identity["tls_public_key_sha256"],
+    }
+
+
 def _load_tls_identity(
     state_dir: Path,
     *,
