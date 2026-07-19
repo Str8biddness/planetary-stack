@@ -684,10 +684,17 @@ to this log.
 - Physical evidence and artifact digests: see the evidence document.
 - Review verdict: pending on the PR.
 - PR and final SHA: recorded on the PR after push.
-- Remaining blockers / next exact command: wire `synthesusd` to select the
-  remote backend when a worker node is configured and present remote job
-  results in the desktop; then result-return-over-mTLS as a product flow
-  and the three-node cell acceptance.
+- Also fixed: `916303b`'s `_build_job_pipeline` constructed a
+  `RemoteExecutionBackend` without the now-required image ref/digest (a
+  startup crash when `SYNTHESUS_WORKER_NODE` is set) using placeholder
+  keys/signatures and a `validator=None` mTLS server. Replaced its remote
+  body with an honest fail-closed stub: worker configured but productionized
+  controller-side construction not yet wired → log and return None (remote
+  jobs unavailable). No fake/insecure wiring ships.
+- Remaining blockers / next exact command: productionize `synthesusd`
+  remote construction (installer-driven mesh enrollment, persistent signed
+  control plane, lease-bound mTLS result return), then the three-node cell
+  acceptance.
 
 ## Session entry template
 
