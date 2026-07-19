@@ -68,6 +68,7 @@ _RECORD_FIELDS = frozenset(
         "status",
         "revocation_reason",
         "enrolled_at",
+        "revoked_at",
     }
 )
 _STATUSES = frozenset({"active", "revoked"})
@@ -251,6 +252,157 @@ class MeshCertificateAuthority:
             sans=expected_sans,
         )
 
+    def renew_certificate(
+        self,
+        csr_pem: str,
+        *,
+        existing_record: MeshEnrollmentRecord,
+        validity_days: int = 7,
+    ) -> IssuedCertificate:
+        """Issue a renewed certificate for an active enrollment keeping the same key."""
+
+        if existing_record.status != "active":
+            raise MeshSecurityError("cannot renew a revoked enrollment")
+
+        if not 1 <= validity_days <= MAX_ISSUE_VALIDITY_DAYS:
+            raise MeshSecurityError("certificate validity must be between 1 and 30 days")
+
+        if not isinstance(csr_pem, str) or not csr_pem or len(csr_pem) > MAX_PEM_BYTES:
+            raise MeshSecurityError("CSR must be a nonempty bounded PEM string")
+
+        try:
+            csr = x509.load_pem_x509_csr(csr_pem.encode("ascii", errors="strict"))
+        except Exception as exc:
+            raise MeshSecurityError("CSR is not valid PEM") from exc
+
+        if not csr.is_signature_valid:
+            raise MeshSecurityError("CSR signature is invalid")
+
+        public_key = csr.public_key()
+        if not isinstance(public_key, ec.EllipticCurvePublicKey) or not isinstance(
+            public_key.curve, ec.SECP256R1
+        ):
+            raise MeshSecurityError("CSR public key must be EC P-256")
+
+        csr_public_key_sha256 = hashlib.sha256(
+            public_key.public_bytes(
+                serialization.Encoding.DER,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+        ).hexdigest()
+
+        if csr_public_key_sha256 != existing_record.public_key_sha256:
+            raise MeshSecurityError("CSR public key does not match the active enrollment")
+
+        common_names = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        if len(common_names) != 1 or common_names[0].value != existing_record.node_id:
+            raise MeshSecurityError("CSR subject does not bind the enrolled node")
+
+        account_names = csr.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
+        if len(account_names) != 1 or account_names[0].value != existing_record.account_id:
+            raise MeshSecurityError("CSR subject does not bind the enrolled account")
+
+        try:
+            csr_san = csr.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+        except x509.ExtensionNotFound as exc:
+            raise MeshSecurityError("CSR must carry a subjectAltName extension") from exc
+        
+        csr_values: list[str] = []
+        for name in csr_san.value:
+            if isinstance(name, x509.DNSName):
+                csr_values.append(name.value.lower())
+            elif isinstance(name, x509.IPAddress):
+                csr_values.append(str(name.value))
+            else:
+                raise MeshSecurityError("CSR SANs must be DNS names or IP addresses")
+
+        if normalize_san_set(csr_values) != existing_record.sans:
+            raise MeshSecurityError("CSR SANs do not match the active enrollment SANs")
+
+        now = datetime.now(UTC)
+        certificate = (
+            x509.CertificateBuilder()
+            .subject_name(csr.subject)
+            .issuer_name(self._certificate.subject)
+            .public_key(public_key)
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(minutes=5))
+            .not_valid_after(
+                min(
+                    now + timedelta(days=validity_days),
+                    certificate_not_valid_after_utc(self._certificate),
+                )
+            )
+            .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+            .add_extension(csr_san.value, critical=False)
+            .add_extension(
+                x509.ExtendedKeyUsage(
+                    [ExtendedKeyUsageOID.CLIENT_AUTH, ExtendedKeyUsageOID.SERVER_AUTH]
+                ),
+                critical=False,
+            )
+            .add_extension(
+                x509.KeyUsage(
+                    digital_signature=True,
+                    content_commitment=False,
+                    key_encipherment=False,
+                    data_encipherment=False,
+                    key_agreement=False,
+                    key_cert_sign=False,
+                    crl_sign=False,
+                    encipher_only=False,
+                    decipher_only=False,
+                ),
+                critical=True,
+            )
+            .sign(self._private_key, hashes.SHA256())
+        )
+
+        metadata = validate_issued_certificate(
+            certificate,
+            self._certificate,
+            account_id=existing_record.account_id,
+            node_id=existing_record.node_id,
+            expected_sans=existing_record.sans,
+            expected_spki_sha256=csr_public_key_sha256,
+        )
+
+        return IssuedCertificate(
+            certificate_pem=certificate.public_bytes(serialization.Encoding.PEM).decode("ascii"),
+            ca_pem=self.ca_pem,
+            certificate_sha256=metadata["certificate_sha256"],
+            public_key_sha256=metadata["public_key_sha256"],
+            serial_hex=metadata["serial_hex"],
+            issuer=metadata["issuer"],
+            not_before=metadata["not_before"],
+            not_after=metadata["not_after"],
+            sans=existing_record.sans,
+        )
+
+    def generate_crl(self, registry: EnrollmentRegistry) -> str:
+        """Generate a PEM-encoded Certificate Revocation List for all revoked peers."""
+        now = datetime.now(UTC)
+        builder = (
+            x509.CertificateRevocationListBuilder()
+            .issuer_name(self._certificate.subject)
+            .last_update(now - timedelta(minutes=5))
+            .next_update(now + timedelta(days=7))
+        )
+
+        for record in registry.snapshot_wire():
+            if record["status"] == "revoked":
+                serial_number = int(record["serial_hex"], 16)
+                revoked_at = parse_wire_time(record["revoked_at"])
+                revoked_cert = (
+                    x509.RevokedCertificateBuilder()
+                    .serial_number(serial_number)
+                    .revocation_date(revoked_at)
+                    .build()
+                )
+                builder = builder.add_revoked_certificate(revoked_cert)
+
+        crl = builder.sign(self._private_key, hashes.SHA256())
+        return crl.public_bytes(serialization.Encoding.PEM).decode("ascii")
 
 @dataclass(frozen=True)
 class MeshEnrollmentRecord:
@@ -268,6 +420,7 @@ class MeshEnrollmentRecord:
     status: str = "active"
     revocation_reason: str | None = None
     enrolled_at: str = ""
+    revoked_at: str | None = None
 
     def __post_init__(self) -> None:
         require_identifier("account_id", self.account_id)
@@ -288,11 +441,15 @@ class MeshEnrollmentRecord:
             raise MeshSecurityError("enrollment status must be active or revoked")
         if (self.status == "revoked") != (self.revocation_reason is not None):
             raise MeshSecurityError("revocation_reason must accompany exactly revoked status")
+        if (self.status == "revoked") != (self.revoked_at is not None):
+            raise MeshSecurityError("revoked_at must accompany exactly revoked status")
         if self.revocation_reason is not None and not (
             isinstance(self.revocation_reason, str) and 1 <= len(self.revocation_reason) <= 256
         ):
             raise MeshSecurityError("revocation_reason must be a bounded string")
         parse_wire_time(self.enrolled_at)
+        if self.revoked_at is not None:
+            parse_wire_time(self.revoked_at)
 
     def to_wire(self) -> dict[str, Any]:
         return {
@@ -309,6 +466,7 @@ class MeshEnrollmentRecord:
             "status": self.status,
             "revocation_reason": self.revocation_reason,
             "enrolled_at": self.enrolled_at,
+            "revoked_at": self.revoked_at,
         }
 
     @classmethod
@@ -333,6 +491,7 @@ class MeshEnrollmentRecord:
             status=payload["status"],
             revocation_reason=payload["revocation_reason"],
             enrolled_at=payload["enrolled_at"],
+            revoked_at=payload.get("revoked_at"),
         )
 
     def peer_identity(self) -> EnrolledPeerIdentity:
@@ -447,6 +606,32 @@ class EnrollmentRegistry:
                 self._records = previous
                 raise
 
+    def renew_peer(self, record: MeshEnrollmentRecord) -> None:
+        """Replace an active peer enrollment with a renewed certificate keeping the same key."""
+
+        with owned_file_lock(
+            self._directory, REGISTRY_LOCK_FILE, exclusive=True
+        ):
+            self._load()
+            key = (record.account_id, record.node_id)
+            existing = self._records.get(key)
+            if existing is None:
+                raise MeshSecurityError("cannot renew an unknown enrollment")
+            if existing.status != "active":
+                raise MeshSecurityError("cannot renew a revoked enrollment")
+            if existing.public_key_sha256 != record.public_key_sha256:
+                raise MeshSecurityError("renewal must use the same public key")
+            for other_key, other_record in self._records.items():
+                if other_key != key and other_record.certificate_sha256 == record.certificate_sha256:
+                    raise MeshSecurityError("certificate fingerprint is already enrolled")
+            previous = self._records
+            self._records = {**previous, key: record}
+            try:
+                self._save()
+            except BaseException:
+                self._records = previous
+                raise
+
     def revoke(self, account_id: str, node_id: str, *, reason: str) -> None:
         with owned_file_lock(
             self._directory, REGISTRY_LOCK_FILE, exclusive=True
@@ -460,6 +645,8 @@ class EnrollmentRegistry:
                 if record.revocation_reason == reason:
                     return
                 raise MeshSecurityError("enrollment is already revoked with a different reason")
+            
+            now = datetime.now(UTC)
             replacement = MeshEnrollmentRecord(
                 **{
                     **{
@@ -479,6 +666,7 @@ class EnrollmentRegistry:
                     },
                     "status": "revoked",
                     "revocation_reason": reason,
+                    "revoked_at": wire_time(now),
                 }
             )
             previous = self._records

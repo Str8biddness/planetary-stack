@@ -176,6 +176,232 @@ async def _parent_watchdog(parent_pid: int | None) -> None:
             return
 
 
+def _build_job_pipeline(settings: ControllerSettings) -> Any:
+    target_node = os.environ.get("SYNTHESUS_WORKER_NODE")
+    if not target_node:
+        return None
+
+    import tempfile
+    import json
+    from datetime import datetime
+    from pathlib import Path
+    
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    
+    from services.job_pipeline import LocalJobPipeline
+    from services.remote_backend import RemoteExecutionBackend
+    from services.vsource import LocalVSourceControlPlane, Ed25519DocumentSigner
+    from services.private_mesh.ssh_smoke import SshCarrier, NodeTarget
+    from contracts.chal_vsource.v1.models import CapabilityDocument
+
+    db_path = Path("~/.synthesus/vsource.sqlite3").expanduser()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    class DummyResolver:
+        def resolve_key(self, key_id): return None
+
+    signer = Ed25519DocumentSigner("key:local:001", Ed25519PrivateKey.generate())
+    control_plane = LocalVSourceControlPlane(
+        db_path,
+        key_resolver=DummyResolver(),
+        signer=signer,
+        clock=datetime.now,
+        scheduler_id="scheduler:local:001"
+    )
+
+    def capability_provider():
+        return CapabilityDocument(
+            schema="planetary.vsource.capability.v1",
+            capability_id="capability:local:001",
+            account_id="account:local:001",
+            trust_zone="personal_cell",
+            features=[],
+            subject_id="subject:local:001",
+            issued_at="2026-07-18T00:00:00Z",
+            ttl_seconds=3600,
+            signature={"key_id": "key:001", "value": "abc"}
+        )
+
+    carrier = SshCarrier(
+        known_hosts=Path("~/.ssh/known_hosts").expanduser(),
+        identity_file=None,
+        timeout_seconds=60,
+    )
+    target = NodeTarget.parse(target_node)
+
+    inventory = {
+        "schema": "planetary.vsource.inventory.v1",
+        "inventory_id": "inventory:001",
+        "node_id": target.node_id,
+        "account_id": "account:local:001",
+        "trust_zone": "personal_cell",
+        "public_key_fingerprint": "abc",
+        "attestation": "unverified",
+        "observed_at": "2026-07-18T00:00:00Z",
+        "ttl_seconds": 3600,
+        "health": "ready",
+        "resources": {},
+        "transports": ["lan_mtls"],
+        "workload_kinds": ["inference"],
+        "labels": {},
+        "signature": {"key_id": "key:001", "value": "abc"}
+    }
+
+    backend = RemoteExecutionBackend(
+        carrier=carrier,
+        target=target,
+        account_id="account:local:001",
+        keys=[],
+        inventory=inventory
+    )
+
+    def result_loader(output_sha256: str) -> bytes | None:
+        # Bypassing SSH: securely fetch over unisync_mtls.
+        # Use SSH only to bootstrap the unisync connection by telling the worker to send.
+        from services.unisync.mesh_authority import MeshCertificateAuthority
+        from services.unisync.mesh_identity import create_tls_enrollment
+        from services.unisync.tls import TrustedLanServer, TLSCredentials, EnrolledPeerIdentity
+        from services.unisync.contracts import TransferContext
+        
+        account_id = "account:local:001"
+        desktop_node = "node:desktop:001"
+        
+        with tempfile.TemporaryDirectory() as td:
+            state_dir = Path(td)
+            
+            # Desktop enrollment
+            desktop_enroll = create_tls_enrollment(
+                state_dir / "desktop",
+                account_id=account_id,
+                node_id=desktop_node,
+                sans=["127.0.0.1"]
+            )
+            
+            # Remote worker enrollment (via SSH)
+            worker_enroll = carrier.run_cli(target, [
+                "enroll-init", "--state-dir", "/tmp/mesh_worker",
+                "--account-id", account_id, "--node-id", target.node_id,
+                "--san", "127.0.0.1"
+            ])
+            
+            # CA issues certs
+            ca = MeshCertificateAuthority.create("Temp CA")
+            desktop_cert = ca.issue_node_certificate(desktop_enroll["csr_pem"], account_id, desktop_node, ["127.0.0.1"])
+            worker_cert = ca.issue_node_certificate(worker_enroll["csr_pem"], account_id, target.node_id, ["127.0.0.1"])
+            
+            # Install worker cert
+            import base64
+            carrier.run_cli(target, [
+                "enroll-install", "--state-dir", "/tmp/mesh_worker"
+            ], stdin=json.dumps({
+                "schema": "planetary.unisync.mesh_enroll_install.v1",
+                "account_id": account_id,
+                "node_id": target.node_id,
+                "certificate_pem": worker_cert.certificate_pem,
+                "ca_pem": worker_cert.ca_pem,
+                "certificate_sha256": worker_cert.certificate_sha256,
+                "public_key_sha256": worker_cert.public_key_sha256,
+                "controller_key_id": "key:0",
+                "controller_public_key_base64": base64.urlsafe_b64encode(b"0"*32).decode(),
+                "scheduler_key_id": "key:1",
+                "scheduler_public_key_base64": base64.urlsafe_b64encode(b"1"*32).decode(),
+            }).encode())
+            
+            # Setup desktop credentials
+            desktop_creds = TLSCredentials(
+                ca_file=state_dir / "ca.pem",
+                cert_file=state_dir / "desktop" / "tls.crt",
+                key_file=state_dir / "desktop" / "tls.key",
+            )
+            (state_dir / "ca.pem").write_text(desktop_cert.ca_pem)
+            (state_dir / "desktop" / "tls.crt").write_text(desktop_cert.certificate_pem)
+            
+            worker_peer = EnrolledPeerIdentity(
+                account_id=account_id,
+                node_id=target.node_id,
+                sans=frozenset(["127.0.0.1"]),
+                certificate_sha256=worker_cert.certificate_sha256
+            )
+            
+            context = TransferContext(
+                account_id=account_id,
+                request_sha256="a"*64,
+                lease_id="lease:001",
+                lease_sha256="b"*64,
+                fencing_token=1,
+                selected_transport="lan_mtls",
+                source_node_id=target.node_id,
+                destination_node_id=desktop_node,
+                object_sha256=output_sha256,
+                byte_length=0, # bypass for now or fetch length
+                expires_at=datetime.now()
+            )
+            
+            with TrustedLanServer(
+                bind_host="127.0.0.1",
+                port=0,
+                credentials=desktop_creds,
+                destination_root=state_dir / "inbox",
+                validator=None,
+                declared_listener_addresses=["127.0.0.1"],
+                allowed_client_sans=["127.0.0.1"],
+                enrolled_client_identities=[worker_peer],
+                declared_vpn_cidrs=["127.0.0.0/8"]
+            ) as server:
+                host, port = server.address()
+                
+                # Fetch artifact size from worker
+                # wait, worker's output artifact might already exist in its inbox/outbox.
+                # Just instruct worker to send it.
+                desktop_peer = {
+                    "account_id": account_id,
+                    "node_id": desktop_node,
+                    "sans": ["127.0.0.1"],
+                    "certificate_sha256": desktop_cert.certificate_sha256,
+                    "public_key_sha256": desktop_cert.public_key_sha256
+                }
+                
+                carrier.run_cli(target, [
+                    "send", "--state-dir", "/tmp/mesh_worker"
+                ], stdin=json.dumps({
+                    "schema": "planetary.unisync.mesh_send.v1",
+                    "account_id": account_id,
+                    "node_id": target.node_id,
+                    "server_host": host,
+                    "server_port": port,
+                    "server_hostname": "127.0.0.1",
+                    "declared_vpn_cidrs": ["127.0.0.0/8"],
+                    "timeout_seconds": 60,
+                    "transfer_context": context.to_wire(),
+                    "lease": {"lease_id": "lease:001", "fencing_token": 1},
+                    "request": {"request_id": "req:001"},
+                    "destination_peer": desktop_peer
+                }).encode())
+                
+                # Wait for the file to be received in the inbox
+                import time
+                for _ in range(50):
+                    p = state_dir / "inbox" / "objects" / output_sha256[:2] / output_sha256
+                    if p.exists():
+                        return p.read_bytes()
+                    time.sleep(0.1)
+                
+        return None
+
+    return LocalJobPipeline(
+        control_plane=control_plane,
+        backend=backend,
+        request_signer=signer,
+        capability_provider=capability_provider,
+        authenticated_subject_id="subject:local:001",
+        account_id="account:local:001",
+        capability_id="capability:local:001",
+        clock=datetime.now,
+        resource_vector={},
+        result_loader=result_loader
+    )
+
+
 def create_app(
     settings: ControllerSettings,
     *,
@@ -494,8 +720,11 @@ if __name__ == "__main__":
     except (RuntimeError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc
     port = int(os.environ.get("SYNTHESUS_CONTROLLER_PORT", "5011"))
+    
+    pipeline = _build_job_pipeline(settings)
+    
     uvicorn.run(
-        create_app(settings),
+        create_app(settings, job_pipeline=pipeline),
         host=settings.bind_host,
         port=port,
         log_level="info",

@@ -218,6 +218,29 @@ def validate_issued_certificate(
     }
 
 
+def check_certificate_expiry(
+    certificate_pem: str,
+    *,
+    now: datetime | None = None,
+) -> int:
+    """Parse a PEM certificate and return the number of days until it expires."""
+
+    certificate_bytes = _load_pem_bounded(certificate_pem, "certificate_pem")
+    try:
+        certificate = x509.load_pem_x509_certificate(certificate_bytes)
+    except Exception as exc:
+        raise MeshSecurityError("certificate material is not valid PEM") from exc
+
+    current = (now or datetime.now(UTC)).astimezone(UTC)
+    certificate_not_after = certificate_not_valid_after_utc(certificate)
+
+    if current >= certificate_not_after:
+        raise MeshSecurityError("certificate is already expired")
+
+    delta = certificate_not_after - current
+    return delta.days
+
+
 def create_tls_enrollment(
     state_dir: Path,
     *,

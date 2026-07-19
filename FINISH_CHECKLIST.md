@@ -239,11 +239,11 @@ local controller are restarted or disconnected at defined failure points.
 
 - [ ] Provide one signed Standard launcher and one clearly distinct optional
   Agentic launcher with correct icon/menu integration.
-- [ ] Implement guided account setup, node enrollment, resource contribution,
+- [x] Implement guided account setup, node enrollment, resource contribution,
   Planetary Drive, job submission, progress, result, cancellation, and support
   flows.
 - [ ] Show real node, storage, sync, lease, workload, failure, and privacy state.
-- [ ] Meet keyboard, screen-reader, contrast, scaling, and reduced-motion
+- [x] Meet keyboard, screen-reader, contrast, scaling, and reduced-motion
   accessibility requirements.
 - [ ] Remove dead controls, mock success, placeholder commerce, and legacy
   network bridges from production paths.

@@ -31,7 +31,7 @@ def _pipeline(tmp_path: Path):
     ctx = harness.ctx
     pipeline = LocalJobPipeline(
         control_plane=ctx.service(),
-        node_agent=harness.agent,
+        backend=harness.agent,
         request_signer=ctx.controller,
         capability_provider=lambda: capability_doc(ctx),
         authenticated_subject_id=SUBJECT,
