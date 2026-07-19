@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import secrets
 import os
 import stat
 from collections.abc import Callable, Mapping
@@ -59,7 +60,6 @@ from services.vsource import (
 log = logging.getLogger("synthesusd.remote")
 
 _WIRE_TIME = "%Y-%m-%dT%H:%M:%SZ"
-_CAPABILITY_ID = "capability:remote:001"
 _RESOURCE_VECTOR = {
     "cpu_millicores": 1000,
     "memory_bytes": 1_073_741_824,
@@ -161,6 +161,7 @@ def build_remote_pipeline(
     controller = _load_or_create_signer(directory, "controller.key", "key:controller:desktop")
     scheduler = _load_or_create_signer(directory, "scheduler.key", "key:scheduler:desktop")
     scheduler_id = "scheduler:desktop:001"
+    capability_id = f"capability:remote:{secrets.token_hex(8)}"
 
     active_carrier = carrier or SshCarrier(
         known_hosts=config.known_hosts,
@@ -259,10 +260,21 @@ def build_remote_pipeline(
         **config.to_backend_kwargs(),
     )
 
+    # One stable capability per session: all jobs share `_CAPABILITY_ID`, so the
+    # signed document must be identical across submissions (otherwise the second
+    # allocation collides as a capability replay). Built once and reused; it is
+    # refreshed only when it nears expiry so long-lived controllers keep working.
+    _capability_cache: dict[str, Any] = {}
+
     def capability_provider() -> CapabilityDocument:
+        now = clock()
+        cached = _capability_cache.get("doc")
+        cached_nb = _capability_cache.get("not_before")
+        if cached is not None and cached_nb is not None and (now - cached_nb).total_seconds() < 2700:
+            return cached
         payload = {
             "schema": "planetary.chal.capability.v1",
-            "capability_id": _CAPABILITY_ID,
+            "capability_id": capability_id,
             "issuer_id": "controller:desktop",
             "subject_id": subject_id,
             "account_id": account_id,
@@ -277,13 +289,16 @@ def build_remote_pipeline(
                 "transports": ["local_process"],
                 "resource_prefixes": ["chal://aivm/"],
             },
-            "not_before": clock().strftime(_WIRE_TIME),
-            "ttl_seconds": 600,
+            "not_before": now.strftime(_WIRE_TIME),
+            "ttl_seconds": 3600,
             "nonce": hashlib.sha256(os.urandom(16)).hexdigest()[:32],
             "revocation_epoch": 0,
             "delegable": False,
         }
-        return sign_contract_document(CapabilityDocument, payload, controller)
+        doc = sign_contract_document(CapabilityDocument, payload, controller)
+        _capability_cache["doc"] = doc
+        _capability_cache["not_before"] = now
+        return doc
 
     return LocalJobPipeline(
         control_plane=control_plane,
@@ -292,7 +307,7 @@ def build_remote_pipeline(
         capability_provider=capability_provider,
         authenticated_subject_id=subject_id,
         account_id=account_id,
-        capability_id=_CAPABILITY_ID,
+        capability_id=capability_id,
         device_uri="chal://aivm/evaluation",
         clock=clock,
         resource_vector=dict(_RESOURCE_VECTOR),
