@@ -1255,3 +1255,18 @@ Zero failures. Both determinism seeds clean.
   (needs owner sudo). The carrier logic is proven; the live physical run and
   the synthesusd loader wiring are gated on that one port. Node-to-node result
   return is already physically proven (F020_RESULT_BYTE_RETURN_PHYSICAL).
+
+## 2026-07-20 — Desktop-initiated result pull: design + proven feasibility
+
+- The sellable result-return design: the desktop dials OUTBOUND to the worker
+  and pulls the result (customer desktop never opens an inbound port; only the
+  provisioned worker listens). Motivated by the desktop ufw blocking inbound.
+- Key invariant PROVEN with running code: a TCP dialer can be the TLS server +
+  receiver while the TCP listener is the TLS client + sender, mutual-auth, TLS
+  1.3. Test: tests/unisync/test_desktop_pull_feasibility.py (1 passed).
+- Design: docs/design/DESKTOP_INITIATED_RESULT_PULL.md. The lease/role/receipt
+  semantics are UNCHANGED from the proven push; only which side opens the TCP
+  socket differs. Implementation is additive (expose receive-over-socket in
+  tls.py + pull-serve/pull-fetch CLI + a pull coordinator + loader wiring).
+- NOT implemented yet; no checklist box checked. This commits the validated,
+  contained architecture and the feasibility guard test.
