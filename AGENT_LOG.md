@@ -1060,3 +1060,18 @@ Zero failures. Both determinism seeds clean.
   result transfer worker→desktop, the desktop `result_loader` that consumes it,
   and a genuine browser→three-node-cell→result-bytes run. Unisync-transfer of
   the workload into the job flow is the other half of the box.
+## 2026-07-19 — F-020 desktop-intent: mesh transfer of a pre-staged result (step 2)
+
+- Branch `agent/f020-result-transfer` off main.
+- Added prepare_mode "existing" to the Unisync mTLS gate: a bounded object
+  already present in the source outbox (e.g. a result staged by `stage-result`,
+  step 1) is transferred over the lease-bound mTLS socket without a prepare
+  step. Config gains `existing_object_sha256`.
+- Test: a result-like object staged in the source outbox transfers over
+  in-process mTLS to the destination inbox (exact bytes, not via the carrier).
+  Full `tests/unisync/test_mesh_mtls_gate.py`: 17 passed (no regression).
+- No checklist box checked. Remaining for the box: the desktop-side
+  `result_loader` that orchestrates stage-result + this transfer (desktop as
+  mTLS destination) so `LocalJobPipeline.result()` returns the bytes; a
+  physical browser→cell→result-bytes run; and folding the workload Unisync
+  transfer into the job submission flow.

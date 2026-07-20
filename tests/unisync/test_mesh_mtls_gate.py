@@ -772,3 +772,31 @@ def test_artifact_mode_with_wrong_declared_size_fails_closed(tmp_path: Path) -> 
 
     with pytest.raises(MeshSecurityError, match="exact bounded local object"):
         run_mesh_mtls_smoke(config, LocalMeshCarrier(timeout_seconds=15))
+
+
+def test_existing_object_transfers_over_mtls_without_prepare(tmp_path: Path) -> None:
+    import hashlib
+    from services.unisync.storage import ContentAddressedStore
+
+    config = _local_mesh_config(tmp_path)
+    # Pre-stage a completed result-like object in the SOURCE outbox, as
+    # `stage-result` would, then transfer it with prepare_mode="existing".
+    payload = b'{"schema":"planetary.aivm.result.text-classification.v1","label":"positive"}'
+    digest = hashlib.sha256(payload).hexdigest()
+    src_state = Path(config.source.state_dir)
+    src_state.mkdir(mode=0o700, parents=True)
+    assert ContentAddressedStore(src_state / "outbox").put_bytes(payload) == digest
+
+    config = replace(
+        config,
+        prepare_mode="existing",
+        existing_object_sha256=digest,
+        object_bytes=len(payload),
+    )
+    evidence = run_mesh_mtls_smoke(config, LocalMeshCarrier(timeout_seconds=15))
+
+    assert evidence["transfer"]["prepare_mode"] == "existing"
+    assert evidence["transfer"]["object_sha256"] == digest
+    # The destination received the exact bytes over lan_mtls (not the carrier).
+    dest_inbox = ContentAddressedStore(Path(config.destination.state_dir) / "inbox")
+    assert dest_inbox.read_bytes(digest) == payload
