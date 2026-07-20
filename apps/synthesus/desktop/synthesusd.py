@@ -15,6 +15,8 @@ import binascii
 import hmac
 import logging
 import os
+import subprocess
+import sys
 import re
 import signal
 from contextlib import asynccontextmanager
@@ -176,6 +178,135 @@ async def _parent_watchdog(parent_pid: int | None) -> None:
             return
 
 
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_DESKTOP_MESH_SAN = "desktop.mesh"
+
+
+def _pinned_ssh_argv(config: Any, remote_command: str) -> list[str]:
+    """Hardened, host-key-pinned ssh argv for one worker command."""
+
+    return [
+        "ssh", "-T",
+        "-o", "BatchMode=yes",
+        "-o", "PasswordAuthentication=no",
+        "-o", "StrictHostKeyChecking=yes",
+        "-o", f"UserKnownHostsFile={config.known_hosts}",
+        "-o", "GlobalKnownHostsFile=/dev/null",
+        "-o", "IdentitiesOnly=yes",
+        "-i", str(config.ssh_identity),
+        "-o", "HostKeyAlgorithms=ssh-ed25519",
+        "-o", "ConnectTimeout=10",
+        config.target.ssh_alias, remote_command,
+    ]
+
+
+def _resolve_worker_listen_ip(alias: str) -> str | None:
+    """Resolve the worker's LAN address from the ssh config (bind target)."""
+
+    try:
+        out = subprocess.run(
+            ["ssh", "-G", alias], capture_output=True, text=True, timeout=10, check=False
+        )
+    except Exception:
+        return None
+    if out.returncode != 0:
+        return None
+    for line in out.stdout.splitlines():
+        key, _, value = line.partition(" ")
+        if key == "hostname" and value.strip():
+            return value.strip()
+    return None
+
+
+def _build_pull_result_loader(config: Any):
+    """Construct the desktop-initiated pull result_loader, or None (best effort).
+
+    Firewall-free result return: the desktop dials the worker and pulls a
+    completed result over lease-bound mTLS. Any construction problem returns
+    None so result bytes are simply unavailable (404) rather than breaking the
+    pipeline.
+    """
+
+    import json
+    import secrets
+
+    from services.result_transfer import build_pull_result_loader
+    from services.unisync.mesh_smoke import HybridMeshCarrier
+
+    listen_ip = _resolve_worker_listen_ip(config.target.ssh_alias)
+    if listen_ip is None:
+        log.warning("could not resolve worker listen address; result pull unavailable")
+        return None
+    target = config.target
+
+    def _ssh(remote_command: str) -> tuple[int, str]:
+        proc = subprocess.run(
+            _pinned_ssh_argv(config, remote_command),
+            capture_output=True, text=True, timeout=90, check=False,
+        )
+        return proc.returncode, proc.stdout
+
+    def stage_on_worker(digest: str, source_state_dir: str):
+        stage_job = json.dumps(
+            {
+                "schema": "planetary.private_mesh.stage_result.v1",
+                "account_id": config.account_id,
+                "node_id": target.node_id,
+                "result_sha256": digest,
+            }
+        )
+        command = (
+            f"set -e; mkdir -m 0700 -p {source_state_dir}/aivm/results; "
+            f"cp {target.remote_state_dir}/aivm/results/{digest} "
+            f"{source_state_dir}/aivm/results/{digest}; "
+            f"printf %s {json.dumps(stage_job)} | env PYTHONPATH={target.remote_repo} "
+            f"{target.remote_python} -m services.private_mesh.worker_cli "
+            f"stage-result --state-dir {source_state_dir}; chmod 0700 {source_state_dir}"
+        )
+        rc, out = _ssh(command)
+        if rc != 0:
+            return None
+        for line in out.splitlines():
+            try:
+                obj = json.loads(line)
+            except ValueError:
+                continue
+            if obj.get("object_sha256") == digest:
+                return int(obj["byte_length"])
+        return None
+
+    def worker_source_dir_factory() -> str:
+        return f"{target.remote_state_dir}-pull-{secrets.token_hex(6)}"
+
+    def cleanup_worker_dir(path: str) -> None:
+        _ssh(f"rm -rf {path}")
+
+    workspace = Path("~/.synthesus/result-pull").expanduser()
+    return build_pull_result_loader(
+        stage_on_worker=stage_on_worker,
+        worker_source_dir_factory=worker_source_dir_factory,
+        cleanup_worker_dir=cleanup_worker_dir,
+        carrier=HybridMeshCarrier(
+            known_hosts=config.known_hosts,
+            identity_file=config.ssh_identity,
+            timeout_seconds=60,
+        ),
+        workspace=workspace,
+        account_id=config.account_id,
+        subject_id=config.subject_id,
+        worker_node_id=target.node_id,
+        worker_python=target.remote_python,
+        worker_repo=target.remote_repo,
+        worker_ssh_alias=target.ssh_alias,
+        worker_ssh_fingerprint=target.ssh_host_fingerprint,
+        worker_listen_ip=listen_ip,
+        desktop_node_id="node:desktop:001",
+        desktop_python=sys.executable,
+        desktop_repo=str(_REPO_ROOT),
+        desktop_san=_DESKTOP_MESH_SAN,
+    )
+
+
 def _build_job_pipeline(settings: ControllerSettings) -> Any:
     """Build the job pipeline the controller serves, or None if unavailable.
 
@@ -185,9 +316,9 @@ def _build_job_pipeline(settings: ControllerSettings) -> Any:
     Returns None when no worker is configured or the worker cannot be reached
     (fail closed). No placeholder keys or signatures are ever constructed.
 
-    Not yet productionized: returning the result *bytes* to the desktop over
-    mTLS. The signed response carries the content-addressed result digest and
-    execution evidence, which the desktop presents.
+    Result bytes return to the desktop via a firewall-free desktop-initiated
+    pull (the desktop dials the worker over lease-bound mTLS); when that loader
+    cannot be constructed, result bytes are simply unavailable, not fatal.
     """
 
     from datetime import UTC, datetime
@@ -206,12 +337,19 @@ def _build_job_pipeline(settings: ControllerSettings) -> Any:
     if config is None:
         return None
 
+    try:
+        result_loader = _build_pull_result_loader(config)
+    except Exception as exc:  # never let result-return wiring break job submission
+        log.warning("result pull loader unavailable: %s", exc)
+        result_loader = None
+
     state_dir = Path("~/.synthesus/remote-authority").expanduser()
     try:
         return build_remote_pipeline(
             config,
             state_dir=state_dir,
             clock=lambda: datetime.now(UTC).replace(microsecond=0),
+            result_loader=result_loader,
         )
     except RemotePipelineError as exc:
         log.warning("remote pipeline state error; remote jobs unavailable: %s", exc)
