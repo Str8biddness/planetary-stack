@@ -25,6 +25,7 @@ import hashlib
 import json
 import platform
 import secrets
+import socket
 import sys
 import time
 from datetime import UTC, datetime
@@ -62,6 +63,7 @@ from .tls import (
     TLSCredentials,
     TrustedLanClient,
     TrustedLanServer,
+    _client_context,
     _literal_allowed_address,
 )
 from .errors import TLSConfigurationError
@@ -78,12 +80,21 @@ SERVE_READY_SCHEMA = "planetary.unisync.mesh_serve_ready.v1"
 SERVE_RESULT_SCHEMA = "planetary.unisync.mesh_serve_result.v1"
 SEND_SCHEMA = "planetary.unisync.mesh_send.v1"
 SEND_RESULT_SCHEMA = "planetary.unisync.mesh_send_result.v1"
+# Desktop-initiated pull: the source (worker) LISTENS and uploads as TLS client;
+# the destination (desktop) DIALS and receives as TLS server. Lease/TLS roles
+# are identical to the push — only which side opens the TCP socket differs.
+PULL_SERVE_SCHEMA = "planetary.unisync.mesh_pull_serve.v1"
+PULL_SERVE_READY_SCHEMA = "planetary.unisync.mesh_pull_serve_ready.v1"
+PULL_SERVE_RESULT_SCHEMA = "planetary.unisync.mesh_pull_serve_result.v1"
+PULL_FETCH_SCHEMA = "planetary.unisync.mesh_pull_fetch.v1"
+PULL_FETCH_RESULT_SCHEMA = "planetary.unisync.mesh_pull_fetch_result.v1"
 CLI_ERROR_SCHEMA = "planetary.unisync.mesh_cli_error.v1"
 
 MAX_INSTALL_JOB_BYTES = 64 * 1024
 MAX_PREPARE_JOB_BYTES = 8 * 1024
 MAX_SERVE_JOB_BYTES = 256 * 1024
 MAX_SEND_JOB_BYTES = 256 * 1024
+MAX_PULL_JOB_BYTES = 256 * 1024
 MAX_OBJECT_BYTES = 8 * 1024 * 1024
 INBOX_DIR = "inbox"
 OUTBOX_DIR = "outbox"
@@ -137,6 +148,44 @@ _SEND_FIELDS = frozenset(
         "lease",
         "request",
         "destination_peer",
+    }
+)
+
+# pull-serve runs on the SOURCE (worker): it listens and uploads as TLS client,
+# so it needs the destination (desktop) peer + that peer's server_hostname to
+# authenticate the TLS server it uploads to.
+_PULL_SERVE_FIELDS = frozenset(
+    {
+        "schema",
+        "account_id",
+        "node_id",
+        "bind_host",
+        "port",
+        "server_hostname",
+        "declared_vpn_cidrs",
+        "timeout_seconds",
+        "transfer_context",
+        "lease",
+        "request",
+        "destination_peer",
+    }
+)
+# pull-fetch runs on the DESTINATION (desktop): it dials the worker's listener
+# and receives as TLS server, authenticating the worker's client certificate
+# via the enrolled source peer.
+_PULL_FETCH_FIELDS = frozenset(
+    {
+        "schema",
+        "account_id",
+        "node_id",
+        "server_host",
+        "server_port",
+        "declared_vpn_cidrs",
+        "timeout_seconds",
+        "transfer_context",
+        "lease",
+        "request",
+        "source_peer",
     }
 )
 
@@ -602,6 +651,204 @@ def command_send(arguments: argparse.Namespace) -> dict[str, Any]:
         raise
 
 
+def command_pull_serve(arguments: argparse.Namespace) -> dict[str, Any]:
+    """Source (worker) side of a desktop-initiated pull.
+
+    The worker LISTENS for the desktop's outbound connection (so the desktop
+    needs no inbound firewall) but remains the TLS client + object sender. It
+    prints a ready line with its bound host/port, then accepts one connection,
+    wraps it as the TLS client, and uploads the leased object. Lease/TLS roles
+    are identical to ``send``; only which side opens the TCP socket differs.
+    """
+
+    job = _read_stdin_job(MAX_PULL_JOB_BYTES)
+    if set(job) != _PULL_SERVE_FIELDS or job["schema"] != PULL_SERVE_SCHEMA:
+        raise MeshSecurityError("pull-serve job has unexpected fields")
+    account_id = require_identifier("account_id", job["account_id"])
+    node_id = require_identifier("node_id", job["node_id"])
+    timeout = _require_timeout(job["timeout_seconds"])
+    context = TransferContext.from_wire(job["transfer_context"])
+    if context.account_id != account_id or context.source_node_id != node_id:
+        raise MeshSecurityError("pull-serve job context does not bind this node as source")
+    destination_peer = _peer_from_wire(job["destination_peer"], "destination_peer")
+    if (
+        destination_peer.node_id != context.destination_node_id
+        or destination_peer.account_id != account_id
+    ):
+        raise MeshSecurityError(
+            "pull-serve destination peer does not match the transfer context"
+        )
+    if not isinstance(job["bind_host"], str):
+        raise MeshSecurityError("bind_host must be a string")
+    _literal_allowed_address(
+        job["bind_host"],
+        declared_vpn_cidrs=_require_vpn_cidrs(job["declared_vpn_cidrs"]),
+    )
+    server_hostname = normalize_san(job["server_hostname"])
+    if server_hostname not in destination_peer.sans:
+        raise MeshSecurityError("server_hostname is not an enrolled destination SAN")
+    state_dir = Path(arguments.state_dir)
+    validator = _validator_for_job(
+        job, context, state_dir=state_dir, account_id=account_id, node_id=node_id
+    )
+    paths, certificate_metadata = load_tls_credential_paths(
+        state_dir, account_id=account_id, node_id=node_id
+    )
+    source = ContentAddressedStore(state_dir / OUTBOX_DIR)
+    if source.stat_size(context.object_sha256) != context.byte_length:
+        raise MeshSecurityError(
+            "source content-addressed object is missing or has the wrong size"
+        )
+    client = _RecordingLanClient(
+        credentials=TLSCredentials(**paths),
+        server_hostname=server_hostname,
+        validator=validator,
+        enrolled_server_identities=(destination_peer,),
+        limits=DEFAULT_LIMITS,
+    )
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind((job["bind_host"], _require_port(job["port"], allow_zero=True)))
+    listener.listen(1)
+    listener.settimeout(min(timeout, 30.0))
+    bound_host, bound_port = listener.getsockname()[0], listener.getsockname()[1]
+    _print_json(
+        {
+            "schema": PULL_SERVE_READY_SCHEMA,
+            "node_id": node_id,
+            "host": bound_host,
+            "port": bound_port,
+        }
+    )
+    lease_use = LeaseUseStore(state_dir, account_id=account_id, node_id=node_id)
+    lease_use.begin(context)
+    try:
+        conn, _ = listener.accept()
+        try:
+            conn.settimeout(min(timeout, 30.0))
+            client_ctx = _client_context(client.credentials)
+            tls_sock = client_ctx.wrap_socket(
+                conn, server_side=False, server_hostname=server_hostname
+            )
+            try:
+                result = client.upload_object_over_tls_socket(
+                    tls_sock=tls_sock, context=context, source_root=source.root
+                )
+            finally:
+                tls_sock.close()
+        finally:
+            conn.close()
+        response = {
+            "schema": PULL_SERVE_RESULT_SCHEMA,
+            "node_id": node_id,
+            "object_sha256": result.object_sha256,
+            "bytes_transferred": result.bytes_transferred,
+            "resumed_from": result.resumed_from,
+            "transport_id": result.transport_id,
+            "verified_receipt_sha256": result.verified_receipt_sha256,
+            "certificate_sha256": certificate_metadata["certificate_sha256"],
+            "negotiated_tls_version": client.negotiated_tls_version,
+            "negotiated_cipher": client.negotiated_cipher,
+        }
+        lease_use.finish(context, succeeded=True)
+        return response
+    except BaseException:
+        try:
+            lease_use.finish(context, succeeded=False)
+        except BaseException:
+            pass
+        raise
+    finally:
+        listener.close()
+
+
+def command_pull_fetch(arguments: argparse.Namespace) -> dict[str, Any]:
+    """Destination (desktop) side of a desktop-initiated pull.
+
+    The desktop DIALS the worker's listener (outbound only) and receives the
+    object as the TLS server, authenticating the worker's client certificate as
+    the enrolled source. The object lands in this node's inbox, verified.
+    """
+
+    job = _read_stdin_job(MAX_PULL_JOB_BYTES)
+    if set(job) != _PULL_FETCH_FIELDS or job["schema"] != PULL_FETCH_SCHEMA:
+        raise MeshSecurityError("pull-fetch job has unexpected fields")
+    account_id = require_identifier("account_id", job["account_id"])
+    node_id = require_identifier("node_id", job["node_id"])
+    timeout = _require_timeout(job["timeout_seconds"])
+    context = TransferContext.from_wire(job["transfer_context"])
+    if context.account_id != account_id or context.destination_node_id != node_id:
+        raise MeshSecurityError("pull-fetch job context does not bind this node as destination")
+    source_peer = _peer_from_wire(job["source_peer"], "source_peer")
+    if source_peer.node_id != context.source_node_id or source_peer.account_id != account_id:
+        raise MeshSecurityError("pull-fetch source peer does not match the transfer context")
+    if not isinstance(job["server_host"], str):
+        raise MeshSecurityError("server_host must be a string")
+    _literal_allowed_address(
+        job["server_host"],
+        declared_vpn_cidrs=_require_vpn_cidrs(job["declared_vpn_cidrs"]),
+    )
+    state_dir = Path(arguments.state_dir)
+    validator = _validator_for_job(
+        job, context, state_dir=state_dir, account_id=account_id, node_id=node_id
+    )
+    paths, certificate_metadata = load_tls_credential_paths(
+        state_dir, account_id=account_id, node_id=node_id
+    )
+    destination_root = state_dir / INBOX_DIR
+    receiver = TrustedLanServer(
+        bind_host="127.0.0.1",
+        port=0,
+        credentials=TLSCredentials(**paths),
+        destination_root=destination_root,
+        validator=validator,
+        declared_listener_addresses={"127.0.0.1"},
+        allowed_client_sans=set(source_peer.sans),
+        enrolled_client_identities=(source_peer,),
+        declared_vpn_cidrs=_require_vpn_cidrs(job["declared_vpn_cidrs"]),
+        limits=DEFAULT_LIMITS,
+        idle_timeout=min(timeout, 30.0),
+    )
+    lease_use = LeaseUseStore(state_dir, account_id=account_id, node_id=node_id)
+    lease_use.begin(context)
+    raw = socket.create_connection(
+        (job["server_host"], _require_port(job["server_port"], allow_zero=False)),
+        timeout=min(timeout, 30.0),
+    )
+    try:
+        receipt = receiver.receive_object_over_dialed_socket(raw)
+        destination = ContentAddressedStore(destination_root)
+        if not destination.has(context.object_sha256):
+            raise MeshSecurityError("pulled object was not committed to the inbox")
+        if destination.stat_size(context.object_sha256) != context.byte_length:
+            raise MeshSecurityError("pulled object size does not match the transfer context")
+        response = {
+            "schema": PULL_FETCH_RESULT_SCHEMA,
+            "node_id": node_id,
+            "received": True,
+            "object_sha256": context.object_sha256,
+            "byte_length": destination.stat_size(context.object_sha256),
+            "verified_receipt_sha256": context.receipt_sha256(),
+            "certificate_sha256": certificate_metadata["certificate_sha256"],
+            "audit_events": receiver.audit_events,
+        }
+        if receipt.get("object_sha256") != context.object_sha256:
+            raise MeshSecurityError("pull receipt does not match the transfer context")
+        lease_use.finish(context, succeeded=True)
+        return response
+    except BaseException:
+        try:
+            lease_use.finish(context, succeeded=False)
+        except BaseException:
+            pass
+        raise
+    finally:
+        try:
+            raw.close()
+        except OSError:
+            pass
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -614,7 +861,15 @@ def _parser() -> argparse.ArgumentParser:
     renew_init.add_argument("--state-dir", type=Path, required=True)
     renew_init.add_argument("--account-id", required=True)
     renew_init.add_argument("--node-id", required=True)
-    for name in ("enroll-install", "prepare", "prepare-artifact", "serve", "send"):
+    for name in (
+        "enroll-install",
+        "prepare",
+        "prepare-artifact",
+        "serve",
+        "send",
+        "pull-serve",
+        "pull-fetch",
+    ):
         sub = subparsers.add_parser(name)
         sub.add_argument("--state-dir", type=Path, required=True)
     return parser
@@ -628,6 +883,8 @@ _COMMANDS = {
     "prepare-artifact": command_prepare_artifact,
     "serve": command_serve,
     "send": command_send,
+    "pull-serve": command_pull_serve,
+    "pull-fetch": command_pull_fetch,
 }
 
 

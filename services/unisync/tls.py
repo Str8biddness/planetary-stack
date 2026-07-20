@@ -17,7 +17,7 @@ import threading
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 from .contracts import (
     AuthenticatedPeerIdentity,
@@ -522,7 +522,7 @@ class TrustedLanServer:
         tls_sock: ssl.SSLSocket,
         *,
         peer_identity: AuthenticatedPeerIdentity | None = None,
-    ) -> None:
+    ) -> dict[str, Any] | None:
         assembler = None
         transfer_context: TransferContext | None = None
         try:
@@ -564,7 +564,7 @@ class TrustedLanServer:
                 if frame.frame_type == FRAME_CANCEL:
                     assembler.abort()
                     send_frame(tls_sock, encode_frame(FRAME_ACK, context=transfer_context.to_wire(), limits=self.limits))
-                    return
+                    return {"cancelled": True}
                 if frame.frame_type == FRAME_CHUNK:
                     require_authorized(
                         transfer_context,
@@ -617,7 +617,11 @@ class TrustedLanServer:
                             limits=self.limits,
                         ),
                     )
-                    return
+                    return {
+                        "object_sha256": digest,
+                        "byte_length": transfer_context.byte_length,
+                        "verified_receipt_sha256": transfer_context.receipt_sha256(digest),
+                    }
                 raise TLSConfigurationError(f"unexpected frame type {frame.frame_type!r}")
         except BaseException as exc:
             if assembler is not None:
@@ -635,6 +639,46 @@ class TrustedLanServer:
                 pass
             if not _is_timeout(exc):
                 raise
+
+    def receive_object_over_dialed_socket(
+        self,
+        raw_sock: socket.socket,
+        *,
+        handshake_timeout: float | None = None,
+    ) -> dict[str, Any]:
+        """Receive one object over a socket THIS side opened (desktop pull).
+
+        Desktop-initiated pull: the desktop dials the TCP connection outbound
+        (so it needs no inbound firewall) but is the TLS server and object
+        receiver. The peer (worker) is therefore the authenticated *source*.
+        The mutual-auth, SAN, lease binding, and receipt logic are identical to
+        the listener path (`_handle_socket` -> `_receive_upload`); only which
+        side opened the TCP socket differs. Raises on any failure and returns
+        the verified receipt on success.
+        """
+
+        context = _server_context(self.credentials)
+        raw_sock.settimeout(handshake_timeout or self.handshake_timeout)
+        with context.wrap_socket(raw_sock, server_side=True) as tls_sock:
+            tls_sock.settimeout(self.idle_timeout)
+            if tls_sock.version() != "TLSv1.3":
+                raise TLSConfigurationError("negotiated TLS version is not TLSv1.3")
+            peer_cert = tls_sock.getpeercert()
+            if not peer_cert:
+                raise AuthorizationError("peer certificate is required")
+            _require_peer_san(peer_cert, self.allowed_client_sans)
+            peer_identity = _derive_authenticated_peer_identity(
+                peer_cert=peer_cert,
+                der_bytes=tls_sock.getpeercert(binary_form=True),
+                enrollments=self.enrolled_client_identities,
+            )
+            self._record_audit("client_identity_bound")
+            result = self._receive_upload(tls_sock, peer_identity=peer_identity)
+            if not result or "object_sha256" not in result:
+                raise TLSConfigurationError(
+                    "pull did not complete a verified object receipt"
+                )
+            return result
 
 
 class TrustedLanClient:

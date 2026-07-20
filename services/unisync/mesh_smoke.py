@@ -87,6 +87,11 @@ from .mesh_node_cli import (
     PREPARE_ARTIFACT_SCHEMA,
     PREPARE_RESULT_SCHEMA,
     PREPARE_SCHEMA,
+    PULL_FETCH_RESULT_SCHEMA,
+    PULL_FETCH_SCHEMA,
+    PULL_SERVE_READY_SCHEMA,
+    PULL_SERVE_RESULT_SCHEMA,
+    PULL_SERVE_SCHEMA,
     SEND_RESULT_SCHEMA,
     SEND_SCHEMA,
     SERVE_READY_SCHEMA,
@@ -193,6 +198,10 @@ class MeshSmokeConfig:
     declared_vpn_cidrs: tuple[str, ...]
     prepare_mode: str = "random"
     existing_object_sha256: str = ""
+    # Desktop-initiated pull: the source (worker) listens and uploads; the
+    # destination (desktop) dials outbound and receives. bind_address is then
+    # the SOURCE's listen address and server_hostname is the DESTINATION SAN.
+    pull: bool = False
 
 
 def _require_bounded_int(value: object, name: str, low: int, high: int) -> int:
@@ -1180,45 +1189,101 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
         raise
     handle = None
     try:
-        handle = carrier.start_serve(
-            config.destination,
-            ["serve", "--state-dir", config.destination.state_dir],
-            stdin=_job_json(serve_job),
-            timeout_seconds=float(config.timeout_seconds),
-        )
-        ready = handle.ready()
-        if (
-            ready.get("schema") != SERVE_READY_SCHEMA
-            or ready.get("node_id") != config.destination.node_id
-            or normalize_san(str(ready.get("host"))) != normalize_san(config.bind_address)
-        ):
-            raise MeshSecurityError("serve process did not report the declared listener")
-        server_port = ready.get("port")
-        if not isinstance(server_port, int) or isinstance(server_port, bool) or not 1 <= server_port <= 65535:
-            raise MeshSecurityError("serve process reported an invalid port")
-        if config.port != 0 and server_port != config.port:
-            raise MeshSecurityError("serve process bound an undeclared port")
+        if config.pull:
+            # Desktop-initiated pull: the SOURCE (worker) listens and uploads as
+            # TLS client; the DESTINATION (desktop) dials outbound and receives
+            # as TLS server. bind_address is the source's listen address.
+            pull_serve_job = {
+                "schema": PULL_SERVE_SCHEMA,
+                "account_id": config.account_id,
+                "node_id": config.source.node_id,
+                "bind_host": config.bind_address,
+                "port": config.port,
+                "server_hostname": config.server_hostname,
+                "declared_vpn_cidrs": list(config.declared_vpn_cidrs),
+                "timeout_seconds": config.timeout_seconds,
+                "transfer_context": context.to_wire(),
+                "lease": lease_wire,
+                "request": request.model_dump(mode="json", by_alias=True),
+                "destination_peer": _peer_wire(destination_record),
+            }
+            handle = carrier.start_serve(
+                config.source,
+                ["pull-serve", "--state-dir", config.source.state_dir],
+                stdin=_job_json(pull_serve_job),
+                timeout_seconds=float(config.timeout_seconds),
+            )
+            ready = handle.ready()
+            if (
+                ready.get("schema") != PULL_SERVE_READY_SCHEMA
+                or ready.get("node_id") != config.source.node_id
+                or normalize_san(str(ready.get("host"))) != normalize_san(config.bind_address)
+            ):
+                raise MeshSecurityError("pull-serve process did not report the declared listener")
+            server_port = ready.get("port")
+            if not isinstance(server_port, int) or isinstance(server_port, bool) or not 1 <= server_port <= 65535:
+                raise MeshSecurityError("pull-serve process reported an invalid port")
+            if config.port != 0 and server_port != config.port:
+                raise MeshSecurityError("pull-serve process bound an undeclared port")
+            pull_fetch_job = {
+                "schema": PULL_FETCH_SCHEMA,
+                "account_id": config.account_id,
+                "node_id": config.destination.node_id,
+                "server_host": config.bind_address,
+                "server_port": server_port,
+                "declared_vpn_cidrs": list(config.declared_vpn_cidrs),
+                "timeout_seconds": config.timeout_seconds,
+                "transfer_context": context.to_wire(),
+                "lease": lease_wire,
+                "request": request.model_dump(mode="json", by_alias=True),
+                "source_peer": _peer_wire(source_record),
+            }
+            send_result = carrier.run_cli(
+                config.destination,
+                ["pull-fetch", "--state-dir", config.destination.state_dir],
+                stdin=_job_json(pull_fetch_job),
+            )
+            serve_result = handle.result()
+        else:
+            handle = carrier.start_serve(
+                config.destination,
+                ["serve", "--state-dir", config.destination.state_dir],
+                stdin=_job_json(serve_job),
+                timeout_seconds=float(config.timeout_seconds),
+            )
+            ready = handle.ready()
+            if (
+                ready.get("schema") != SERVE_READY_SCHEMA
+                or ready.get("node_id") != config.destination.node_id
+                or normalize_san(str(ready.get("host"))) != normalize_san(config.bind_address)
+            ):
+                raise MeshSecurityError("serve process did not report the declared listener")
+            server_port = ready.get("port")
+            if not isinstance(server_port, int) or isinstance(server_port, bool) or not 1 <= server_port <= 65535:
+                raise MeshSecurityError("serve process reported an invalid port")
+            if config.port != 0 and server_port != config.port:
+                raise MeshSecurityError("serve process bound an undeclared port")
 
-        send_job = {
-            "schema": SEND_SCHEMA,
-            "account_id": config.account_id,
-            "node_id": config.source.node_id,
-            "server_host": config.bind_address,
-            "server_port": server_port,
-            "server_hostname": config.server_hostname,
-            "declared_vpn_cidrs": list(config.declared_vpn_cidrs),
-            "timeout_seconds": config.timeout_seconds,
-            "transfer_context": context.to_wire(),
-            "lease": lease_wire,
-            "request": request.model_dump(mode="json", by_alias=True),
-            "destination_peer": _peer_wire(destination_record),
-        }
-        send_result = carrier.run_cli(
-            config.source,
-            ["send", "--state-dir", config.source.state_dir],
-            stdin=_job_json(send_job),
-        )
-        serve_result = handle.result()
+            send_job = {
+                "schema": SEND_SCHEMA,
+                "account_id": config.account_id,
+                "node_id": config.source.node_id,
+                "server_host": config.bind_address,
+                "server_port": server_port,
+                "server_hostname": config.server_hostname,
+                "declared_vpn_cidrs": list(config.declared_vpn_cidrs),
+                "timeout_seconds": config.timeout_seconds,
+                "transfer_context": context.to_wire(),
+                "lease": lease_wire,
+                "request": request.model_dump(mode="json", by_alias=True),
+                "destination_peer": _peer_wire(destination_record),
+            }
+            send_result = carrier.run_cli(
+                config.source,
+                ["send", "--state-dir", config.source.state_dir],
+                stdin=_job_json(send_job),
+            )
+            serve_result = handle.result()
     except BaseException:
         if handle is not None:
             handle.kill()
@@ -1241,29 +1306,37 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
         raise
 
     expected_receipt = context.receipt_sha256(object_sha256)
+    if config.pull:
+        # serve_result is the SOURCE (worker) upload; send_result is the
+        # DESTINATION (desktop) receipt — both over the desktop-dialed socket.
+        uploader_result, receiver_result = serve_result, send_result
+        uploader_schema, receiver_schema = PULL_SERVE_RESULT_SCHEMA, PULL_FETCH_RESULT_SCHEMA
+    else:
+        uploader_result, receiver_result = send_result, serve_result
+        uploader_schema, receiver_schema = SEND_RESULT_SCHEMA, SERVE_RESULT_SCHEMA
     if (
-        send_result.get("schema") != SEND_RESULT_SCHEMA
-        or send_result.get("node_id") != config.source.node_id
-        or send_result.get("object_sha256") != object_sha256
-        or send_result.get("bytes_transferred") != config.object_bytes
-        or send_result.get("resumed_from") != 0
-        or send_result.get("transport_id") != "lan_mtls"
-        or send_result.get("verified_receipt_sha256") != expected_receipt
-        or send_result.get("certificate_sha256") != source_record.certificate_sha256
-        or send_result.get("negotiated_tls_version") != "TLSv1.3"
+        uploader_result.get("schema") != uploader_schema
+        or uploader_result.get("node_id") != config.source.node_id
+        or uploader_result.get("object_sha256") != object_sha256
+        or uploader_result.get("bytes_transferred") != config.object_bytes
+        or uploader_result.get("resumed_from") != 0
+        or uploader_result.get("transport_id") != "lan_mtls"
+        or uploader_result.get("verified_receipt_sha256") != expected_receipt
+        or uploader_result.get("certificate_sha256") != source_record.certificate_sha256
+        or uploader_result.get("negotiated_tls_version") != "TLSv1.3"
     ):
-        raise MeshSecurityError("send result does not prove the bound mTLS transfer")
+        raise MeshSecurityError("upload result does not prove the bound mTLS transfer")
     if (
-        serve_result.get("schema") != SERVE_RESULT_SCHEMA
-        or serve_result.get("node_id") != config.destination.node_id
-        or serve_result.get("received") is not True
-        or serve_result.get("object_sha256") != object_sha256
-        or serve_result.get("byte_length") != config.object_bytes
-        or serve_result.get("verified_receipt_sha256") != expected_receipt
-        or serve_result.get("certificate_sha256") != destination_record.certificate_sha256
-        or "client_identity_bound" not in serve_result.get("audit_events", [])
+        receiver_result.get("schema") != receiver_schema
+        or receiver_result.get("node_id") != config.destination.node_id
+        or receiver_result.get("received") is not True
+        or receiver_result.get("object_sha256") != object_sha256
+        or receiver_result.get("byte_length") != config.object_bytes
+        or receiver_result.get("verified_receipt_sha256") != expected_receipt
+        or receiver_result.get("certificate_sha256") != destination_record.certificate_sha256
+        or "client_identity_bound" not in receiver_result.get("audit_events", [])
     ):
-        raise MeshSecurityError("serve result does not prove the bound mTLS receipt")
+        raise MeshSecurityError("receive result does not prove the bound mTLS receipt")
 
     os.chmod(database_path, 0o600)
     if stat.S_IMODE(database_path.lstat().st_mode) != 0o600:
@@ -1311,6 +1384,7 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
             "object_sha256": object_sha256,
             "byte_length": config.object_bytes,
             "prepare_mode": config.prepare_mode,
+            "direction": "desktop_initiated_pull" if config.pull else "push",
             "verified_receipt_sha256": expected_receipt,
             "send_result": send_result,
             "serve_result": serve_result,
@@ -1341,6 +1415,11 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
             "physical_two_node_execution_proven": config.carrier in ("ssh", "hybrid"),
             "desktop_is_local_mtls_destination": config.carrier == "hybrid",
             "single_pinned_ssh_worker_endpoint": config.carrier == "hybrid",
+            # Desktop-initiated pull: the destination (desktop) opened the TCP
+            # connection outbound, so no inbound firewall is required on the
+            # receiver; only the source (worker) listened.
+            "desktop_initiated_pull_no_inbound_firewall": config.pull,
+            "receiver_opened_tcp_connection": config.pull,
             "certificate_rotation_renewal_proven": False,
             "revocation_distribution_proven": False,
             "nat_traversal_or_relay_proven": False,

@@ -1270,3 +1270,40 @@ Zero failures. Both determinism seeds clean.
   tls.py + pull-serve/pull-fetch CLI + a pull coordinator + loader wiring).
 - NOT implemented yet; no checklist box checked. This commits the validated,
   contained architecture and the feasibility guard test.
+## 2026-07-20 — BUILDING desktop-initiated result pull (in progress)
+
+Starting the production implementation per docs/design/DESKTOP_INITIATED_RESULT_PULL.md.
+Order: (1) expose receive-over-socket on the mTLS receiver in tls.py (additive,
+no auth/lease-semantics change), (2) pull-serve/pull-fetch node CLI commands,
+(3) pull coordinator in mesh_smoke reusing HybridMeshCarrier, (4) physical
+result_loader + synthesusd wiring, (5) physical desktop(.55)->worker(.54) pull.
+No checklist box will be checked until a physical run is verified. This entry
+marks the start; each landed piece gets its own honest entry.
+### step 1 landed — transport receive-over-dialed-socket
+- tls.py: `_receive_upload` now returns the verified receipt; new
+  `TrustedLanServer.receive_object_over_dialed_socket(raw_sock)` runs the exact
+  server-side auth + receive over a socket THIS side dialed (desktop pull).
+  Reuses all auth/lease/receipt logic; only the TCP dial direction differs.
+- Tests: real-TCP pull (desktop dials outbound, receives as TLS server, worker
+  mutually authenticated as source) passes; existing loopback push + the
+  feasibility guard still pass.
+### steps 2-3 landed — pull CLI + coordinator pull mode
+- mesh_node_cli.py: `pull-serve` (source listens, uploads as TLS client) and
+  `pull-fetch` (destination dials outbound, receives as TLS server) commands,
+  with schemas + field sets + parser/dispatch.
+- mesh_smoke.py: `MeshSmokeConfig.pull` + a pull branch in run_mesh_mtls_smoke
+  (source runs pull-serve via start_serve, destination runs pull-fetch); honest
+  evidence (`direction: desktop_initiated_pull`, no-inbound-firewall claims).
+- Test: coordinator-level pull (LocalMeshCarrier) delivers a staged result into
+  the destination inbox with the receiver opening the TCP connection — 1 passed.
+  Push path + hybrid carrier unaffected. Physical desktop->worker pull next.
+### step 5 landed — PHYSICAL desktop-initiated pull (firewall-free)
+- Real hardware: desktop `dakin-chronos` (.55) DIALED OUTBOUND to worker
+  `dakin-MS-7C95` (.54) and received the genuine result `5df96635…` (314 B)
+  over lease-bound mTLS (TLS 1.3, mutual auth, client_identity_bound). No
+  inbound firewall on the desktop; only the worker listened.
+- Driven with carrier="hybrid" + pull=True (worker deployed at 699a338).
+- Evidence: docs/evidence/F020_DESKTOP_INITIATED_PULL_PHYSICAL_2026-07-20.md
+  (transcript sha256 13958eea…). NO checklist box checked.
+- Remaining: the synthesusd result_loader wiring that runs this pull on a live
+  browser result fetch (transport + coordinator now physically proven).
