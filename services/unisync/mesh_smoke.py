@@ -528,6 +528,54 @@ class LocalMeshCarrier:
         return ServeHandle(process, timeout_seconds=timeout_seconds)
 
 
+class HybridMeshCarrier:
+    """Desktop-as-destination carrier: the local node (``ssh_alias is None``)
+    runs its mesh CLI as a local subprocess while the remote node (``ssh_alias``
+    set) runs over the pinned SSH carrier.
+
+    This is the physical result-return topology: the coordinating desktop runs
+    the lease-bound mTLS ``serve`` receiver locally and a remote worker runs
+    ``send`` over the LAN. Exactly one node is local and one is remote, so the
+    transfer spans two distinct physical machines with a single pinned SSH
+    endpoint (the worker); the destination is this host itself.
+    """
+
+    kind = "hybrid_local_ssh"
+
+    def __init__(
+        self, *, known_hosts: Path, identity_file: Path | None, timeout_seconds: int
+    ) -> None:
+        self._local = LocalMeshCarrier(timeout_seconds=timeout_seconds)
+        self._ssh = SshMeshCarrier(
+            known_hosts=known_hosts,
+            identity_file=identity_file,
+            timeout_seconds=timeout_seconds,
+        )
+
+    def _carrier_for(self, node: MeshNodeConfig) -> Any:
+        return self._local if node.ssh_alias is None else self._ssh
+
+    def verify_node(self, node: MeshNodeConfig) -> dict[str, Any]:
+        return self._carrier_for(node).verify_node(node)
+
+    def run_cli(
+        self, node: MeshNodeConfig, arguments: list[str], *, stdin: bytes | None = None
+    ) -> dict[str, Any]:
+        return self._carrier_for(node).run_cli(node, arguments, stdin=stdin)
+
+    def start_serve(
+        self,
+        node: MeshNodeConfig,
+        arguments: list[str],
+        *,
+        stdin: bytes,
+        timeout_seconds: float,
+    ) -> ServeHandle:
+        return self._carrier_for(node).start_serve(
+            node, arguments, stdin=stdin, timeout_seconds=timeout_seconds
+        )
+
+
 def _signer(key_id: str) -> Ed25519DocumentSigner:
     return Ed25519DocumentSigner(key_id, Ed25519PrivateKey.generate())
 
@@ -890,6 +938,14 @@ def _prepare_allocated_transfer(
 
 def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]:
     nodes = (config.source, config.destination)
+    if config.carrier == "hybrid":
+        # Desktop-as-destination: exactly one local node (the desktop, no SSH
+        # alias) and one pinned-SSH remote node (the worker). The local node
+        # must be the destination — the desktop runs the mTLS receiver.
+        if config.destination.ssh_alias is not None:
+            raise MeshSecurityError("hybrid destination (desktop) must be local, not SSH")
+        if config.source.ssh_alias is None or config.source.ssh_host_fingerprint is None:
+            raise MeshSecurityError("hybrid source (worker) must be a pinned SSH endpoint")
     pins = [carrier.verify_node(node) for node in nodes]
     if config.carrier == "ssh":
         if len({node.ssh_host_fingerprint for node in nodes}) != 2:
@@ -910,8 +966,8 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
         _validate_enroll_init(node, enrollment, account_id=config.account_id)
         for node, enrollment in zip(nodes, enrollments, strict=True)
     ]
-    if config.carrier == "ssh" and len({e["hostname"] for e in enrollments}) != 2:
-        raise MeshSecurityError("SSH targets did not reach two distinct physical hostnames")
+    if config.carrier in ("ssh", "hybrid") and len({e["hostname"] for e in enrollments}) != 2:
+        raise MeshSecurityError("carrier did not reach two distinct physical hostnames")
     if len({e["tls_public_key_sha256"] for e in enrollments}) != 2:
         raise MeshSecurityError("nodes do not have distinct node-local TLS keys")
     if len({e["contract"]["public_key_fingerprint"] for e in enrollments}) != 2:
@@ -1277,7 +1333,14 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
             "content_addressed_bounded_object": True,
             "two_distinct_pinned_ssh_endpoints": config.carrier == "ssh",
             "single_host_rehearsal": config.carrier == "local",
-            "physical_two_node_execution_proven": config.carrier == "ssh",
+            # Hybrid spans this desktop (local receiver) and one physical SSH
+            # worker: two distinct machines, verified above by distinct
+            # enrollment hostnames. It is a genuine physical two-node transfer
+            # with a single pinned SSH endpoint (the worker) and the desktop as
+            # the destination.
+            "physical_two_node_execution_proven": config.carrier in ("ssh", "hybrid"),
+            "desktop_is_local_mtls_destination": config.carrier == "hybrid",
+            "single_pinned_ssh_worker_endpoint": config.carrier == "hybrid",
             "certificate_rotation_renewal_proven": False,
             "revocation_distribution_proven": False,
             "nat_traversal_or_relay_proven": False,
