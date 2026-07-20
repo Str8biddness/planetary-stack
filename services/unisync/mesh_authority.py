@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+import logging
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -48,6 +49,8 @@ from .mesh_common import (
 )
 from .mesh_identity import MAX_PEM_BYTES, validate_issued_certificate
 from .tls import EnrolledPeerIdentity
+
+log = logging.getLogger(__name__)
 
 REGISTRY_FILE = "enrollments.json"
 REGISTRY_LOCK_FILE = "enrollments.lock"
@@ -157,12 +160,15 @@ class MeshCertificateAuthority:
         if not 1 <= validity_days <= MAX_ISSUE_VALIDITY_DAYS:
             raise MeshSecurityError("certificate validity must be between 1 and 30 days")
         if not isinstance(csr_pem, str) or not csr_pem or len(csr_pem) > MAX_PEM_BYTES:
+            log.warning("Certificate issuance rejected", extra={"account_id": account_id, "node_id": node_id, "reason": "CSR must be a nonempty bounded PEM string"})
             raise MeshSecurityError("CSR must be a nonempty bounded PEM string")
         try:
             csr = x509.load_pem_x509_csr(csr_pem.encode("ascii", errors="strict"))
         except Exception as exc:
+            log.warning("Certificate issuance rejected", extra={"account_id": account_id, "node_id": node_id, "reason": "CSR is not valid PEM"})
             raise MeshSecurityError("CSR is not valid PEM") from exc
         if not csr.is_signature_valid:
+            log.warning("Certificate issuance rejected", extra={"account_id": account_id, "node_id": node_id, "reason": "CSR signature is invalid"})
             raise MeshSecurityError("CSR signature is invalid")
         common_names = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
         if len(common_names) != 1 or common_names[0].value != node_id:
@@ -293,6 +299,176 @@ class MeshCertificateAuthority:
 
         if csr_public_key_sha256 != existing_record.public_key_sha256:
             raise MeshSecurityError("CSR public key does not match the active enrollment")
+
+        common_names = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        if len(common_names) != 1 or common_names[0].value != existing_record.node_id:
+            raise MeshSecurityError("CSR subject does not bind the enrolled node")
+
+        account_names = csr.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
+        if len(account_names) != 1 or account_names[0].value != existing_record.account_id:
+            raise MeshSecurityError("CSR subject does not bind the enrolled account")
+
+        try:
+            csr_san = csr.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+        except x509.ExtensionNotFound as exc:
+            raise MeshSecurityError("CSR must carry a subjectAltName extension") from exc
+        
+        csr_values: list[str] = []
+        for name in csr_san.value:
+            if isinstance(name, x509.DNSName):
+                csr_values.append(name.value.lower())
+            elif isinstance(name, x509.IPAddress):
+                csr_values.append(str(name.value))
+            else:
+                raise MeshSecurityError("CSR SANs must be DNS names or IP addresses")
+
+        if normalize_san_set(csr_values) != existing_record.sans:
+            raise MeshSecurityError("CSR SANs do not match the active enrollment SANs")
+
+        now = datetime.now(UTC)
+        certificate = (
+            x509.CertificateBuilder()
+            .subject_name(csr.subject)
+            .issuer_name(self._certificate.subject)
+            .public_key(public_key)
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(minutes=5))
+            .not_valid_after(
+                min(
+                    now + timedelta(days=validity_days),
+                    certificate_not_valid_after_utc(self._certificate),
+                )
+            )
+            .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+            .add_extension(csr_san.value, critical=False)
+            .add_extension(
+                x509.ExtendedKeyUsage(
+                    [ExtendedKeyUsageOID.CLIENT_AUTH, ExtendedKeyUsageOID.SERVER_AUTH]
+                ),
+                critical=False,
+            )
+            .add_extension(
+                x509.KeyUsage(
+                    digital_signature=True,
+                    content_commitment=False,
+                    key_encipherment=False,
+                    data_encipherment=False,
+                    key_agreement=False,
+                    key_cert_sign=False,
+                    crl_sign=False,
+                    encipher_only=False,
+                    decipher_only=False,
+                ),
+                critical=True,
+            )
+            .sign(self._private_key, hashes.SHA256())
+        )
+
+        metadata = validate_issued_certificate(
+            certificate,
+            self._certificate,
+            account_id=existing_record.account_id,
+            node_id=existing_record.node_id,
+            expected_sans=existing_record.sans,
+            expected_spki_sha256=csr_public_key_sha256,
+        )
+
+        return IssuedCertificate(
+            certificate_pem=certificate.public_bytes(serialization.Encoding.PEM).decode("ascii"),
+            ca_pem=self.ca_pem,
+            certificate_sha256=metadata["certificate_sha256"],
+            public_key_sha256=metadata["public_key_sha256"],
+            serial_hex=metadata["serial_hex"],
+            issuer=metadata["issuer"],
+            not_before=metadata["not_before"],
+            not_after=metadata["not_after"],
+            sans=existing_record.sans,
+        )
+
+    def rotate_account_key(
+        self,
+        *,
+        validity_days: int = 14,
+    ) -> "MeshCertificateAuthority":
+        """Generate a new CA key and cross-sign it with the current CA (account recovery)."""
+        if not 1 <= validity_days <= MAX_ISSUE_VALIDITY_DAYS:
+            raise MeshSecurityError("CA validity must be between 1 and 30 days")
+            
+        private_key = ec.generate_private_key(ec.SECP256R1())
+        now = datetime.now(UTC)
+        name = self._certificate.subject
+        certificate = (
+            x509.CertificateBuilder()
+            .subject_name(name)
+            .issuer_name(self._certificate.subject)
+            .public_key(private_key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(minutes=5))
+            .not_valid_after(now + timedelta(days=validity_days))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+            .add_extension(
+                x509.KeyUsage(
+                    digital_signature=False,
+                    content_commitment=False,
+                    key_encipherment=False,
+                    data_encipherment=False,
+                    key_agreement=False,
+                    key_cert_sign=True,
+                    crl_sign=True,
+                    encipher_only=False,
+                    decipher_only=False,
+                ),
+                critical=True,
+            )
+            .add_extension(
+                x509.SubjectKeyIdentifier.from_public_key(private_key.public_key()),
+                critical=False,
+            )
+            .sign(self._private_key, hashes.SHA256())
+        )
+        return MeshCertificateAuthority(private_key, certificate)
+
+    def rotate_peer_key(
+        self,
+        csr_pem: str,
+        *,
+        existing_record: MeshEnrollmentRecord,
+        validity_days: int = 7,
+    ) -> IssuedCertificate:
+        """Issue a new certificate for an active enrollment using a new key."""
+        
+        if existing_record.status != "active":
+            raise MeshSecurityError("cannot rotate key for a revoked enrollment")
+
+        if not 1 <= validity_days <= MAX_ISSUE_VALIDITY_DAYS:
+            raise MeshSecurityError("certificate validity must be between 1 and 30 days")
+
+        if not isinstance(csr_pem, str) or not csr_pem or len(csr_pem) > MAX_PEM_BYTES:
+            raise MeshSecurityError("CSR must be a nonempty bounded PEM string")
+
+        try:
+            csr = x509.load_pem_x509_csr(csr_pem.encode("ascii", errors="strict"))
+        except Exception as exc:
+            raise MeshSecurityError("CSR is not valid PEM") from exc
+
+        if not csr.is_signature_valid:
+            raise MeshSecurityError("CSR signature is invalid")
+
+        public_key = csr.public_key()
+        if not isinstance(public_key, ec.EllipticCurvePublicKey) or not isinstance(
+            public_key.curve, ec.SECP256R1
+        ):
+            raise MeshSecurityError("CSR public key must be EC P-256")
+
+        csr_public_key_sha256 = hashlib.sha256(
+            public_key.public_bytes(
+                serialization.Encoding.DER,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+        ).hexdigest()
+
+        if csr_public_key_sha256 == existing_record.public_key_sha256:
+            raise MeshSecurityError("CSR public key must be different for key rotation")
 
         common_names = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
         if len(common_names) != 1 or common_names[0].value != existing_record.node_id:
@@ -590,20 +766,25 @@ class EnrollmentRegistry:
             self._load()
             key = (record.account_id, record.node_id)
             if key in self._records:
+                log.warning("Enrollment registration rejected", extra={"account_id": record.account_id, "node_id": record.node_id, "reason": "node is already enrolled"})
                 raise MeshSecurityError(
                     "node is already enrolled; re-enrollment/rotation is a separate gate"
                 )
             for existing in self._records.values():
                 if existing.certificate_sha256 == record.certificate_sha256:
+                    log.warning("Enrollment registration rejected", extra={"account_id": record.account_id, "node_id": record.node_id, "reason": "certificate fingerprint is already enrolled"})
                     raise MeshSecurityError("certificate fingerprint is already enrolled")
                 if existing.public_key_sha256 == record.public_key_sha256:
+                    log.warning("Enrollment registration rejected", extra={"account_id": record.account_id, "node_id": record.node_id, "reason": "public-key fingerprint is already enrolled"})
                     raise MeshSecurityError("public-key fingerprint is already enrolled")
             previous = self._records
             self._records = {**previous, key: record}
             try:
                 self._save()
-            except BaseException:
+                log.info("Enrollment registered", extra={"account_id": record.account_id, "node_id": record.node_id, "serial_hex": record.serial_hex})
+            except BaseException as exc:
                 self._records = previous
+                log.warning("Enrollment registration rejected", extra={"account_id": record.account_id, "node_id": record.node_id, "reason": str(exc)})
                 raise
 
     def renew_peer(self, record: MeshEnrollmentRecord) -> None:
@@ -623,13 +804,113 @@ class EnrollmentRegistry:
                 raise MeshSecurityError("renewal must use the same public key")
             for other_key, other_record in self._records.items():
                 if other_key != key and other_record.certificate_sha256 == record.certificate_sha256:
+                    log.warning("Enrollment renewal rejected", extra={"account_id": record.account_id, "node_id": record.node_id, "reason": "certificate fingerprint is already enrolled"})
                     raise MeshSecurityError("certificate fingerprint is already enrolled")
             previous = self._records
             self._records = {**previous, key: record}
             try:
                 self._save()
-            except BaseException:
+                log.info("Enrollment renewed", extra={"account_id": record.account_id, "node_id": record.node_id, "serial_hex": record.serial_hex})
+            except BaseException as exc:
                 self._records = previous
+                log.warning("Enrollment renewal rejected", extra={"account_id": record.account_id, "node_id": record.node_id, "reason": str(exc)})
+                raise
+
+    def rotate_peer_key(self, record: MeshEnrollmentRecord) -> None:
+        """Replace an active peer enrollment with a new certificate and new key."""
+        with owned_file_lock(
+            self._directory, REGISTRY_LOCK_FILE, exclusive=True
+        ):
+            self._load()
+            key = (record.account_id, record.node_id)
+            existing = self._records.get(key)
+            if existing is None:
+                raise MeshSecurityError("cannot rotate key for an unknown enrollment")
+            if existing.status != "active":
+                raise MeshSecurityError("cannot rotate key for a revoked enrollment")
+            if existing.public_key_sha256 == record.public_key_sha256:
+                raise MeshSecurityError("rotation must use a different public key")
+            for other_key, other_record in self._records.items():
+                if other_key != key and other_record.certificate_sha256 == record.certificate_sha256:
+                    log.warning("Enrollment key rotation rejected", extra={"account_id": record.account_id, "node_id": record.node_id, "reason": "certificate fingerprint is already enrolled"})
+                    raise MeshSecurityError("certificate fingerprint is already enrolled")
+                if other_key != key and other_record.public_key_sha256 == record.public_key_sha256:
+                    log.warning("Enrollment key rotation rejected", extra={"account_id": record.account_id, "node_id": record.node_id, "reason": "public-key fingerprint is already enrolled"})
+                    raise MeshSecurityError("public-key fingerprint is already enrolled")
+            previous = self._records
+            self._records = {**previous, key: record}
+            try:
+                self._save()
+                log.info("Enrollment key rotated", extra={"account_id": record.account_id, "node_id": record.node_id, "serial_hex": record.serial_hex})
+            except BaseException as exc:
+                self._records = previous
+                log.warning("Enrollment key rotation rejected", extra={"account_id": record.account_id, "node_id": record.node_id, "reason": str(exc)})
+                raise
+
+    def transfer_ownership(
+        self,
+        account_id: str,
+        node_id: str,
+        new_account_id: str,
+        new_record: MeshEnrollmentRecord,
+        *,
+        reason: str = "ownership transfer",
+    ) -> None:
+        """Transfer a node to a new account, revoking the old enrollment."""
+        with owned_file_lock(
+            self._directory, REGISTRY_LOCK_FILE, exclusive=True
+        ):
+            self._load()
+            old_key = (account_id, node_id)
+            existing = self._records.get(old_key)
+            if existing is None:
+                raise MeshSecurityError("cannot transfer an unknown enrollment")
+            if existing.status != "active":
+                raise MeshSecurityError("cannot transfer a revoked enrollment")
+            
+            if new_record.account_id != new_account_id or new_record.node_id != node_id:
+                raise MeshSecurityError("new record must match the new account and existing node")
+                
+            new_key = (new_account_id, node_id)
+            if new_key in self._records:
+                raise MeshSecurityError("node is already enrolled in the new account")
+                
+            for other_key, other_record in self._records.items():
+                if other_key != old_key and other_record.certificate_sha256 == new_record.certificate_sha256:
+                    raise MeshSecurityError("certificate fingerprint is already enrolled")
+                
+            now = datetime.now(UTC)
+            revoked_old = MeshEnrollmentRecord(
+                **{
+                    **{
+                        field: getattr(existing, field)
+                        for field in (
+                            "account_id",
+                            "node_id",
+                            "sans",
+                            "certificate_sha256",
+                            "public_key_sha256",
+                            "serial_hex",
+                            "issuer",
+                            "not_before",
+                            "not_after",
+                            "enrolled_at",
+                        )
+                    },
+                    "status": "revoked",
+                    "revocation_reason": reason,
+                    "revoked_at": wire_time(now),
+                }
+            )
+            
+            previous = self._records
+            self._records = {**previous, old_key: revoked_old, new_key: new_record}
+            try:
+                self._save()
+                log.info("Ownership transferred", extra={"old_account_id": account_id, "new_account_id": new_account_id, "node_id": node_id, "serial_hex": new_record.serial_hex})
+            except BaseException as exc:
+                self._records = previous
+                log.warning("Ownership transfer rejected", extra={"old_account_id": account_id, "new_account_id": new_account_id, "node_id": node_id, "reason": str(exc)})
                 raise
 
     def revoke(self, account_id: str, node_id: str, *, reason: str) -> None:
@@ -673,8 +954,10 @@ class EnrollmentRegistry:
             self._records = {**previous, key: replacement}
             try:
                 self._save()
-            except BaseException:
+                log.info("Enrollment revoked", extra={"account_id": account_id, "node_id": node_id, "reason": reason})
+            except BaseException as exc:
                 self._records = previous
+                log.warning("Enrollment revocation rejected", extra={"account_id": account_id, "node_id": node_id, "reason": str(exc)})
                 raise
 
     def active_peer(

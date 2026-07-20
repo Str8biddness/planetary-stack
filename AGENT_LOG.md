@@ -1025,3 +1025,24 @@ Zero failures. Both determinism seeds clean.
 - `pytest tests/planetary_drive/test_storage.py` → 11 passed.
 - Foundation only; no checklist box checked. Signed manifests, replica
   placement, SSI-RO-001, quotas, repair, and key wrapping remain.
+## 2026-07-19 — F-030 closed to core: lifecycle code merged + full physical gate
+
+- Branch `agent/f030-close-lifecycle` off clean `main`.
+- Brought the unmerged F-030 CA-side code (rotate/transfer/audit) onto clean
+  main and fixed its two failing tests (test-setup bugs, not code bugs); added
+  the missing node-side same-key renewal (`create_renewal_csr` + `renew-init`).
+  Full `tests/unisync` green (81); 9 new/ported F-030 tests pass.
+- Physically verified the FULL lifecycle across AIVM / dakin-MS-7C95 /
+  dako-MS-7C89 (impl `d97310a`): enroll → renew(same key) → rotate(new key) →
+  revoke+CRL → rollback-prevention → recover(ownership transfer) → replace,
+  keys never copied. Evidence:
+  docs/evidence/F030_FULL_LIFECYCLE_PHYSICAL_2026-07-19.md
+  (f030b-evidence.json sha256 `482732e3…`).
+- Checked F-030 boxes 2-6 with linked code + physical evidence. Box 1
+  (installer-driven enrollment) left unchecked. Documented remaining gaps:
+  node re-install of renewed/rotated cert (no code path — install refuses
+  replace), physical expiry force, CRL distribution endpoint, independent
+  review.
+- Correction to the prior "F-030 finished" claim: on origin/main F-030 was
+  entirely unchecked and the lifecycle commits were unmerged with CI-failing
+  tests; this branch is the real, clean, tested closure of the core lifecycle.

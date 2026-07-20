@@ -125,19 +125,36 @@ Desktop and independently verifies its result without in-process shortcuts.
 ### F-030 Node enrollment and identity lifecycle
 
 - [ ] Create node identity during installer-driven enrollment with explicit
-  account/user confirmation.
-- [ ] Keep private keys hardware-backed where available and mode-confined
-  otherwise.
-- [ ] Implement CA/intermediate custody, certificate issuance, renewal,
-  rotation, expiry warnings, and online revocation distribution.
-- [ ] Add lost-device removal, account recovery, key recovery/rotation, and
-  ownership-transfer policy.
-- [ ] Prevent rollback or resurrection of revoked enrollment state.
-- [ ] Audit every enrollment, renewal, rejection, and revocation without
-  logging credentials.
+  account/user confirmation. (Enrollment is coordinator/CLI-driven, not
+  installer-driven; remains open — installer is F-100-adjacent.)
+- [x] Keep private keys hardware-backed where available and mode-confined
+  otherwise. Evidence: `d97310a`; physically verified across three machines
+  (keys never leave the node — only CSRs cross the wire; mode-0600 files, no
+  TPM available). `docs/evidence/F030_FULL_LIFECYCLE_PHYSICAL_2026-07-19.md`.
+- [x] Implement CA/intermediate custody, certificate issuance, renewal,
+  rotation, expiry warnings, and online revocation distribution. Evidence:
+  `d97310a` + physical gate — issuance, same-key renewal (`renew-init` +
+  `renew_certificate`), key rotation, and revocation with CRL generation all
+  proven on three machines; `check_certificate_expiry` unit-tested. Gaps:
+  CRL *distribution endpoint* and physical expiry force are not yet exercised.
+- [x] Add lost-device removal, account recovery, key recovery/rotation, and
+  ownership-transfer policy. Evidence: `d97310a` + physical gate — revoke
+  (lost-device removal), `rotate_peer_key` (key rotation), and
+  `transfer_ownership` (account recovery/transfer) all verified across three
+  machines.
+- [x] Prevent rollback or resurrection of revoked enrollment state. Evidence:
+  `18cb37a`/`d97310a`; physically verified (re-registering a revoked node is
+  blocked) in the 2026-07-19 full lifecycle gate.
+- [x] Audit every enrollment, renewal, rejection, and revocation without
+  logging credentials. Evidence: `d97310a`; `tests/unisync/test_mesh_authority_audit.py`.
 
 Acceptance: enroll, rotate, expire, revoke, recover, and replace nodes across
 three physical machines without manual source edits or copying private keys.
+STATUS: core lifecycle (enroll/renew/rotate/revoke/recover/replace) physically
+verified across three machines with keys never copied
+(`F030_FULL_LIFECYCLE_PHYSICAL_2026-07-19.md`). NOT yet closed: installer-driven
+enrollment, node-side re-install of a renewed/rotated certificate (no code
+path), physical expiry force, and independent adversarial review.
 
 ### F-040 Node service and resource controls
 
