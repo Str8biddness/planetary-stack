@@ -1189,3 +1189,23 @@ Zero failures. Both determinism seeds clean.
   proven by the absence of the container `run` command in every case.
 - Physical evidence and artifact digests: none claimed.
 - Review verdict: pending.
+
+## 2026-07-20 — F-020 result-byte return PHYSICAL (node-to-node over mTLS)
+
+- Physical run on the owner's LAN machines. A genuine text-classification
+  result was produced by real rootless Podman on `dakin-MS-7C95`
+  (`localhost/aivm-text-classify`, --network none --read-only), result object
+  sha256 `5df96635…` (314 B, byte-identical to every prior physical path).
+- `stage-result` placed it into a source outbox; the mesh mTLS gate
+  (`prepare_mode="existing"`, commit 31a189e deployed to both nodes) returned
+  it over a scheduler-signed lease-bound `lan_mtls` socket (TLS 1.3, mutual
+  auth, `client_identity_bound`) from `AIVM` (.52) to `dakin-MS-7C95` (.54).
+  Destination inbox object re-hashes to `5df96635…` at 314 B — verified.
+- Evidence: docs/evidence/F020_RESULT_BYTE_RETURN_PHYSICAL_2026-07-20.md
+  (+ .evidence.json, transcript sha256
+  `f38e52ed1a8cde46ffc9d64e29280729664d19fe88d1a318a5e7afb0b90e8aab`).
+- NO checklist box checked. Remaining: desktop-as-destination on hardware
+  (hybrid local-serve/SSH-send carrier), synthesusd loader wiring, persistent
+  enrollment. The receiving party here is a peer node, not the coordinating
+  desktop; result bytes were produced on .54 and copied to .52 for staging
+  (deterministic, digest verified at every hop).
