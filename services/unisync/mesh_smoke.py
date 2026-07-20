@@ -123,7 +123,7 @@ _CONFIG_FIELDS = frozenset(
         "prepare_mode",
     }
 )
-_PREPARE_MODES = frozenset({"random", "workload_model", "workload_document"})
+_PREPARE_MODES = frozenset({"random", "workload_model", "workload_document", "existing"})
 _NODE_FIELDS = frozenset(
     {
         "node_id",
@@ -192,6 +192,7 @@ class MeshSmokeConfig:
     server_hostname: str
     declared_vpn_cidrs: tuple[str, ...]
     prepare_mode: str = "random"
+    existing_object_sha256: str = ""
 
 
 def _require_bounded_int(value: object, name: str, low: int, high: int) -> int:
@@ -1008,47 +1009,53 @@ def run_mesh_mtls_smoke(config: MeshSmokeConfig, carrier: Any) -> dict[str, Any]
             )
         )
 
-    if config.prepare_mode == "random":
-        prepare_result = carrier.run_cli(
-            config.source,
-            ["prepare", "--state-dir", config.source.state_dir],
-            stdin=_job_json(
-                {
-                    "schema": PREPARE_SCHEMA,
-                    "account_id": config.account_id,
-                    "node_id": config.source.node_id,
-                    "byte_length": config.object_bytes,
-                }
-            ),
-        )
+    if config.prepare_mode == "existing":
+        # The object is already present in the source outbox (e.g. a completed
+        # AIVM result staged via `stage-result`). No preparation is performed;
+        # the lease-bound mTLS `send` reads and verifies it from the outbox.
+        object_sha256 = config.existing_object_sha256
     else:
-        # The source reproduces the repo-pinned workload artifact locally;
-        # config.object_bytes declares its exact expected size upfront.
-        prepare_result = carrier.run_cli(
-            config.source,
-            ["prepare-artifact", "--state-dir", config.source.state_dir],
-            stdin=_job_json(
-                {
-                    "schema": PREPARE_ARTIFACT_SCHEMA,
-                    "account_id": config.account_id,
-                    "node_id": config.source.node_id,
-                    "artifact": (
-                        "model"
-                        if config.prepare_mode == "workload_model"
-                        else "document"
-                    ),
-                }
-            ),
-        )
-    if (
-        prepare_result.get("schema") != PREPARE_RESULT_SCHEMA
-        or prepare_result.get("account_id") != config.account_id
-        or prepare_result.get("node_id") != config.source.node_id
-        or prepare_result.get("byte_length") != config.object_bytes
-        or not isinstance(prepare_result.get("object_sha256"), str)
-    ):
-        raise MeshSecurityError("source did not prepare the exact bounded local object")
-    object_sha256 = prepare_result["object_sha256"]
+        if config.prepare_mode == "random":
+            prepare_result = carrier.run_cli(
+                config.source,
+                ["prepare", "--state-dir", config.source.state_dir],
+                stdin=_job_json(
+                    {
+                        "schema": PREPARE_SCHEMA,
+                        "account_id": config.account_id,
+                        "node_id": config.source.node_id,
+                        "byte_length": config.object_bytes,
+                    }
+                ),
+            )
+        else:
+            # The source reproduces the repo-pinned workload artifact locally;
+            # config.object_bytes declares its exact expected size upfront.
+            prepare_result = carrier.run_cli(
+                config.source,
+                ["prepare-artifact", "--state-dir", config.source.state_dir],
+                stdin=_job_json(
+                    {
+                        "schema": PREPARE_ARTIFACT_SCHEMA,
+                        "account_id": config.account_id,
+                        "node_id": config.source.node_id,
+                        "artifact": (
+                            "model"
+                            if config.prepare_mode == "workload_model"
+                            else "document"
+                        ),
+                    }
+                ),
+            )
+        if (
+            prepare_result.get("schema") != PREPARE_RESULT_SCHEMA
+            or prepare_result.get("account_id") != config.account_id
+            or prepare_result.get("node_id") != config.source.node_id
+            or prepare_result.get("byte_length") != config.object_bytes
+            or not isinstance(prepare_result.get("object_sha256"), str)
+        ):
+            raise MeshSecurityError("source did not prepare the exact bounded local object")
+        object_sha256 = prepare_result["object_sha256"]
     if len(object_sha256) != 64 or any(
         character not in "0123456789abcdef" for character in object_sha256
     ):
