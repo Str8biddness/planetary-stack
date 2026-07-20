@@ -1307,3 +1307,19 @@ marks the start; each landed piece gets its own honest entry.
   (transcript sha256 13958eea…). NO checklist box checked.
 - Remaining: the synthesusd result_loader wiring that runs this pull on a live
   browser result fetch (transport + coordinator now physically proven).
+### step 4 landed — pull result_loader + synthesusd wiring
+- result_transfer.py: `build_pull_result_loader` — returns result bytes via the
+  desktop-initiated pull (worker stages over injected SSH; desktop dials
+  outbound + receives via HybridMeshCarrier + pull=True; reads local inbox,
+  verifies digest). PHYSICALLY verified end-to-end against .54/.55: given a
+  digest it staged on the worker, pulled outbound, and returned the exact 314
+  genuine bytes; absent result -> None.
+- synthesusd.py: `_build_job_pipeline` now constructs the pull loader from the
+  RemoteWorkerConfig (pinned-ssh staging via `_pinned_ssh_argv`, worker listen
+  IP via `ssh -G`) and passes result_loader to build_remote_pipeline. Best
+  effort: any construction failure -> no loader (result 404), never fatal.
+- Tests: wiring helpers (hardened ssh argv, listen-IP parse, fail-closed) +
+  result endpoint; full desktop suite 35 passed.
+- Remaining for a live browser demo: a running synthesusd configured with a
+  worker execution env (env vars) so a real job executes end-to-end; the
+  transport, loader, endpoint, and UI are all in place and proven.
