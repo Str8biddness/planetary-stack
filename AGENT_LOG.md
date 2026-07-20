@@ -1046,3 +1046,17 @@ Zero failures. Both determinism seeds clean.
 - Correction to the prior "F-030 finished" claim: on origin/main F-030 was
   entirely unchecked and the lifecycle commits were unmerged with CI-failing
   tests; this branch is the real, clean, tested closure of the core lifecycle.
+## 2026-07-19 — F-020 desktop-intent: worker result staging (step 1 of result-byte return)
+
+- Branch `agent/f020-result-return` off main.
+- The F-020 "Wire authenticated Web Desktop intent … verified result … desktop
+  presentation" box needs the result BYTES returned to the desktop (today the
+  desktop shows the result digest). Added the first bounded piece: a
+  `stage-result` worker CLI command (`services/private_mesh/worker_cli.py`)
+  that copies a completed AIVM result from the owner-only result store into the
+  mesh outbox as a content-addressed object (digest re-verified), ready for a
+  lease-bound Unisync mTLS `send` to the desktop. Tests: 17 passed (2 new).
+- No checklist box checked. Remaining for the box: the lease-authorized mTLS
+  result transfer worker→desktop, the desktop `result_loader` that consumes it,
+  and a genuine browser→three-node-cell→result-bytes run. Unisync-transfer of
+  the workload into the job flow is the other half of the box.
