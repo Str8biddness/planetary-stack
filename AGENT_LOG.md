@@ -1098,3 +1098,46 @@ Zero failures. Both determinism seeds clean.
   two-host SSH run — the hybrid SSH carrier (local desktop destination + SSH
   worker source) and a physical browser->cell->bytes run remain. (3) synthesusd
   does not yet construct/pass the loader.
+
+## 2026-07-19 — F-020 cancel/stop terminal cleanup proof (test-only)
+
+- Worktree branch `worktree-agent-a1ea21f1ba53c922c` off main head
+  `45a25a8f9504f83b0a49f057d39197603cb92a07`.
+- Task: prove the F-020 checklist item "Implement cancel/stop and prove terminal
+  cleanup at every layer" with real tests. Added one new file
+  `tests/private_mesh/test_cancel_cleanup.py`; no product code was modified and
+  `FINISH_CHECKLIST.md` was not edited.
+- The cancel/stop code paths already exist in product code
+  (`NodeAgent.cancel` + CANCELLED lifecycle, `LocalJobPipeline.cancel` +
+  control-plane lease revocation, `PodmanExecutor._cleanup` stop/kill/rm on a
+  timed-out run). This file consolidates a per-layer terminal-cleanup proof,
+  reusing the existing `_wiring` (test_execution_wiring.py), `_pipeline`
+  (test_job_pipeline.py), and the podman-executor fixtures/patterns
+  (test_podman_execution.py).
+- Layers proven by the 3 new tests:
+  1. Node agent: cancel on an admitted lease emits a signed, lease-bound
+     CANCELLED lifecycle event (previous_state ADMITTED → CANCELLED,
+     `validate_lease_bound_lifecycle` passes), drives `workload_state` terminal,
+     a subsequent `execute` returns DUPLICATE_TRANSITION, and the faked Podman
+     runner logs no `run` command. Re-cancel is an idempotent
+     DUPLICATE_TRANSITION with no new signed event.
+  2. Job pipeline: cancel on an admitted job yields `JobState.CANCELLED`, the
+     control-plane lease moves ACTIVE → REVOKED, the retained bundle is dropped,
+     the fake Podman runner is never invoked, and a post-cancel `run` stays
+     CANCELLED without executing.
+  3. Podman executor: a timed-out container run issues `stop` → `kill` → `rm`
+     in order (rm forced, all targeting the same container name) and returns
+     terminal FAILED with stable reason `execution_timeout`; the captured
+     stderr ("secret backend detail") never appears in the result.
+- Validation: `pytest tests/private_mesh/test_cancel_cleanup.py -q` → `3 passed`
+  under `PYTHONHASHSEED=1` and again under `PYTHONHASHSEED=4`. Only the new file
+  was run (compute-limited machine; full mesh suite not re-run).
+- No checklist box checked here (that is the owner/reviewer's call and
+  FINISH_CHECKLIST.md is out of scope for this task). Honest scope limits: this
+  is a fixture-backed proof with faked container transport, not physical
+  Podman acceptance. Uncovered by these tests: the physical timeout→stop/kill/rm
+  path against a real rootless Podman container (gated behind
+  `AIVM_RUN_PODMAN_PHYSICAL`), and cancellation of an already-dispatched remote
+  `ssh_job.v2` job — `RemoteExecutionBackend.cancel` only drops a pre-dispatch
+  pending job and relies on the control-plane lease revocation as the
+  authoritative signal, with no test here driving a live remote worker.
