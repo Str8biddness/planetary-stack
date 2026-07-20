@@ -1,0 +1,432 @@
+{
+  "account_id": "account:private-mesh:home",
+  "bootstrap_carrier": "ssh_stdio",
+  "capacity_note": "Inventory RAM/free-disk values are host snapshots, not reservations; network capacity is intentionally advertised as zero for this single-object gate.",
+  "carrier_pins": [
+    {
+      "host_key_alias": "aivm",
+      "resolved_host": "192.168.68.52",
+      "resolved_port": 22,
+      "ssh_alias": "AIVM",
+      "ssh_host_fingerprint": "SHA256:K93xXWV+UB7FCvv8yf1TpTaERu8h+ey2WOK/0x1PYAE"
+    },
+    {
+      "host_key_alias": "dakin-ms-7c95",
+      "resolved_host": "192.168.68.54",
+      "resolved_port": 22,
+      "ssh_alias": "dakin-MS-7C95",
+      "ssh_host_fingerprint": "SHA256:q0JCxuHCtW6gnRbnnAvcH0sqFz5RE8tfKQHoXSMGw4w"
+    }
+  ],
+  "claims": {
+    "bootstrap_carrier": "ssh_stdio",
+    "certificate_rotation_renewal_proven": false,
+    "content_addressed_bounded_object": true,
+    "data_transport": "lan_mtls",
+    "failure_recovery_proven": false,
+    "hardware_attestation_proven": false,
+    "mutual_tls_client_certificate_required": true,
+    "nat_traversal_or_relay_proven": false,
+    "negotiated_tls_version": "TLSv1.3",
+    "node_local_private_key_export": false,
+    "persistent_enrollment_registry": true,
+    "physical_two_node_execution_proven": true,
+    "production_ca_operations_proven": false,
+    "revocation_distribution_proven": false,
+    "scheduler_signed_active_lease_bound": true,
+    "single_host_rehearsal": false,
+    "two_distinct_pinned_ssh_endpoints": true,
+    "workload_bytes_generated_on_source_node": true,
+    "workload_bytes_provisioned_to_source_via_bootstrap": false,
+    "workload_bytes_to_destination_via_lan_mtls_only": true
+  },
+  "completed_at": "2026-07-20T14:03:16Z",
+  "contract_transport": "lan_mtls",
+  "documents": {
+    "active_lease": {
+      "account_id": "account:private-mesh:home",
+      "capability_id": "capability:mesh-mtls:c107777f51855f9a:d06e6a0c3f4e",
+      "fencing_token": 1,
+      "gpu_ids": [],
+      "inventory_id": "inventory:mesh:d06e6a0c3f4e02fff57d7b",
+      "inventory_sha256": "4ebd36f84840bb7cec5d468a0cabd285db32f521cf3ba15d937bd06b71a37280",
+      "lease_id": "lease:2d4344d1383ceb70ad9a3d8e299760b8",
+      "node_id": "node:private-mesh:dakin-ms-7c95",
+      "not_before": "2026-07-20T14:03:14Z",
+      "placement_id": "placement:2d4344d1383ceb70ad9a3d8e299760b8",
+      "renewal_sequence": 0,
+      "renewals_remaining": 16,
+      "request_id": "request:mesh-mtls:c107777f51855f9a:d06e6a0c3f4e",
+      "request_sha256": "dd44cd6eea83a8b46075f982425502e18a75b6b3247ea3ec8862022a8865f5d8",
+      "resources": {
+        "cpu_millicores": 100,
+        "egress_bps": 0,
+        "gpu_count": 0,
+        "gpu_memory_bytes": 0,
+        "ingress_bps": 0,
+        "memory_bytes": 1048576,
+        "storage_bytes": 1048576
+      },
+      "revocation_reason": null,
+      "schema": "planetary.vsource.lease.v1",
+      "signature": {
+        "algorithm": "ed25519",
+        "key_id": "key:scheduler:unisync-mesh:c107777f51855f9a",
+        "value": "u9JzHcE5fZt8Hv8W2MDLYw3jzUEPd1jGAt_3RAvU2L4CrYena3GwjFtyfkWtQJ3bwb2V72dffJhiWuUoDU7jCA"
+      },
+      "state": "active",
+      "transport": "lan_mtls",
+      "ttl_seconds": 120
+    },
+    "capability": {
+      "account_id": "account:private-mesh:home",
+      "actions": [
+        "execute",
+        "reserve"
+      ],
+      "audience_node_ids": [
+        "node:private-mesh:dakin-ms-7c95"
+      ],
+      "capability_id": "capability:mesh-mtls:c107777f51855f9a:d06e6a0c3f4e",
+      "constraints": {
+        "minimum_attestation": "unverified",
+        "resource_prefixes": [
+          "chal://unisync-mesh/d06e6a0c3f4e/"
+        ],
+        "resources": {
+          "cpu_millicores": 100,
+          "egress_bps": 0,
+          "gpu_count": 0,
+          "gpu_memory_bytes": 0,
+          "ingress_bps": 0,
+          "memory_bytes": 1048576,
+          "storage_bytes": 1048576
+        },
+        "transports": [
+          "lan_mtls"
+        ],
+        "workload_kinds": [
+          "evaluation"
+        ]
+      },
+      "delegable": false,
+      "issuer_id": "controller:unisync-mesh",
+      "nonce": "meshmtlsc107777f51855f9ad06e6a0c3f4e",
+      "not_before": "2026-07-20T14:03:14Z",
+      "revocation_epoch": 0,
+      "schema": "planetary.chal.capability.v1",
+      "signature": {
+        "algorithm": "ed25519",
+        "key_id": "key:controller:unisync-mesh:c107777f51855f9a",
+        "value": "LNdmoLDLv0vpUY14naiBZbfleXahQCFsVbQvVZsiXVo7QuDgVfyhTzN_bGMTsSC-WnVaXXlR6BUeD3iue_JrDQ"
+      },
+      "subject_id": "subject:private-mesh:owner",
+      "ttl_seconds": 600
+    },
+    "inventories": [
+      {
+        "account_id": "account:private-mesh:home",
+        "attestation": "unverified",
+        "health": "ready",
+        "inventory_id": "inventory:mesh:b8be6e226b987233baeb06",
+        "labels": {
+          "network_scope": "trusted_lan",
+          "power_class": "consumer",
+          "thermal_policy": "balanced"
+        },
+        "node_id": "node:private-mesh:aivm",
+        "observed_at": "2026-07-20T14:03:11Z",
+        "public_key_fingerprint": "a0d3434b5e6ac69b5e6e2677b176cd07fe6bde240988dcd13f252bd102b34f98",
+        "resources": {
+          "allocatable": {
+            "cpu_millicores": 16000,
+            "egress_bps": 0,
+            "ingress_bps": 0,
+            "memory_bytes": 16686379008,
+            "storage_bytes": 277646749696
+          },
+          "cpu": {
+            "architecture": "x86_64",
+            "features": [],
+            "logical_cores": 16
+          },
+          "gpus": {}
+        },
+        "schema": "planetary.vsource.inventory.v1",
+        "signature": {
+          "algorithm": "ed25519",
+          "key_id": "key:unisync-mesh:773d7777da604e7170e5",
+          "value": "WJGpNJPxYD4SbW7ZPYWg9KCdx-JiHjdiQksLxMCWdsqf0uiS7q_9JSECkTAZABhNWjMsTmWyf96YRVvh4yloAw"
+        },
+        "transports": [
+          "lan_mtls"
+        ],
+        "trust_zone": "personal_cell",
+        "ttl_seconds": 300,
+        "workload_kinds": [
+          "evaluation"
+        ]
+      },
+      {
+        "account_id": "account:private-mesh:home",
+        "attestation": "unverified",
+        "health": "ready",
+        "inventory_id": "inventory:mesh:d06e6a0c3f4e02fff57d7b",
+        "labels": {
+          "network_scope": "trusted_lan",
+          "power_class": "consumer",
+          "thermal_policy": "balanced"
+        },
+        "node_id": "node:private-mesh:dakin-ms-7c95",
+        "observed_at": "2026-07-20T14:03:12Z",
+        "public_key_fingerprint": "110e3765a8ec8bca2ad2e5bac12c44911acbb8c7c7236e7b2d445c1d904f833b",
+        "resources": {
+          "allocatable": {
+            "cpu_millicores": 12000,
+            "egress_bps": 0,
+            "ingress_bps": 0,
+            "memory_bytes": 8195579904,
+            "storage_bytes": 113482477568
+          },
+          "cpu": {
+            "architecture": "x86_64",
+            "features": [],
+            "logical_cores": 12
+          },
+          "gpus": {}
+        },
+        "schema": "planetary.vsource.inventory.v1",
+        "signature": {
+          "algorithm": "ed25519",
+          "key_id": "key:unisync-mesh:c51e13c24c7993be2e90",
+          "value": "bio-YEAhEY-9F1d8S1hj_CcMAMiMgNgFCydvtb6Y45n4JnIds3V0TcuqypmDLu2eA50dR95RLfeIKshsUOEpBw"
+        },
+        "transports": [
+          "lan_mtls"
+        ],
+        "trust_zone": "personal_cell",
+        "ttl_seconds": 300,
+        "workload_kinds": [
+          "evaluation"
+        ]
+      }
+    ],
+    "released_lease": {
+      "account_id": "account:private-mesh:home",
+      "capability_id": "capability:mesh-mtls:c107777f51855f9a:d06e6a0c3f4e",
+      "fencing_token": 1,
+      "gpu_ids": [],
+      "inventory_id": "inventory:mesh:d06e6a0c3f4e02fff57d7b",
+      "inventory_sha256": "4ebd36f84840bb7cec5d468a0cabd285db32f521cf3ba15d937bd06b71a37280",
+      "lease_id": "lease:2d4344d1383ceb70ad9a3d8e299760b8",
+      "node_id": "node:private-mesh:dakin-ms-7c95",
+      "not_before": "2026-07-20T14:03:14Z",
+      "placement_id": "placement:2d4344d1383ceb70ad9a3d8e299760b8",
+      "renewal_sequence": 0,
+      "renewals_remaining": 16,
+      "request_id": "request:mesh-mtls:c107777f51855f9a:d06e6a0c3f4e",
+      "request_sha256": "dd44cd6eea83a8b46075f982425502e18a75b6b3247ea3ec8862022a8865f5d8",
+      "resources": {
+        "cpu_millicores": 100,
+        "egress_bps": 0,
+        "gpu_count": 0,
+        "gpu_memory_bytes": 0,
+        "ingress_bps": 0,
+        "memory_bytes": 1048576,
+        "storage_bytes": 1048576
+      },
+      "revocation_reason": null,
+      "schema": "planetary.vsource.lease.v1",
+      "signature": {
+        "algorithm": "ed25519",
+        "key_id": "key:scheduler:unisync-mesh:c107777f51855f9a",
+        "value": "cAfh9uEKKvic12Xo2H-4NVwSDzMKR3rLg9ghVLMBnhgfyUsCPhpl0VmOWld6SA6aoCxn9uiCwF-fOENqn7oUDg"
+      },
+      "state": "released",
+      "transport": "lan_mtls",
+      "ttl_seconds": 120
+    },
+    "request": {
+      "account_id": "account:private-mesh:home",
+      "capability_id": "capability:mesh-mtls:c107777f51855f9a:d06e6a0c3f4e",
+      "constraints": {
+        "checkpoint_required": false,
+        "grounding_required": false,
+        "latency_budget_ms": 30000,
+        "network_access": "none",
+        "resources": {
+          "cpu_millicores": 100,
+          "egress_bps": 0,
+          "gpu_count": 0,
+          "gpu_memory_bytes": 0,
+          "ingress_bps": 0,
+          "memory_bytes": 1048576,
+          "storage_bytes": 1048576
+        },
+        "template_leakage_allowed": false
+      },
+      "device_uri": "chal://unisync-mesh/d06e6a0c3f4e/object",
+      "idempotency_key": "idempotency:mesh-mtls:c107777f51855f9a:d06e6a0c3f4e",
+      "inputs": [],
+      "issued_at": "2026-07-20T14:03:14Z",
+      "parameters": {
+        "batch_size": null,
+        "checkpoint_interval_seconds": null,
+        "chunk_size": null,
+        "deterministic": true,
+        "height": null,
+        "max_tokens": null,
+        "precision": null,
+        "replica_count": null,
+        "seed": 0,
+        "steps": null,
+        "temperature": 0.0,
+        "top_k": null,
+        "width": null
+      },
+      "parent_request_id": null,
+      "request_id": "request:mesh-mtls:c107777f51855f9a:d06e6a0c3f4e",
+      "schema": "planetary.chal.request.v1",
+      "signature": {
+        "algorithm": "ed25519",
+        "key_id": "key:controller:unisync-mesh:c107777f51855f9a",
+        "value": "hJs9CorViG7S8GTZqDK1Xhr5KesfDyj-xf_7bUPGBkriB61SIhcVYdWAL4SC9D_wZSkEL3rjkU_1BKugCpd0Dg"
+      },
+      "trace_id": "trace:mesh-mtls:c107777f51855f9a:d06e6a0c3f4e",
+      "ttl_seconds": 300,
+      "workload_kind": "evaluation",
+      "workload_manifest": {
+        "classification": "private",
+        "media_type": "application/octet-stream",
+        "sha256": "5df96635e0a6a63e1026d42ced2e4dbbaa72a370035f0d7aa0df004476e557b1",
+        "size_bytes": 314,
+        "uri": "artifact://unisync-mesh/object/5df96635e0a6a63e1026d42ced2e4dbbaa72a370035f0d7aa0df004476e557b1"
+      }
+    }
+  },
+  "enrollment": {
+    "csr_pems": {
+      "node:private-mesh:aivm": "-----BEGIN CERTIFICATE REQUEST-----\nMIIBJzCBzgIBADBFMSIwIAYDVQQKDBlhY2NvdW50OnByaXZhdGUtbWVzaDpob21l\nMR8wHQYDVQQDDBZub2RlOnByaXZhdGUtbWVzaDphaXZtMFkwEwYHKoZIzj0CAQYI\nKoZIzj0DAQcDQgAESYlMkU7xT9/KwsTZpqyv08YjpferJZLJ8QByjQJnobkFfQC8\n5YN9by1NC69buAnp/8GdgyYPBaN8IXiLeh4SGaAnMCUGCSqGSIb3DQEJDjEYMBYw\nFAYDVR0RBA0wC4IJYWl2bS5tZXNoMAoGCCqGSM49BAMCA0gAMEUCIByVNtUwg68a\nuHUA3GoS0Pqdm31f5Q391XO6uIWYBUDZAiEA2dFIodl2OCEOHOhzLB3qCmrDeTv6\nCxyHVbL7FR+0gtI=\n-----END CERTIFICATE REQUEST-----\n",
+      "node:private-mesh:dakin-ms-7c95": "-----BEGIN CERTIFICATE REQUEST-----\nMIIBKzCB0gIBADBOMSIwIAYDVQQKDBlhY2NvdW50OnByaXZhdGUtbWVzaDpob21l\nMSgwJgYDVQQDDB9ub2RlOnByaXZhdGUtbWVzaDpkYWtpbi1tcy03Yzk1MFkwEwYH\nKoZIzj0CAQYIKoZIzj0DAQcDQgAEeLFFYzs5k0GRBaIRFXQtiSiz/0s017I775NC\n2k1DRg67REyUTsiWpe/gJlfrHC4s0DwVMhlAIOvE1TcFzv/UkaAiMCAGCSqGSIb3\nDQEJDjETMBEwDwYDVR0RBAgwBocEwKhENjAKBggqhkjOPQQDAgNIADBFAiEA4VKb\nhUUC6VRLZ1GVqTfoiTz/H5s0ZYGrACTX5xgBJGECICe35R9/ZuiK7uvjGgEd7xJL\nhOfKQxRmltOZ+2LmsobR\n-----END CERTIFICATE REQUEST-----\n"
+    },
+    "hostnames": [
+      "AIVM",
+      "dakin-MS-7C95"
+    ],
+    "registry": [
+      {
+        "account_id": "account:private-mesh:home",
+        "certificate_sha256": "e711d8dcca98eacdfa6765282e49bade034e84b5bee2563b8117bda4048a8ea2",
+        "enrolled_at": "2026-07-20T14:03:12Z",
+        "issuer": "CN=Unisync Mesh CA c107777f51855f9a",
+        "node_id": "node:private-mesh:aivm",
+        "not_after": "2026-07-27T14:03:12Z",
+        "not_before": "2026-07-20T13:58:12Z",
+        "public_key_sha256": "7936349d28a0e529a5ff6736e4c9eff349ef5063b2e86ae600f6afff521f8e5f",
+        "revocation_reason": null,
+        "revoked_at": null,
+        "sans": [
+          "aivm.mesh"
+        ],
+        "schema": "planetary.unisync.mesh_enrollment_record.v1",
+        "serial_hex": "61bb184398d439fd6220d5edb2492657771f8c7e",
+        "status": "active"
+      },
+      {
+        "account_id": "account:private-mesh:home",
+        "certificate_sha256": "ca35f5a0661b0cccb76294ba96df8a6bf2810589e83a310a6c22abafd2ae1727",
+        "enrolled_at": "2026-07-20T14:03:12Z",
+        "issuer": "CN=Unisync Mesh CA c107777f51855f9a",
+        "node_id": "node:private-mesh:dakin-ms-7c95",
+        "not_after": "2026-07-27T14:03:13Z",
+        "not_before": "2026-07-20T13:58:13Z",
+        "public_key_sha256": "b2a31580fda2237575ab361a3650fb62050903f6967fd2ab0291a85bcfe26643",
+        "revocation_reason": null,
+        "revoked_at": null,
+        "sans": [
+          "192.168.68.54"
+        ],
+        "schema": "planetary.unisync.mesh_enrollment_record.v1",
+        "serial_hex": "6bbe7779d9bcaa6e9dee011c5b9ec056e29dfb0a",
+        "status": "active"
+      }
+    ],
+    "registry_path": "/home/dakin/.claude/jobs/adcb2aa2/tmp/rr-registry/enrollments.json"
+  },
+  "implementation_sha256": "0a14c420365afbf2f358f1927125c7d4fe82e85030226ef1f2191ffe2636c9dc",
+  "passed": true,
+  "run_token": "c107777f51855f9a",
+  "schema": "planetary.unisync.mesh_mtls_smoke_evidence.v1",
+  "sqlite_state": {
+    "path": "/home/dakin/.claude/jobs/adcb2aa2/tmp/rr-vsource.sqlite3",
+    "sha256": "2834c5c1e30484beff9a7027484757e0fe4e8090168e0b8221f324bec845578f"
+  },
+  "subject_id": "subject:private-mesh:owner",
+  "transfer": {
+    "byte_length": 314,
+    "object_sha256": "5df96635e0a6a63e1026d42ced2e4dbbaa72a370035f0d7aa0df004476e557b1",
+    "prepare_mode": "existing",
+    "send_result": {
+      "bytes_transferred": 314,
+      "certificate_sha256": "e711d8dcca98eacdfa6765282e49bade034e84b5bee2563b8117bda4048a8ea2",
+      "negotiated_cipher": "TLS_AES_256_GCM_SHA384",
+      "negotiated_tls_version": "TLSv1.3",
+      "node_id": "node:private-mesh:aivm",
+      "object_sha256": "5df96635e0a6a63e1026d42ced2e4dbbaa72a370035f0d7aa0df004476e557b1",
+      "resumed_from": 0,
+      "schema": "planetary.unisync.mesh_send_result.v1",
+      "transport_id": "lan_mtls",
+      "verified_receipt_sha256": "78e0c486e638f214f1f61974c662cab275b650fab659d90fe23ec6f93c7031c0"
+    },
+    "serve_result": {
+      "audit_events": [
+        "client_identity_bound"
+      ],
+      "byte_length": 314,
+      "certificate_sha256": "ca35f5a0661b0cccb76294ba96df8a6bf2810589e83a310a6c22abafd2ae1727",
+      "errors": [],
+      "node_id": "node:private-mesh:dakin-ms-7c95",
+      "object_sha256": "5df96635e0a6a63e1026d42ced2e4dbbaa72a370035f0d7aa0df004476e557b1",
+      "received": true,
+      "schema": "planetary.unisync.mesh_serve_result.v1",
+      "verified_receipt_sha256": "78e0c486e638f214f1f61974c662cab275b650fab659d90fe23ec6f93c7031c0"
+    },
+    "transfer_context": {
+      "account_id": "account:private-mesh:home",
+      "byte_length": 314,
+      "destination_node_id": "node:private-mesh:dakin-ms-7c95",
+      "expires_at": "2026-07-20T14:05:14Z",
+      "fencing_token": 1,
+      "lease_id": "lease:2d4344d1383ceb70ad9a3d8e299760b8",
+      "lease_sha256": "b5796f20ed7721815f2bcbdad061d62aeee61ff61f82143eb47b6431a844ee16",
+      "object_sha256": "5df96635e0a6a63e1026d42ced2e4dbbaa72a370035f0d7aa0df004476e557b1",
+      "request_sha256": "dd44cd6eea83a8b46075f982425502e18a75b6b3247ea3ec8862022a8865f5d8",
+      "selected_transport": "lan_mtls",
+      "source_node_id": "node:private-mesh:aivm"
+    },
+    "verified_receipt_sha256": "78e0c486e638f214f1f61974c662cab275b650fab659d90fe23ec6f93c7031c0"
+  },
+  "trust_bundle": {
+    "controller_key_id": "key:controller:unisync-mesh:c107777f51855f9a",
+    "controller_public_key_base64": "-lK9Nu3y8B0VsbjL9rcg8VL-zeJPov0U0RT0Nl34Jzc",
+    "node_contracts": [
+      {
+        "account_id": "account:private-mesh:home",
+        "key_id": "key:unisync-mesh:773d7777da604e7170e5",
+        "node_id": "node:private-mesh:aivm",
+        "public_key_base64": "MLpweJuQE6I_Cr-A8d8LxqMpFwJ7GbKaPYfFqgmacPU",
+        "public_key_fingerprint": "a0d3434b5e6ac69b5e6e2677b176cd07fe6bde240988dcd13f252bd102b34f98"
+      },
+      {
+        "account_id": "account:private-mesh:home",
+        "key_id": "key:unisync-mesh:c51e13c24c7993be2e90",
+        "node_id": "node:private-mesh:dakin-ms-7c95",
+        "public_key_base64": "5eF2p75Erl6QHOIteenKAVI1MubxS7d21YjmRdjMyrY",
+        "public_key_fingerprint": "110e3765a8ec8bca2ad2e5bac12c44911acbb8c7c7236e7b2d445c1d904f833b"
+      }
+    ],
+    "scheduler_id": "scheduler:unisync-mesh:c107777f51855f9a",
+    "scheduler_key_id": "key:scheduler:unisync-mesh:c107777f51855f9a",
+    "scheduler_public_key_base64": "UVwKq9EN2FyrCRPzEvuWHVcMUe8IwOF9cYVFfdCBEnM"
+  }
+}
