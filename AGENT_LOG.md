@@ -1270,3 +1270,12 @@ Zero failures. Both determinism seeds clean.
   tls.py + pull-serve/pull-fetch CLI + a pull coordinator + loader wiring).
 - NOT implemented yet; no checklist box checked. This commits the validated,
   contained architecture and the feasibility guard test.
+## 2026-07-20 — BUILDING desktop-initiated result pull (in progress)
+
+Starting the production implementation per docs/design/DESKTOP_INITIATED_RESULT_PULL.md.
+Order: (1) expose receive-over-socket on the mTLS receiver in tls.py (additive,
+no auth/lease-semantics change), (2) pull-serve/pull-fetch node CLI commands,
+(3) pull coordinator in mesh_smoke reusing HybridMeshCarrier, (4) physical
+result_loader + synthesusd wiring, (5) physical desktop(.55)->worker(.54) pull.
+No checklist box will be checked until a physical run is verified. This entry
+marks the start; each landed piece gets its own honest entry.
