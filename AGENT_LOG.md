@@ -1141,3 +1141,51 @@ Zero failures. Both determinism seeds clean.
   `ssh_job.v2` job — `RemoteExecutionBackend.cancel` only drops a pre-dispatch
   pending job and relies on the control-plane lease revocation as the
   authoritative signal, with no test here driving a live remote worker.
+
+## 2026-07-19 — F-020 pre-execution rejection matrix (consolidated tests)
+
+- Base SHA: `45a25a8f9504f83b0a49f057d39197603cb92a07`.
+- Branch: `worktree-agent-a6358b38d6241a281` (auto-created worktree branch).
+- Objective: prove the F-020 checklist item "Reject stale, duplicated,
+  substituted, expired, cross-account, wrong-node, oversized, and unsupported
+  requests before workload execution" with one focused, real, passing test per
+  named case. No product code changed; `FINISH_CHECKLIST.md` untouched.
+- File added: `tests/private_mesh/test_rejection_matrix.py` (only this file).
+  Reuses existing fixtures from `tests/private_mesh/test_execution_wiring.py`
+  (node-agent + `PodmanExecutor` + `PersistentExecutionAuthority` wiring,
+  `_workload_manifest`, `FakeModelRunner`) and the `aivm.execution` package
+  already exercised by `tests/aivm/test_model_profile.py` and
+  `tests/aivm/test_execution_authority.py`.
+- Each case asserts rejection BEFORE workload execution: executor-level tests
+  assert the container `podman run` command was never issued (the
+  `FakeModelRunner` records every command); the node-agent case asserts the
+  same for the injected executor; authority-level cases assert the durable
+  verifier fails closed.
+- Per-case enforcement proven (all covered / enforced in code):
+  - stale: `PersistentExecutionAuthority` refuses an older fencing token once a
+    newer revision is registered (newest-fence-only) -> `AuthorityStatus.REJECTED`.
+  - duplicated: replay of an already-consumed durable authority through
+    `PodmanExecutor` -> `REJECTED` (`execution_authority_rejected`); the
+    workload container ran exactly once across both attempts.
+  - substituted: mutated signed-manifest bundle bytes through the node agent ->
+    `NodeAgentStatus.BUNDLE_MISMATCH`; executor never invoked.
+  - expired: manifest consumed after `expires_at` ->
+    `REJECTED` (`manifest_outside_validity_window`); no run.
+  - cross-account: request account != executing node account ->
+    `REJECTED` (`executor_account_mismatch`); no run.
+  - wrong-node: lease node != executor node ->
+    `REJECTED` (`executor_node_mismatch`); no run.
+  - oversized: input artifact exceeds executor `max_input_file_bytes` ->
+    `REJECTED` (`input_artifact_too_large`); no run.
+  - unsupported: manifest runtime image not in the trusted-image set ->
+    `REJECTED` (`runtime_image_not_trusted`); no run.
+- Command and exact result (from worktree root, this file only):
+  `pytest tests/private_mesh/test_rejection_matrix.py -q` -> `8 passed in 2.52s`.
+- Honest scope: this consolidates negative-path coverage using the established
+  fake-runner boundary; it exercises the same rejection paths already spot-tested
+  in `test_model_profile.py`, `test_execution_authority.py`, and
+  `test_execution_wiring.py`. It is not a physical Podman run and checks no
+  FINISH_CHECKLIST box on its own; the "before workload execution" claim is
+  proven by the absence of the container `run` command in every case.
+- Physical evidence and artifact digests: none claimed.
+- Review verdict: pending.
