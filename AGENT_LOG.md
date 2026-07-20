@@ -1279,3 +1279,11 @@ no auth/lease-semantics change), (2) pull-serve/pull-fetch node CLI commands,
 result_loader + synthesusd wiring, (5) physical desktop(.55)->worker(.54) pull.
 No checklist box will be checked until a physical run is verified. This entry
 marks the start; each landed piece gets its own honest entry.
+### step 1 landed — transport receive-over-dialed-socket
+- tls.py: `_receive_upload` now returns the verified receipt; new
+  `TrustedLanServer.receive_object_over_dialed_socket(raw_sock)` runs the exact
+  server-side auth + receive over a socket THIS side dialed (desktop pull).
+  Reuses all auth/lease/receipt logic; only the TCP dial direction differs.
+- Tests: real-TCP pull (desktop dials outbound, receives as TLS server, worker
+  mutually authenticated as source) passes; existing loopback push + the
+  feasibility guard still pass.

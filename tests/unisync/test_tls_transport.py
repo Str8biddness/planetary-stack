@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
+import socket
 import ssl
 import threading
 import time
@@ -798,3 +799,68 @@ def test_tls_client_also_requires_injected_admission(tmp_path, payload: bytes, c
             host="127.0.0.1",
             port=9,
         )
+
+
+def test_desktop_initiated_pull_over_real_tcp(tmp_path, payload: bytes, certs: CertMaterial) -> None:
+    """Desktop-initiated pull over a real TCP socket.
+
+    The worker holds the object and LISTENS (inbound), acting as the TLS client
+    + sender. The desktop DIALS OUTBOUND (no inbound firewall) and receives the
+    object as the TLS server via ``receive_object_over_dialed_socket``. Mutual
+    auth and the lease's source/destination role binding are unchanged; only
+    which side opened the TCP socket differs.
+    """
+
+    source = ContentAddressedStore(tmp_path / "source")
+    digest = source.put_bytes(payload)
+    # Desktop = TLS server + object receiver (destination inbox).
+    desktop = _server_instance(tmp_path, certs)
+    desktop.validate_listener_config()
+    # Worker = TLS client + object sender.
+    worker = TrustedLanClient(
+        credentials=_client_credentials(certs),
+        server_hostname="server.test",
+        validator=StrictValidator(),
+        enrolled_server_identities={_server_enrollment(certs)},
+        chunk_size=80,
+    )
+    context = make_context(payload, transport="lan_mtls")
+
+    listen = socket.socket()
+    listen.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listen.bind(("127.0.0.1", 0))
+    listen.listen(1)
+    port = listen.getsockname()[1]
+    worker_errors: list[BaseException] = []
+
+    def worker_side() -> None:
+        try:
+            conn, _ = listen.accept()
+            client_ctx = _client_context(worker.credentials)
+            tls = client_ctx.wrap_socket(conn, server_side=False, server_hostname="server.test")
+            try:
+                worker.upload_object_over_tls_socket(
+                    tls_sock=tls, context=context, source_root=source.root
+                )
+            finally:
+                tls.close()
+        except BaseException as exc:  # surfaced to the test below
+            worker_errors.append(exc)
+
+    thread = threading.Thread(target=worker_side)
+    thread.start()
+    try:
+        raw = socket.create_connection(("127.0.0.1", port), timeout=5)
+        receipt = desktop.receive_object_over_dialed_socket(raw)
+    finally:
+        thread.join(timeout=5)
+        listen.close()
+
+    if worker_errors:
+        raise worker_errors[0]
+    inbox = ContentAddressedStore(tmp_path / "destination")
+    assert receipt["object_sha256"] == digest
+    assert inbox.read_bytes(digest) == payload
+    assert receipt["verified_receipt_sha256"] == context.receipt_sha256(digest)
+    # The worker was mutually authenticated as the enrolled source.
+    assert desktop.validator.peer_identities[-1].node_id == "node:source"
