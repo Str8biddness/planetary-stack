@@ -1234,3 +1234,24 @@ Zero failures. Both determinism seeds clean.
 - Scope respected: no edits to `synthesusd.py` routing/pipeline or `services/`.
   Full desktop suite: 31 passed (30 existing + 1 new). `node --check script.js`
   clean. NO checklist box checked; FINISH_CHECKLIST.md untouched.
+## 2026-07-20 — F-020 hybrid mesh carrier (desktop-as-destination)
+
+- `HybridMeshCarrier` (services/unisync/mesh_smoke.py): routes the local node
+  (no ssh_alias) to a local-subprocess carrier and the remote node (pinned SSH)
+  to the SSH carrier — the desktop-as-destination topology (desktop runs the
+  mTLS `serve` receiver locally; the worker runs `send` over the LAN).
+- `run_mesh_mtls_smoke` gains a `carrier="hybrid"` path: guards that the
+  destination is local and the source is a pinned SSH endpoint, requires two
+  distinct physical hostnames, and reports honest claims
+  (`physical_two_node_execution_proven=True`,
+  `desktop_is_local_mtls_destination=True`,
+  `single_pinned_ssh_worker_endpoint=True`). parse_config still rejects
+  "hybrid" from untrusted file configs — it is constructed only internally.
+- Test: tests/unisync/test_hybrid_carrier.py — per-node routing + topology
+  guards (SSH destination rejected, local source rejected). 3 passed.
+- NOT YET physically run desktop-as-destination: the owner's desktop
+  (dakin-chronos, 192.168.68.55) has ufw active and blocks inbound, so a worker
+  cannot open the mTLS socket INTO the desktop without a firewall allow rule
+  (needs owner sudo). The carrier logic is proven; the live physical run and
+  the synthesusd loader wiring are gated on that one port. Node-to-node result
+  return is already physically proven (F020_RESULT_BYTE_RETURN_PHYSICAL).
