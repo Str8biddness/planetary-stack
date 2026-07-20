@@ -1075,3 +1075,26 @@ Zero failures. Both determinism seeds clean.
   mTLS destination) so `LocalJobPipeline.result()` returns the bytes; a
   physical browser→cell→result-bytes run; and folding the workload Unisync
   transfer into the job submission flow.
+## 2026-07-19 — F-020 desktop-intent: desktop result_loader over mesh mTLS (step 3)
+
+- `services/result_transfer.py`: `build_result_loader` returns the exact hook
+  `LocalJobPipeline.result` calls. Given a completed output digest it reads +
+  verifies the result from the worker's AIVM store, stages it into a source
+  outbox (as `stage-result` does), moves it worker->desktop over the in-process
+  Unisync mTLS gate (`prepare_mode="existing"`), and reads the received bytes
+  back from the desktop's inbox — returning them only if they re-hash to the
+  requested digest. The bytes reach the desktop over TLS 1.3 mutual-auth only.
+- `services/remote_pipeline.py`: `build_remote_pipeline` gains an optional
+  `result_loader` passthrough to `LocalJobPipeline` (default None; SSH-remote
+  behaviour unchanged). A same-host cell can now return real result bytes.
+- Tests: `tests/private_mesh/test_result_transfer.py` — a seeded AIVM result
+  returns as exact bytes over mTLS; absent result raises; malformed digest ->
+  None; per-fetch scratch is cleaned up. 4 passed. Existing
+  `tests/private_mesh/test_remote_pipeline.py`: 4 passed (no regression).
+- HONEST GAPS (box NOT checked): (1) each fetch re-enrolls + re-creates a CA +
+  signs a fresh lease — proves the mechanism, not the production shape
+  (persistent enrollment reused across fetches). (2) Drives the in-process
+  LocalMeshCarrier against a worker state dir on THIS host, not a physical
+  two-host SSH run — the hybrid SSH carrier (local desktop destination + SSH
+  worker source) and a physical browser->cell->bytes run remain. (3) synthesusd
+  does not yet construct/pass the loader.
