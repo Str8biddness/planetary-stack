@@ -1297,3 +1297,13 @@ marks the start; each landed piece gets its own honest entry.
 - Test: coordinator-level pull (LocalMeshCarrier) delivers a staged result into
   the destination inbox with the receiver opening the TCP connection — 1 passed.
   Push path + hybrid carrier unaffected. Physical desktop->worker pull next.
+### step 5 landed — PHYSICAL desktop-initiated pull (firewall-free)
+- Real hardware: desktop `dakin-chronos` (.55) DIALED OUTBOUND to worker
+  `dakin-MS-7C95` (.54) and received the genuine result `5df96635…` (314 B)
+  over lease-bound mTLS (TLS 1.3, mutual auth, client_identity_bound). No
+  inbound firewall on the desktop; only the worker listened.
+- Driven with carrier="hybrid" + pull=True (worker deployed at 699a338).
+- Evidence: docs/evidence/F020_DESKTOP_INITIATED_PULL_PHYSICAL_2026-07-20.md
+  (transcript sha256 13958eea…). NO checklist box checked.
+- Remaining: the synthesusd result_loader wiring that runs this pull on a live
+  browser result fetch (transport + coordinator now physically proven).
