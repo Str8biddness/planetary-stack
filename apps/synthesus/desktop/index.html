@@ -271,11 +271,15 @@
                     <div id="jobs-list" style="display:flex; flex-direction:column; gap:8px; font-size:0.85rem; color:#e2e8f0;"></div>
                 </div>
                 <div id="jobs-result-panel" style="display:none; border-top:1px solid rgba(148,163,184,0.2); padding-top:8px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                        <span style="color:#cbd5e1; font-size:0.85rem;">Verified result <code id="jobs-result-sha" style="font-size:0.7rem; color:#64748b;"></code></span>
-                        <button class="glass-btn" style="font-size:0.75rem;" onclick="document.getElementById('jobs-result-panel').style.display='none'">✕</button>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;">
+                        <span style="color:#cbd5e1; font-size:0.85rem; display:flex; align-items:center; gap:6px; flex:1; min-width:0;">
+                            <span id="jobs-result-verified" style="display:none; flex:none; font-size:0.68rem; font-weight:700; color:#4ade80; border:1px solid rgba(74,222,128,.4); background:rgba(74,222,128,.12); border-radius:999px; padding:1px 7px;" title="The controller only returns bytes that re-hash to the requested SHA-256 digest. It does not attest to the correctness of the model or its prediction.">✓ VERIFIED BYTES</span>
+                            <span style="flex:none;">Result</span>
+                            <code id="jobs-result-sha" style="font-size:0.7rem; color:#64748b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></code>
+                        </span>
+                        <button class="glass-btn" style="font-size:0.75rem; flex:none;" onclick="document.getElementById('jobs-result-panel').style.display='none'">✕</button>
                     </div>
-                    <pre id="jobs-result-body" style="max-height:180px; overflow:auto; background:rgba(2,6,23,.6); border:1px solid rgba(148,163,184,.2); border-radius:6px; padding:8px; font-size:0.75rem; color:#a5f3fc; white-space:pre-wrap; word-break:break-all;"></pre>
+                    <div id="jobs-result-body" style="max-height:240px; overflow:auto; background:rgba(2,6,23,.6); border:1px solid rgba(148,163,184,.2); border-radius:6px; padding:8px; font-size:0.75rem; color:#a5f3fc;"></div>
                 </div>
             </div>
         </div>
