@@ -1287,3 +1287,13 @@ marks the start; each landed piece gets its own honest entry.
 - Tests: real-TCP pull (desktop dials outbound, receives as TLS server, worker
   mutually authenticated as source) passes; existing loopback push + the
   feasibility guard still pass.
+### steps 2-3 landed — pull CLI + coordinator pull mode
+- mesh_node_cli.py: `pull-serve` (source listens, uploads as TLS client) and
+  `pull-fetch` (destination dials outbound, receives as TLS server) commands,
+  with schemas + field sets + parser/dispatch.
+- mesh_smoke.py: `MeshSmokeConfig.pull` + a pull branch in run_mesh_mtls_smoke
+  (source runs pull-serve via start_serve, destination runs pull-fetch); honest
+  evidence (`direction: desktop_initiated_pull`, no-inbound-firewall claims).
+- Test: coordinator-level pull (LocalMeshCarrier) delivers a staged result into
+  the destination inbox with the receiver opening the TCP connection — 1 passed.
+  Push path + hybrid carrier unaffected. Physical desktop->worker pull next.

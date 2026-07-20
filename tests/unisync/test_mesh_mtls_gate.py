@@ -800,3 +800,41 @@ def test_existing_object_transfers_over_mtls_without_prepare(tmp_path: Path) -> 
     # The destination received the exact bytes over lan_mtls (not the carrier).
     dest_inbox = ContentAddressedStore(Path(config.destination.state_dir) / "inbox")
     assert dest_inbox.read_bytes(digest) == payload
+
+
+def test_desktop_initiated_pull_returns_object_over_mtls(tmp_path: Path) -> None:
+    """Desktop-initiated pull through the coordinator.
+
+    The source (worker) listens and uploads as TLS client; the destination
+    (desktop) dials outbound and receives as TLS server. Same lease/TLS roles as
+    the push — only which side opens the TCP socket differs. Proves the object
+    lands in the destination inbox with the pull direction recorded.
+    """
+
+    import hashlib
+    from services.unisync.storage import ContentAddressedStore
+
+    config = _local_mesh_config(tmp_path)
+    payload = b'{"schema":"planetary.aivm.result.text-classification.v1","label":"positive"}'
+    digest = hashlib.sha256(payload).hexdigest()
+    src_state = Path(config.source.state_dir)
+    src_state.mkdir(mode=0o700, parents=True)
+    assert ContentAddressedStore(src_state / "outbox").put_bytes(payload) == digest
+
+    config = replace(
+        config,
+        prepare_mode="existing",
+        existing_object_sha256=digest,
+        object_bytes=len(payload),
+        pull=True,
+    )
+    evidence = run_mesh_mtls_smoke(config, LocalMeshCarrier(timeout_seconds=15))
+
+    assert evidence["transfer"]["direction"] == "desktop_initiated_pull"
+    assert evidence["transfer"]["object_sha256"] == digest
+    assert evidence["claims"]["desktop_initiated_pull_no_inbound_firewall"] is True
+    assert evidence["claims"]["receiver_opened_tcp_connection"] is True
+    # The destination (desktop) received the exact bytes over lan_mtls, having
+    # opened the connection itself.
+    dest_inbox = ContentAddressedStore(Path(config.destination.state_dir) / "inbox")
+    assert dest_inbox.read_bytes(digest) == payload
