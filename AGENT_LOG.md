@@ -1209,3 +1209,28 @@ Zero failures. Both determinism seeds clean.
   enrollment. The receiving party here is a peer node, not the coordinating
   desktop; result bytes were produced on .54 and copied to .52 for staging
   (deterministic, digest verified at every hop).
+## 2026-07-20 — Web Desktop: rich verified-result view + byte-exactness test
+
+- UI (`apps/synthesus/desktop/script.js`, `jobsViewResult`): when a completed
+  job's result parses as schema
+  `planetary.aivm.result.text-classification.v1`, the panel now shows the
+  predicted `label` prominently, a sorted per-label `scores` bar list (winning
+  label highlighted), `feature_dims`, and truncated `model_sha256` /
+  `document_sha256` (full digest on hover). Any other schema falls back to
+  pretty-printed raw JSON (invalid JSON shown verbatim). Loading state and the
+  404 `result_not_found` state ("Result bytes not yet retrievable from the
+  mesh.") are handled honestly; 401 shown as a re-auth prompt.
+- Added a small "✓ VERIFIED BYTES" pill (`index.html`) shown only on a 200,
+  with a tooltip stating it means only that the controller returns bytes that
+  re-hash to the requested SHA-256 — it does NOT attest model/prediction
+  correctness. No overclaim beyond byte-identity.
+- Test (NEW `apps/synthesus/desktop/test_job_result_bytes.py`): builds the app
+  via `create_app(..., job_pipeline=<fake>)` whose `.result()` returns
+  `(payload_bytes, "application/json")` for one known (job, sha) and `None`
+  otherwise. Asserts authorized GET → 200 with EXACT bytes
+  (`resp.content == payload`) and media type; `None` → 404 `result_not_found`
+  (both unknown-sha and unknown-job); unauthenticated → 401 `unauthorized`,
+  and that the unauthorized request never reached the pipeline.
+- Scope respected: no edits to `synthesusd.py` routing/pipeline or `services/`.
+  Full desktop suite: 31 passed (30 existing + 1 new). `node --check script.js`
+  clean. NO checklist box checked; FINISH_CHECKLIST.md untouched.

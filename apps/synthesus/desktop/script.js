@@ -3443,30 +3443,111 @@ async function jobsCancel(jobId) {
     } catch (e) { /* leave last honest state */ }
 }
 
+// Render a raw-JSON (or plain-text) fallback for any schema we don't have a
+// bespoke view for. Pretty-prints valid JSON; otherwise shows bytes verbatim.
+function jobsRenderRaw(text) {
+    let shown = text;
+    try { shown = JSON.stringify(JSON.parse(text), null, 2); } catch (e) { /* not JSON */ }
+    return '<pre style="margin:0; white-space:pre-wrap; word-break:break-all; ' +
+        'font-size:0.75rem; color:#a5f3fc;">' + escapeHtml(shown) + '</pre>';
+}
+
+function jobsShortDigest(value) {
+    const s = String(value || '');
+    return s.length > 20 ? s.slice(0, 10) + '…' + s.slice(-6) : s;
+}
+
+// Bespoke, honest presentation of the text-classification result schema.
+// Only the winning label and the per-label scores are asserted; the digests
+// identify (but do not certify) the model and document that produced them.
+function jobsRenderTextClassification(data) {
+    const scores = (data && data.scores && typeof data.scores === 'object') ? data.scores : {};
+    const entries = Object.keys(scores)
+        .map(function (k) { return [k, Number(scores[k])]; })
+        .filter(function (e) { return isFinite(e[1]); })
+        .sort(function (a, b) { return b[1] - a[1]; });
+    const label = (data && data.label != null) ? String(data.label) : (entries.length ? entries[0][0] : '—');
+
+    let bars = '';
+    entries.forEach(function (e) {
+        const name = e[0];
+        const pct = Math.max(0, Math.min(1, e[1])) * 100;
+        const isTop = name === label;
+        bars +=
+            '<div style="margin-bottom:6px;">' +
+                '<div style="display:flex; justify-content:space-between; font-size:0.72rem; margin-bottom:2px;">' +
+                    '<span style="color:' + (isTop ? '#4ade80' : '#cbd5e1') + '; font-weight:' + (isTop ? '700' : '400') + ';">' +
+                        escapeHtml(name) + '</span>' +
+                    '<code style="color:#94a3b8;">' + e[1].toFixed(6) + '</code>' +
+                '</div>' +
+                '<div style="height:8px; border-radius:4px; background:rgba(148,163,184,.15); overflow:hidden;">' +
+                    '<div style="height:100%; width:' + pct.toFixed(2) + '%; border-radius:4px; background:' +
+                        (isTop ? '#4ade80' : 'rgba(56,189,248,.55)') + ';"></div>' +
+                '</div>' +
+            '</div>';
+    });
+    if (!bars) bars = '<div style="color:#94a3b8; font-size:0.72rem;">No per-label scores in result.</div>';
+
+    const dims = (data && data.feature_dims != null) ? String(data.feature_dims) : null;
+
+    return '' +
+        '<div style="margin-bottom:8px;">' +
+            '<div style="font-size:0.7rem; color:#94a3b8; text-transform:uppercase; letter-spacing:.05em;">Predicted label</div>' +
+            '<div style="font-size:1.25rem; font-weight:800; color:#4ade80;">' + escapeHtml(label) + '</div>' +
+        '</div>' +
+        '<div style="margin-bottom:8px;">' + bars + '</div>' +
+        '<div style="display:flex; flex-direction:column; gap:3px; border-top:1px solid rgba(148,163,184,.15); padding-top:6px; font-size:0.7rem; color:#94a3b8;">' +
+            (dims ? '<div>feature dims: <code style="color:#cbd5e1;">' + escapeHtml(dims) + '</code></div>' : '') +
+            (data && data.model_sha256 ? '<div>model: <code style="color:#cbd5e1;" title="' + escapeHtml(String(data.model_sha256)) + '">' + escapeHtml(jobsShortDigest(data.model_sha256)) + '</code></div>' : '') +
+            (data && data.document_sha256 ? '<div>document: <code style="color:#cbd5e1;" title="' + escapeHtml(String(data.document_sha256)) + '">' + escapeHtml(jobsShortDigest(data.document_sha256)) + '</code></div>' : '') +
+        '</div>';
+}
+
 async function jobsViewResult(jobId, sha256) {
     const panel = document.getElementById('jobs-result-panel');
     const body = document.getElementById('jobs-result-body');
     const shaEl = document.getElementById('jobs-result-sha');
+    const verifiedEl = document.getElementById('jobs-result-verified');
     panel.style.display = 'block';
     shaEl.textContent = sha256;
-    body.textContent = 'Fetching verified result…';
+    shaEl.title = sha256;
+    if (verifiedEl) verifiedEl.style.display = 'none';
+    body.innerHTML = '<div style="color:#94a3b8; font-size:0.78rem;">Fetching verified result…</div>';
     try {
         const resp = await fetch(
             '/api/jobs/' + encodeURIComponent(jobId) + '/results/' + encodeURIComponent(sha256),
             { headers: jobsAuthHeaders() }
         );
         if (!resp.ok) {
-            body.textContent = 'Result unavailable (' + resp.status + ').';
+            let msg;
+            if (resp.status === 404) {
+                let code = '';
+                try { code = (await resp.json()).error || ''; } catch (e) { /* ignore */ }
+                msg = code === 'result_not_found'
+                    ? 'Result bytes not yet retrievable from the mesh.'
+                    : 'Result not found (404).';
+            } else if (resp.status === 401) {
+                msg = 'Not authorized — re-authenticate to view results.';
+            } else {
+                msg = 'Result unavailable (' + resp.status + ').';
+            }
+            body.innerHTML = '<div style="color:#fbbf24; font-size:0.78rem;">' + escapeHtml(msg) + '</div>';
             return;
         }
+        // The endpoint only returns bytes that re-hash to the requested digest,
+        // so a 200 here means the payload is byte-exact for this SHA-256.
+        if (verifiedEl) verifiedEl.style.display = 'inline-block';
         const text = await resp.text();
-        try {
-            body.textContent = JSON.stringify(JSON.parse(text), null, 2);
-        } catch (e) {
-            body.textContent = text;
+        let data = null;
+        try { data = JSON.parse(text); } catch (e) { data = null; }
+        if (data && data.schema === 'planetary.aivm.result.text-classification.v1') {
+            body.innerHTML = jobsRenderTextClassification(data);
+        } else {
+            body.innerHTML = jobsRenderRaw(text);
         }
     } catch (e) {
-        body.textContent = 'DEGRADED: ' + (e.message || e);
+        body.innerHTML = '<div style="color:#fb7185; font-size:0.78rem;">DEGRADED: ' +
+            escapeHtml(e.message || String(e)) + '</div>';
     }
 }
 
