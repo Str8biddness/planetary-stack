@@ -772,6 +772,51 @@ def execute_job(*, state_dir: Path, payload: dict[str, Any]) -> dict[str, Any]:
     return response
 
 
+_STAGE_RESULT_FIELDS = frozenset({"schema", "account_id", "node_id", "result_sha256"})
+STAGE_RESULT_SCHEMA = "planetary.private_mesh.stage_result.v1"
+STAGE_RESULT_RESULT_SCHEMA = "planetary.private_mesh.stage_result_result.v1"
+
+
+def stage_result(*, state_dir: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    """Copy a completed AIVM result into the mesh outbox for mTLS return.
+
+    A job result produced by ``execute_job`` lives content-addressed in the
+    owner-only AIVM result store. This makes it available as a bounded mesh
+    object in the outbox so the lease-bound Unisync mTLS transfer can return it
+    to the desktop — the result bytes never leave over the administrative
+    channel. The digest is re-verified before and after staging.
+    """
+
+    from services.unisync.mesh_node_cli import OUTBOX_DIR
+    from services.unisync.storage import ContentAddressedStore
+
+    if set(payload) != _STAGE_RESULT_FIELDS or payload["schema"] != STAGE_RESULT_SCHEMA:
+        raise ValueError("stage-result job has unexpected fields")
+    account_id = payload["account_id"]
+    node_id = payload["node_id"]
+    result_sha256 = payload["result_sha256"]
+    if not all(isinstance(v, str) for v in (account_id, node_id)):
+        raise ValueError("stage-result identity fields must be strings")
+    if not isinstance(result_sha256, str) or not _SHA256_RE.fullmatch(result_sha256):
+        raise ValueError("result_sha256 must be a canonical SHA-256 digest")
+    result_path = state_dir / "aivm" / "results" / result_sha256
+    try:
+        data = result_path.read_bytes()
+    except OSError as exc:
+        raise ValueError("result is not present in the AIVM result store") from exc
+    if hashlib.sha256(data).hexdigest() != result_sha256:
+        raise ValueError("stored result does not match its digest")
+    digest = ContentAddressedStore(state_dir / OUTBOX_DIR).put_bytes(data)
+    if digest != result_sha256:
+        raise ValueError("staged object digest mismatch")
+    return {
+        "schema": STAGE_RESULT_RESULT_SCHEMA,
+        "node_id": node_id,
+        "object_sha256": digest,
+        "byte_length": len(data),
+    }
+
+
 def _read_stdin_job() -> dict[str, Any]:
     raw = sys.stdin.buffer.read(MAX_JOB_BYTES + 1)
     if len(raw) > MAX_JOB_BYTES:
@@ -789,6 +834,8 @@ def _parser() -> argparse.ArgumentParser:
     enroll.add_argument("--authenticated-subject-id", required=True)
     execute = subparsers.add_parser("execute")
     execute.add_argument("--state-dir", type=Path, required=True)
+    stage = subparsers.add_parser("stage-result")
+    stage.add_argument("--state-dir", type=Path, required=True)
     return parser
 
 
@@ -801,6 +848,11 @@ def main(argv: list[str] | None = None) -> int:
                 account_id=arguments.account_id,
                 node_id=arguments.node_id,
                 authenticated_subject_id=arguments.authenticated_subject_id,
+            )
+        elif arguments.command == "stage-result":
+            result = stage_result(
+                state_dir=arguments.state_dir,
+                payload=_read_stdin_job(),
             )
         else:
             result = execute_job(

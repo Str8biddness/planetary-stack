@@ -487,3 +487,50 @@ def test_remote_workload_rejects_missing_objects_and_bad_spec(tmp_path):
                 ),
             ),
         )
+
+
+def test_stage_result_moves_result_into_mesh_outbox(tmp_path):
+    import hashlib as _h
+    from services.private_mesh.worker_cli import (
+        stage_result, STAGE_RESULT_SCHEMA, STAGE_RESULT_RESULT_SCHEMA,
+    )
+    from services.unisync.mesh_node_cli import OUTBOX_DIR
+    from services.unisync.storage import ContentAddressedStore
+
+    state = tmp_path / "state"
+    results = state / "aivm" / "results"
+    results.mkdir(mode=0o700, parents=True)
+    payload = b'{"schema":"planetary.aivm.result.text-classification.v1","label":"positive"}'
+    sha = _h.sha256(payload).hexdigest()
+    (results / sha).write_bytes(payload)
+
+    out = stage_result(state_dir=state, payload={
+        "schema": STAGE_RESULT_SCHEMA, "account_id": "account:owner:001",
+        "node_id": "node:owner:a", "result_sha256": sha,
+    })
+    assert out["schema"] == STAGE_RESULT_RESULT_SCHEMA
+    assert out["object_sha256"] == sha and out["byte_length"] == len(payload)
+    # The object is now retrievable from the mesh outbox, digest-verified.
+    assert ContentAddressedStore(state / OUTBOX_DIR).read_bytes(sha) == payload
+
+
+def test_stage_result_fails_closed(tmp_path):
+    import pytest as _pt
+    from services.private_mesh.worker_cli import stage_result, STAGE_RESULT_SCHEMA
+
+    state = tmp_path / "state"
+    (state / "aivm" / "results").mkdir(mode=0o700, parents=True)
+    base = {"schema": STAGE_RESULT_SCHEMA, "account_id": "account:owner:001", "node_id": "node:owner:a"}
+    # missing result
+    with _pt.raises(ValueError, match="not present"):
+        stage_result(state_dir=state, payload={**base, "result_sha256": "a" * 64})
+    # bad digest format
+    with _pt.raises(ValueError, match="canonical SHA-256"):
+        stage_result(state_dir=state, payload={**base, "result_sha256": "nope"})
+    # unexpected fields
+    with _pt.raises(ValueError, match="unexpected fields"):
+        stage_result(state_dir=state, payload={**base, "result_sha256": "a" * 64, "x": 1})
+    # digest mismatch (stored bytes != claimed digest)
+    (state / "aivm" / "results" / ("b" * 64)).write_bytes(b"tampered")
+    with _pt.raises(ValueError, match="does not match its digest"):
+        stage_result(state_dir=state, payload={**base, "result_sha256": "b" * 64})
