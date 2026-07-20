@@ -146,6 +146,7 @@ def build_remote_pipeline(
     state_dir: Path,
     clock: Callable[[], datetime],
     carrier: Any | None = None,
+    result_loader: Callable[[str], bytes | None] | None = None,
 ) -> LocalJobPipeline | None:
     """Construct the secure remote job pipeline, or None if unavailable.
 
@@ -311,4 +312,5 @@ def build_remote_pipeline(
         device_uri="chal://aivm/evaluation",
         clock=clock,
         resource_vector=dict(_RESOURCE_VECTOR),
+        result_loader=result_loader,
     )
