@@ -2068,3 +2068,45 @@ marks the start; each landed piece gets its own honest entry.
   vendor-side issuing service, billing integration, and enforcement wiring into
   the character loader. This is the primitive plus its terms, nothing more.
 - NO FINISH_CHECKLIST box checked.
+### spec — browser GPU workers (NOT BUILT)
+- Idea: devices that cannot be mesh peers (phone/tablet/TV — no rootless Podman
+  on unrooted Android or locked TV firmware) can still contribute GPU through a
+  browser, because WebGPU is the only GPU API that reaches heterogeneous
+  consumer hardware uniformly. This is not a trick to extract GPU from the
+  driver; it is the only available door.
+- NO CONTRACT CHANGE NEEDED. vSource already has WorkloadKind.RENDERING /
+  EMBEDDING / INDEXING / SIMULATION, ResourceVector.gpu_count +
+  gpu_memory_bytes, inventory.resources.gpus, and lease.gpu_ids validated
+  against allocatable GPU memory. The novelty is the executor, not the model.
+- CORRECTED THE OWNER'S MECHANISM: you cannot "trick the kernel" into
+  allocating more GPU. Schedulers do not grant capacity based on what work
+  claims to be. What is true: in a browser you MUST express compute as shaders
+  (no other API), and sustained load pulls a GPU out of idle clock states.
+  Neither creates capability that is not there.
+- THE UNSOLVED PROBLEM, recorded before any design: A DEVICE THAT COMPUTES ON
+  DATA SEES THAT DATA. The permission model governs whether a device may run
+  work, not what it learns by running it. Handing documents to a smart TV — a
+  device class this project already identified as among the most-compromised on
+  a home network — is a regression against the privacy claim. Three options
+  documented; spec assumes peers-may-do-anything + sources-do-blind-work-only.
+  Informed consent per device is a PRODUCT decision, not an engineering one.
+- Physics recorded: VRAM is the binding constraint and does not pool over LAN.
+  Coarse-grained independent work (batch embedding, indexing, re-ranking, image
+  tiles) wins; MODEL-PARALLEL single forward pass LOSES decisively to running a
+  smaller model locally at ~0.3-1ms LAN RTT. Designed for the former only.
+- Browsers deliberately do not expose true VRAM: declared_gpu_memory_bytes is
+  an upper bound the browser permits, reported with measured:false, and must
+  never be presented as a measured figure. Unreadable limits report null.
+- LEGITIMACY LINE STATED: this technology is identical to cryptojacking; what
+  separates them is consent. Default-deny per device (already enforced by
+  DevicePolicyStore), explicit per-device GPU grant, UI showing what runs where
+  with one-action stop, and workers declining on low battery or thermal
+  throttle. Built WITH the feature, not after.
+- HONEST HEADLINE recorded: not "your home is a datacentre" — it is "your
+  home's idle silicon becomes one addressable pool for parallel work,
+  privately". Does NOT pool VRAM, does NOT speed a single request by sharding,
+  does NOT make a small model equal a frontier one.
+- NOT BUILT: no worker, no executor, no measurement. Explicitly noted that a
+  benchmark showing a browser worker beats doing the work locally should come
+  BEFORE the feature.
+- NO FINISH_CHECKLIST box checked.
