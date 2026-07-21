@@ -1528,3 +1528,39 @@ marks the start; each landed piece gets its own honest entry.
   physical worker (the pipeline used in endpoint tests is a stub; the real
   provenance path was physically proven separately on 2026-07-21).
 - NO FINISH_CHECKLIST box checked.
+### sequence step 3 — desktop restyle + real Devices/Permissions and Settings UI
+- Owner direction: build it all, apply the restyle to the EXISTING desktop.
+- styles.css: design tokens reworked to the specified direction — dark layered
+  glass, soft gradients, ambient glow, rounded corners (radius scale), minimal
+  borders, accents electric blue / violet / cyan / teal, hover lift + focus-
+  visible rings + animated meters. Added prefers-reduced-motion guard.
+- NEW REAL WINDOWS (wired to the step-2 endpoints):
+  * Devices & Permissions — per-device rows, capability toggles inside, exactly
+    the model chosen. A `source` row renders its own explanation of why it can
+    never run work. After any toggle the UI RE-READS from the controller, so a
+    switch shows what was actually stored, not what was clicked (tested).
+  * Settings — the evidence enforcement toggle, plus plain-language text about
+    what a verified result does and does NOT mean (self-attestation; a
+    compromised device holds its own key; hardware attestation unavailable).
+- Job result viewer now shows a provenance badge from X-Synthesus-Evidence-
+  Status alongside the existing byte-exactness marker — they are different
+  claims and are now displayed as different claims. 403 and 409 render as
+  explained states instead of a generic error.
+- Dashboard: live cards (device counts by role, how many may run work,
+  enforcement state, worker, tracked jobs) read real endpoints and print
+  "unknown" when they cannot be read — never a guessed number. The blueprint's
+  remaining widgets (CPU/memory/storage/network/weather/music/calendar/notes/
+  project) are built as requested but each carries a DEMO tag plus a banner
+  saying nothing below it reflects the real system.
+- Tests: 13 UI wiring tests — every markup handler is defined, every element the
+  new code reads exists, each new window has a dock entry, the badge host and
+  header name are present, all 9 mock cards carry demo-chrome, the unreachable
+  path says so, and the toggle re-reads. Desktop suite 40 -> 53 passed.
+  script.js verified with a real parser (node --check), not a brace count.
+- HONEST GAP: THE PAGE WAS NEVER RENDERED. Browser tools are unavailable in this
+  session, so there is no screenshot and no proof it looks right or that the
+  windows open. The wiring tests catch missing handlers and missing element ids;
+  they cannot catch layout, contrast or z-index problems. Needs a human to open
+  it. Also: device rows are still added by hand — nothing populates them from
+  the enrollment registry yet.
+- NO FINISH_CHECKLIST box checked.
