@@ -51,6 +51,7 @@ _SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{1,96}$")
 _MAX_JOB_BUNDLE_BASE64_CHARS = 12 * 1024 * 1024
 _LOOPBACK_BIND_HOSTS = {"127.0.0.1", "localhost", "::1"}
 _KNOWN_DEFAULT_API_KEY = "dev-key-change-me"
+import host_metrics  # noqa: E402
 from device_policy import (  # noqa: E402
     ALL_CAPABILITIES,
     ROLES,
@@ -416,6 +417,10 @@ def create_app(
             watchdog.cancel()
             await asyncio.gather(watchdog, return_exceptions=True)
 
+    # CPU utilisation is a rate and needs a baseline sample; take it at startup
+    # so the first dashboard read reports a real figure instead of "unknown".
+    host_metrics.cpu_percent()
+
     if device_policy is None:
         device_policy = DevicePolicyStore(DEVICE_POLICY_PATH)
     if worker_node_id is None:
@@ -755,6 +760,14 @@ def create_app(
             except Exception:
                 pass
 
+
+    @app.get("/api/system/metrics")
+    async def system_metrics(request: Request):
+        """Real host readings. Any value that cannot be read is null, never
+        guessed — the UI renders those as unknown."""
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        return await asyncio.to_thread(host_metrics.snapshot)
 
     # ---------------------------------------------------------------- settings
 

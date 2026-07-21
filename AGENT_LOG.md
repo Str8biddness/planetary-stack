@@ -1820,3 +1820,432 @@ marks the start; each landed piece gets its own honest entry.
   snapshot retired. Every original archived under /home/dakin/planetary-stack-
   archive/.
 - NO FINISH_CHECKLIST box checked.
+### Overview surface — mock-up layout, professional wording, measured data
+- Owner supplied a reference design (GHOSTKEY OS) and asked for that look "with
+  professional comfortable wording". Took the STRUCTURE, rejected the VOCABULARY.
+- WORDING MAP (the explicit ask). Left column is the reference, right is what
+  shipped, chosen so no label implies a capability that does not exist:
+    QUANTUM CORE        -> Devices
+    AI SYNAPSE          -> Assistant
+    ENTER GODMODE       -> Add a device / Run a job (real actions)
+    QUAD-HEMISPHERIC…   -> "3 devices added, 1 allowed to run your work"
+    ACTIVE PROTOCOLS    -> Privacy & security
+    RSAFM / IMPOSTER TRACE / QUANTUM FIREWALL / LDM MODE
+                        -> Everything runs on your machines / Encrypted between
+                           your devices / Result verification / Per-device
+                           permissions
+    QUANTUM TIMELINE    -> Recent activity
+    STORE               -> dropped (there is no store)
+  A test now FAILS the build if GODMODE/QUANTUM/SYNAPSE/NEURAL/HEMISPHERIC/
+  PROTOCOL appear on the Overview.
+- NEW: apps/synthesus/desktop/host_metrics.py — REAL host readings from
+  /proc/stat, /proc/meminfo and statvfs. No psutil dependency, no invented
+  numbers: anything unreadable is null and renders as "unknown". CPU is a rate,
+  so the first sample only sets a baseline; synthesusd primes it at startup so
+  the first dashboard read shows a real figure. GET /api/system/metrics (authed).
+- The nine DEMO cards from the previous dashboard are GONE, replaced by measured
+  values (processor, memory, storage, devices, assistant model). The test that
+  used to assert "all mock cards are marked DEMO" now asserts the stronger
+  property: the dashboard contains NO demo-chrome element at all, and no
+  hardcoded percentage in the markup. The DEMO styling stays in the stylesheet
+  for anything genuinely unbacked in future.
+- Privacy & security panel states only real things, and says "unknown" when the
+  controller cannot be read rather than showing a reassuring green tick.
+- Asset version bumped to v=20260721b (the cache-buster I missed last time).
+- Verified live against the running app: /api/system/metrics returns
+  cpu 93.2%, memory 78.5%, storage 48.2% on first read; the served index.html
+  contains the 8 rail items, hero, security and activity panels.
+  Desktop suite: 78 passed.
+- HONEST GAP, STILL UNCHANGED: no browser tools in this session. NOBODY HAS SEEN
+  THIS RENDER. Layout, contrast, spacing and whether the rail/hero fit the
+  window are unverified. The owner has not yet confirmed the earlier dock change
+  was even visible to them.
+- NO FINISH_CHECKLIST box checked.
+### Synthesus character archive + UI polish pass
+- CHARACTER ARCHIVE (the owner's ask): characters were loose JSON directories
+  and the studio's "export" returned a dict plus a sentence telling you to copy
+  files into place by hand. Nothing recorded which files belonged together and
+  nothing detected an edited member.
+- apps/synthesus/runtime/packages/characters/archive.py: `.sxc` archive —
+  a ZIP carrying manifest.json + bio/personality/knowledge/patterns. Two
+  deliberate properties: DETERMINISTIC (sorted members, fixed 1980 timestamp,
+  fixed compression, so the same input yields byte-identical output — verified:
+  rebuild is BYTE-IDENTICAL) and VERIFIED ON LOAD (every member's sha256 in the
+  manifest, manifest covered by archive_sha256, all re-checked on read).
+- Shipped: characters/synthesus.sxc, archive_sha256
+  bbbff85f31fb5d1e1fa388cac598c3e2138f4d42a2ea311022035e40dbd0c3eb,
+  25693 bytes from 111233 bytes of JSON. A test asserts the shipped archive is
+  a build of the checked-in directory, so it cannot silently go stale.
+- character_studio.py: /api/session/{id}/export now BUILDS a verified archive
+  instead of returning a dict; added /api/character/import which refuses
+  anything failing verification and writes nothing until it checks out.
+- HONEST SCOPE, stated in the module: this is INTEGRITY, NOT AUTHENTICITY. The
+  digest proves the archive is intact and self-consistent; it does not prove who
+  produced it. Signing would reuse the node contract keys the mesh already
+  distributes; NOT built. An archive must never be called "trusted" on this.
+- Tests (12): round trip, determinism, edited member refused, removed member
+  refused, SMUGGLED EXTRA MEMBER refused (an archive is not a container for
+  arbitrary files), rewritten manifest refused (re-hashing a tampered member
+  does not rescue it), missing bio refused, extract writes only known members,
+  shipped archive verifies, shipped archive matches its source directory.
+- UI: workspaces replace floating windows — existing surfaces are MOVED (same
+  DOM nodes) into workspace panes at boot, so handlers, xterm and chat keep
+  working while losing their chrome. Grouped sidebar, single global top nav
+  naming the workspace, depth instead of borders, animated aurora background,
+  type ladder 30/18/15/13 in sentence case, ALL dock emoji replaced with one
+  Lucide-style outline family (verified zero emoji remain), ripple, skeletons,
+  empty-state component, toast progress + expandable detail, Ctrl/Cmd-K search.
+- NOTED HONESTLY TO THE OWNER: the blueprint asks to "memoize expensive React
+  components" — THERE IS NO REACT. Vanilla JS, no build step. Did the
+  equivalent: GPU-only transform/opacity animation, panes toggled not rebuilt,
+  metrics polled on a 6s cadence.
+- Desktop + characters suites: 90 passed.
+- HONEST GAPS: window INTERNALS (chat, vitals, config) still have their original
+  layouts — adoption fixes chrome, not their insides. AI Studio centrepiece,
+  login screen, project cards and terminal redesign NOT done. The owner's latest
+  screenshot predates this build. STILL NO BROWSER TOOLS — every visual claim is
+  from served markup, not a render.
+- NO FINISH_CHECKLIST box checked.
+### identity layer — hash-chained continuity on the consciousness loop
+- Owner's design: a real identity layer running off the consciousness loop,
+  with narrative simulation adding variables and a continuous story; framed as
+  the moat ("characters others cannot reproduce").
+- What already existed: core/consciousness_integrator.py computes
+  C(t) = Psi_f(t) ⊕ M_c(t) ⊕ N_s(t); conscious_state.NarrativeState is already
+  labelled "N_s(t): Narrative Simulation / Identity State" with identity,
+  current_role, scene_tag, goals, emotional_tone, continuity_summary, timeline.
+  What was MISSING was continuity you can check — a character running for six
+  months was indistinguishable from a fresh copy of the same genome.
+- characters/identity.py: append-only hash chain.
+    genesis = H(archive_sha256 || character_id)
+    entry_n = H(entry_{n-1} || C(t) digest || narrative delta)
+    identity = chain head
+  Genesis binds to the SHIPPED .sxc digest, so a chain cannot be transplanted
+  onto another genome or another character. Persisted as JSON lines, fsynced,
+  re-verified on load. Only identity-bearing narrative fields are committed;
+  unknown fields are REFUSED (an entry is not a smuggling channel).
+- Demonstrated on the real shipped archive: genome bbbff85f…, genesis
+  2136152202a7ce22, head a3b8e25d0ff5c58a after 3 lived steps, chain verifies,
+  story renders as continuous narrative.
+- Tests (13, total characters suite 25): edited entry, reordered entries,
+  excised entry, forged appended entry, transplant onto another genome,
+  transplant onto another character, unknown narrative fields, survives reload,
+  deterministic state digest over the loop's dataclass, roots in the real
+  shipped archive, and the commercial one — a fresh copy of the genome shares
+  genesis but has NO history.
+- HONEST SCOPE recorded in the module and told to the owner plainly:
+  * The equations DO NOT make characters unreproducible. This is a local-first
+    product; the genome and consciousness_integrator.py ship to the customer's
+    own machine as readable JSON and Python. Obfuscation on hardware the other
+    party controls is not a boundary. "Others cannot reproduce it" is FALSE as
+    stated and must not be sold that way.
+  * What IS defensible: accumulated history (a buyer gets the genome at
+    genesis, not 50k lived entries), signed heads for issuance/authenticity,
+    keeping the GENERATOR off the shipped artifact, and the legal rights.
+  * The chain is tamper-EVIDENCE and continuity, NOT authenticity. The machine
+    owner can legitimately run their own chain forward — that is the product
+    working. Binding a chain to an issuer needs a signature over the head.
+    NOT built.
+- LEGAL FLAG RAISED TO OWNER, UNRESOLVED: the supplied image says "Patented".
+  Repo-wide search finds no patent or application number — only the comments
+  "Patent-Aligned State" and "patent equation". Marking a product patented
+  without a grant is false patent marking (35 U.S.C. 292); "patent pending"
+  requires a filed application. Asked for the number/status before ANY such
+  wording goes near the product. Nothing shipped uses the word.
+- NO FINISH_CHECKLIST box checked.
+### canonical statement of the consciousness model
+- Three statements of the model were in circulation: the artwork, a
+  reconstruction from a chat log, and the code. Only the code runs. Wrote
+  docs/design/CONSCIOUSNESS_MODEL.md as the single canonical statement, taken
+  from consciousness_integrator.py rather than from either narrative source.
+- The implemented form is a DYNAMICALLY WEIGHTED fusion, already the "weighted
+  model" shape people reach for:
+      C(t) = Φ( w_f·Ψ_f(t), w_m·M_c(t), w_n·N_s(t) ),  w summing to 1
+      s_f = min(0.5, novelty + uncertainty + 0.2·[hypotheses])
+      s_m = 0.2·mean(traits);  s_n = 0.3·arousal
+      w_x = (base_x + s_x) / Z
+  Outputs: dominant_emotion, ranked action_biases, confidence =
+  1 − uncertainty·w_f, and update_directives (novelty > 0.7 promotes fluid
+  experience into crystallized memory — the learning term).
+- The "× T" / persistence term people add to these formulations is NOT a
+  coefficient inside the fusion. C(t) is recomputed each tick and is memoryless
+  across restarts. Continuity is the identity chain, which commits each C(t)
+  digest into an append-only history rooted in the shipped genome. Documented
+  as such.
+- STATED PLAINLY IN THE DOC: this is a SPECIFICATION, not a scientific result.
+  It defines a deterministic procedure with reproducible outputs. It does NOT
+  explain, measure or produce consciousness in any philosophical or
+  neuroscientific sense, nothing in the codebase validates such a claim, and it
+  must not be sold as though it does. The value is reproducible specified
+  behaviour, not the literalness of the label.
+- NOTATION: the artwork is stylised and not well-formed in places —
+  `M(αchbb(N_est))` does not define an expression and `⊕` is informal. Fine as
+  art, not as a specification; must not be transcribed into product material or
+  a filing.
+- PATENT, STILL UNRESOLVED AND NOW DOUBLY FLAGGED: no patent or application
+  number anywhere in the repo. Beyond false-marking exposure (35 U.S.C. 292),
+  patent claims must be DEFINITE (35 U.S.C. 112(b)) — the artwork's notation
+  would not satisfy that; the formulation in this doc could. Until a number and
+  status are supplied, product material says PROPRIETARY, not patented.
+- NO FINISH_CHECKLIST box checked.
+### LICENCE CORRECTION + character content separated from the engine
+- I PREVIOUSLY TOLD THE OWNER "no license file — all rights reserved" for the
+  public repos. THAT WAS WRONG. `gh repo view` reported licenseInfo: none and I
+  repeated it without opening the file. The actual licence is AGPL-3.0:
+  apps/synthesus/LICENSE, the public mobile repo's LICENSE, and LICENSES.md all
+  say so. Correcting it here because the wrong version was acted on.
+- Consequence explained to the owner: AGPL grants use/modify/REDISTRIBUTE.
+  Anyone who took a copy during the public window holds an IRREVOCABLE licence;
+  making the repos private stopped further distribution but revoked nothing.
+  "Characters others cannot resell" is not enforceable under AGPL for whatever
+  the licence covers.
+- Owner confirmed AGPL is BY CHOICE, not inherited obligation. Verified: git log
+  on apps/synthesus shows a single contributor across three of his own
+  identities, so he can relicense going forward without third-party consent.
+- BUILT the split that lets him keep the open engine AND sell characters:
+  * characters/LICENSE — Synthesus Character Content Licence 1.0. Covers
+    CONTENT ONLY (bio/personality/knowledge/patterns/.sxc/identity chains),
+    explicitly NOT the engine; states it adds no restrictions to AGPL code.
+    Prohibits redistribution, resale, and training/distillation use. Includes a
+    "your history is yours" clause — chain entries from the customer's own use
+    are their data and the licence does not permit collecting them.
+  * Licence terms now travel INSIDE the archive manifest, covered by
+    archive_sha256, because a sibling LICENSE file can be dropped in transit.
+    Stripping or swapping the terms invalidates the archive (2 new tests).
+  * LICENSES.md updated: engine and character content recorded as separate
+    works, with a rule against mixing the paths in either direction.
+- Rebuilt characters/synthesus.sxc; archive_sha256 is now
+  c7d35c1e4fbb495839d701d44cd0c2bf12359a57806c7b0e76cc637b61cfed1b (was
+  bbbff85f… before the licence field). Identity genesis derives from this, so
+  the digest change is expected; nothing has shipped to a customer yet.
+- The licence file states plainly that it was drafted as an engineering
+  artefact and NOT reviewed by a lawyer, and that protection here is LEGAL not
+  technical — content runs on hardware the customer controls and no technical
+  measure prevents reading it.
+- Tests: characters suite 25 -> 28 passed.
+- NO FINISH_CHECKLIST box checked.
+### refined for SUBSCRIPTION (owner: the platform depends on subscription users)
+- A perpetual "install and run" grant is the wrong shape for subscriptions.
+  Rewrote the character licence to v1.1 (subscription) and built the
+  entitlement layer under it.
+- ARCHITECTURAL TENSION NAMED, NOT GLOSSED: a subscription must be checked, and
+  a local-first product must not send the customer's data anywhere. Resolution:
+  the vendor signs a SHORT-LIVED entitlement; the client verifies it OFFLINE
+  against a pinned ed25519 key. The only network event is RENEWAL, and it
+  discloses exactly one fact — this subscription is in use. The licence now
+  says plainly this is NOT "nothing leaves your machine", it is "nothing about
+  your work leaves your machine". A test asserts the entitlement carries no
+  telemetry-shaped field and pins its exact field set.
+- services/entitlement.py: issue/verify, domain-separated signature, 7-day
+  default term (max 31), 14-day default grace (max 90), plan scoping by
+  character id or "*", account binding, future-dated refusal, clock-skew
+  tolerance. Expiry is a STATE (active/grace/lapsed), not an exception, so the
+  caller can tell grace from lapse.
+- TWO PRODUCT RULES ENCODED IN CODE AND ASSERTED BY TEST, so they cannot erode
+  into policy later:
+  * GRACE IS NOT A CLIFF — an expired-but-in-grace subscription keeps running.
+    A local-first tool that bricks itself offline is a broken promise.
+  * LAPSE NEVER HOLDS DATA HOSTAGE — data_access_after_lapse() returns identity
+    chain readable + exportable, conversation history readable, local files
+    readable, and ONLY character_may_run False. A subscription buys the right
+    to RUN a character, never the right to withhold what the customer's own
+    machine recorded. The licence forbids deleting/encrypting/ransoming data on
+    the customer's hardware.
+- STATED IN THE LICENCE: entitlement checking is NOT copy protection and must
+  not be sold as DRM. The customer owns the hardware and can bypass it; its
+  purpose is to make the legitimate path automatic, not to defeat someone who
+  owns the computer.
+- Licence terms in the archive manifest updated to
+  LicenseRef-Synthesus-Character-Content-1.1 with model=subscription and
+  requires_entitlement=true, still covered by archive_sha256 (stripping or
+  rewriting them still fails verification). Rebuilt synthesus.sxc:
+  archive_sha256 5f28501c894cb560fda463dada389fe538b37e3547cca8b50f25e5b6f04f43eb.
+- A test I wrote was WRONG and I fixed it rather than the code: the "no usage
+  data" check substring-scanned the whole blob and matched "count" inside
+  "account_id". Now checks field NAMES.
+- Tests: characters suite 28 -> 41 passed.
+- NOT BUILT: the renewal client (fetch/store/refresh an entitlement), the
+  vendor-side issuing service, billing integration, and enforcement wiring into
+  the character loader. This is the primitive plus its terms, nothing more.
+- NO FINISH_CHECKLIST box checked.
+### spec — browser GPU workers (NOT BUILT)
+- Idea: devices that cannot be mesh peers (phone/tablet/TV — no rootless Podman
+  on unrooted Android or locked TV firmware) can still contribute GPU through a
+  browser, because WebGPU is the only GPU API that reaches heterogeneous
+  consumer hardware uniformly. This is not a trick to extract GPU from the
+  driver; it is the only available door.
+- NO CONTRACT CHANGE NEEDED. vSource already has WorkloadKind.RENDERING /
+  EMBEDDING / INDEXING / SIMULATION, ResourceVector.gpu_count +
+  gpu_memory_bytes, inventory.resources.gpus, and lease.gpu_ids validated
+  against allocatable GPU memory. The novelty is the executor, not the model.
+- CORRECTED THE OWNER'S MECHANISM: you cannot "trick the kernel" into
+  allocating more GPU. Schedulers do not grant capacity based on what work
+  claims to be. What is true: in a browser you MUST express compute as shaders
+  (no other API), and sustained load pulls a GPU out of idle clock states.
+  Neither creates capability that is not there.
+- THE UNSOLVED PROBLEM, recorded before any design: A DEVICE THAT COMPUTES ON
+  DATA SEES THAT DATA. The permission model governs whether a device may run
+  work, not what it learns by running it. Handing documents to a smart TV — a
+  device class this project already identified as among the most-compromised on
+  a home network — is a regression against the privacy claim. Three options
+  documented; spec assumes peers-may-do-anything + sources-do-blind-work-only.
+  Informed consent per device is a PRODUCT decision, not an engineering one.
+- Physics recorded: VRAM is the binding constraint and does not pool over LAN.
+  Coarse-grained independent work (batch embedding, indexing, re-ranking, image
+  tiles) wins; MODEL-PARALLEL single forward pass LOSES decisively to running a
+  smaller model locally at ~0.3-1ms LAN RTT. Designed for the former only.
+- Browsers deliberately do not expose true VRAM: declared_gpu_memory_bytes is
+  an upper bound the browser permits, reported with measured:false, and must
+  never be presented as a measured figure. Unreadable limits report null.
+- LEGITIMACY LINE STATED: this technology is identical to cryptojacking; what
+  separates them is consent. Default-deny per device (already enforced by
+  DevicePolicyStore), explicit per-device GPU grant, UI showing what runs where
+  with one-action stop, and workers declining on low battery or thermal
+  throttle. Built WITH the feature, not after.
+- HONEST HEADLINE recorded: not "your home is a datacentre" — it is "your
+  home's idle silicon becomes one addressable pool for parallel work,
+  privately". Does NOT pool VRAM, does NOT speed a single request by sharding,
+  does NOT make a small model equal a frontier one.
+- NOT BUILT: no worker, no executor, no measurement. Explicitly noted that a
+  benchmark showing a browser worker beats doing the work locally should come
+  BEFORE the feature.
+- NO FINISH_CHECKLIST box checked.
+### CORRECTION — the boundary is the home, not the machine
+- Owner pushed back and was right. My earlier draft treated a smart TV as a
+  third party. It is not: the owner owns the TV, and PC->TV work over the LAN
+  does not leave the house. "Nothing leaves your home" is the guarantee users
+  actually want and the one this product should make. Corrected in
+  docs/design/BROWSER_GPU_WORKERS.md.
+- THE NARROWER POINT THAT SURVIVES, and it is not about trusting the user:
+  OWNERSHIP IS NOT CONTROL. The risk is vendor firmware doing what the owner
+  never asked — smart TVs run automatic content recognition, ship telemetry to
+  the manufacturer, and carry unpatched vulnerabilities for years. Data placed
+  there can leave the house by a path the owner did not authorise and cannot
+  see. So the question is not "do we trust the owner" (obviously yes) but "does
+  the device's own firmware honour the boundary the owner set" — largely yes
+  for phones/tablets, not currently knowable for TVs.
+- On the owner's proposed firewall module: scoped honestly. A firewall on the
+  coordinator can govern what Synthesus SENDS; it cannot stop a TV's firmware
+  from talking to its manufacturer. The real control is network isolation
+  (VLAN + egress rules) and that lives at the router, not in our kernel. Any
+  kernel firewall module must claim only what it can enforce.
+- On the owner's strategic bet (TV vendors adapt once Synthesus is normal):
+  recorded as a reasonable BET but not usable as a security control today — a
+  guarantee that depends on future vendor cooperation is not yet a guarantee.
+- SEQUENCING CHANGE that sidesteps most of the argument: PHONES AND TABLETS
+  FIRST, TVs later. Phones deliver the same unlock (a GPU reachable only via a
+  browser, on a device the mesh cannot otherwise use) without the firmware
+  problem — owner controls the OS, apps sandboxed, no content recognition, and
+  most homes have several. TVs are the harder case and the smaller win.
+- NO FINISH_CHECKLIST box checked.
+### mobile worker design — corrected the "heavy wallpaper as compute" inversion
+- Owner's proposal: mobile app opens a WebSocket to the desktop, plays a heavy
+  live wallpaper, animates the phone "funnelling compute", acts as an autonomous
+  acceleration funnel.
+- WHAT IS RIGHT: WebSocket phone->desktop (same pattern terminal_server.py
+  already uses for the PTY); auto-connect on the home LAN after the owner grants
+  run_inference once; a visual that makes the mesh legible.
+- THE INVERSION, corrected in the spec: A HEAVY LIVE WALLPAPER DOES NOT PRODUCE
+  USEFUL COMPUTE. Rendering an expensive animation burns GPU on rendering an
+  expensive animation. It does not warm the GPU into availability or unlock
+  capacity. If the phone renders a heavy visual AND runs compute shaders they
+  CONTEND for the same silicon — the animation steals throughput from the work
+  it depicts and brings forward thermal throttling. Rule: the COMPUTE is the GPU
+  work (WebGPU compute shaders); the VISUAL is cheap and DRIVEN BY telemetry.
+  A light visualisation of real state is worth building ("my phone did 4,000
+  embeddings last night and nothing left the house" is the product in one
+  sentence). An expensive shader that looks busy is theatre that costs
+  throughput.
+- MOBILE OS CONSTRAINTS recorded because they decide the design: background
+  tabs are throttled/suspended (iOS strictest), so a worker needs screen-on and
+  foreground — "autonomous" means RESUMES WHEN ELIGIBLE, not runs unattended.
+  Thermals bound sustained load to minutes; design for bursts and the
+  overnight-on-charger case. Battery is the owner's: decline below threshold,
+  prefer charging.
+- HONEST POSITIONING recorded: a phone does NOT accelerate a desktop that has a
+  discrete GPU — its GPU is a small fraction and coordination exceeds the gain
+  for single requests. It helps with several idle devices on parallel work, a
+  coordinator with integrated graphics only, or overnight batch where
+  wall-clock does not matter. "Phone accelerates an RTX desktop" would not
+  survive measurement; "a household's idle devices index a corpus overnight,
+  privately" would.
+- NO FINISH_CHECKLIST box checked.
+### PLANNED — spare-node mesh: Termux workers, namespace SSI, drive sync
+Recording the development thread so the decisions and the corrections survive.
+
+WHAT THE OWNER IS BUILDING TOWARD
+- Recycle spare/idle hardware (old phones, spare PCs) into mesh workers. E-waste
+  framing is genuine and sellable: "your old phones become your AI".
+- Each node runs a terminal reachable from the one Web Desktop UI, exactly as
+  terminal_server.py already streams a PTY over WebSocket into xterm.js.
+- A shared namespace ("expansion drive") every node reaches, partitioned by
+  role, with automated push/pull keeping the mesh current.
+
+CORRECTIONS MADE DURING THIS THREAD (each one changed the plan)
+1. "Harvest/uncompute the GPU": REJECTED, four times, on physics. Computation is
+   not a fluid; a render produces its output and the energy leaves as heat.
+   Uncomputation is real (compute -> copy out -> uncompute) but recovers clean
+   workspace, NOT extra work. Rendering is also not invertible (rasterisation is
+   many-to-one and lossy). AND there is no gatekeeper to fool: a WebGPU compute
+   shader already gets full utilisation on submission. The door is open.
+2. THE STEELMAN THAT DOES WORK: make the render BE the computation (classic
+   GPGPU-via-fragment-shaders). The wallpaper's shader is the embedding kernel;
+   the texture holds the vectors. One pass, two purposes, ledger closes.
+   Caveats: 8-bit framebuffers destroy vector precision (need float textures),
+   readback stalls the pipeline, and on WebGPU you should just use compute
+   shaders. Fragment path is the WebGL2 fallback only.
+3. GeometricEmbedder is the strongest asset for mobile: DETERMINISTIC frequency
+   maps, no learned weights, so NO MODEL TO LOAD, no VRAM ceiling, no
+   quantisation problem — and pure position arithmetic, which is exactly what a
+   shader wants. The real "point compute at the phone" play.
+4. MY OBJECTIONS ABOUT MOBILE WERE WRONG FOR THE ACTUAL TARGET. Background
+   suspension, battery drain and thermal urgency all assume a phone someone is
+   USING. A dedicated spare node sits on a shelf on a charger with nothing else
+   running: Termux + wake lock runs indefinitely, nothing backgrounds it.
+5. THE ROOTING PROBLEM IS ALREADY SOLVED AND SHIPPED: docs/TERMUX.md in the
+   mobile repo — Termux + proot-distro Debian ARM64 -> normal installer ->
+   headless on localhost:8081. Sanctioned path, no root, no exploit. The whole
+   uncompute exploration was routing around a problem the owner had already
+   solved by a better route.
+   BUT that doc states it "hasn't been mechanically verified against a physical
+   device". NOBODY HAS RUN IT. Needs one spare phone and an afternoon.
+6. SSI: I initially refused the term citing the owner's own coordinator.py
+   ("It is NOT a single system image ... we do not fake it"). The owner pushed
+   back and was PARTLY RIGHT and I conceded: there are two SSIs. Kernel-level
+   (MOSIX/OpenSSI: process migration, shared address space) is impossible here.
+   NAMESPACE-level (Plan 9 / 9P: unify the namespace and the machine boundary
+   stops mattering) is exactly what this is, is legitimate, and has pedigree.
+   Position it as Plan 9-style namespace SSI. Still true: no mid-run process
+   migration (jobs must stay idempotent and re-runnable — the lease + fencing
+   token model already assumes this), and no mount on Android.
+7. "Expansion drive" is NOT a disk. Its endpoints are /drive/ingest, /paste,
+   /preview, /sources, /remotes with rclone — a grounding INGESTION pipeline.
+   "Mount it on every node" is really "every node reaches the same grounded
+   corpus", i.e. a replication problem. ContentAddressedStore IS the abstracted
+   cache the owner was describing, and it already exists.
+8. PER-OS ROUTING (owner's insight, correct): one logical namespace, a different
+   local realisation per platform. Linux/macOS rclone mount (FUSE) or sync;
+   Windows rclone mount via WinFsp; Android/Termux rclone SYNC ONLY (proot has
+   no CAP_SYS_ADMIN, no FUSE); iOS nothing. Use rclone, NOT provider apps —
+   Drive/Dropbox on Android expose content:// via the Storage Access Framework,
+   not POSIX paths, and stream rather than materialise files.
+
+THE HARD GUARD THAT MUST BE BUILT WITH THIS, NOT AFTER
+- Three zones with DIFFERENT transports, not one drive with mixed partitions:
+    system/node state  — per node, never shared
+    code (GitHub)      — LEAVES the house by design
+    personal grounding — mesh CAS + mTLS ONLY, NEVER a cloud provider
+- If the shared hub is Google Drive/Dropbox, personal data leaves the home and
+  the product's central claim dies. The failure is SILENT — a misrouted sync
+  does not error, it just uploads someone's private files. Needs an enforced
+  boundary, not a convention.
+
+NEXT PIECES, in order
+  a. Physically verify the Termux path on one spare phone (cheapest, highest
+     information — converts the best-documented path from theory to fact).
+  b. Termux node terminal: same PTY-over-WebSocket pattern, so every spare node
+     is manageable from the one UI.
+  c. Zone model + enforcement point for the three storage zones.
+  d. Role/capability advertisement so placement routes by role.
+  e. Push/pull sync over the CAS.
+- NOTHING IN THIS ENTRY IS BUILT. NO FINISH_CHECKLIST box checked.

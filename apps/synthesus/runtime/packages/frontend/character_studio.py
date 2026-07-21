@@ -26,6 +26,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+
+from characters.archive import (
+    ARCHIVE_SUFFIX,
+    CharacterArchiveError,
+    build_archive,
+    verify_archive,
+)
 from pydantic import BaseModel, Field
 
 from cognitive.cognitive_engine import CognitiveEngine
@@ -347,11 +354,56 @@ async def export_character(session_id: str):
     if not session:
         raise HTTPException(404, "Session not found")
 
+    # Export writes a real archive rather than handing back a dict and asking
+    # the caller to copy files into place. The archive is deterministic and
+    # every member is digest-checked on load.
+    bio = session["bio"]
+    char_id = bio["character_id"]
+    staging = CHARACTERS_DIR / f".export-{session_id}"
+    staging.mkdir(parents=True, exist_ok=True)
+    try:
+        (staging / "bio.json").write_text(json.dumps(bio, indent=2))
+        (staging / "patterns.json").write_text(json.dumps(session["patterns"], indent=2))
+        archive_path = CHARACTERS_DIR / f"{char_id}{ARCHIVE_SUFFIX}"
+        build_archive(staging, archive_path)
+        manifest = verify_archive(archive_path)
+    except CharacterArchiveError as exc:
+        raise HTTPException(400, f"character could not be archived: {exc}") from exc
+    finally:
+        for leftover in staging.glob("*"):
+            leftover.unlink()
+        staging.rmdir()
+
     return {
-        "bio": session["bio"],
-        "patterns": session["patterns"],
-        "export_format": "synthesus_v2",
-        "instructions": "Save bio.json and patterns.json to characters/<id>/ directory",
+        "export_format": "planetary.synthesus.character_archive.v1",
+        "archive_path": str(archive_path),
+        "character_id": manifest["character_id"],
+        "archive_sha256": manifest["archive_sha256"],
+        "members": manifest["members"],
+    }
+
+
+@app.post("/api/character/import")
+async def import_character(payload: Dict[str, Any]):
+    """Install a character from an archive, refusing anything that fails
+    verification. Nothing is written until the archive checks out."""
+    archive_path = payload.get("archive_path")
+    if not isinstance(archive_path, str) or not archive_path:
+        raise HTTPException(400, "archive_path is required")
+    source = Path(archive_path)
+    if not source.is_file():
+        raise HTTPException(404, "archive not found")
+    try:
+        manifest = verify_archive(source)
+    except CharacterArchiveError as exc:
+        raise HTTPException(400, f"archive failed verification: {exc}") from exc
+    from characters.archive import extract_archive
+
+    target = extract_archive(source, CHARACTERS_DIR)
+    return {
+        "installed": str(target),
+        "character_id": manifest["character_id"],
+        "archive_sha256": manifest["archive_sha256"],
     }
 
 
