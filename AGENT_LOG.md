@@ -2110,3 +2110,31 @@ marks the start; each landed piece gets its own honest entry.
   benchmark showing a browser worker beats doing the work locally should come
   BEFORE the feature.
 - NO FINISH_CHECKLIST box checked.
+### CORRECTION — the boundary is the home, not the machine
+- Owner pushed back and was right. My earlier draft treated a smart TV as a
+  third party. It is not: the owner owns the TV, and PC->TV work over the LAN
+  does not leave the house. "Nothing leaves your home" is the guarantee users
+  actually want and the one this product should make. Corrected in
+  docs/design/BROWSER_GPU_WORKERS.md.
+- THE NARROWER POINT THAT SURVIVES, and it is not about trusting the user:
+  OWNERSHIP IS NOT CONTROL. The risk is vendor firmware doing what the owner
+  never asked — smart TVs run automatic content recognition, ship telemetry to
+  the manufacturer, and carry unpatched vulnerabilities for years. Data placed
+  there can leave the house by a path the owner did not authorise and cannot
+  see. So the question is not "do we trust the owner" (obviously yes) but "does
+  the device's own firmware honour the boundary the owner set" — largely yes
+  for phones/tablets, not currently knowable for TVs.
+- On the owner's proposed firewall module: scoped honestly. A firewall on the
+  coordinator can govern what Synthesus SENDS; it cannot stop a TV's firmware
+  from talking to its manufacturer. The real control is network isolation
+  (VLAN + egress rules) and that lives at the router, not in our kernel. Any
+  kernel firewall module must claim only what it can enforce.
+- On the owner's strategic bet (TV vendors adapt once Synthesus is normal):
+  recorded as a reasonable BET but not usable as a security control today — a
+  guarantee that depends on future vendor cooperation is not yet a guarantee.
+- SEQUENCING CHANGE that sidesteps most of the argument: PHONES AND TABLETS
+  FIRST, TVs later. Phones deliver the same unlock (a GPU reachable only via a
+  browser, on a device the mesh cannot otherwise use) without the firmware
+  problem — owner controls the OS, apps sandboxed, no content recognition, and
+  most homes have several. TVs are the harder case and the smaller win.
+- NO FINISH_CHECKLIST box checked.

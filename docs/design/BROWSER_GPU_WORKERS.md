@@ -28,33 +28,53 @@ No contract change is required. The following already exist:
 A browser worker advertises an inventory and receives leases like any other
 node. The novelty is the executor, not the model.
 
-## The unsolved problem — read before designing anything else
+## The boundary is the home, not the machine
 
-**A device that computes on data sees that data.**
+An earlier draft of this document treated a smart TV as though it were a third
+party. That was wrong. The owner owns the TV. Work sent from the PC to the TV
+over the LAN does not leave the house, and "nothing leaves your home" is the
+guarantee users actually want and the one this product should make.
 
-Sending text to a phone to embed means the phone sees the text. The permission
-model governs *whether* a device may run work; it says nothing about what that
-device learns by running it. For a product whose claim is that your data stays
-on machines you control, handing documents to a smart TV — a device class
-already identified here as among the most-compromised on a home network — is a
-regression, not a feature.
+The correction that survives is narrower and still matters:
 
-Three honest options, and the choice determines everything downstream:
+**Ownership is not control.** The risk is not that the owner cannot be trusted
+with their own data — it is that vendor firmware does things the owner did not
+ask for. Smart TVs are documented to run automatic content recognition, ship
+telemetry to the manufacturer, and carry unpatched vulnerabilities for years.
+Data placed on such a device can leave the house through a path the owner never
+authorised and cannot see.
 
-1. **Peers only.** GPU work goes only to devices the owner has explicitly
-   trusted as peers. Simple, safe, and gives up the phones and TVs — which were
-   the whole motivation.
-2. **Blind work only.** Dispatch only workloads meaningless without context:
-   operations on already-embedded vectors, re-ranking by opaque score, image
-   kernels on tiles the worker cannot reassemble. Real but narrow, and the
-   boundary is easy to get wrong.
-3. **Informed consent per device.** The owner is told plainly — "your TV will
-   see the documents it indexes" — and chooses. Honest, but only acceptable if
-   the UI states it at the moment of granting, not buried in terms.
+So the question is not "do we trust the user" — obviously yes, it is their
+house and their hardware. It is: *does the device's own firmware honour the
+boundary the owner set?* For a phone or tablet the answer is largely yes. For a
+smart TV it is not currently knowable.
 
-This spec assumes **(1) plus (2)**: `peer` devices may take any permitted
-workload; `source` devices may take blind work only. Option 3 is a product
-decision, not an engineering one.
+### What actually mitigates this
+
+* **Send work the firmware cannot use.** Operations on already-embedded
+  vectors, opaque re-ranking, image tiles that cannot be reassembled. This is
+  not a hedge against the owner; it is a hedge against the vendor's software.
+* **Network isolation.** Putting untrusted devices on their own VLAN with
+  egress rules is the real control. Note that this lives at the router, not in
+  the PC — a firewall on the coordinator can govern what Synthesus *sends*, but
+  cannot stop a TV's own firmware from talking to the manufacturer. Any kernel
+  firewall module should be scoped to what it can honestly enforce.
+* **Informed consent per device.** "This device's manufacturer software may see
+  what it processes" stated at the moment of granting, not buried in terms.
+
+### Sequencing, which sidesteps most of this
+
+**Phones and tablets first. TVs later.** Phones give the same unlock — a GPU
+reachable only through a browser, on a device the mesh cannot otherwise use —
+without the firmware problem: the owner controls the OS, apps are sandboxed,
+there is no content recognition running, and most homes have several. TVs are
+the harder case and the smaller win; they can follow once either network
+isolation or vendor behaviour makes them safe.
+
+The strategic bet — that TV manufacturers adapt once this is normal — is a
+reasonable bet. It cannot be a security control today, because a guarantee that
+depends on future vendor cooperation is not a guarantee yet. Build for phones,
+keep the TV path behind blind work and consent, and relax it when reality does.
 
 ## What a browser worker reports
 
@@ -122,7 +142,7 @@ they must be built with the feature rather than after it.
 
 **Does:** idle silicon across a home becomes addressable as one pool for
 parallel work — overnight indexing, batch embedding, corpus re-ranking, image
-processing — with nothing leaving the house. Devices previously excluded from
+processing — with nothing leaving the home network. Devices previously excluded from
 the mesh contribute for the first time.
 
 **Does not:** pool VRAM (a 70B model does not become runnable), speed up a
