@@ -2554,3 +2554,53 @@ NEXT PIECES, in order
   static wiring tests.
 - NO FINISH_CHECKLIST box checked.
 
+
+## 2026-07-21 — Image Forge v2: shareable recipes, presets, richer render
+
+### Work completed (owner asked for "more flavor / more exciting")
+
+- Recipe system: a scene is fully described by a short, shareable code
+  `SF1.mode.iters.blend.hue.glow.palette.cam`. `encodeRecipe`/`decodeRecipe`
+  round-trip; `recipeFromSeed(text)` grows a deterministic recipe from any free
+  text (a mulberry32 PRNG over an FNV hash), so a typed word or a pasted code
+  both reproduce the same picture on any machine. Six named `PRESETS`.
+- UI: added a Preset picker, a recipe input with Load / Copy / "Surprise me",
+  and Palette / Glow / Camera controls. Export filenames carry the recipe code.
+  All new handlers are real `function` definitions; all controls have
+  `data-testid`s; styling uses design tokens only (mono font on the code field).
+- Render flavour: a 4th scene (Gyroid lattice — an implicit minimal surface
+  intersected with a sphere), plus soft shadows, 5-tap ambient occlusion,
+  fresnel rim glow (the `Glow` control), specular white highlights, a central
+  sky glow, vignette and procedural film grain. Colours stay strictly in the
+  purple family (hue clamped 260–320; no blue/cyan), richness from
+  value/saturation and white highlights via two palette colours per theme.
+- Cache-bust bumped to `?v=20260721l`; module served as `sdf_forge.js?v=2`.
+- Tests grew to 32 (`test_forge_wiring.py`), adding a headless node check that
+  recipes are deterministic and round-trip, presets all decode, a bad code
+  decodes to null, and that four scenes + named presets exist.
+
+### Commands run and their real output
+
+- `node --check` on `script.js` and `assets/sdf_forge.js` -> exit 0.
+- Headless node recipe check (determinism, round-trip, presets, null) -> `ok
+  SF1.…`.
+- `.venv/bin/python -m pytest apps/synthesus/desktop -q
+  --ignore=…/test_desktop_security.py` -> `110 passed` (78 pre-existing + 32
+  forge). No desktop regression.
+
+### RENDERED — not simulated
+
+- Served the desktop dir and loaded a temporary preview of all six PRESETS in
+  headless Chromium (WebGL2/SwiftShader) at the routed origin. Every preset
+  returned a non-empty PNG (383,934–477,634 bytes) and the screenshot showed
+  six distinct purple geometries — including the gyroid orb with visible rim
+  glow, film grain and vignette. Harness removed afterward; not in the boot
+  path.
+
+### HONEST GAPS
+
+- Same as v1: headless SwiftShader, NOT the pywebview native shell; the full
+  `script.js` app was not booted against `synthesusd` here. Clipboard copy may
+  be blocked in some webviews — the code is still shown in the field as a
+  fallback. NO FINISH_CHECKLIST box checked.
+

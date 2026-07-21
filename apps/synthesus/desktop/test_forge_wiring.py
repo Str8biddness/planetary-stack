@@ -10,6 +10,7 @@ offline: no CDN, no external origin in the vendored module.
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -20,7 +21,17 @@ SCRIPT = (HERE / "script.js").read_text(encoding="utf-8")
 STYLES = (HERE / "styles.css").read_text(encoding="utf-8")
 FORGE = (HERE / "assets" / "sdf_forge.js").read_text(encoding="utf-8")
 
-FORGE_HANDLERS = ("openForge", "forgeApply", "forgeRender", "forgeExport", "forgeToggleAnim")
+FORGE_HANDLERS = (
+    "openForge",
+    "forgeApply",
+    "forgeRender",
+    "forgeExport",
+    "forgeToggleAnim",
+    "forgeRandomize",
+    "forgeApplyRecipe",
+    "forgeCopyRecipe",
+    "forgeLoadPreset",
+)
 FORGE_IDS = (
     "forge-canvas",
     "forge-unavailable",
@@ -28,10 +39,15 @@ FORGE_IDS = (
     "forge-status-detail",
     "forge-animate-btn",
     "forge-download",
+    "forge-preset",
     "forge-mode",
     "forge-iters",
     "forge-blend",
+    "forge-palette",
     "forge-hue",
+    "forge-glow",
+    "forge-cam",
+    "forge-recipe",
 )
 
 
@@ -65,8 +81,8 @@ def test_module_is_vendored_with_a_cache_bust():
     assert (HERE / "assets" / "sdf_forge.js").exists()
     assert "assets/sdf_forge.js?v=" in HTML
     # script.js and styles.css cache-busts were bumped for this change.
-    assert "script.js?v=20260721k" in HTML
-    assert "styles.css?v=20260721k" in HTML
+    assert "script.js?v=20260721l" in HTML
+    assert "styles.css?v=20260721l" in HTML
 
 
 def test_module_is_offline_no_external_origin():
@@ -101,3 +117,35 @@ def test_forge_styles_use_design_tokens_not_arbitrary_values():
     assert "var(--" in forge_css
     # The stage keeps the brand accent on the range controls.
     assert "var(--purple)" in STYLES[STYLES.index(".forge-field"):STYLES.index(".forge-field") + 800]
+
+
+def test_recipes_are_deterministic_and_round_trip():
+    """A shared recipe code must reproduce the same scene for everyone, and a
+    free-text seed must always grow the same recipe (this is the shareability
+    guarantee, checked headlessly in node)."""
+    script = (
+        "const F=require('./assets/sdf_forge.js');"
+        "const a=F.encodeRecipe(F.recipeFromSeed('synthesus-demo'));"
+        "const b=F.encodeRecipe(F.recipeFromSeed('synthesus-demo'));"
+        "if(a!==b){console.error('seed not deterministic');process.exit(1);}"
+        "const dec=F.decodeRecipe(a);"
+        "if(F.encodeRecipe(dec)!==a){console.error('recipe not round-trip');process.exit(2);}"
+        "for(const [k,v] of Object.entries(F.PRESETS)){if(!F.decodeRecipe(v)){console.error('bad preset '+k);process.exit(3);}}"
+        "if(F.decodeRecipe('not-a-recipe')!==null){console.error('bad code should decode to null');process.exit(4);}"
+        "console.log('ok '+a);"
+    )
+    result = subprocess.run(
+        ["node", "-e", script], cwd=str(HERE), capture_output=True, text=True, timeout=30
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith("ok SF1.")
+
+
+def test_forge_offers_four_scenes_and_named_presets():
+    """The excitement is real content: four distinct generators and shareable
+    presets, all listed in the module and surfaced in the markup."""
+    assert 'value="3"' in HTML[HTML.index('id="forge-mode"'):HTML.index('id="forge-iters"')]
+    assert "Gyroid lattice" in HTML
+    assert "PRESETS" in FORGE
+    for scene in ("Boolean sculpture", "Infinite carved field", "Menger sponge", "Gyroid lattice"):
+        assert scene in FORGE

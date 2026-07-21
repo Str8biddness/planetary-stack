@@ -4425,35 +4425,42 @@ document.addEventListener('keydown', function (event) {
 
 /* ----------------------------------------------------------- image forge */
 /* CSG + SDF raymarched procedural image generation. Offline, vendored WebGL2,
- * no dependency. When WebGL2 is unavailable the forge reports "unknown" and
- * renders nothing — it never shows a fabricated frame (NO MOCK DATA IN THE UI).
+ * no dependency. Scenes are reproducible from a short shareable recipe code.
+ * When WebGL2 is unavailable the forge reports "unknown" and renders nothing —
+ * it never shows a fabricated frame (NO MOCK DATA IN THE UI).
  */
 let forgeRenderer = null;
 let forgeAnimating = false;
-
-function forgeAccentFromHue(hue) {
-    // Map the purple-only hue range to an RGB accent. Stays in-brand.
-    const h = (hue % 360) / 360;
-    const f = (n) => {
-        const k = (n + h * 6) % 6;
-        return Math.max(0, Math.min(1, Math.min(k, 4 - k, 1)));
-    };
-    // Bias toward the brand purple; saturate lightly.
-    const r = 0.35 + 0.45 * f(5);
-    const g = 0.20 + 0.30 * f(3);
-    const b = 0.80 + 0.20 * f(1);
-    return [r, g, b];
-}
+let forgePresetsWired = false;
 
 function forgeSetStatus(text) {
     const el = document.getElementById('forge-status');
     if (el) el.textContent = text;
 }
 
+function forgeVal(id, fallback) {
+    const el = document.getElementById(id);
+    return el ? el.value : fallback;
+}
+
+function forgeWirePresets() {
+    if (forgePresetsWired || !window.SDFForge) return;
+    const sel = document.getElementById('forge-preset');
+    if (!sel) return;
+    Object.keys(window.SDFForge.PRESETS).forEach(function (name) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        sel.appendChild(opt);
+    });
+    forgePresetsWired = true;
+}
+
 function forgeInit() {
     const canvas = document.getElementById('forge-canvas');
     if (!canvas) return;
     if (!window.SDFForge) { forgeSetStatus('forge module unavailable'); return; }
+    forgeWirePresets();
     if (!forgeRenderer) {
         forgeRenderer = window.SDFForge.create(canvas);
     }
@@ -4472,23 +4479,49 @@ function forgeInit() {
     forgeRender();
 }
 
-function forgeReadParams() {
-    const mode = parseInt((document.getElementById('forge-mode') || {}).value || '0', 10);
-    const iters = parseInt((document.getElementById('forge-iters') || {}).value || '6', 10);
-    const blend = parseInt((document.getElementById('forge-blend') || {}).value || '35', 10) / 100;
-    const hue = parseInt((document.getElementById('forge-hue') || {}).value || '270', 10);
-    return { mode, iters, blend, accent: forgeAccentFromHue(hue) };
+// The live control state, as a recipe object the module understands.
+function forgeReadRecipe() {
+    return {
+        mode: parseInt(forgeVal('forge-mode', '0'), 10),
+        iters: parseInt(forgeVal('forge-iters', '6'), 10),
+        blend: parseInt(forgeVal('forge-blend', '35'), 10),
+        hue: parseInt(forgeVal('forge-hue', '285'), 10),
+        glow: parseInt(forgeVal('forge-glow', '60'), 10),
+        palette: parseInt(forgeVal('forge-palette', '0'), 10),
+        cam: parseInt(forgeVal('forge-cam', '42'), 10),
+    };
+}
+
+// Push a recipe object into the controls (without firing their handlers).
+function forgeWriteControls(r) {
+    const set = function (id, v) { const el = document.getElementById(id); if (el) el.value = String(v); };
+    set('forge-mode', r.mode);
+    set('forge-iters', r.iters);
+    set('forge-blend', r.blend);
+    set('forge-hue', r.hue);
+    set('forge-glow', r.glow);
+    set('forge-palette', r.palette);
+    set('forge-cam', r.cam);
+}
+
+function forgeShowRecipeCode(r) {
+    const code = window.SDFForge.encodeRecipe(r);
+    const input = document.getElementById('forge-recipe');
+    if (input) input.value = code;
+    return code;
 }
 
 function forgeApply() {
     if (!forgeRenderer || !forgeRenderer.available) return;
-    forgeRenderer.setParams(forgeReadParams());
+    const r = forgeReadRecipe();
+    forgeRenderer.applyRecipe(r);
+    forgeShowRecipeCode(r);
     if (!forgeAnimating) forgeRender();
 }
 
 function forgeRender() {
     if (!forgeRenderer || !forgeRenderer.available) { forgeSetStatus('nothing to render (unknown)'); return; }
-    forgeRenderer.setParams(forgeReadParams());
+    forgeRenderer.applyRecipe(forgeReadRecipe());
     forgeRenderer.renderStill(0.0);
     forgeSetStatus('Rendered a still frame');
 }
@@ -4502,12 +4535,64 @@ function forgeToggleAnim() {
         if (btn) btn.textContent = 'Animate';
         forgeSetStatus('Paused');
     } else {
-        forgeRenderer.setParams(forgeReadParams());
+        forgeRenderer.applyRecipe(forgeReadRecipe());
         forgeRenderer.start();
         forgeAnimating = true;
         if (btn) btn.textContent = 'Pause';
         forgeSetStatus('Animating');
     }
+}
+
+function forgeRandomize() {
+    if (!window.SDFForge) return;
+    const seed = Math.random().toString(36).slice(2, 9);
+    const r = window.SDFForge.recipeFromSeed(seed);
+    forgeWriteControls(r);
+    const preset = document.getElementById('forge-preset');
+    if (preset) preset.value = '';
+    forgeApply();
+    forgeSetStatus('Surprised you with seed "' + seed + '"');
+}
+
+function forgeApplyRecipe() {
+    if (!window.SDFForge) return;
+    const input = document.getElementById('forge-recipe');
+    const raw = input ? input.value.trim() : '';
+    let r = window.SDFForge.decodeRecipe(raw);
+    if (!r) {
+        // Not a recipe code — treat whatever was typed as a free-text seed.
+        r = window.SDFForge.recipeFromSeed(raw || 'synthesus');
+        forgeSetStatus('Grew a scene from your text');
+    } else {
+        forgeSetStatus('Loaded recipe');
+    }
+    forgeWriteControls(r);
+    const preset = document.getElementById('forge-preset');
+    if (preset) preset.value = '';
+    forgeApply();
+}
+
+function forgeCopyRecipe() {
+    const code = forgeShowRecipeCode(forgeReadRecipe());
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(code);
+        }
+    } catch (e) { /* clipboard may be blocked; the code is still shown in the field */ }
+    forgeSetStatus('Copied recipe ' + code);
+}
+
+function forgeLoadPreset() {
+    if (!window.SDFForge) return;
+    const sel = document.getElementById('forge-preset');
+    const name = sel ? sel.value : '';
+    if (!name) return;
+    const code = window.SDFForge.PRESETS[name];
+    const r = window.SDFForge.decodeRecipe(code);
+    if (!r) return;
+    forgeWriteControls(r);
+    if (forgeRenderer && forgeRenderer.available) { forgeRenderer.applyRecipe(r); forgeShowRecipeCode(r); forgeRender(); }
+    forgeSetStatus('Preset: ' + name);
 }
 
 function forgeExport() {
@@ -4518,7 +4603,7 @@ function forgeExport() {
     const link = document.getElementById('forge-download');
     if (link) {
         link.href = data;
-        link.download = 'synthesus-forge.png';
+        link.download = 'synthesus-forge-' + window.SDFForge.encodeRecipe(forgeReadRecipe()) + '.png';
         link.click();
     }
     forgeSetStatus('Exported PNG');

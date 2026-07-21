@@ -44,6 +44,14 @@
 .forge-field input[type="range"] { accent-color: var(--purple); width: 100%; }
 .forge-actions { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
 .forge-statusline { color: var(--fg-dim); font-size: var(--t-meta); margin-left: auto; }
+.forge-recipe-row { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.forge-recipe-input {
+    flex: 1 1 220px;
+    min-width: 200px;
+    font-family: var(--font-mono);
+    font-size: var(--t-meta);
+    letter-spacing: 0.01em;
+}
 @media (max-width: 720px) {
     .forge-window { width: 96vw !important; left: 2vw !important; }
     .forge-controls { grid-template-columns: 1fr 1fr; }
