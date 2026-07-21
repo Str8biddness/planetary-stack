@@ -5,7 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Synthesus Planetary OS Ultra</title>
     <link rel="icon" type="image/png" href="assets/synthesus-icon.png">
-    <link rel="stylesheet" href="styles.css?v=20260721b">
+    <link rel="icon" type="image/png" sizes="64x64" href="assets/synthesus-mark-64.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/synthesus-mark-32.png">
+    <link rel="apple-touch-icon" href="assets/synthesus-mark-128.png">
+    <link rel="stylesheet" href="design-system.css?v=20260721j">
+    <link rel="stylesheet" href="styles.css?v=20260721j">
     <!-- No external font CDN: the shell assets render locally and remain available offline.
          Uses locally-installed Outfit/Fira Code if present, else a
          native system stack. To pin the exact look later, self-host the woff2 via @font-face. -->
@@ -13,7 +17,8 @@
     <script src="xterm.js"></script>
     <script src="xterm-addon-fit.js"></script>
 </head>
-<body id="os-body">
+<body id="os-body" class="ds">
+    <div class="ds-toasts" id="ds-toasts" aria-live="polite"></div>
     <!-- LLM Health Banner -->
     <div id="llm-health-banner" style="display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(239, 68, 68, 0.9); color: white; padding: 10px 20px; border-radius: 8px; z-index: 999999; box-shadow: 0 4px 6px rgba(0,0,0,0.3); align-items: center; gap: 15px; font-size: 0.95rem; border: 1px solid #fca5a5;">
         <span>⚠️ Local model not loaded — chat is in fallback mode.</span>
@@ -35,6 +40,7 @@
             <div class="login-mark">SYNTHESUS</div>
             <h1 class="login-title">PLANETARY OS</h1>
             <p class="login-tagline">Synthetic Intelligence · Local-first Substrate</p>
+            <img class="ps-login-mark" src="assets/synthesus-mark-128.png" alt="Synthesus" width="64" height="64">
             <p id="login-subtitle" class="login-sub">Authenticate to mount the desktop.</p>
             <div class="login-oath">Network use is feature-dependent — see Vitals</div>
 
@@ -653,30 +659,45 @@
 
         <!-- Dashboard — mixed. Cards backed by live endpoints render live;
              everything else is tagged DEMO and is deliberately not wired. -->
-        <div class="window glass-panel" id="win-dashboard" style="top: 40px; left: 90px; width: 1020px; height: 700px; display: none;">
+        <div class="window ps-overview-layer" id="win-dashboard" style="display: none;">
             <div class="window-header" onmousedown="dragWindow(event, 'win-dashboard')">
                 <span class="window-title">Overview</span>
                 <div class="window-controls"><button class="win-btn minimize" onclick="minimizeWindow(this)" style="background: #facc15;"></button><button class="win-btn maximize" onclick="maximizeWindow(this)" style="background: #22c55e;"></button><button class="win-btn close" onclick="toggleWindow('win-dashboard')"></button></div>
             </div>
             <div class="window-content ps-shell">
                 <!-- Left rail: plain nouns, no jargon. Each entry opens a real window. -->
-                <nav class="ps-rail" aria-label="Sections">
-                    <button class="ps-rail-item is-active" onclick="dashboardRefresh()">
-                        <span class="ps-rail-ico">◱</span><span>Overview</span></button>
-                    <button class="ps-rail-item" onclick="openDevices()">
-                        <span class="ps-rail-ico">◉</span><span>Devices</span></button>
-                    <button class="ps-rail-item" onclick="toggleWindow('win-jobs')">
-                        <span class="ps-rail-ico">▤</span><span>Jobs</span></button>
-                    <button class="ps-rail-item" onclick="toggleWindow('win-chat')">
-                        <span class="ps-rail-ico">◈</span><span>Assistant</span></button>
-                    <button class="ps-rail-item" onclick="toggleWindow('win-drive')">
-                        <span class="ps-rail-ico">▧</span><span>Storage</span></button>
-                    <button class="ps-rail-item" onclick="toggleWindow('win-explorer')">
-                        <span class="ps-rail-ico">▭</span><span>Files</span></button>
-                    <button class="ps-rail-item" onclick="spawnTerminalWindow()">
-                        <span class="ps-rail-ico">▸</span><span>Terminal</span></button>
-                    <button class="ps-rail-item" onclick="openSettings()">
-                        <span class="ps-rail-ico">⚙</span><span>Settings</span></button>
+                <nav class="ps-rail" aria-label="Workspaces">
+                    <div class="ps-brand">
+                        <span class="ps-brand-mark"><img src="assets/synthesus-mark-64.png" alt="" width="20" height="20"></span>
+                        <span class="ps-brand-name">Synthesus</span>
+                    </div>
+
+                    <div class="ps-rail-group">Workspace</div>
+                    <button class="ps-rail-item is-active" data-workspace="home" onclick="wsGo('home')">
+                        <span class="ps-rail-ico" data-icon="dashboard"></span><span>Home</span></button>
+
+                    <div class="ps-rail-group">AI</div>
+                    <button class="ps-rail-item" data-workspace="ai" onclick="wsGo('ai')">
+                        <span class="ps-rail-ico" data-icon="assistant"></span><span>AI Studio</span></button>
+
+                    <div class="ps-rail-group">Development</div>
+                    <button class="ps-rail-item" data-workspace="dev" onclick="wsGo('dev')">
+                        <span class="ps-rail-ico" data-icon="terminal"></span><span>Developer</span></button>
+
+                    <div class="ps-rail-group">Storage</div>
+                    <button class="ps-rail-item" data-workspace="storage" onclick="wsGo('storage')">
+                        <span class="ps-rail-ico" data-icon="storage"></span><span>Files &amp; storage</span></button>
+
+                    <div class="ps-rail-group">Security</div>
+                    <button class="ps-rail-item" data-workspace="security" onclick="wsGo('security')">
+                        <span class="ps-rail-ico" data-icon="shield"></span><span>Devices &amp; access</span></button>
+
+                    <div class="ps-rail-group">System</div>
+                    <button class="ps-rail-item" data-workspace="system" onclick="wsGo('system')">
+                        <span class="ps-rail-ico" data-icon="cpu"></span><span>System</span></button>
+                    <button class="ps-rail-item" data-workspace="settings" onclick="wsGo('settings')">
+                        <span class="ps-rail-ico" data-icon="settings"></span><span>Settings</span></button>
+
                     <div class="ps-rail-spacer"></div>
                     <div class="ps-rail-user">
                         <div class="ps-rail-user-name" id="dash-user">Signed in</div>
@@ -687,6 +708,15 @@
                 <div class="ps-main">
                     <!-- Status strip. Every value here is measured or says unknown. -->
                     <div class="ps-topbar">
+                        <h1 class="ps-ws-title" id="ws-title">Home</h1>
+                        <div class="ps-search">
+                            <span class="ps-search-ico" data-icon="search"></span>
+                            <input type="text" id="dash-search" class="ps-search-input"
+                                   placeholder="Search apps and settings…"
+                                   oninput="dashSearch(this.value)"
+                                   onkeydown="if(event.key==='Enter')dashSearchOpenFirst()">
+                            <div class="ps-search-results" id="dash-search-results"></div>
+                        </div>
                         <div class="ps-status" id="dash-status">
                             <span class="ps-dot" id="dash-status-dot"></span>
                             <span id="dash-status-text">Checking…</span>
@@ -697,7 +727,8 @@
                         </div>
                     </div>
 
-                    <section class="ps-hero">
+                    <div class="ps-ws is-active" id="ws-home">
+                    <section class="ps-hero"><div class="ps-hero-art"></div>
                         <div class="ps-hero-copy">
                             <div class="ps-hero-eyebrow">Welcome back</div>
                             <h2 class="ps-hero-title" id="dash-hero-name">Your private AI</h2>
@@ -727,56 +758,87 @@
                             <div id="dash-activity"></div>
                         </section>
                     </div>
+                    </div>
+                    <!-- Workspace panes. Existing app surfaces are MOVED here at
+                         boot (same DOM nodes), so every handler, the terminal and
+                         the chat keep working while losing their window chrome. -->
+                    <div class="ps-ws" id="ws-ai" hidden></div>
+                    <div class="ps-ws" id="ws-dev" hidden></div>
+                    <div class="ps-ws" id="ws-storage" hidden></div>
+                    <div class="ps-ws" id="ws-security" hidden></div>
+                    <div class="ps-ws" id="ws-system" hidden></div>
+                    <div class="ps-ws" id="ws-settings" hidden></div>
                 </div>
+
+                <!-- Right panel: system health, every row measured or unknown. -->
+                <aside class="ps-aside">
+                    <div class="ps-panel-head">
+                        <h3>System health</h3>
+                        <span class="ps-panel-note">Live from this machine</span>
+                    </div>
+                    <div id="dash-health"></div>
+                    <div class="ps-panel-head" style="margin-top:var(--s2);">
+                        <h3>Quick actions</h3>
+                    </div>
+                    <div class="ps-quick">
+                        <button class="ds-btn" onclick="openDevices()">Manage devices</button>
+                        <button class="ds-btn" onclick="openSettings()">Settings</button>
+                        <button class="ds-btn" onclick="spawnTerminalWindow()">Open terminal</button>
+                    </div>
+                </aside>
             </div>
         </div>
 
         <nav class="dock" id="os-dock" aria-label="System dock">
+        <button type="button" onclick="openDashboard()" class="dock-btn dock-brand" data-win="win-dashboard" title="Synthesus — Overview">
+            <span class="dock-ico"><img src="assets/synthesus-mark-64.png" alt="" width="22" height="22"></span><span class="dock-lbl">Overview</span>
+        </button>
+        <span class="dock-sep" aria-hidden="true"></span>
         <button type="button" onclick="toggleVitals()" class="dock-btn" data-win="win-vitals" title="System Vitals">
-            <span class="dock-ico">📡</span><span class="dock-lbl">Vitals</span>
+            <span class="dock-ico" data-icon="activity"></span><span class="dock-lbl">Vitals</span>
         </button>
         <button type="button" onclick="toggleWindow('win-core')" class="dock-btn" data-win="win-core" title="System Configuration">
-            <span class="dock-ico">⚙️</span><span class="dock-lbl">Config</span>
+            <span class="dock-ico" data-icon="settings"></span><span class="dock-lbl">Config</span>
         </button>
         <button type="button" onclick="toggleWindow('win-chat')" class="dock-btn" data-win="win-chat" title="Quadbrain SI">
-            <span class="dock-ico">🧠</span><span class="dock-lbl">Chat</span>
+            <span class="dock-ico" data-icon="assistant"></span><span class="dock-lbl">Chat</span>
         </button>
         <button type="button" onclick="toggleWindow('win-image')" class="dock-btn" data-win="win-image" title="SI Image Studio">
-            <span class="dock-ico">🎨</span><span class="dock-lbl">Image</span>
+            <span class="dock-ico" data-icon="image"></span><span class="dock-lbl">Image</span>
         </button>
         <button type="button" onclick="toggleWindow('win-voice')" class="dock-btn" data-win="win-voice" title="SI Voice Studio">
-            <span class="dock-ico">🔊</span><span class="dock-lbl">Voice</span>
+            <span class="dock-ico" data-icon="audio"></span><span class="dock-lbl">Voice</span>
         </button>
         <button type="button" onclick="toggleWindow('win-drive')" class="dock-btn" data-win="win-drive" title="Expansion Drive">
-            <span class="dock-ico">💽</span><span class="dock-lbl">Drive</span>
+            <span class="dock-ico" data-icon="storage"></span><span class="dock-lbl">Drive</span>
         </button>
         <button type="button" onclick="openDashboard()" class="dock-btn" data-win="win-dashboard" title="Dashboard">
-            <span class="dock-ico">📊</span><span class="dock-lbl">Dash</span>
+            <span class="dock-ico" data-icon="dashboard"></span><span class="dock-lbl">Dash</span>
         </button>
         <button type="button" onclick="openDevices()" class="dock-btn" data-win="win-devices" title="Devices & Permissions">
-            <span class="dock-ico">🔐</span><span class="dock-lbl">Devices</span>
+            <span class="dock-ico" data-icon="devices"></span><span class="dock-lbl">Devices</span>
         </button>
         <button type="button" onclick="openSettings()" class="dock-btn" data-win="win-settings" title="Settings">
-            <span class="dock-ico">⚙️</span><span class="dock-lbl">Settings</span>
+            <span class="dock-ico" data-icon="settings"></span><span class="dock-lbl">Settings</span>
         </button>
         <button type="button" onclick="toggleWindow('win-jobs')" class="dock-btn" data-win="win-jobs" title="Mesh Jobs">
-            <span class="dock-ico">🛰️</span><span class="dock-lbl">Jobs</span>
+            <span class="dock-ico" data-icon="jobs"></span><span class="dock-lbl">Jobs</span>
         </button>
         <button type="button" onclick="toggleWindow('win-explorer')" class="dock-btn" data-win="win-explorer" title="File Explorer">
-            <span class="dock-ico">📁</span><span class="dock-lbl">Files</span>
+            <span class="dock-ico" data-icon="files"></span><span class="dock-lbl">Files</span>
         </button>
         <button type="button" onclick="toggleWindow('win-foreman')" class="dock-btn" data-win="win-foreman" title="Foreman Bridge">
-            <span class="dock-ico">🛡️</span><span class="dock-lbl">Secure</span>
+            <span class="dock-ico" data-icon="shield"></span><span class="dock-lbl">Secure</span>
         </button>
         <button type="button" onclick="spawnTerminalWindow()" class="dock-btn" title="Authenticated Terminal">
             <span class="dock-ico">_</span><span class="dock-lbl">Term</span>
         </button>
         <button type="button" onclick="showTiers()" class="dock-btn" title="Unlock Pro">
-            <span class="dock-ico">⭐</span><span class="dock-lbl">Pro</span>
+            <span class="dock-ico" data-icon="star"></span><span class="dock-lbl">Pro</span>
         </button>
     </nav>
 
-    <script src="script.js?v=20260721b"></script>
+    <script src="script.js?v=20260721j"></script>
     <script src="hyperspace.js?v=5"></script>
 
 </body>

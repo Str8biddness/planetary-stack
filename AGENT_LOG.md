@@ -1861,3 +1861,48 @@ marks the start; each landed piece gets its own honest entry.
   window are unverified. The owner has not yet confirmed the earlier dock change
   was even visible to them.
 - NO FINISH_CHECKLIST box checked.
+### Synthesus character archive + UI polish pass
+- CHARACTER ARCHIVE (the owner's ask): characters were loose JSON directories
+  and the studio's "export" returned a dict plus a sentence telling you to copy
+  files into place by hand. Nothing recorded which files belonged together and
+  nothing detected an edited member.
+- apps/synthesus/runtime/packages/characters/archive.py: `.sxc` archive —
+  a ZIP carrying manifest.json + bio/personality/knowledge/patterns. Two
+  deliberate properties: DETERMINISTIC (sorted members, fixed 1980 timestamp,
+  fixed compression, so the same input yields byte-identical output — verified:
+  rebuild is BYTE-IDENTICAL) and VERIFIED ON LOAD (every member's sha256 in the
+  manifest, manifest covered by archive_sha256, all re-checked on read).
+- Shipped: characters/synthesus.sxc, archive_sha256
+  bbbff85f31fb5d1e1fa388cac598c3e2138f4d42a2ea311022035e40dbd0c3eb,
+  25693 bytes from 111233 bytes of JSON. A test asserts the shipped archive is
+  a build of the checked-in directory, so it cannot silently go stale.
+- character_studio.py: /api/session/{id}/export now BUILDS a verified archive
+  instead of returning a dict; added /api/character/import which refuses
+  anything failing verification and writes nothing until it checks out.
+- HONEST SCOPE, stated in the module: this is INTEGRITY, NOT AUTHENTICITY. The
+  digest proves the archive is intact and self-consistent; it does not prove who
+  produced it. Signing would reuse the node contract keys the mesh already
+  distributes; NOT built. An archive must never be called "trusted" on this.
+- Tests (12): round trip, determinism, edited member refused, removed member
+  refused, SMUGGLED EXTRA MEMBER refused (an archive is not a container for
+  arbitrary files), rewritten manifest refused (re-hashing a tampered member
+  does not rescue it), missing bio refused, extract writes only known members,
+  shipped archive verifies, shipped archive matches its source directory.
+- UI: workspaces replace floating windows — existing surfaces are MOVED (same
+  DOM nodes) into workspace panes at boot, so handlers, xterm and chat keep
+  working while losing their chrome. Grouped sidebar, single global top nav
+  naming the workspace, depth instead of borders, animated aurora background,
+  type ladder 30/18/15/13 in sentence case, ALL dock emoji replaced with one
+  Lucide-style outline family (verified zero emoji remain), ripple, skeletons,
+  empty-state component, toast progress + expandable detail, Ctrl/Cmd-K search.
+- NOTED HONESTLY TO THE OWNER: the blueprint asks to "memoize expensive React
+  components" — THERE IS NO REACT. Vanilla JS, no build step. Did the
+  equivalent: GPU-only transform/opacity animation, panes toggled not rebuilt,
+  metrics polled on a 6s cadence.
+- Desktop + characters suites: 90 passed.
+- HONEST GAPS: window INTERNALS (chat, vitals, config) still have their original
+  layouts — adoption fixes chrome, not their insides. AI Studio centrepiece,
+  login screen, project cards and terminal redesign NOT done. The owner's latest
+  screenshot predates this build. STILL NO BROWSER TOOLS — every visual claim is
+  from served markup, not a render.
+- NO FINISH_CHECKLIST box checked.

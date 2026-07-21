@@ -1231,6 +1231,19 @@ function enterDesktop() {
     const tm = document.getElementById('tier-modal');
     if (tm) tm.style.display = 'none';
     document.body.classList.add('desktop-live');
+    // The Overview IS the desktop surface, not a window you have to find. It
+    // sits behind everything else, so opening any app still works normally.
+    try {
+        const overview = document.getElementById('win-dashboard');
+        if (overview) {
+            overview.style.display = 'flex';
+            dsHydrateIcons(overview);
+            wsAdoptWindows();
+            wsGo('home');
+            dashboardRefresh();
+            dashboardStartClock();
+        }
+    } catch (e) { console.log('overview unavailable (continuing):', e); }
     // Boot flash — instrument console coming online
     const flash = document.createElement('div');
     flash.className = 'boot-flash';
@@ -3839,10 +3852,10 @@ async function devicesToggle(deviceId, capability, enabled) {
         );
         if (!resp.ok) {
             const payload = await resp.json().catch(function () { return {}; });
-            alert(payload.error || 'That permission was refused.');
+            dsToast('Permission refused', payload.error || 'That change was not applied.', 'error');
         }
     } catch (e) {
-        alert('Controller unreachable — the permission was not changed.');
+        dsToast('Controller unreachable', 'The permission was not changed.', 'error');
     }
     // Always re-read: the switch must show what the controller actually stored,
     // not what we optimistically clicked.
@@ -3930,6 +3943,11 @@ function dashboardStartClock() {
     };
     tick();
     _dashClockTimer = setInterval(tick, 20000);
+    // Sample metrics on a slow cadence so the sparklines have real history.
+    setInterval(function () {
+        const overview = document.getElementById('win-dashboard');
+        if (overview && overview.style.display !== 'none') dashboardRefresh();
+    }, 6000);
 }
 
 function psBytes(n) {
@@ -3942,13 +3960,18 @@ function psBytes(n) {
 
 // A card renders a measured value or the word "unknown". It never fills a gap
 // with a plausible number.
-function dashMetricCard(label, value, sub, percent) {
-    const meter = percent == null ? '' :
+function dashMetricCard(label, value, sub, percent, options) {
+    const opts = options || {};
+    const spark = opts.series ? dashSparkline(opts.series, opts.color || '#38bdf8') : '';
+    const meter = (percent == null || spark) ? '' :
         '<div class="ps-meter"><span style="width:' + Math.max(0, Math.min(100, percent)) + '%"></span></div>';
     return '<div class="ps-card">' +
-        '<div class="ps-card-label">' + psEscape(label) + '</div>' +
+        '<div class="ps-card-top">' +
+            '<div class="ps-card-label">' + psEscape(label) + '</div>' +
+            (opts.icon ? '<span class="ps-card-ico">' + opts.icon + '</span>' : '') +
+        '</div>' +
         '<div class="ps-card-value">' + psEscape(value) + '</div>' +
-        meter +
+        spark + meter +
         (sub ? '<div class="ps-card-sub">' + psEscape(sub) + '</div>' : '') +
         '</div>';
 }
@@ -4018,24 +4041,31 @@ async function dashboardRefresh() {
     const mem = (metrics && metrics.memory) || {};
     const disk = (metrics && metrics.storage) || {};
     const model = system && system.llm ? system.llm.model : null;
+    if (metrics) {
+        dashRecord('cpu', metrics.cpu_percent);
+        dashRecord('memory', mem.percent);
+        dashRecord('storage', disk.percent);
+    }
     live.innerHTML =
         dashMetricCard('Processor',
             metrics && metrics.cpu_percent != null ? metrics.cpu_percent + '%' : 'unknown',
-            'this computer', metrics ? metrics.cpu_percent : null) +
+            'this computer', metrics ? metrics.cpu_percent : null,
+            { icon: '▨', color: '#38bdf8', series: _dashHistory.cpu }) +
         dashMetricCard('Memory',
             mem.percent != null ? mem.percent + '%' : 'unknown',
             mem.used_bytes != null ? psBytes(mem.used_bytes) + ' of ' + psBytes(mem.total_bytes) : 'could not be read',
-            mem.percent) +
+            mem.percent, { icon: '▤', color: '#a78bfa', series: _dashHistory.memory }) +
         dashMetricCard('Storage',
             disk.percent != null ? disk.percent + '%' : 'unknown',
             disk.used_bytes != null ? psBytes(disk.used_bytes) + ' of ' + psBytes(disk.total_bytes) : 'could not be read',
-            disk.percent) +
+            disk.percent, { icon: '▥', color: '#2dd4bf' }) +
         dashMetricCard('Devices',
             devices === null ? 'unknown' : String(devices.length),
-            devices === null ? 'permissions unreadable' : peers.length + ' can be given work', null) +
+            devices === null ? 'permissions unreadable' : peers.length + ' can be given work', null,
+            { icon: '◉' }) +
         dashMetricCard('Assistant',
             model ? 'Local' : 'unknown',
-            model ? model : 'model not reported', null);
+            model ? model : 'model not reported', null, { icon: '◈' });
 
     // ---- privacy & security: real states only
     const evidenceOn = settings ? settings.require_verified_evidence : null;
@@ -4055,6 +4085,29 @@ async function dashboardRefresh() {
             'A new device can do nothing until you allow it.',
             devices === null ? 'unknown' : 'Default deny',
             devices === null ? 'is-unknown' : 'is-ok');
+
+    // ---- system health (right panel)
+    const health_el = document.getElementById('dash-health');
+    if (health_el) {
+        const runtime = health && health.runtime ? health.runtime.status : null;
+        const term = health && health.terminal ? health.terminal.status : null;
+        health_el.innerHTML =
+            dashGauge('Processor', metrics ? metrics.cpu_percent : null,
+                'this computer', '#A78BFA') +
+            dashGauge('Memory', mem.percent != null ? mem.percent : null,
+                mem.total_bytes ? psBytes(mem.total_bytes) + ' total' : 'unknown', '#8B5CF6') +
+            dashGauge('Storage', disk.percent != null ? disk.percent : null,
+                disk.total_bytes ? psBytes(disk.total_bytes) + ' total' : 'unknown', '#C4B5FD') +
+            dashLine('AI engine', model ? model : 'model not reported',
+                system && system.llm && system.llm.ollama_reachable ? 'Ready' : 'Not loaded',
+                system && system.llm && system.llm.ollama_reachable ? 'is-ok' : 'is-warn') +
+            dashLine('Runtime', 'background services',
+                runtime === 'online' ? 'Online' : (runtime || 'unknown'),
+                runtime === 'online' ? 'is-ok' : 'is-warn') +
+            dashLine('Terminal', 'authenticated shell backend',
+                term === 'online' ? 'Online' : (term || 'unknown'),
+                term === 'online' ? 'is-ok' : 'is-warn');
+    }
 
     // ---- activity
     const ids = (typeof meshJobs !== 'undefined' && meshJobs.ids) ? meshJobs.ids : [];
@@ -4089,3 +4142,282 @@ function psEvidenceBadge(status) {
     return '<span class="ps-badge ps-badge-unsigned" title="Provenance could not be determined.">' +
         '⚠ ' + psEscape(status) + '</span>';
 }
+
+
+/* ---- Overview: sampled sparklines and a working search ---------------- */
+
+// Rolling history of values THIS page has observed. A sparkline is only ever
+// drawn from readings we actually took — there is no seeded or synthetic
+// history, so a fresh window shows a short line that grows.
+const _dashHistory = { cpu: [], memory: [], storage: [] };
+const _DASH_HISTORY_MAX = 40;
+
+function dashRecord(key, value) {
+    if (value == null) return;
+    const series = _dashHistory[key];
+    series.push(value);
+    if (series.length > _DASH_HISTORY_MAX) series.shift();
+}
+
+function dashSparkline(series, stroke) {
+    if (!series || series.length < 2) return '';
+    const w = 100, h = 30;
+    const max = Math.max.apply(null, series);
+    const min = Math.min.apply(null, series);
+    const span = (max - min) || 1;
+    const step = w / (series.length - 1);
+    const points = series.map(function (value, i) {
+        const x = (i * step).toFixed(2);
+        const y = (h - ((value - min) / span) * (h - 4) - 2).toFixed(2);
+        return x + ',' + y;
+    });
+    const line = 'M' + points.join(' L');
+    const fill = line + ' L' + w + ',' + h + ' L0,' + h + ' Z';
+    return '<svg class="ps-spark" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" aria-hidden="true">' +
+        '<path class="ps-spark-fill" d="' + fill + '" fill="' + stroke + '"/>' +
+        '<path d="' + line + '" stroke="' + stroke + '"/></svg>';
+}
+
+// Search over things that actually exist. Every hit opens a real window.
+const DASH_TARGETS = [
+    { name: 'Devices & permissions', hint: 'allow or block each device', run: 'openDevices()' },
+    { name: 'Settings', hint: 'result verification and preferences', run: 'openSettings()' },
+    { name: 'Jobs', hint: 'submit work and view results', run: "toggleWindow('win-jobs')" },
+    { name: 'Assistant', hint: 'chat with the local model', run: "toggleWindow('win-chat')" },
+    { name: 'Storage', hint: 'expansion drive and sources', run: "toggleWindow('win-drive')" },
+    { name: 'Files', hint: 'browse your files', run: "toggleWindow('win-explorer')" },
+    { name: 'Terminal', hint: 'authenticated shell', run: 'spawnTerminalWindow()' },
+    { name: 'System configuration', hint: 'wallpaper and AI backend', run: "toggleWindow('win-core')" },
+    { name: 'Vitals', hint: 'runtime status', run: 'toggleVitals()' },
+];
+
+function dashSearch(query) {
+    const box = document.getElementById('dash-search-results');
+    if (!box) return;
+    const q = (query || '').trim().toLowerCase();
+    if (!q) { box.classList.remove('is-open'); box.innerHTML = ''; return; }
+    const hits = DASH_TARGETS.filter(function (t) {
+        return t.name.toLowerCase().indexOf(q) !== -1 || t.hint.toLowerCase().indexOf(q) !== -1;
+    });
+    if (!hits.length) {
+        box.innerHTML = '<div class="ps-search-hit" style="cursor:default;color:#6b7ea3;">Nothing matches that</div>';
+    } else {
+        box.innerHTML = hits.map(function (t, i) {
+            return '<button class="ps-search-hit' + (i === 0 ? ' is-first' : '') + '" onclick="' +
+                t.run + '; dashSearchClear();">' + psEscape(t.name) +
+                '<small>' + psEscape(t.hint) + '</small></button>';
+        }).join('');
+    }
+    box.classList.add('is-open');
+}
+
+function dashSearchOpenFirst() {
+    const first = document.querySelector('#dash-search-results .ps-search-hit.is-first');
+    if (first) first.click();
+}
+
+function dashSearchClear() {
+    const input = document.getElementById('dash-search');
+    const box = document.getElementById('dash-search-results');
+    if (input) input.value = '';
+    if (box) { box.classList.remove('is-open'); box.innerHTML = ''; }
+}
+
+/* =====================================================================
+   Design-system runtime: toasts replacing browser alerts, and outline
+   icons. No icon font and no npm package — Lucide-style outline glyphs
+   are inlined as SVG so the app keeps working with no network.
+   ===================================================================== */
+
+const DS_ICONS = {
+    dashboard: '<path d="M3 3h7v7H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 14h7v7H3z"/>',
+    devices:   '<rect x="3" y="4" width="13" height="10" rx="2"/><path d="M8 20h6M11 14v6"/><rect x="18" y="9" width="4" height="11" rx="1"/>',
+    jobs:      '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    assistant: '<path d="M12 3a5 5 0 0 1 5 5v1a4 4 0 0 1 0 8h-1a5 5 0 0 1-8 0H7a4 4 0 0 1 0-8V8a5 5 0 0 1 5-5z"/>',
+    storage:   '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+    files:     '<path d="M4 6a2 2 0 0 1 2-2h4l2 3h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>',
+    terminal:  '<path d="M5 7l5 5-5 5M13 17h6"/>',
+    settings:  '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
+    search:    '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+    cpu:       '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/>',
+    memory:    '<rect x="4" y="7" width="16" height="10" rx="2"/><path d="M8 7V4M12 7V4M16 7V4"/>',
+    disk:      '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/>',
+    shield:    '<path d="M12 3l7 3v6c0 4.4-3 8.3-7 9-4-.7-7-4.6-7-9V6z"/>',
+    activity:  '<path d="M3 12h4l3 8 4-16 3 8h4"/>',
+    image:     '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="M21 15l-5-5L5 21"/>',
+    audio:     '<path d="M11 5L6 9H3v6h3l5 4z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/>',
+    star:      '<path d="M12 3l2.6 5.6 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.4l6-.8z"/>',
+};
+
+function dsIcon(name, size) {
+    const path = DS_ICONS[name];
+    if (!path) return '';
+    const s = size || 18;
+    return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" ' +
+        'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" ' +
+        'stroke-linejoin="round" aria-hidden="true">' + path + '</svg>';
+}
+
+// Toasts replace alert(): non-blocking, dismissible, auto-expiring.
+function dsToast(title, body, kind, timeoutMs) {
+    const host = document.getElementById('ds-toasts');
+    if (!host) { console.log('[toast]', title, body || ''); return; }
+    const el = document.createElement('div');
+    el.className = 'ds-toast' + (kind ? ' ds-toast-' + kind : '');
+    el.innerHTML = '<div class="ds-toast-accent"></div><div>' +
+        '<div class="ds-toast-title">' + psEscape(title) + '</div>' +
+        (body ? '<div class="ds-toast-body">' + psEscape(body) + '</div>' : '') +
+        '</div>';
+    el.onclick = function () { dsToastDismiss(el); };
+    host.appendChild(el);
+    setTimeout(function () { dsToastDismiss(el); }, timeoutMs || 5200);
+}
+
+function dsToastDismiss(el) {
+    if (!el || el.classList.contains('is-leaving')) return;
+    el.classList.add('is-leaving');
+    setTimeout(function () { el.remove(); }, 260);
+}
+
+
+// Swap declarative [data-icon] placeholders for inline outline SVGs.
+function dsHydrateIcons(root) {
+    (root || document).querySelectorAll('[data-icon]').forEach(function (el) {
+        if (el.dataset.iconDone) return;
+        const svg = dsIcon(el.getAttribute('data-icon'), el.classList.contains('ps-search-ico') ? 16 : 18);
+        if (svg) { el.innerHTML = svg; el.dataset.iconDone = '1'; }
+    });
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { dsHydrateIcons(); });
+} else { dsHydrateIcons(); }
+
+
+// Circular gauge from a measured percentage. Renders nothing rather than a
+// zero ring when the value is unknown.
+function dashGauge(label, percent, sub, color) {
+    const r = 22, c = 2 * Math.PI * r;
+    const known = percent != null;
+    const dash = known ? (c * Math.max(0, Math.min(100, percent)) / 100) : 0;
+    return '<div class="ps-gauge-row">' +
+        '<div class="ps-gauge">' +
+            '<svg width="54" height="54" viewBox="0 0 54 54">' +
+                '<circle class="ps-gauge-track" cx="27" cy="27" r="' + r + '" fill="none" stroke-width="5"/>' +
+                (known ? '<circle cx="27" cy="27" r="' + r + '" fill="none" stroke="' + color + '" ' +
+                    'stroke-width="5" stroke-linecap="round" stroke-dasharray="' + dash.toFixed(1) +
+                    ' ' + c.toFixed(1) + '"/>' : '') +
+            '</svg>' +
+            '<div class="ps-gauge-value">' + (known ? Math.round(percent) + '%' : '—') + '</div>' +
+        '</div>' +
+        '<div class="ps-gauge-meta">' +
+            '<div class="ps-gauge-label">' + psEscape(label) + '</div>' +
+            '<div class="ps-gauge-sub">' + psEscape(sub) + '</div>' +
+        '</div></div>';
+}
+
+/* =====================================================================
+   Workspaces, not windows.
+
+   Existing app surfaces are MOVED (not rebuilt) into workspace panes at
+   boot. Because they are the same DOM nodes, every event handler, the
+   xterm terminal and the chat transport keep working exactly as before —
+   they simply lose their window chrome and become part of one surface.
+   ===================================================================== */
+
+const WORKSPACES = {
+    home:     { title: 'Home',              windows: [] },
+    ai:       { title: 'AI Studio',         windows: ['win-chat', 'win-image', 'win-voice'] },
+    dev:      { title: 'Developer',         windows: ['win-foreman'] },
+    storage:  { title: 'Files & storage',   windows: ['win-drive', 'win-explorer'] },
+    security: { title: 'Devices & access',  windows: ['win-devices', 'win-jobs'] },
+    system:   { title: 'System',            windows: ['win-vitals', 'win-core'] },
+    settings: { title: 'Settings',          windows: ['win-settings'] },
+};
+
+let _wsCurrent = 'home';
+let _wsAdopted = false;
+
+// Move each window into its workspace pane once, stripping the chrome.
+function wsAdoptWindows() {
+    if (_wsAdopted) return;
+    _wsAdopted = true;
+    Object.keys(WORKSPACES).forEach(function (key) {
+        const pane = document.getElementById('ws-' + key);
+        if (!pane) return;
+        WORKSPACES[key].windows.forEach(function (winId) {
+            const win = document.getElementById(winId);
+            if (!win || win.dataset.adopted) return;
+            win.dataset.adopted = '1';
+            win.classList.add('ps-adopted');
+            // Inline geometry from the floating layout must go, or the pane
+            // inherits absolute positioning and collapses.
+            win.style.top = win.style.left = win.style.width = win.style.height = '';
+            win.style.transform = '';
+            win.style.display = 'flex';
+            pane.appendChild(win);
+        });
+    });
+}
+
+function wsGo(key) {
+    if (!WORKSPACES[key]) return;
+    wsAdoptWindows();
+    _wsCurrent = key;
+    document.querySelectorAll('.ps-ws').forEach(function (pane) {
+        const active = pane.id === 'ws-' + key;
+        pane.hidden = !active;
+        pane.classList.toggle('is-active', active);
+    });
+    document.querySelectorAll('.ps-rail-item[data-workspace]').forEach(function (item) {
+        item.classList.toggle('is-active', item.getAttribute('data-workspace') === key);
+        item.setAttribute('aria-current', item.getAttribute('data-workspace') === key ? 'page' : 'false');
+    });
+    const label = document.getElementById('ws-title');
+    if (label) label.textContent = WORKSPACES[key].title;
+    if (key === 'home') dashboardRefresh();
+    if (key === 'security') { try { devicesRefresh(); } catch (e) {} }
+    if (key === 'settings') { try { settingsRefresh(); } catch (e) {} }
+    dsHydrateIcons(document.getElementById('ws-' + key));
+}
+
+// Dock and legacy callers still say toggleWindow(...); route them to the
+// workspace that now owns that surface instead of floating a window.
+const _wsOwnerOf = {};
+Object.keys(WORKSPACES).forEach(function (key) {
+    WORKSPACES[key].windows.forEach(function (w) { _wsOwnerOf[w] = key; });
+});
+
+if (typeof window.toggleWindow === 'function') {
+    const _legacyToggleWindow = window.toggleWindow;
+    window.toggleWindow = function (winId) {
+        const owner = _wsOwnerOf[winId];
+        if (owner && _wsAdopted) { wsGo(owner); return; }
+        return _legacyToggleWindow.apply(this, arguments);
+    };
+}
+
+/* ---- click ripple on interactive chrome ---------------------------- */
+document.addEventListener('pointerdown', function (event) {
+    const target = event.target.closest('.dock-btn, .ps-rail-item, .ds-btn, .ps-cta');
+    if (!target) return;
+    const rect = target.getBoundingClientRect();
+    const ripple = document.createElement('span');
+    const size = Math.max(rect.width, rect.height);
+    ripple.className = 'ds-ripple';
+    ripple.style.width = ripple.style.height = size + 'px';
+    ripple.style.left = (event.clientX - rect.left - size / 2) + 'px';
+    ripple.style.top = (event.clientY - rect.top - size / 2) + 'px';
+    if (getComputedStyle(target).position === 'static') target.style.position = 'relative';
+    target.appendChild(ripple);
+    setTimeout(function () { ripple.remove(); }, 500);
+}, { passive: true });
+
+/* ---- keyboard: workspace switching + search focus ------------------ */
+document.addEventListener('keydown', function (event) {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
+        event.preventDefault();
+        const input = document.getElementById('dash-search');
+        if (input) { input.focus(); input.select(); }
+    }
+    if (event.key === 'Escape') { dashSearchClear(); }
+});

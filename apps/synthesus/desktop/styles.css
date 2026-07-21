@@ -16,22 +16,22 @@
     --text-muted: #6b7ea3;
 
     /* Accents: electric blue, violet, cyan, teal. */
-    --accent: #38bdf8;
-    --accent-blue: #38bdf8;
-    --accent-blue-glow: rgba(56, 189, 248, 0.5);
+    --accent: #8B5CF6;
+    --accent-blue: #8B5CF6;
+    --accent-blue-glow: rgba(139, 92, 246, 0.5);
     --accent-violet: #a78bfa;
     --accent-violet-glow: rgba(167, 139, 250, 0.5);
-    --accent-cyan: #22d3ee;
-    --accent-cyan-glow: rgba(34, 211, 238, 0.5);
-    --accent-teal: #2dd4bf;
+    --accent-cyan: #A78BFA;
+    --accent-cyan-glow: rgba(167, 139, 250, 0.5);
+    --accent-teal: #C4B5FD;
     --accent-teal-glow: rgba(45, 212, 191, 0.5);
 
     --ok: #34d399;
     --warn: #fbbf24;
     --danger: #fb7185;
 
-    --bg-desktop: linear-gradient(135deg, #0b1024 0%, #171335 55%, #0d1b33 100%);
-    --bg-space: #070a16;
+    --bg-desktop: linear-gradient(135deg, #050509 0%, #16102b 55%, #0a0a12 100%);
+    --bg-space: #050509;
     --accent-amber: #fbbf24;
     --accent-amber-glow: rgba(251, 191, 36, 0.5);
     --accent-pink: #f472b6;
@@ -653,6 +653,7 @@ body.has-instr-strip .window { margin-top: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
     .instr-btn, .dock-btn, .message { transition: none !important; animation: none !important; }
+}
 
 /* ===================== WOW PASS — instrument OS chrome ===================== */
 body.desktop-live #desktop-area {
@@ -1353,3 +1354,548 @@ body.desktop-live #desktop-area {
 .ps-line-state.is-warn { color: var(--warn); }
 .ps-line-state.is-bad { color: var(--danger); }
 .ps-line-state.is-unknown { color: var(--text-muted); }
+
+/* ---------------------------------------------------------------------
+   Dock: buttons hold an icon AND a label, but were fixed 44x44 squares, so
+   labels overflowed and collided with their neighbours ("Settings" over
+   "Jobs"). Size to content instead, and stack icon over label.
+   --------------------------------------------------------------------- */
+.dock-btn {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: auto;
+    min-width: 46px;
+    height: auto;
+    min-height: 46px;
+    padding: 5px 9px;
+    line-height: 1.05;
+}
+.dock-btn .dock-ico { font-size: 1.05rem; }
+.dock-btn .dock-lbl {
+    max-width: 74px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+@media (max-width: 720px) {
+    .dock-btn { min-width: 40px; padding: 4px 6px; }
+    .dock-btn .dock-lbl { max-width: 52px; }
+}
+
+/* ---------------------------------------------------------------------
+   Overview as the desktop itself, not a window floating on it. The
+   reference design is dashboard-first: the rail and hero ARE the surface,
+   with the app's windows opening above it.
+   --------------------------------------------------------------------- */
+#win-dashboard.ps-overview-layer {
+    position: absolute;
+    inset: 0;
+    width: auto !important;
+    height: auto !important;
+    top: 0 !important;
+    left: 0 !important;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    z-index: 1;            /* windows sit above this; the dock is 10060 */
+    resize: none;
+}
+#win-dashboard.ps-overview-layer .window-header { display: none; }
+#win-dashboard.ps-overview-layer::after { display: none; }
+#win-dashboard.ps-overview-layer .window-content {
+    height: 100%;
+    padding: 0;
+    background: transparent;
+}
+#win-dashboard.ps-overview-layer .ps-rail {
+    background: linear-gradient(180deg, rgba(14, 19, 38, 0.86), rgba(10, 14, 30, 0.9));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    backdrop-filter: blur(var(--glass-blur));
+}
+#win-dashboard.ps-overview-layer .ps-main { padding: 18px 22px 96px; }
+
+/* ---- Overview: brand, search, hero artwork, sparklines ---------------- */
+
+.ps-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 10px 16px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--glass-border);
+}
+.ps-brand-mark {
+    display: grid;
+    place-items: center;
+    width: 30px; height: 30px;
+    border-radius: 9px;
+    font-size: 0.95rem;
+    color: #08111f;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-violet));
+    box-shadow: 0 6px 18px -8px var(--accent-cyan-glow);
+}
+.ps-brand-name { font-size: 0.98rem; font-weight: 600; letter-spacing: 0.01em; }
+
+.ps-search { position: relative; flex: 1; max-width: 420px; }
+.ps-search-ico {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--text-muted); font-size: 0.95rem; pointer-events: none;
+}
+.ps-search-input {
+    width: 100%;
+    padding: 9px 14px 9px 32px;
+    border-radius: 999px;
+    border: 1px solid var(--glass-border);
+    background: rgba(148, 178, 255, 0.07);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 0.83rem;
+    transition: border-color 160ms var(--ease), background 160ms var(--ease);
+}
+.ps-search-input::placeholder { color: var(--text-muted); }
+.ps-search-input:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+    background: rgba(148, 178, 255, 0.11);
+}
+.ps-search-results {
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+    background: rgba(16, 22, 42, 0.97);
+    border: 1px solid var(--glass-border-strong);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-soft);
+    overflow: hidden;
+    display: none;
+    z-index: 40;
+}
+.ps-search-results.is-open { display: block; }
+.ps-search-hit {
+    display: block; width: 100%; text-align: left;
+    padding: 9px 14px; border: none; background: transparent;
+    color: var(--text-primary); font: inherit; font-size: 0.83rem; cursor: pointer;
+}
+.ps-search-hit:hover, .ps-search-hit.is-first { background: rgba(56, 189, 248, 0.14); }
+.ps-search-hit small { display: block; color: var(--text-muted); font-size: 0.7rem; }
+
+.ps-hero { min-height: 208px; display: flex; align-items: center; }
+.ps-hero-art {
+    position: absolute; inset: 0;
+    background-image: url("wallpaper.jpg");
+    background-size: cover;
+    background-position: center 38%;
+    opacity: 0.55;
+    z-index: 0;
+}
+.ps-hero::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, rgba(9, 13, 28, 0.94) 0%, rgba(9, 13, 28, 0.72) 42%, rgba(9, 13, 28, 0.18) 100%);
+    z-index: 1;
+}
+.ps-hero-copy { position: relative; z-index: 2; }
+
+/* Sparkline drawn from values this page actually sampled. */
+.ps-spark { display: block; width: 100%; height: 30px; margin-top: 2px; }
+.ps-spark path { fill: none; stroke-width: 1.8; vector-effect: non-scaling-stroke; }
+.ps-spark .ps-spark-fill { stroke: none; opacity: 0.16; }
+.ps-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ps-card-ico { font-size: 0.85rem; opacity: 0.85; }
+
+/* =====================================================================
+   Blueprint alignment: exact palette, 8px rhythm, unified shell.
+   Loaded after the legacy sheet so these win without !important.
+   ===================================================================== */
+
+body { background-color: var(--bg-0); color: var(--fg); }
+
+/* ---- shell surfaces ---- */
+#win-dashboard.ps-overview-layer .ps-rail {
+    width: 260px;
+    padding: var(--s3) var(--s2);
+    gap: 2px;
+    background: linear-gradient(180deg, rgba(9, 13, 21, 0.9), rgba(5, 7, 12, 0.94));
+    border-right: 1px solid var(--hairline);
+}
+.ps-brand { padding: 0 var(--s1) var(--s3); border-bottom: 1px solid var(--hairline); }
+.ps-brand-name { font-weight: var(--w-title); }
+.ps-brand-mark { background: linear-gradient(135deg, var(--purple), var(--purple-light)); border-radius: 10px; }
+
+.ps-rail-item {
+    gap: var(--s2);
+    padding: 11px var(--s2);
+    border-radius: var(--r-btn);
+    font-size: 0.9rem;
+    font-weight: var(--w-button);
+    color: var(--fg-muted);
+    transition: background var(--t-base) var(--spring), color var(--t-base) var(--spring),
+                transform var(--t-fast) var(--spring);
+}
+.ps-rail-item:hover { background: rgba(255,255,255,0.05); color: var(--fg); transform: translateX(2px); }
+.ps-rail-item.is-active {
+    color: var(--fg);
+    background: linear-gradient(90deg, rgba(139,92,246,0.22), rgba(167,139,250,0.08));
+    border-color: transparent;
+    position: relative;
+}
+.ps-rail-item.is-active::before {
+    content: ""; position: absolute; left: 0; top: 22%; bottom: 22%;
+    width: 3px; border-radius: 2px; background: linear-gradient(180deg, var(--purple-bright), var(--purple));
+}
+.ps-rail-ico { display: grid; place-items: center; width: 20px; color: currentColor; }
+.ps-rail-user { border-radius: var(--r-btn); border-color: var(--hairline); }
+
+.ps-main { padding: var(--s3) var(--s4) 104px; gap: var(--s3); }
+.ps-topbar { height: 64px; gap: var(--s3); }
+.ps-search { max-width: 520px; }
+.ps-search-input { height: 44px; border-radius: var(--r-pill); font-size: 0.88rem; }
+.ps-search-input:focus { border-color: var(--purple); box-shadow: 0 0 0 4px rgba(139,92,246,0.20); }
+.ps-status { border-radius: var(--r-pill); border-color: var(--hairline); background: rgba(255,255,255,0.04); }
+
+.ps-hero { border-radius: var(--r-card); padding: var(--s5) var(--s4); border-color: var(--hairline); min-height: 232px; }
+.ps-hero-eyebrow { color: var(--purple-light); font-weight: var(--w-meta); letter-spacing: 0.18em; }
+.ps-hero-title { font-size: 2.3rem; font-weight: var(--w-title); letter-spacing: -0.02em; }
+.ps-hero-sub { color: var(--fg-muted); font-size: 0.95rem; margin-bottom: var(--s3); }
+.ps-hero-actions { gap: var(--s2); }
+.ps-cta {
+    height: 46px; padding: 0 var(--s3); border-radius: var(--r-btn);
+    background: linear-gradient(135deg, var(--purple), var(--purple-light));
+    color: #07101f; font-weight: 600;
+}
+.ps-cta-ghost { background: rgba(255,255,255,0.06); color: var(--fg); border-color: var(--hairline); }
+
+.ps-grid { gap: var(--s2); grid-template-columns: repeat(auto-fill, minmax(212px, 1fr)); }
+.ps-card {
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+    padding: var(--s3);
+    gap: var(--s1);
+}
+.ps-card:hover { border-color: var(--hairline-strong); box-shadow: var(--shadow-3); }
+.ps-card-label { color: var(--fg-dim); font-weight: var(--w-meta); letter-spacing: 0.1em; }
+.ps-card-value { font-weight: var(--w-title); letter-spacing: -0.02em; }
+.ps-card-sub { color: var(--fg-muted); font-weight: var(--w-meta); }
+
+.ps-two-col { gap: var(--s2); }
+.ps-panel {
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+    padding: var(--s3);
+    gap: var(--s2);
+}
+.ps-panel-head h3 { font-weight: var(--w-section); font-size: 1rem; }
+.ps-panel-note { color: var(--fg-dim); font-weight: var(--w-meta); }
+.ps-line { padding: var(--s1) 0; border-top-color: rgba(255,255,255,0.05); }
+.ps-line-label { font-weight: var(--w-button); }
+.ps-line-help { color: var(--fg-dim); font-weight: var(--w-meta); }
+.ps-line-state.is-ok { color: var(--success); }
+.ps-line-state.is-warn { color: var(--warning); }
+.ps-line-state.is-bad { color: var(--error); }
+
+/* ---- dock: centred, floating, icons only, magnify on hover ---- */
+.dock {
+    left: 50%; right: auto;
+    transform: translateX(-50%);
+    max-width: min(92vw, 900px);
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 10px 14px;
+    gap: 10px;
+    border-radius: 22px;
+    background: rgba(9, 13, 21, 0.74);
+    border: 1px solid var(--hairline);
+    box-shadow: var(--shadow-3);
+}
+.dock::-webkit-scrollbar { display: none; }
+.dock-btn {
+    width: 46px; min-width: 46px; height: 46px; min-height: 46px;
+    padding: 0; gap: 0;
+    border-radius: var(--r-btn);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--hairline);
+    transform-origin: bottom center;
+    transition: transform var(--t-base) var(--spring), background var(--t-base) var(--spring);
+}
+/* Icons only, per the blueprint — the label becomes a tooltip. */
+.dock-btn .dock-lbl {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    padding: 5px 10px;
+    border-radius: 10px;
+    background: rgba(9, 13, 21, 0.96);
+    border: 1px solid var(--hairline-strong);
+    color: var(--fg);
+    font-family: var(--font);
+    font-size: 0.72rem;
+    font-weight: var(--w-button);
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+    max-width: none;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--t-base) var(--spring), transform var(--t-base) var(--spring);
+    box-shadow: var(--shadow-2);
+}
+.dock-btn { position: relative; }
+.dock-btn:hover { transform: scale(1.18) translateY(-6px); background: rgba(255,255,255,0.1) !important; }
+.dock-btn:hover .dock-lbl { opacity: 1; transform: translateX(-50%) translateY(0); }
+.dock-btn .dock-ico { font-size: 1.25rem; }
+
+/* ---- windows adopt the same language until they are re-homed ---- */
+.window {
+    background: var(--panel) !important;
+    border: 1px solid var(--hairline) !important;
+    border-radius: var(--r-card) !important;
+    box-shadow: var(--shadow-3) !important;
+}
+.window-header {
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--hairline);
+    border-radius: var(--r-card) var(--r-card) 0 0;
+}
+.window-title { font-weight: var(--w-section); font-size: 0.9rem; letter-spacing: -0.01em; }
+
+/* ---- login: centred glass card, minimal ---- */
+#login-modal .login-card, #login-modal .glass-panel {
+    border-radius: var(--r-card);
+    border: 1px solid var(--hairline);
+    background: var(--panel);
+    box-shadow: var(--shadow-3);
+}
+#login-modal .glass-input { height: 50px; border-radius: var(--r-btn); font-size: 0.94rem; }
+#login-modal .primary-btn { height: 50px; border-radius: var(--r-btn); font-weight: 600; }
+
+/* ---- responsive: no overlap up to 4K ---- */
+@media (min-width: 2400px) {
+    .ps-main { padding: var(--s4) var(--s6) 120px; }
+    .ps-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+    .ps-hero-title { font-size: 2.8rem; }
+}
+@media (max-width: 1100px) {
+    #win-dashboard.ps-overview-layer .ps-rail { width: 72px; }
+    #win-dashboard.ps-overview-layer .ps-rail-item span:last-child,
+    .ps-brand-name, .ps-rail-user { display: none; }
+    .ps-rail-item { justify-content: center; padding: 11px 0; }
+    .ps-main { padding: var(--s2) var(--s3) 104px; }
+}
+
+/* ---- brand mark: purple field, white S, per the Synthesus logo ---- */
+.ps-brand-mark {
+    background: linear-gradient(160deg, var(--purple), var(--purple-deep)) !important;
+    color: #FFFFFF;
+    border: 1px solid rgba(255,255,255,0.14);
+    box-shadow: 0 8px 22px -10px rgba(139, 92, 246, 0.9);
+}
+.ps-hero-art { opacity: 0.28; filter: saturate(0.35) hue-rotate(-16deg); }
+.ps-hero::after {
+    background: linear-gradient(90deg, rgba(5,5,9,0.96) 0%, rgba(5,5,9,0.8) 44%, rgba(20,10,38,0.42) 100%);
+}
+
+/* ---- the Synthesus mark, used consistently ------------------------- */
+
+.ps-brand-mark {
+    background: linear-gradient(160deg, rgba(139,92,246,0.30), rgba(109,40,217,0.18)) !important;
+    display: grid;
+    place-items: center;
+}
+.ps-brand-mark img { display: block; filter: drop-shadow(0 0 6px rgba(167,139,250,0.55)); }
+
+.ps-login-mark {
+    display: block;
+    margin: 0 auto var(--s2);
+    filter: drop-shadow(0 6px 26px rgba(139, 92, 246, 0.55));
+}
+
+.dock-brand {
+    background: linear-gradient(160deg, rgba(139,92,246,0.26), rgba(109,40,217,0.14)) !important;
+    border-color: rgba(167,139,250,0.34) !important;
+}
+.dock-brand .dock-ico img { display: block; filter: drop-shadow(0 0 7px rgba(167,139,250,0.6)); }
+.dock-sep {
+    width: 1px;
+    align-self: stretch;
+    margin: 6px 2px;
+    background: var(--hairline);
+    flex: none;
+}
+
+/* Boot flash tinted to the brand rather than cyan. */
+.boot-flash {
+    background: radial-gradient(ellipse at 50% 40%, rgba(139, 92, 246, 0.26), transparent 55%) !important;
+}
+
+/* ---- three-column shell: rail | main | right panel ------------------ */
+
+#win-dashboard.ps-overview-layer .window-content { display: flex; }
+.ps-aside {
+    width: 320px;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2);
+    padding: var(--s3);
+    overflow-y: auto;
+    background: linear-gradient(180deg, rgba(10,10,18,0.72), rgba(5,5,9,0.86));
+    border-left: 1px solid var(--hairline);
+}
+.ps-quick { display: flex; flex-direction: column; gap: var(--s1); }
+.ps-quick .ds-btn { width: 100%; justify-content: flex-start; height: 42px; }
+
+/* Circular gauge, drawn from a measured percentage. */
+.ps-gauge-row { display: flex; align-items: center; gap: var(--s2); padding: var(--s1) 0; }
+.ps-gauge { position: relative; width: 54px; height: 54px; flex: none; }
+.ps-gauge svg { transform: rotate(-90deg); display: block; }
+.ps-gauge-track { stroke: rgba(255,255,255,0.08); }
+.ps-gauge-value {
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+    font-size: 0.74rem; font-weight: var(--w-section);
+}
+.ps-gauge-meta { min-width: 0; }
+.ps-gauge-label { font-size: 0.84rem; font-weight: var(--w-button); }
+.ps-gauge-sub { font-size: 0.72rem; color: var(--fg-dim); font-weight: var(--w-meta); }
+
+@media (max-width: 1500px) { .ps-aside { width: 268px; } }
+@media (max-width: 1240px) { .ps-aside { display: none; } }
+
+/* =====================================================================
+   Workspaces: one surface, no floating chrome. Depth instead of borders.
+   ===================================================================== */
+
+/* ---- living background: layered gradients + slow light, very low opacity */
+body.desktop-live::before,
+body.desktop-live::after {
+    content: "";
+    position: fixed;
+    inset: -20%;
+    pointer-events: none;
+    z-index: -2;
+    will-change: transform, opacity;
+}
+body.desktop-live::before {
+    background:
+        radial-gradient(46% 38% at 18% 22%, rgba(139, 92, 246, 0.16), transparent 62%),
+        radial-gradient(40% 34% at 82% 16%, rgba(79, 110, 255, 0.10), transparent 64%),
+        radial-gradient(50% 44% at 66% 88%, rgba(167, 139, 250, 0.10), transparent 66%);
+    animation: ws-drift 48s ease-in-out infinite alternate;
+}
+body.desktop-live::after {
+    background-image:
+        radial-gradient(1.4px 1.4px at 12% 28%, rgba(255,255,255,.28), transparent 60%),
+        radial-gradient(1.2px 1.2px at 74% 18%, rgba(255,255,255,.22), transparent 60%),
+        radial-gradient(1.6px 1.6px at 42% 72%, rgba(255,255,255,.20), transparent 60%),
+        radial-gradient(1.1px 1.1px at 88% 64%, rgba(255,255,255,.18), transparent 60%),
+        radial-gradient(1.3px 1.3px at 28% 86%, rgba(255,255,255,.16), transparent 60%);
+    opacity: .5;
+    animation: ws-float 90s linear infinite;
+}
+@keyframes ws-drift {
+    from { transform: translate3d(0,0,0) scale(1); }
+    to   { transform: translate3d(2%, -1.5%, 0) scale(1.06); }
+}
+@keyframes ws-float {
+    from { transform: translate3d(0, 0, 0); }
+    to   { transform: translate3d(-3%, -4%, 0); }
+}
+
+/* ---- workspace panes ---- */
+.ps-ws { display: none; flex-direction: column; gap: var(--s3); min-width: 0; }
+.ps-ws.is-active { display: flex; animation: ws-in 260ms var(--spring); }
+@keyframes ws-in {
+    from { opacity: 0; transform: translate3d(0, 8px, 0); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* ---- adopted surfaces: cards attached to the desktop, not windows ---- */
+.window.ps-adopted {
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 380px;
+    max-height: none;
+    transform: none !important;
+    border: none !important;
+    border-radius: var(--r-card) !important;
+    background: var(--panel) !important;
+    box-shadow: var(--elev-2), var(--ambient) !important;
+    resize: none;
+    animation: ws-in 240ms var(--spring);
+}
+.window.ps-adopted > .window-header {
+    background: transparent;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+    padding: var(--s2) var(--s3);
+    cursor: default;
+}
+/* One global navigation: per-window traffic lights and resize grips go. */
+.window.ps-adopted .window-controls,
+.window.ps-adopted::after { display: none !important; }
+.window.ps-adopted > .window-header .window-title {
+    font-size: var(--t-h2);
+    font-weight: var(--w-section);
+    text-transform: none;
+    letter-spacing: -0.01em;
+}
+.window.ps-adopted > .window-content { padding: var(--s3); }
+
+/* ---- depth instead of outlines across the shell ---- */
+.ps-card, .ps-panel, .ps-aside, .ds-card {
+    border-color: transparent;
+    box-shadow: var(--elev-1), var(--ambient);
+}
+.ps-card:hover, .ds-card:hover { box-shadow: var(--elev-2), var(--ambient); }
+.ps-panel { background: linear-gradient(180deg, rgba(22,22,34,.66), rgba(14,14,24,.72)); }
+.ps-aside { border-left: none; box-shadow: -24px 0 60px -40px rgba(0,0,0,.9); }
+#win-dashboard.ps-overview-layer .ps-rail { border-right: none; box-shadow: 24px 0 60px -40px rgba(0,0,0,.9); }
+
+/* ---- sidebar groups ---- */
+#win-dashboard.ps-overview-layer .ps-rail { width: 276px; }
+.ps-rail-group {
+    font-size: var(--t-micro);
+    color: var(--fg-dim);
+    font-weight: var(--w-meta);
+    letter-spacing: .06em;
+    padding: var(--s2) var(--s2) 4px;
+}
+.ps-rail-item.is-active {
+    background: linear-gradient(90deg, rgba(139,92,246,.26), rgba(167,139,250,.06));
+    box-shadow: 0 8px 24px -14px rgba(139,92,246,.9);
+}
+.ps-rail-item.is-active::before { background: linear-gradient(180deg, var(--purple-bright), var(--purple)); }
+
+/* ---- dock: more air, smoother motion ---- */
+.dock { gap: 14px; padding: 12px 18px; }
+.dock-btn { transition: transform 220ms var(--spring), background 220ms var(--spring), box-shadow 220ms var(--spring); }
+.dock-btn:hover {
+    transform: scale(1.22) translateY(-8px);
+    box-shadow: 0 16px 34px -16px rgba(139,92,246,.95);
+}
+.dock-btn .dock-ico svg { display: block; }
+
+/* ---- responsive: 1080p → ultrawide, no overlap ---- */
+@media (min-width: 3000px) {
+    .ps-main { max-width: 1900px; margin: 0 auto; }
+    .ps-aside { width: 380px; }
+}
+
+/* Single global navigation: the top bar names the current workspace. */
+.ps-ws-title {
+    font-size: var(--t-h2);
+    font-weight: var(--w-section);
+    letter-spacing: -0.01em;
+    margin: 0;
+    white-space: nowrap;
+    flex: none;
+}
+@media (max-width: 1100px) { .ps-ws-title { display: none; } }
