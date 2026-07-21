@@ -24,12 +24,14 @@ websockets requests flask flask_cors werkzeug pywebview`.
   object-level backpressure, reference reconciliation. 20 refusal-first tests
   (`tests/unisync/test_zone_sync.py`) incl. grounding-never-over-public and
   node-never-leaves-device. Full suite: 428→448 passing (+20, zero new fails).
-- **CSG + SDF Image Forge** (owner-requested wow feature). Vendored
+- **CSG + SDF Image Forge (v2)** (owner-requested wow feature). Vendored
   dependency-free WebGL2 raymarcher (`assets/sdf_forge.js`): union/intersect/
-  difference, smooth union, Menger sponge, infinite lattice. New `win-forge`
-  window, design-token styled, degrades to "unknown" (no fake frame). 21 wiring
-  tests. Rendered for real in headless Chromium (3 scenes, non-empty PNGs).
-  Cache-bust bumped to `?v=20260721k`.
+  difference, smooth union, Menger sponge, infinite lattice, gyroid orb. Soft
+  shadows, AO, fresnel glow, purple palettes, vignette + film grain. Shareable
+  recipe codes (`SF1.m.i.b.h.g.p.c`), free-text seeds, 6 named presets, PNG
+  export. New `win-forge` window, design-token styled, degrades to "unknown"
+  (no fake frame). 32 wiring/determinism tests. Rendered for real in headless
+  Chromium (6 presets, non-empty PNGs). Cache-bust `?v=20260721l`.
 
 Deliverable exported as `/app/synthesus_phase3_and_forge.patch` (commit on branch
 `agent/phase3-zone-sync-and-forge`). Not pushed (no write creds; owner must grant

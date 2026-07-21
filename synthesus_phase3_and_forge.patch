@@ -1,7 +1,7 @@
 From 8261fc8e463abcfecbf95d2904d36fb58b07d21c Mon Sep 17 00:00:00 2001
 From: synthesus-agent <agent@synthesus.local>
 Date: Tue, 21 Jul 2026 17:52:01 +0000
-Subject: [PATCH] Phase 3: zone-aware expansion-drive sync; plus offline
+Subject: [PATCH 1/2] Phase 3: zone-aware expansion-drive sync; plus offline
  CSG+SDF image forge
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -1650,6 +1650,864 @@ index 0000000..7a2e6c4
 +    assert "internet_mtls_relay" in MESH_TRANSPORT_IDS
 +    assert "lan_mtls" in MESH_TRANSPORT_IDS
 +    assert "local_process" in MESH_TRANSPORT_IDS
+-- 
+2.39.5
+
+
+From 8b10973858582f67e1bb0d6cf30b63cd5eaf6ac2 Mon Sep 17 00:00:00 2001
+From: synthesus-agent <agent@synthesus.local>
+Date: Tue, 21 Jul 2026 18:02:11 +0000
+Subject: [PATCH 2/2] Image Forge v2: shareable recipe codes, 6 presets, gyroid
+ scene, soft shadows/AO/fresnel glow, palettes, vignette+grain (offline,
+ purple-only)
+
+---
+ AGENT_LOG.md                                |  50 ++++
+ apps/synthesus/desktop/assets/sdf_forge.js  | 263 +++++++++++++++++---
+ apps/synthesus/desktop/index.html           |  45 +++-
+ apps/synthesus/desktop/script.js            | 137 ++++++++--
+ apps/synthesus/desktop/styles.css           |   8 +
+ apps/synthesus/desktop/test_forge_wiring.py |  54 +++-
+ 6 files changed, 481 insertions(+), 76 deletions(-)
+
+diff --git a/AGENT_LOG.md b/AGENT_LOG.md
+index 2282b41..c228fc2 100644
+--- a/AGENT_LOG.md
++++ b/AGENT_LOG.md
+@@ -2554,3 +2554,53 @@ NEXT PIECES, in order
+   static wiring tests.
+ - NO FINISH_CHECKLIST box checked.
+ 
++
++## 2026-07-21 — Image Forge v2: shareable recipes, presets, richer render
++
++### Work completed (owner asked for "more flavor / more exciting")
++
++- Recipe system: a scene is fully described by a short, shareable code
++  `SF1.mode.iters.blend.hue.glow.palette.cam`. `encodeRecipe`/`decodeRecipe`
++  round-trip; `recipeFromSeed(text)` grows a deterministic recipe from any free
++  text (a mulberry32 PRNG over an FNV hash), so a typed word or a pasted code
++  both reproduce the same picture on any machine. Six named `PRESETS`.
++- UI: added a Preset picker, a recipe input with Load / Copy / "Surprise me",
++  and Palette / Glow / Camera controls. Export filenames carry the recipe code.
++  All new handlers are real `function` definitions; all controls have
++  `data-testid`s; styling uses design tokens only (mono font on the code field).
++- Render flavour: a 4th scene (Gyroid lattice — an implicit minimal surface
++  intersected with a sphere), plus soft shadows, 5-tap ambient occlusion,
++  fresnel rim glow (the `Glow` control), specular white highlights, a central
++  sky glow, vignette and procedural film grain. Colours stay strictly in the
++  purple family (hue clamped 260–320; no blue/cyan), richness from
++  value/saturation and white highlights via two palette colours per theme.
++- Cache-bust bumped to `?v=20260721l`; module served as `sdf_forge.js?v=2`.
++- Tests grew to 32 (`test_forge_wiring.py`), adding a headless node check that
++  recipes are deterministic and round-trip, presets all decode, a bad code
++  decodes to null, and that four scenes + named presets exist.
++
++### Commands run and their real output
++
++- `node --check` on `script.js` and `assets/sdf_forge.js` -> exit 0.
++- Headless node recipe check (determinism, round-trip, presets, null) -> `ok
++  SF1.…`.
++- `.venv/bin/python -m pytest apps/synthesus/desktop -q
++  --ignore=…/test_desktop_security.py` -> `110 passed` (78 pre-existing + 32
++  forge). No desktop regression.
++
++### RENDERED — not simulated
++
++- Served the desktop dir and loaded a temporary preview of all six PRESETS in
++  headless Chromium (WebGL2/SwiftShader) at the routed origin. Every preset
++  returned a non-empty PNG (383,934–477,634 bytes) and the screenshot showed
++  six distinct purple geometries — including the gyroid orb with visible rim
++  glow, film grain and vignette. Harness removed afterward; not in the boot
++  path.
++
++### HONEST GAPS
++
++- Same as v1: headless SwiftShader, NOT the pywebview native shell; the full
++  `script.js` app was not booted against `synthesusd` here. Clipboard copy may
++  be blocked in some webviews — the code is still shown in the field as a
++  fallback. NO FINISH_CHECKLIST box checked.
++
+diff --git a/apps/synthesus/desktop/assets/sdf_forge.js b/apps/synthesus/desktop/assets/sdf_forge.js
+index 1dae480..73e124e 100644
+--- a/apps/synthesus/desktop/assets/sdf_forge.js
++++ b/apps/synthesus/desktop/assets/sdf_forge.js
+@@ -30,7 +30,7 @@
+ })(typeof self !== "undefined" ? self : typeof globalThis !== "undefined" ? globalThis : this, function () {
+   "use strict";
+ 
+-  const VERSION = "1";
++  const VERSION = "2";
+ 
+   // ---- pure distance math (GPU-independent, unit-tested in node) --------
+   const math = {
+@@ -75,6 +75,103 @@
+     },
+   };
+ 
++  // ---- deterministic seeding: a short recipe string -> a scene ----------
++  // A recipe is human-legible and shareable: "SF1.m.i.b.h.g.p.c".
++  const SCENES = ["Boolean sculpture", "Infinite carved field", "Menger sponge", "Gyroid lattice"];
++  const PALETTES = ["Amethyst", "Magenta bloom", "Ultraviolet", "Orchid mist"];
++
++  const PRESETS = {
++    "Amethyst engine": "SF1.0.6.42.285.60.0.42",
++    "Void lattice": "SF1.1.6.20.300.75.2.40",
++    "Cathedral sponge": "SF1.2.7.20.278.55.3.44",
++    "Nebula gyroid": "SF1.3.5.30.312.90.1.38",
++    "Orchid bloom": "SF1.0.6.70.320.100.3.46",
++    "Ultraviolet core": "SF1.2.6.15.268.45.2.42",
++  };
++
++  function mulberry32(seed) {
++    let a = seed >>> 0;
++    return function () {
++      a |= 0;
++      a = (a + 0x6d2b79f5) | 0;
++      let t = Math.imul(a ^ (a >>> 15), 1 | a);
++      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
++      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
++    };
++  }
++
++  function hashString(str) {
++    let h = 2166136261;
++    for (let i = 0; i < str.length; i++) {
++      h ^= str.charCodeAt(i);
++      h = Math.imul(h, 16777619);
++    }
++    return h >>> 0;
++  }
++
++  function clampInt(v, lo, hi) {
++    v = Math.round(v);
++    return v < lo ? lo : v > hi ? hi : v;
++  }
++
++  // A free-text seed -> a full recipe (deterministic).
++  function recipeFromSeed(seedText) {
++    const rng = mulberry32(hashString(String(seedText || "synthesus")));
++    const mode = Math.floor(rng() * SCENES.length);
++    const iters = clampInt(2 + rng() * 8, 1, 10);
++    const blend = clampInt(rng() * 100, 0, 100);
++    const hue = clampInt(260 + rng() * 60, 260, 320);
++    const glow = clampInt(30 + rng() * 70, 0, 100);
++    const palette = Math.floor(rng() * PALETTES.length);
++    const cam = clampInt(36 + rng() * 12, 30, 52);
++    return { mode, iters, blend, hue, glow, palette, cam };
++  }
++
++  function encodeRecipe(r) {
++    return ["SF1", r.mode, r.iters, r.blend, r.hue, r.glow, r.palette, r.cam].join(".");
++  }
++
++  function decodeRecipe(text) {
++    const parts = String(text || "").trim().split(".");
++    if (parts[0] !== "SF1" || parts.length < 8) return null;
++    const n = parts.slice(1).map((x) => parseInt(x, 10));
++    if (n.some((x) => Number.isNaN(x))) return null;
++    return {
++      mode: clampInt(n[0], 0, SCENES.length - 1),
++      iters: clampInt(n[1], 1, 10),
++      blend: clampInt(n[2], 0, 100),
++      hue: clampInt(n[3], 260, 320),
++      glow: clampInt(n[4], 0, 100),
++      palette: clampInt(n[5], 0, PALETTES.length - 1),
++      cam: clampInt(n[6], 30, 52),
++    };
++  }
++
++  // Two purple-family colours per palette. Purple is the only accent hue —
++  // richness comes from value/saturation and white highlights, never blue.
++  function hslToRgb(h, s, l) {
++    h = (((h % 360) + 360) % 360) / 360;
++    const f = (n) => {
++      const k = (n + h * 12) % 12;
++      const a = s * Math.min(l, 1 - l);
++      return l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
++    };
++    return [f(0), f(8), f(4)];
++  }
++
++  function paletteColours(hue, palette) {
++    const profiles = [
++      { sA: 0.62, lA: 0.5, sB: 0.5, lB: 0.86 }, // Amethyst
++      { sA: 0.78, lA: 0.5, sB: 0.6, lB: 0.88 }, // Magenta bloom
++      { sA: 0.72, lA: 0.38, sB: 0.62, lB: 0.8 }, // Ultraviolet
++      { sA: 0.5, lA: 0.62, sB: 0.35, lB: 0.94 }, // Orchid mist
++    ];
++    const p = profiles[palette % profiles.length];
++    const colA = hslToRgb(hue, p.sA, p.lA);
++    const colB = hslToRgb(hue + 12, p.sB, p.lB);
++    return { colA, colB };
++  }
++
+   // ---- the GPU raymarcher ----------------------------------------------
+   const VERT = `#version 300 es
+   in vec2 aPos;
+@@ -85,10 +182,13 @@
+   out vec4 fragColor;
+   uniform vec2 uRes;
+   uniform float uTime;
+-  uniform int uIters;        // fractal fold depth
+-  uniform float uBlend;      // smooth-union amount
+-  uniform int uMode;         // 0 boolean sculpture, 1 infinite field, 2 fractal
+-  uniform vec3 uAccent;      // purple accent
++  uniform int uIters;
++  uniform float uBlend;
++  uniform int uMode;
++  uniform float uGlow;
++  uniform float uCam;
++  uniform vec3 uColA;
++  uniform vec3 uColB;
+ 
+   float sdSphere(vec3 p, float r){ return length(p) - r; }
+   float sdBox(vec3 p, vec3 b){ vec3 q = abs(p) - b; return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0); }
+@@ -98,18 +198,18 @@
+   float opS(float a, float b){ return max(-a,b); }
+   float opSU(float a, float b, float k){ float h = clamp(0.5+0.5*(b-a)/k,0.0,1.0); return mix(b,a,h)-k*h*(1.0-h); }
+ 
++  float hash21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
++
+   float scene(vec3 p){
+     if (uMode == 1){
+-      // infinite field: repeat a carved cube-sphere every 4 units
++      // infinite field: a carved cube-sphere repeated every 4 units
+       vec3 q = mod(p+2.0,4.0)-2.0;
+       float box = sdBox(q, vec3(1.0));
+-      float sph = sdSphere(q, 1.28);
+-      return opS(sph*0.0 + sdSphere(q,1.2), box);
++      return opS(sdSphere(q,1.2), box);
+     }
+     if (uMode == 2){
+-      // Menger sponge: the classic CSG fractal — a cube with a cross carved out
+-      // (difference), repeated at one third scale, iterated. Pure boolean algebra
+-      // on distances, scaling detail infinitely from one primitive.
++      // Menger sponge: cube minus a cross, repeated at 1/3 scale (iterated
++      // difference). Pure boolean algebra scaling detail infinitely.
+       float d = sdBox(p, vec3(1.0));
+       float s = 1.0;
+       for (int m=0;m<10;m++){
+@@ -121,64 +221,108 @@
+         float db = max(r.y, r.z);
+         float dc = max(r.z, r.x);
+         float c = (min(da, min(db, dc)) - 1.0) / s;
+-        d = max(d, c);   // difference: carve the cross out of the cube
++        d = max(d, c);
+       }
+       return d;
+     }
+-    // boolean sculpture: sphere ∩ box, minus three axis cylinders (as torii),
+-    // smooth-unioned with an orbiting sphere.
++    if (uMode == 3){
++      // Gyroid: an infinite minimal surface, intersected with a sphere so it
++      // reads as a woven orb. Scale rises gently with fractal depth.
++      float sc = 2.0 + float(uIters)*0.6;
++      vec3 q = p + vec3(0.0, uTime*0.15, 0.0);
++      float g = abs(dot(sin(q*sc), cos(q.yzx*sc))) / sc - 0.03;
++      g *= 0.5;
++      return opI(g, sdSphere(p, 1.7));
++    }
++    // boolean sculpture: box ∩ sphere, carved by an inner sphere, smooth-unioned
++    // with an orbiting sphere.
+     float box = sdBox(p, vec3(1.15));
+     float sph = sdSphere(p, 1.5);
+     float solid = opI(box, sph);
+-    float holeX = sdTorus(p.yzx, vec2(1.15, 0.42));
+-    float holeY = sdTorus(p, vec2(1.15, 0.42));
+     solid = opS(sdSphere(p, 0.72), solid);
+-    solid = min(solid, 1e9);
+     vec3 op = p - vec3(1.9*sin(uTime), 0.0, 1.9*cos(uTime));
+     float orbit = sdSphere(op, 0.55);
+     return opSU(orbit, solid, max(uBlend, 0.001));
+   }
+ 
+-  vec3 normal(vec3 p){
+-    vec2 e = vec2(0.0008, 0.0);
++  vec3 calcNormal(vec3 p){
++    vec2 e = vec2(0.0009, 0.0);
+     return normalize(vec3(
+       scene(p+e.xyy)-scene(p-e.xyy),
+       scene(p+e.yxy)-scene(p-e.yxy),
+       scene(p+e.yyx)-scene(p-e.yyx)));
+   }
+ 
++  float softShadow(vec3 ro, vec3 rd){
++    float res = 1.0; float t = 0.03;
++    for (int i=0;i<28;i++){
++      float h = scene(ro + rd*t);
++      if (h < 0.001) return 0.0;
++      res = min(res, 9.0*h/t);
++      t += clamp(h, 0.02, 0.28);
++      if (t > 7.0) break;
++    }
++    return clamp(res, 0.0, 1.0);
++  }
++
++  float calcAO(vec3 p, vec3 n){
++    float occ = 0.0; float sca = 1.0;
++    for (int i=0;i<5;i++){
++      float hr = 0.012 + 0.12*float(i)/4.0;
++      float d = scene(p + n*hr);
++      occ += (hr - d)*sca;
++      sca *= 0.86;
++    }
++    return clamp(1.0 - 1.6*occ, 0.0, 1.0);
++  }
++
+   void main(){
+     vec2 uv = (gl_FragCoord.xy*2.0 - uRes) / uRes.y;
+     float ca = cos(uTime*0.25), sa = sin(uTime*0.25);
+-    vec3 ro = vec3(4.2*sa, 1.4, 4.2*ca);
++    float dist = uCam*0.1;
++    vec3 ro = vec3(dist*sa, 1.4, dist*ca);
+     vec3 fw = normalize(-ro);
+     vec3 rt = normalize(cross(vec3(0.0,1.0,0.0), fw));
+     vec3 up = cross(fw, rt);
+     vec3 rd = normalize(uv.x*rt + uv.y*up + 1.6*fw);
+ 
+-    float t = 0.0; float d = 0.0; bool hit=false;
+-    for (int i=0;i<128;i++){
++    float t = 0.0; float d = 0.0; bool hit=false; int steps=0;
++    for (int i=0;i<160;i++){
+       vec3 p = ro + rd*t;
+       d = scene(p);
+-      if (d < 0.001){ hit=true; break; }
++      steps = i;
++      if (d < 0.0009){ hit=true; break; }
+       t += d;
+       if (t > 40.0) break;
+     }
+-    vec3 col = vec3(0.02,0.02,0.03);
++
++    vec3 sky = mix(vec3(0.015,0.012,0.02), uColA*0.10, clamp(uv.y*0.5+0.5,0.0,1.0));
++    // a soft central glow so empty space still feels lit, never flat black
++    sky += uColB * uGlow * 0.06 * exp(-2.5*length(uv));
++    vec3 col = sky;
++
+     if (hit){
+       vec3 p = ro + rd*t;
+-      vec3 n = normal(p);
+-      vec3 ld = normalize(vec3(0.6,0.8,0.4));
+-      float diff = clamp(dot(n,ld),0.0,1.0);
+-      float rim = pow(1.0-clamp(dot(n,-rd),0.0,1.0), 2.5);
+-      vec3 base = mix(vec3(0.9), uAccent, 0.55);
+-      col = base*(0.18 + 0.82*diff) + uAccent*rim*0.9;
+-      col = mix(col, vec3(0.02,0.02,0.03), clamp(t/40.0,0.0,1.0));
+-    } else {
+-      float g = clamp(uv.y*0.5+0.5, 0.0, 1.0);
+-      col = mix(vec3(0.02,0.02,0.03), uAccent*0.10, g);
++      vec3 n = calcNormal(p);
++      vec3 ld = normalize(vec3(0.55, 0.8, 0.35));
++      float dif = clamp(dot(n, ld), 0.0, 1.0);
++      float sh = softShadow(p + n*0.01, ld);
++      float ao = calcAO(p, n);
++      float fres = pow(1.0 - clamp(dot(n, -rd), 0.0, 1.0), 3.0);
++      vec3 h = normalize(ld - rd);
++      float spec = pow(clamp(dot(n, h), 0.0, 1.0), 40.0);
++
++      vec3 base = mix(uColA, uColB, 0.35 + 0.5*dif);
++      col = base * (0.14 + 0.9*dif*sh) * ao;
++      col += uColB * fres * (0.6 + uGlow);      // fresnel glow, the flavour
++      col += vec3(1.0) * spec * 0.5 * sh;       // white highlight
++      col = mix(col, sky, clamp(t/40.0, 0.0, 1.0)); // distance haze
+     }
+-    col = pow(col, vec3(0.4545)); // gamma
++
++    // vignette + subtle film grain for depth (design-guide: grain/noise)
++    col *= 1.0 - 0.30*dot(uv, uv)*0.25;
++    col += (hash21(gl_FragCoord.xy + fract(uTime)) - 0.5) * 0.035;
++    col = pow(max(col, 0.0), vec3(0.4545)); // gamma
+     fragColor = vec4(col, 1.0);
+   }`;
+ 
+@@ -203,7 +347,15 @@
+       this.startedAt = 0;
+       this.frames = 0;
+       this.fps = null; // null means "unknown", never a fabricated number
+-      this.params = { iters: 6, blend: 0.35, mode: 0, accent: [0.55, 0.36, 0.96] };
++      this.params = {
++        iters: 6,
++        blend: 0.35,
++        mode: 0,
++        glow: 0.6,
++        cam: 42,
++        colA: [0.5, 0.34, 0.85],
++        colB: [0.86, 0.74, 1.0],
++      };
+       if (this.available) this._build();
+     }
+ 
+@@ -229,7 +381,10 @@
+         iters: gl.getUniformLocation(prog, "uIters"),
+         blend: gl.getUniformLocation(prog, "uBlend"),
+         mode: gl.getUniformLocation(prog, "uMode"),
+-        accent: gl.getUniformLocation(prog, "uAccent"),
++        glow: gl.getUniformLocation(prog, "uGlow"),
++        cam: gl.getUniformLocation(prog, "uCam"),
++        colA: gl.getUniformLocation(prog, "uColA"),
++        colB: gl.getUniformLocation(prog, "uColB"),
+       };
+     }
+ 
+@@ -237,6 +392,20 @@
+       Object.assign(this.params, patch || {});
+     }
+ 
++    // Apply a decoded recipe (numbers) to GPU params, deriving the colours.
++    applyRecipe(r) {
++      const { colA, colB } = paletteColours(r.hue, r.palette);
++      this.setParams({
++        mode: r.mode,
++        iters: r.iters,
++        blend: r.blend / 100,
++        glow: r.glow / 100,
++        cam: r.cam,
++        colA,
++        colB,
++      });
++    }
++
+     drawFrame(timeSeconds) {
+       if (!this.available) return false;
+       const gl = this.gl;
+@@ -247,7 +416,10 @@
+       gl.uniform1i(this.u.iters, this.params.iters | 0);
+       gl.uniform1f(this.u.blend, this.params.blend);
+       gl.uniform1i(this.u.mode, this.params.mode | 0);
+-      gl.uniform3fv(this.u.accent, this.params.accent);
++      gl.uniform1f(this.u.glow, this.params.glow);
++      gl.uniform1f(this.u.cam, this.params.cam);
++      gl.uniform3fv(this.u.colA, this.params.colA);
++      gl.uniform3fv(this.u.colB, this.params.colB);
+       gl.drawArrays(gl.TRIANGLES, 0, 3);
+       return true;
+     }
+@@ -274,7 +446,6 @@
+     }
+ 
+     renderStill(timeSeconds) {
+-      // A single deterministic frame, for export.
+       return this.drawFrame(timeSeconds || 0);
+     }
+ 
+@@ -288,5 +459,17 @@
+     return new Renderer(canvas);
+   }
+ 
+-  return { VERSION, math, Renderer, create };
++  return {
++    VERSION,
++    math,
++    Renderer,
++    create,
++    SCENES,
++    PALETTES,
++    PRESETS,
++    recipeFromSeed,
++    encodeRecipe,
++    decodeRecipe,
++    paletteColours,
++  };
+ });
+diff --git a/apps/synthesus/desktop/index.html b/apps/synthesus/desktop/index.html
+index a853d56..40e4e2d 100644
+--- a/apps/synthesus/desktop/index.html
++++ b/apps/synthesus/desktop/index.html
+@@ -8,8 +8,8 @@
+     <link rel="icon" type="image/png" sizes="64x64" href="assets/synthesus-mark-64.png">
+     <link rel="icon" type="image/png" sizes="32x32" href="assets/synthesus-mark-32.png">
+     <link rel="apple-touch-icon" href="assets/synthesus-mark-128.png">
+-    <link rel="stylesheet" href="design-system.css?v=20260721k">
+-    <link rel="stylesheet" href="styles.css?v=20260721k">
++    <link rel="stylesheet" href="design-system.css?v=20260721l">
++    <link rel="stylesheet" href="styles.css?v=20260721l">
+     <!-- No external font CDN: the shell assets render locally and remain available offline.
+          Uses locally-installed Outfit/Fira Code if present, else a
+          native system stack. To pin the exact look later, self-host the woff2 via @font-face. -->
+@@ -814,26 +814,57 @@
+                     </div>
+                 </div>
+                 <div class="forge-controls">
++                    <label class="forge-field">
++                        <span>Preset</span>
++                        <select id="forge-preset" class="glass-input" data-testid="forge-preset" onchange="forgeLoadPreset()">
++                            <option value="">Custom…</option>
++                        </select>
++                    </label>
+                     <label class="forge-field">
+                         <span>Scene</span>
+                         <select id="forge-mode" class="glass-input" data-testid="forge-mode" onchange="forgeApply()">
+                             <option value="0">Boolean sculpture</option>
+                             <option value="1">Infinite carved field</option>
+-                            <option value="2">Fractal fold</option>
++                            <option value="2">Menger sponge</option>
++                            <option value="3">Gyroid lattice</option>
+                         </select>
+                     </label>
+                     <label class="forge-field">
+                         <span>Fractal depth</span>
+-                        <input id="forge-iters" type="range" min="1" max="12" value="6" data-testid="forge-iters" oninput="forgeApply()">
++                        <input id="forge-iters" type="range" min="1" max="10" value="6" data-testid="forge-iters" oninput="forgeApply()">
+                     </label>
+                     <label class="forge-field">
+                         <span>Smooth blend</span>
+                         <input id="forge-blend" type="range" min="0" max="100" value="35" data-testid="forge-blend" oninput="forgeApply()">
+                     </label>
++                    <label class="forge-field">
++                        <span>Palette</span>
++                        <select id="forge-palette" class="glass-input" data-testid="forge-palette" onchange="forgeApply()">
++                            <option value="0">Amethyst</option>
++                            <option value="1">Magenta bloom</option>
++                            <option value="2">Ultraviolet</option>
++                            <option value="3">Orchid mist</option>
++                        </select>
++                    </label>
+                     <label class="forge-field">
+                         <span>Accent hue</span>
+-                        <input id="forge-hue" type="range" min="240" max="300" value="270" data-testid="forge-hue" oninput="forgeApply()">
++                        <input id="forge-hue" type="range" min="260" max="320" value="285" data-testid="forge-hue" oninput="forgeApply()">
+                     </label>
++                    <label class="forge-field">
++                        <span>Glow</span>
++                        <input id="forge-glow" type="range" min="0" max="100" value="60" data-testid="forge-glow" oninput="forgeApply()">
++                    </label>
++                    <label class="forge-field">
++                        <span>Camera pull-back</span>
++                        <input id="forge-cam" type="range" min="30" max="52" value="42" data-testid="forge-cam" oninput="forgeApply()">
++                    </label>
++                </div>
++                <div class="forge-recipe-row">
++                    <input id="forge-recipe" class="glass-input forge-recipe-input" data-testid="forge-recipe"
++                        placeholder="recipe code, e.g. SF1.0.6.42.285.60.0.42" aria-label="Recipe code">
++                    <button class="ds-btn" onclick="forgeApplyRecipe()" data-testid="forge-load-recipe-btn">Load</button>
++                    <button class="ds-btn" onclick="forgeCopyRecipe()" data-testid="forge-copy-btn">Copy</button>
++                    <button class="ds-btn" onclick="forgeRandomize()" data-testid="forge-randomize-btn">Surprise me</button>
+                 </div>
+                 <div class="forge-actions">
+                     <button class="ds-btn ds-btn-primary" onclick="forgeToggleAnim()" data-testid="forge-animate-btn" id="forge-animate-btn">Animate</button>
+@@ -897,8 +928,8 @@
+         </button>
+     </nav>
+ 
+-    <script src="script.js?v=20260721k"></script>
+-    <script src="assets/sdf_forge.js?v=1"></script>
++    <script src="script.js?v=20260721l"></script>
++    <script src="assets/sdf_forge.js?v=2"></script>
+     <script src="hyperspace.js?v=5"></script>
+ 
+ </body>
+diff --git a/apps/synthesus/desktop/script.js b/apps/synthesus/desktop/script.js
+index 40dfd0e..4bc1d2c 100644
+--- a/apps/synthesus/desktop/script.js
++++ b/apps/synthesus/desktop/script.js
+@@ -4425,35 +4425,42 @@ document.addEventListener('keydown', function (event) {
+ 
+ /* ----------------------------------------------------------- image forge */
+ /* CSG + SDF raymarched procedural image generation. Offline, vendored WebGL2,
+- * no dependency. When WebGL2 is unavailable the forge reports "unknown" and
+- * renders nothing — it never shows a fabricated frame (NO MOCK DATA IN THE UI).
++ * no dependency. Scenes are reproducible from a short shareable recipe code.
++ * When WebGL2 is unavailable the forge reports "unknown" and renders nothing —
++ * it never shows a fabricated frame (NO MOCK DATA IN THE UI).
+  */
+ let forgeRenderer = null;
+ let forgeAnimating = false;
+-
+-function forgeAccentFromHue(hue) {
+-    // Map the purple-only hue range to an RGB accent. Stays in-brand.
+-    const h = (hue % 360) / 360;
+-    const f = (n) => {
+-        const k = (n + h * 6) % 6;
+-        return Math.max(0, Math.min(1, Math.min(k, 4 - k, 1)));
+-    };
+-    // Bias toward the brand purple; saturate lightly.
+-    const r = 0.35 + 0.45 * f(5);
+-    const g = 0.20 + 0.30 * f(3);
+-    const b = 0.80 + 0.20 * f(1);
+-    return [r, g, b];
+-}
++let forgePresetsWired = false;
+ 
+ function forgeSetStatus(text) {
+     const el = document.getElementById('forge-status');
+     if (el) el.textContent = text;
+ }
+ 
++function forgeVal(id, fallback) {
++    const el = document.getElementById(id);
++    return el ? el.value : fallback;
++}
++
++function forgeWirePresets() {
++    if (forgePresetsWired || !window.SDFForge) return;
++    const sel = document.getElementById('forge-preset');
++    if (!sel) return;
++    Object.keys(window.SDFForge.PRESETS).forEach(function (name) {
++        const opt = document.createElement('option');
++        opt.value = name;
++        opt.textContent = name;
++        sel.appendChild(opt);
++    });
++    forgePresetsWired = true;
++}
++
+ function forgeInit() {
+     const canvas = document.getElementById('forge-canvas');
+     if (!canvas) return;
+     if (!window.SDFForge) { forgeSetStatus('forge module unavailable'); return; }
++    forgeWirePresets();
+     if (!forgeRenderer) {
+         forgeRenderer = window.SDFForge.create(canvas);
+     }
+@@ -4472,23 +4479,49 @@ function forgeInit() {
+     forgeRender();
+ }
+ 
+-function forgeReadParams() {
+-    const mode = parseInt((document.getElementById('forge-mode') || {}).value || '0', 10);
+-    const iters = parseInt((document.getElementById('forge-iters') || {}).value || '6', 10);
+-    const blend = parseInt((document.getElementById('forge-blend') || {}).value || '35', 10) / 100;
+-    const hue = parseInt((document.getElementById('forge-hue') || {}).value || '270', 10);
+-    return { mode, iters, blend, accent: forgeAccentFromHue(hue) };
++// The live control state, as a recipe object the module understands.
++function forgeReadRecipe() {
++    return {
++        mode: parseInt(forgeVal('forge-mode', '0'), 10),
++        iters: parseInt(forgeVal('forge-iters', '6'), 10),
++        blend: parseInt(forgeVal('forge-blend', '35'), 10),
++        hue: parseInt(forgeVal('forge-hue', '285'), 10),
++        glow: parseInt(forgeVal('forge-glow', '60'), 10),
++        palette: parseInt(forgeVal('forge-palette', '0'), 10),
++        cam: parseInt(forgeVal('forge-cam', '42'), 10),
++    };
++}
++
++// Push a recipe object into the controls (without firing their handlers).
++function forgeWriteControls(r) {
++    const set = function (id, v) { const el = document.getElementById(id); if (el) el.value = String(v); };
++    set('forge-mode', r.mode);
++    set('forge-iters', r.iters);
++    set('forge-blend', r.blend);
++    set('forge-hue', r.hue);
++    set('forge-glow', r.glow);
++    set('forge-palette', r.palette);
++    set('forge-cam', r.cam);
++}
++
++function forgeShowRecipeCode(r) {
++    const code = window.SDFForge.encodeRecipe(r);
++    const input = document.getElementById('forge-recipe');
++    if (input) input.value = code;
++    return code;
+ }
+ 
+ function forgeApply() {
+     if (!forgeRenderer || !forgeRenderer.available) return;
+-    forgeRenderer.setParams(forgeReadParams());
++    const r = forgeReadRecipe();
++    forgeRenderer.applyRecipe(r);
++    forgeShowRecipeCode(r);
+     if (!forgeAnimating) forgeRender();
+ }
+ 
+ function forgeRender() {
+     if (!forgeRenderer || !forgeRenderer.available) { forgeSetStatus('nothing to render (unknown)'); return; }
+-    forgeRenderer.setParams(forgeReadParams());
++    forgeRenderer.applyRecipe(forgeReadRecipe());
+     forgeRenderer.renderStill(0.0);
+     forgeSetStatus('Rendered a still frame');
+ }
+@@ -4502,7 +4535,7 @@ function forgeToggleAnim() {
+         if (btn) btn.textContent = 'Animate';
+         forgeSetStatus('Paused');
+     } else {
+-        forgeRenderer.setParams(forgeReadParams());
++        forgeRenderer.applyRecipe(forgeReadRecipe());
+         forgeRenderer.start();
+         forgeAnimating = true;
+         if (btn) btn.textContent = 'Pause';
+@@ -4510,6 +4543,58 @@ function forgeToggleAnim() {
+     }
+ }
+ 
++function forgeRandomize() {
++    if (!window.SDFForge) return;
++    const seed = Math.random().toString(36).slice(2, 9);
++    const r = window.SDFForge.recipeFromSeed(seed);
++    forgeWriteControls(r);
++    const preset = document.getElementById('forge-preset');
++    if (preset) preset.value = '';
++    forgeApply();
++    forgeSetStatus('Surprised you with seed "' + seed + '"');
++}
++
++function forgeApplyRecipe() {
++    if (!window.SDFForge) return;
++    const input = document.getElementById('forge-recipe');
++    const raw = input ? input.value.trim() : '';
++    let r = window.SDFForge.decodeRecipe(raw);
++    if (!r) {
++        // Not a recipe code — treat whatever was typed as a free-text seed.
++        r = window.SDFForge.recipeFromSeed(raw || 'synthesus');
++        forgeSetStatus('Grew a scene from your text');
++    } else {
++        forgeSetStatus('Loaded recipe');
++    }
++    forgeWriteControls(r);
++    const preset = document.getElementById('forge-preset');
++    if (preset) preset.value = '';
++    forgeApply();
++}
++
++function forgeCopyRecipe() {
++    const code = forgeShowRecipeCode(forgeReadRecipe());
++    try {
++        if (navigator.clipboard && navigator.clipboard.writeText) {
++            navigator.clipboard.writeText(code);
++        }
++    } catch (e) { /* clipboard may be blocked; the code is still shown in the field */ }
++    forgeSetStatus('Copied recipe ' + code);
++}
++
++function forgeLoadPreset() {
++    if (!window.SDFForge) return;
++    const sel = document.getElementById('forge-preset');
++    const name = sel ? sel.value : '';
++    if (!name) return;
++    const code = window.SDFForge.PRESETS[name];
++    const r = window.SDFForge.decodeRecipe(code);
++    if (!r) return;
++    forgeWriteControls(r);
++    if (forgeRenderer && forgeRenderer.available) { forgeRenderer.applyRecipe(r); forgeShowRecipeCode(r); forgeRender(); }
++    forgeSetStatus('Preset: ' + name);
++}
++
+ function forgeExport() {
+     if (!forgeRenderer || !forgeRenderer.available) { forgeSetStatus('no frame to export (unknown)'); return; }
+     forgeRenderer.renderStill(forgeAnimating ? (performance.now() / 1000) : 0.0);
+@@ -4518,7 +4603,7 @@ function forgeExport() {
+     const link = document.getElementById('forge-download');
+     if (link) {
+         link.href = data;
+-        link.download = 'synthesus-forge.png';
++        link.download = 'synthesus-forge-' + window.SDFForge.encodeRecipe(forgeReadRecipe()) + '.png';
+         link.click();
+     }
+     forgeSetStatus('Exported PNG');
+diff --git a/apps/synthesus/desktop/styles.css b/apps/synthesus/desktop/styles.css
+index 7c693bc..d22c5b5 100644
+--- a/apps/synthesus/desktop/styles.css
++++ b/apps/synthesus/desktop/styles.css
+@@ -44,6 +44,14 @@
+ .forge-field input[type="range"] { accent-color: var(--purple); width: 100%; }
+ .forge-actions { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+ .forge-statusline { color: var(--fg-dim); font-size: var(--t-meta); margin-left: auto; }
++.forge-recipe-row { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
++.forge-recipe-input {
++    flex: 1 1 220px;
++    min-width: 200px;
++    font-family: var(--font-mono);
++    font-size: var(--t-meta);
++    letter-spacing: 0.01em;
++}
+ @media (max-width: 720px) {
+     .forge-window { width: 96vw !important; left: 2vw !important; }
+     .forge-controls { grid-template-columns: 1fr 1fr; }
+diff --git a/apps/synthesus/desktop/test_forge_wiring.py b/apps/synthesus/desktop/test_forge_wiring.py
+index 3728abb..6b81af3 100644
+--- a/apps/synthesus/desktop/test_forge_wiring.py
++++ b/apps/synthesus/desktop/test_forge_wiring.py
+@@ -10,6 +10,7 @@ offline: no CDN, no external origin in the vendored module.
+ from __future__ import annotations
+ 
+ import re
++import subprocess
+ from pathlib import Path
+ 
+ import pytest
+@@ -20,7 +21,17 @@ SCRIPT = (HERE / "script.js").read_text(encoding="utf-8")
+ STYLES = (HERE / "styles.css").read_text(encoding="utf-8")
+ FORGE = (HERE / "assets" / "sdf_forge.js").read_text(encoding="utf-8")
+ 
+-FORGE_HANDLERS = ("openForge", "forgeApply", "forgeRender", "forgeExport", "forgeToggleAnim")
++FORGE_HANDLERS = (
++    "openForge",
++    "forgeApply",
++    "forgeRender",
++    "forgeExport",
++    "forgeToggleAnim",
++    "forgeRandomize",
++    "forgeApplyRecipe",
++    "forgeCopyRecipe",
++    "forgeLoadPreset",
++)
+ FORGE_IDS = (
+     "forge-canvas",
+     "forge-unavailable",
+@@ -28,10 +39,15 @@ FORGE_IDS = (
+     "forge-status-detail",
+     "forge-animate-btn",
+     "forge-download",
++    "forge-preset",
+     "forge-mode",
+     "forge-iters",
+     "forge-blend",
++    "forge-palette",
+     "forge-hue",
++    "forge-glow",
++    "forge-cam",
++    "forge-recipe",
+ )
+ 
+ 
+@@ -65,8 +81,8 @@ def test_module_is_vendored_with_a_cache_bust():
+     assert (HERE / "assets" / "sdf_forge.js").exists()
+     assert "assets/sdf_forge.js?v=" in HTML
+     # script.js and styles.css cache-busts were bumped for this change.
+-    assert "script.js?v=20260721k" in HTML
+-    assert "styles.css?v=20260721k" in HTML
++    assert "script.js?v=20260721l" in HTML
++    assert "styles.css?v=20260721l" in HTML
+ 
+ 
+ def test_module_is_offline_no_external_origin():
+@@ -101,3 +117,35 @@ def test_forge_styles_use_design_tokens_not_arbitrary_values():
+     assert "var(--" in forge_css
+     # The stage keeps the brand accent on the range controls.
+     assert "var(--purple)" in STYLES[STYLES.index(".forge-field"):STYLES.index(".forge-field") + 800]
++
++
++def test_recipes_are_deterministic_and_round_trip():
++    """A shared recipe code must reproduce the same scene for everyone, and a
++    free-text seed must always grow the same recipe (this is the shareability
++    guarantee, checked headlessly in node)."""
++    script = (
++        "const F=require('./assets/sdf_forge.js');"
++        "const a=F.encodeRecipe(F.recipeFromSeed('synthesus-demo'));"
++        "const b=F.encodeRecipe(F.recipeFromSeed('synthesus-demo'));"
++        "if(a!==b){console.error('seed not deterministic');process.exit(1);}"
++        "const dec=F.decodeRecipe(a);"
++        "if(F.encodeRecipe(dec)!==a){console.error('recipe not round-trip');process.exit(2);}"
++        "for(const [k,v] of Object.entries(F.PRESETS)){if(!F.decodeRecipe(v)){console.error('bad preset '+k);process.exit(3);}}"
++        "if(F.decodeRecipe('not-a-recipe')!==null){console.error('bad code should decode to null');process.exit(4);}"
++        "console.log('ok '+a);"
++    )
++    result = subprocess.run(
++        ["node", "-e", script], cwd=str(HERE), capture_output=True, text=True, timeout=30
++    )
++    assert result.returncode == 0, result.stderr
++    assert result.stdout.startswith("ok SF1.")
++
++
++def test_forge_offers_four_scenes_and_named_presets():
++    """The excitement is real content: four distinct generators and shareable
++    presets, all listed in the module and surfaced in the markup."""
++    assert 'value="3"' in HTML[HTML.index('id="forge-mode"'):HTML.index('id="forge-iters"')]
++    assert "Gyroid lattice" in HTML
++    assert "PRESETS" in FORGE
++    for scene in ("Boolean sculpture", "Infinite carved field", "Menger sponge", "Gyroid lattice"):
++        assert scene in FORGE
 -- 
 2.39.5
 
