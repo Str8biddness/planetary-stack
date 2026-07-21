@@ -222,16 +222,45 @@ class _StubJobPipeline:
         return b'{"schema":"stub.result.v1"}', "application/json"
 
 
+def _permissive_policy(tmp_path, node_id="node:test:worker"):
+    """Policy store granting the test worker both peer capabilities.
+
+    Job submission and result return are default-deny, so a test that wants to
+    exercise the happy path must grant permission explicitly — the same as a
+    real owner would.
+    """
+    from device_policy import DevicePolicyStore
+
+    store = DevicePolicyStore(tmp_path / "policy" / "device-policy.json")
+    store.add_device(device_id=node_id, display_name="Test worker", role="peer")
+    store.set_capabilities(
+        node_id, {"run_inference": True, "return_results": True}
+    )
+    # These tests exercise job/result plumbing, not provenance. Evidence
+    # enforcement is ON by default and would refuse a stub pipeline that
+    # reports no provenance at all; that behaviour has its own tests in
+    # test_device_policy_endpoints.py.
+    store.set_require_verified_evidence(False)
+    return store
+
+
 def test_job_endpoints_require_auth_and_a_configured_pipeline(tmp_path):
     import base64
 
     terminal_socket = tmp_path / "terminal.sock"
     terminal_socket.touch()
     pipeline = _StubJobPipeline()
-    app_without_jobs = synthesusd.create_app(_settings(terminal_socket))
+    policy = _permissive_policy(tmp_path)
+    app_without_jobs = synthesusd.create_app(
+        _settings(terminal_socket),
+        device_policy=policy,
+        worker_node_id="node:test:worker",
+    )
     app_with_jobs = synthesusd.create_app(
         _settings(terminal_socket),
         job_pipeline=pipeline,
+        device_policy=policy,
+        worker_node_id="node:test:worker",
     )
     bundle = base64.b64encode(b"canonical manifest bytes").decode()
 
