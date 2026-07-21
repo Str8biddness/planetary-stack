@@ -26,6 +26,7 @@ function toggleWindow(id) {
         if (id === 'win-drive') loadDriveSources();
         if (id === 'win-core') loadLLMSettings();
         if (id === 'win-image') { try { renderImageGallery(); } catch (e) {} }
+        if (id === 'win-forge') { try { forgeInit(); } catch (e) {} }
         // Foreman poll only while the window is open (QA BUG-5)
         if (id === 'win-foreman') startForemanSync();
     } else {
@@ -4421,3 +4422,109 @@ document.addEventListener('keydown', function (event) {
     }
     if (event.key === 'Escape') { dashSearchClear(); }
 });
+
+/* ----------------------------------------------------------- image forge */
+/* CSG + SDF raymarched procedural image generation. Offline, vendored WebGL2,
+ * no dependency. When WebGL2 is unavailable the forge reports "unknown" and
+ * renders nothing — it never shows a fabricated frame (NO MOCK DATA IN THE UI).
+ */
+let forgeRenderer = null;
+let forgeAnimating = false;
+
+function forgeAccentFromHue(hue) {
+    // Map the purple-only hue range to an RGB accent. Stays in-brand.
+    const h = (hue % 360) / 360;
+    const f = (n) => {
+        const k = (n + h * 6) % 6;
+        return Math.max(0, Math.min(1, Math.min(k, 4 - k, 1)));
+    };
+    // Bias toward the brand purple; saturate lightly.
+    const r = 0.35 + 0.45 * f(5);
+    const g = 0.20 + 0.30 * f(3);
+    const b = 0.80 + 0.20 * f(1);
+    return [r, g, b];
+}
+
+function forgeSetStatus(text) {
+    const el = document.getElementById('forge-status');
+    if (el) el.textContent = text;
+}
+
+function forgeInit() {
+    const canvas = document.getElementById('forge-canvas');
+    if (!canvas) return;
+    if (!window.SDFForge) { forgeSetStatus('forge module unavailable'); return; }
+    if (!forgeRenderer) {
+        forgeRenderer = window.SDFForge.create(canvas);
+    }
+    const unavailable = document.getElementById('forge-unavailable');
+    if (!forgeRenderer.available) {
+        if (unavailable) unavailable.hidden = false;
+        const detail = document.getElementById('forge-status-detail');
+        if (detail) detail.textContent = 'unknown';
+        canvas.style.display = 'none';
+        forgeSetStatus('WebGL2 unavailable');
+        return;
+    }
+    if (unavailable) unavailable.hidden = true;
+    canvas.style.display = 'block';
+    forgeApply();
+    forgeRender();
+}
+
+function forgeReadParams() {
+    const mode = parseInt((document.getElementById('forge-mode') || {}).value || '0', 10);
+    const iters = parseInt((document.getElementById('forge-iters') || {}).value || '6', 10);
+    const blend = parseInt((document.getElementById('forge-blend') || {}).value || '35', 10) / 100;
+    const hue = parseInt((document.getElementById('forge-hue') || {}).value || '270', 10);
+    return { mode, iters, blend, accent: forgeAccentFromHue(hue) };
+}
+
+function forgeApply() {
+    if (!forgeRenderer || !forgeRenderer.available) return;
+    forgeRenderer.setParams(forgeReadParams());
+    if (!forgeAnimating) forgeRender();
+}
+
+function forgeRender() {
+    if (!forgeRenderer || !forgeRenderer.available) { forgeSetStatus('nothing to render (unknown)'); return; }
+    forgeRenderer.setParams(forgeReadParams());
+    forgeRenderer.renderStill(0.0);
+    forgeSetStatus('Rendered a still frame');
+}
+
+function forgeToggleAnim() {
+    if (!forgeRenderer || !forgeRenderer.available) { forgeSetStatus('nothing to animate (unknown)'); return; }
+    const btn = document.getElementById('forge-animate-btn');
+    if (forgeAnimating) {
+        forgeRenderer.stop();
+        forgeAnimating = false;
+        if (btn) btn.textContent = 'Animate';
+        forgeSetStatus('Paused');
+    } else {
+        forgeRenderer.setParams(forgeReadParams());
+        forgeRenderer.start();
+        forgeAnimating = true;
+        if (btn) btn.textContent = 'Pause';
+        forgeSetStatus('Animating');
+    }
+}
+
+function forgeExport() {
+    if (!forgeRenderer || !forgeRenderer.available) { forgeSetStatus('no frame to export (unknown)'); return; }
+    forgeRenderer.renderStill(forgeAnimating ? (performance.now() / 1000) : 0.0);
+    const data = forgeRenderer.toPNG();
+    if (!data) { forgeSetStatus('export unavailable (unknown)'); return; }
+    const link = document.getElementById('forge-download');
+    if (link) {
+        link.href = data;
+        link.download = 'synthesus-forge.png';
+        link.click();
+    }
+    forgeSetStatus('Exported PNG');
+}
+
+function openForge() {
+    toggleWindow('win-forge');
+    if (document.getElementById('win-forge').style.display !== 'none') forgeInit();
+}

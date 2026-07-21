@@ -8,8 +8,8 @@
     <link rel="icon" type="image/png" sizes="64x64" href="assets/synthesus-mark-64.png">
     <link rel="icon" type="image/png" sizes="32x32" href="assets/synthesus-mark-32.png">
     <link rel="apple-touch-icon" href="assets/synthesus-mark-128.png">
-    <link rel="stylesheet" href="design-system.css?v=20260721j">
-    <link rel="stylesheet" href="styles.css?v=20260721j">
+    <link rel="stylesheet" href="design-system.css?v=20260721k">
+    <link rel="stylesheet" href="styles.css?v=20260721k">
     <!-- No external font CDN: the shell assets render locally and remain available offline.
          Uses locally-installed Outfit/Fira Code if present, else a
          native system stack. To pin the exact look later, self-host the woff2 via @font-face. -->
@@ -789,6 +789,62 @@
             </div>
         </div>
 
+        <!-- Image Forge: offline CSG + SDF raymarched procedural image generation -->
+        <div class="window glass-panel forge-window" id="win-forge" style="top: 80px; left: 380px; width: 720px; height: 640px; display: none;">
+            <div class="window-header" onmousedown="dragWindow(event, 'win-forge')">
+                <span class="window-title">Image forge</span>
+                <div class="window-controls">
+                    <button class="win-btn minimize" onclick="minimizeWindow(this)"></button>
+                    <button class="win-btn maximize" onclick="maximizeWindow(this)"></button>
+                    <button class="win-btn close" onclick="toggleWindow('win-forge')"></button>
+                </div>
+            </div>
+            <div class="window-content forge-body">
+                <p class="forge-lede">
+                    Every pixel is computed from geometry — signed distance fields combined by
+                    constructive solid geometry (union, intersection, difference), scaled by
+                    fractal folding. No bitmap, no network, no model. The image is a real
+                    evaluation of the scene, not a fabrication.
+                </p>
+                <div class="forge-stage">
+                    <canvas id="forge-canvas" class="forge-canvas" width="640" height="360" data-testid="forge-canvas"></canvas>
+                    <div id="forge-unavailable" class="forge-unavailable" data-testid="forge-unavailable" hidden>
+                        WebGL2 is unavailable on this surface — the forge renders nothing rather
+                        than show a fabricated frame. Status: <span id="forge-status-detail">unknown</span>
+                    </div>
+                </div>
+                <div class="forge-controls">
+                    <label class="forge-field">
+                        <span>Scene</span>
+                        <select id="forge-mode" class="glass-input" data-testid="forge-mode" onchange="forgeApply()">
+                            <option value="0">Boolean sculpture</option>
+                            <option value="1">Infinite carved field</option>
+                            <option value="2">Fractal fold</option>
+                        </select>
+                    </label>
+                    <label class="forge-field">
+                        <span>Fractal depth</span>
+                        <input id="forge-iters" type="range" min="1" max="12" value="6" data-testid="forge-iters" oninput="forgeApply()">
+                    </label>
+                    <label class="forge-field">
+                        <span>Smooth blend</span>
+                        <input id="forge-blend" type="range" min="0" max="100" value="35" data-testid="forge-blend" oninput="forgeApply()">
+                    </label>
+                    <label class="forge-field">
+                        <span>Accent hue</span>
+                        <input id="forge-hue" type="range" min="240" max="300" value="270" data-testid="forge-hue" oninput="forgeApply()">
+                    </label>
+                </div>
+                <div class="forge-actions">
+                    <button class="ds-btn ds-btn-primary" onclick="forgeToggleAnim()" data-testid="forge-animate-btn" id="forge-animate-btn">Animate</button>
+                    <button class="ds-btn" onclick="forgeRender()" data-testid="forge-render-btn">Render still</button>
+                    <button class="ds-btn" onclick="forgeExport()" data-testid="forge-export-btn">Export PNG</button>
+                    <span id="forge-status" class="forge-statusline" data-testid="forge-status">Ready</span>
+                </div>
+                <a id="forge-download" style="display:none;" data-testid="forge-download"></a>
+            </div>
+        </div>
+
         <nav class="dock" id="os-dock" aria-label="System dock">
         <button type="button" onclick="openDashboard()" class="dock-btn dock-brand" data-win="win-dashboard" title="Synthesus — Overview">
             <span class="dock-ico"><img src="assets/synthesus-mark-64.png" alt="" width="22" height="22"></span><span class="dock-lbl">Overview</span>
@@ -805,6 +861,9 @@
         </button>
         <button type="button" onclick="toggleWindow('win-image')" class="dock-btn" data-win="win-image" title="SI Image Studio">
             <span class="dock-ico" data-icon="image"></span><span class="dock-lbl">Image</span>
+        </button>
+        <button type="button" onclick="openForge()" class="dock-btn" data-win="win-forge" title="Image Forge — CSG + SDF">
+            <span class="dock-ico" data-icon="image"></span><span class="dock-lbl">Forge</span>
         </button>
         <button type="button" onclick="toggleWindow('win-voice')" class="dock-btn" data-win="win-voice" title="SI Voice Studio">
             <span class="dock-ico" data-icon="audio"></span><span class="dock-lbl">Voice</span>
@@ -838,7 +897,8 @@
         </button>
     </nav>
 
-    <script src="script.js?v=20260721j"></script>
+    <script src="script.js?v=20260721k"></script>
+    <script src="assets/sdf_forge.js?v=1"></script>
     <script src="hyperspace.js?v=5"></script>
 
 </body>

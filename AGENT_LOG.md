@@ -2430,3 +2430,127 @@ NEXT PIECES, in order
 - Full suite after the rename: 475 passed, 1 skipped (the skip is the opt-in
   live-Ollama integration test, which skips when /api/tags does not answer).
 - NO FINISH_CHECKLIST box checked.
+
+## 2026-07-21 — Phase 3: zone-aware expansion-drive sync loop
+
+### Work completed
+
+- Added `services/unisync/zone_sync.py`: a push/pull sync loop over the existing
+  `ContentAddressedStore`, moving objects between nodes through the existing
+  injected `ObjectTransport` (lease-bound; `InProcessObjectTransport` in tests,
+  LAN/relay mTLS in production). It mints no lease and grants no authority — the
+  control-plane `TransferContext` and injected validator still do that.
+- The zone boundary (`services/storage_zones.py`) is called as the FIRST
+  statement of every transfer, before any store is opened or byte read, via
+  `_gate_zone()` -> `require_transport(zone, transport_class)`. A refused move
+  raises `ZoneViolation` and touches nothing. This is deliberately not a single
+  central check a future edit could skip: `plan()` withholds forbidden zones AND
+  `transfer_one()` re-gates at the point bytes move.
+- Second gate binds the wire transport to the zone: every valid unisync object
+  transport id is mesh-class, so a public sink has no object transport at all —
+  EXTERNAL egress stays on the drive's rclone path, unreachable from here.
+- Diffing is a digest set-difference (content is immutable/content-addressed);
+  moves are idempotent (a digest the destination already holds is skipped, not
+  re-sent); object-level `BackpressureController` bounds in-flight bytes so a
+  fast node cannot flood a slow one; `reconcile_references()` is a commutative,
+  idempotent per-zone union — content never conflicts, only references.
+- Exported the new names from `services/unisync/__init__.py`.
+- Added `tests/unisync/test_zone_sync.py`: 20 tests, refusal-first. The one that
+  matters: `test_sync_refuses_to_push_grounding_over_a_public_transport` proves
+  grounding raises and writes zero bytes (the silent-upload failure). Also
+  covers NODE-never-leaves, EXTERNAL-has-no-object-transport, over-budget
+  backpressure moving nothing, validator-still-required, no self-promotion path,
+  and reference reconciliation.
+
+### Commands run and their real output
+
+- `node --check apps/synthesus/desktop/script.js` -> exit 0 (unchanged; JS not
+  touched this session, so no `?v=` bump was needed).
+- `.venv/bin/python -m pytest tests/unisync/test_zone_sync.py -q` -> `20 passed`.
+- `.venv/bin/python -m pytest apps/synthesus/desktop -q
+  --ignore=apps/synthesus/desktop/test_desktop_security.py` -> `78 passed`.
+- `.venv/bin/python -m pytest tests -q` -> `45 failed, 448 passed, 1 skipped,
+  2 errors`. Before this session on the same host: `45 failed, 428 passed, 1
+  skipped, 2 errors`. Delta is exactly +20 passing, zero new failures/errors.
+
+### HONEST GAPS — what I did NOT verify
+
+- HOST IS aarch64, NOT the briefing's x86_64. I could not reproduce the stated
+  baselines (92 desktop, 475 full). On this host the pre-existing baseline is
+  78 desktop and 448/475-equivalent passing. The 45 failures + 2 errors in
+  `tests/unisync/test_mesh_mtls_gate.py` and `tests/private_mesh/test_worker_cli.py`
+  are all one pre-existing cause: `platform.machine()` -> `aarch64` is normalised
+  to `"arm64"` (`mesh_identity.py:632`, `worker_cli.py:329`) but the
+  `ResourceInventory` pydantic model only accepts `x86_64/aarch64/riscv64`, so
+  the node CLI is rejected before any TLS. This is unrelated to Phase 3, present
+  on a clean checkout, and I did not touch it. The 92-vs-78 desktop count I also
+  could not explain from the tree at head `f4bef27`; I held my own measured
+  baseline (78) and did not regress it.
+- The sync loop was exercised only over `InProcessObjectTransport` (real bytes,
+  real framing, real CAS, real zone gate) — NOT over a physical two-host LAN
+  mTLS run. The mТLS transport it would use in production is the same one the
+  mesh-gate tests drive, which cannot run on this arm64 host (see above). No
+  physical multi-node acceptance is claimed.
+- No UI was rendered this session; Phase 3 is backend only. The desktop page was
+  never opened here.
+- NO FINISH_CHECKLIST box checked.
+
+
+## 2026-07-21 — Image Forge: offline CSG + SDF procedural image generation
+
+### Work completed (owner-requested "wow" feature, scoped to the stack's rules)
+
+- Added `apps/synthesus/desktop/assets/sdf_forge.js`: a vendored, dependency-free
+  WebGL2 raymarcher that generates images from constructive solid geometry over
+  signed distance fields — union `min(a,b)`, intersection `max(a,b)`, difference
+  `max(-a,b)`, smooth union, and domain repetition/folding for infinite scaling.
+  Three scenes: a boolean sculpture, an infinite carved lattice, and a Menger
+  sponge (the iterated-difference CSG fractal). No CDN, no network, no npm — it
+  honours the offline core claim. The CSG algebra also lives as pure JS (`math`)
+  so it runs and is tested headlessly.
+- New `win-forge` desktop window + dock entry, wired with `openForge`,
+  `forgeApply`, `forgeRender`, `forgeToggleAnim`, `forgeExport` (all real
+  `function` definitions), controls with `data-testid`s, styled only with the
+  existing design tokens (`--panel`, `--purple`, `--r-card`, `--s*` …).
+- NO MOCK DATA: when WebGL2 is unavailable the forge shows the word "unknown"
+  and renders nothing; `Renderer.fps` starts `null` (unknown) until measured;
+  `toPNG()` returns `null` rather than a fabricated frame.
+- Bumped the cache-bust on `styles.css`/`script.js` to `?v=20260721k` because
+  both changed; the module is served as `assets/sdf_forge.js?v=1`.
+- Added `apps/synthesus/desktop/test_forge_wiring.py` (21 tests): handlers
+  defined, window+dock present, every read id exists, module vendored with a
+  cache-bust, module has no external origin, CSG operators present in both CPU
+  math and shader, the "unknown"/no-fake-frame degrade path, and design-token
+  styling.
+
+### Commands run and their real output
+
+- `node --check apps/synthesus/desktop/assets/sdf_forge.js` -> exit 0.
+- `node --check apps/synthesus/desktop/script.js` -> exit 0.
+- Headless CSG math check via `node -e` against known distances (sphere/box
+  inside=-1 outside=1, union=min, intersect=max, subtract=max(-a,b),
+  foldRepeat) -> `MATH OK; VERSION 1`.
+- `.venv/bin/python -m pytest apps/synthesus/desktop -q
+  --ignore=apps/synthesus/desktop/test_desktop_security.py` -> `99 passed`
+  (78 pre-existing + 21 forge). No desktop regression.
+
+### RENDERED — not simulated
+
+- Served the desktop dir over `http.server` and loaded a temporary
+  `forge_preview.html` in real headless Chromium (WebGL2 via SwiftShader) at the
+  routed preview origin. All three scenes returned `rendered=true` with non-empty
+  PNGs — boolean sculpture 32,662 B, infinite field 141,478 B, Menger sponge
+  55,474 B (up from 9,914 B before the sponge fix, confirming real added detail).
+  A screenshot showed the three geometries. The temporary harness was removed
+  afterward; it is not part of the product boot path.
+
+### HONEST GAPS
+
+- The render above was headless Chromium with SwiftShader (software WebGL2), NOT
+  the pywebview native shell on real hardware. The shader is standard WebGL2 GLSL
+  ES 3.00, but I did not open it inside `synthesus_native_shell.py`.
+- The full desktop app (`script.js` booting against `synthesusd`) was not run
+  end to end here; only the forge module was rendered in isolation, plus the
+  static wiring tests.
+- NO FINISH_CHECKLIST box checked.
+

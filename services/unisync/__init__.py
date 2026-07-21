@@ -54,6 +54,15 @@ from .framing import (
 from .local import InProcessObjectTransport
 from .storage import ContentAddressedStore, ObjectAssembler
 from .tls import EnrolledPeerIdentity, TrustedLanClient, TrustedLanServer, TLSCredentials
+from .zone_sync import (
+    MESH_TRANSPORT_IDS,
+    SyncItem,
+    SyncPlan,
+    SyncReport,
+    ZoneAwareObjectSync,
+    ZoneInventory,
+    reconcile_references,
+)
 
 __all__ = [
     "AuthorizationError",
@@ -83,10 +92,14 @@ __all__ = [
     "InProcessObjectTransport",
     "InvalidFrameError",
     "InvalidTransferContextError",
+    "MESH_TRANSPORT_IDS",
     "ObjectAssembler",
     "ObjectTransport",
     "PROTOCOL",
     "StorageSecurityError",
+    "SyncItem",
+    "SyncPlan",
+    "SyncReport",
     "TLSConfigurationError",
     "TLSCredentials",
     "TaskDescriptorRef",
@@ -99,7 +112,10 @@ __all__ = [
     "TrustedLanServer",
     "UnisyncError",
     "VERSION",
+    "ZoneAwareObjectSync",
+    "ZoneInventory",
     "decode_frame",
     "encode_frame",
+    "reconcile_references",
     "validate_task_descriptor_bytes",
 ]
