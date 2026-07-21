@@ -124,3 +124,184 @@ def test_permissions_ui_refreshes_from_the_controller_after_a_toggle():
     toggle = SCRIPT[SCRIPT.index("async function devicesToggle") :]
     toggle = toggle[: toggle.index("\nasync function devicesRemove")]
     assert "devicesRefresh()" in toggle
+
+
+# ---------------------------------------------------------------------------
+# Installable phone app (PWA)
+#
+# There are no browser tools in the environment these tests were written in, so
+# NOTHING below proves the app installs, renders, or lays out on a phone. What
+# these do catch is the set of failures that make a PWA silently not install:
+# a manifest that is not valid JSON, an icon path that points at a file that
+# was never generated, a manifest nobody linked, and a service worker that
+# caches live controller data.
+# ---------------------------------------------------------------------------
+
+import json
+
+MANIFEST_PATH = HERE / "manifest.webmanifest"
+SW_PATH = HERE / "sw.js"
+
+
+def test_manifest_exists_and_is_valid_json():
+    assert MANIFEST_PATH.exists(), "manifest.webmanifest is missing"
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    assert manifest["display"] == "standalone"
+    assert manifest["name"] and manifest["short_name"]
+    assert manifest["start_url"]
+    # Chrome refuses to offer installation without a 192px and a 512px icon.
+    sizes = {icon["sizes"] for icon in manifest["icons"]}
+    assert "192x192" in sizes and "512x512" in sizes
+
+
+def test_every_manifest_icon_exists_on_disk():
+    """A manifest that names a file nobody generated fails install silently."""
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    missing = [
+        icon["src"] for icon in manifest["icons"] if not (HERE / icon["src"]).is_file()
+    ]
+    assert not missing, f"manifest references icons that do not exist: {missing}"
+
+
+def test_manifest_colors_come_from_the_stylesheet_palette():
+    """The splash must not be a colour that appears nowhere in the product."""
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    for key in ("background_color", "theme_color"):
+        assert manifest[key] in STYLES, f"{key} {manifest[key]} is not a palette colour"
+
+
+def test_index_links_the_manifest_and_declares_a_theme_colour():
+    assert 'rel="manifest"' in HTML
+    assert 'href="manifest.webmanifest"' in HTML
+    assert 'name="theme-color"' in HTML
+
+
+def test_index_apple_touch_icon_exists_on_disk():
+    match = re.search(r'rel="apple-touch-icon"\s+href="([^"]+)"', HTML)
+    assert match, "no apple-touch-icon declared"
+    assert (HERE / match.group(1)).is_file()
+
+
+def test_the_page_registers_the_service_worker():
+    assert "serviceWorker" in SCRIPT
+    assert "register('sw.js')" in SCRIPT
+    assert SW_PATH.exists(), "sw.js is registered but does not exist"
+
+
+def test_service_worker_never_caches_api_responses():
+    """Stale API data would render as fabricated state, so it is never cached.
+
+    The rule is asserted three ways: the guard list names /api/, the guard is
+    actually consulted in the fetch handler, and no cache write is reachable
+    without passing it.
+    """
+    sw = SW_PATH.read_text(encoding="utf-8")
+    assert "'/api/'" in sw, "the never-cache list does not name /api/"
+    assert "isNeverCached" in sw
+    fetch_handler = sw[sw.index("addEventListener('fetch'") :]
+    # The bail-out must come before anything that opens or reads the cache.
+    bail = fetch_handler.index("isNeverCached")
+    for cache_call in ("caches.match", "caches.open"):
+        assert bail < fetch_handler.index(cache_call), (
+            f"{cache_call} is reachable before the /api/ guard"
+        )
+    # Precaching must not list an API path either.
+    shell = sw[sw.index("const SHELL") : sw.index("const NEVER_CACHE")]
+    assert "/api/" not in shell
+
+
+def test_service_worker_versions_its_cache_and_drops_old_ones():
+    sw = SW_PATH.read_text(encoding="utf-8")
+    assert "CACHE_VERSION" in sw
+    activate = sw[sw.index("addEventListener('activate'") : sw.index("addEventListener('fetch'")]
+    assert "caches.delete" in activate, "old caches are never cleaned up"
+
+
+def test_every_precached_shell_asset_exists_on_disk():
+    sw = SW_PATH.read_text(encoding="utf-8")
+    shell = sw[sw.index("const SHELL") : sw.index("const NEVER_CACHE")]
+    paths = [p for p in re.findall(r"'([^']+)'", shell) if p not in ("./",)]
+    missing = [p for p in paths if not (HERE / p).is_file()]
+    assert not missing, f"the service worker precaches files that do not exist: {missing}"
+
+
+# Absolute URLs that were already in the tree before the PWA work. They are
+# recorded here rather than waved through: the point of the test below is that
+# this list must never grow. Each entry is a (literal, expected count) pair.
+#   http://' + window.location.host  — same-origin, built from the current page
+#   http://localhost:1234            — the operator's local LM Studio default
+#   https://rclone.org/install.sh    — printed as a copy-paste instruction
+PRE_EXISTING_ABSOLUTE_URLS = {
+    "index.html": {"http://localhost:1234": 1},
+    "script.js": {
+        "http://' + window.location.host": 9,
+        "http://localhost:1234": 2,
+        "https://rclone.org/install.sh": 1,
+    },
+    "sw.js": {},
+}
+
+
+@pytest.mark.parametrize("filename", sorted(PRE_EXISTING_ABSOLUTE_URLS))
+def test_no_new_external_urls_are_introduced(filename):
+    """The product must work with no network and no external dependency.
+
+    A CDN link or a remote asset would make an offline phone install render
+    broken, so every absolute URL has to be an already-known one.
+    """
+    text = (HERE / filename).read_text(encoding="utf-8")
+    allowed = PRE_EXISTING_ABSOLUTE_URLS[filename]
+    seen: dict[str, int] = {}
+    for match in re.finditer(r"https?://", text):
+        tail = text[match.start() :]
+        literal = next((a for a in allowed if tail.startswith(a)), None)
+        assert literal is not None, (
+            f"{filename} introduces a new absolute URL: {tail[:60]!r}"
+        )
+        seen[literal] = seen.get(literal, 0) + 1
+    assert seen == {k: v for k, v in allowed.items() if v}, (
+        f"{filename}: absolute-URL counts changed — expected {allowed}, saw {seen}"
+    )
+
+
+def test_phone_layout_makes_windows_full_screen_instead_of_floating():
+    """Windows carry inline pixel geometry, so the override must be !important.
+
+    Without it the sheet rule loses to the inline style and the window stays
+    720px wide on a 360px screen.
+    """
+    block = STYLES[STYLES.index("@media (max-width: 820px)") :]
+    block = block[: block.index("@media (max-width: 380px)")]
+    assert "position: fixed !important" in block
+    assert "width: 100vw !important" in block
+    assert "overflow-x: hidden" in block, "page can still scroll sideways"
+    # Touch targets: the 14px window-chrome dots must be grown.
+    assert "width: 44px !important" in block and "height: 44px !important" in block
+    assert "min-height: 44px" in block
+
+
+def test_worker_view_exists_and_has_a_dock_entry():
+    assert 'id="win-worker"' in HTML
+    assert 'data-win="win-worker"' in HTML
+    assert "openWorker" in _defined_functions()
+
+
+def test_worker_view_reads_only_endpoints_that_already_exist():
+    """No new backend endpoint may be invented to feed the phone view."""
+    block = SCRIPT[SCRIPT.index("async function workerRefresh") :]
+    block = block[: block.index("/* ------------------------------------------------ installable app")]
+    called = set(re.findall(r"psFetch\('(/api/[^']*)'", block))
+    assert called <= {"/api/settings", "/api/devices", "/api/jobs/"}, (
+        f"worker view calls endpoints outside the existing set: {called}"
+    )
+
+
+def test_worker_view_says_unknown_rather_than_inventing_a_reading():
+    """Thermal has no web API at all; it must never render a number."""
+    block = SCRIPT[SCRIPT.index("async function workerRefresh") :]
+    block = block[: block.index("/* ------------------------------------------------ installable app")]
+    assert "dashCard('Thermal', 'unknown'" in block
+    assert "'unknown'" in block
+    # Battery is read through the browser API, and absence is reported.
+    assert "navigator.getBattery" in SCRIPT
+    assert "does not expose the Battery Status API" in block

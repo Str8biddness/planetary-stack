@@ -2,10 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Synthesus Planetary OS Ultra</title>
+    <!-- Installable app (PWA). Served over plain HTTP from loopback on the
+         device itself, which browsers treat as a secure context, so this
+         installs with no TLS and no external origin. -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#070a16">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Synthesus">
+    <link rel="apple-touch-icon" href="assets/synthesus-icon-192.png">
     <link rel="icon" type="image/png" href="assets/synthesus-icon.png">
-    <link rel="stylesheet" href="styles.css?v=20260721">
+    <link rel="stylesheet" href="styles.css?v=20260721b">
     <!-- No external font CDN: the shell assets render locally and remain available offline.
          Uses locally-installed Outfit/Fira Code if present, else a
          native system stack. To pin the exact look later, self-host the woff2 via @font-face. -->
@@ -653,6 +663,40 @@
 
         <!-- Dashboard — mixed. Cards backed by live endpoints render live;
              everything else is tagged DEMO and is deliberately not wired. -->
+        <!-- This device — the phone-sized view. Every value below is read from
+             an endpoint that already exists or from a browser API; anything
+             that cannot be read renders the word "unknown". -->
+        <div class="window glass-panel" id="win-worker" style="top: 70px; left: 90px; width: 480px; height: 560px; display: none;">
+            <div class="window-header" onmousedown="dragWindow(event, 'win-worker')">
+                <span class="window-title">📱 This device</span>
+                <div class="window-controls"><button class="win-btn minimize" onclick="minimizeWindow(this)" style="background: #facc15;"></button><button class="win-btn maximize" onclick="maximizeWindow(this)" style="background: #22c55e;"></button><button class="win-btn close" onclick="toggleWindow('win-worker')"></button></div>
+            </div>
+            <div class="window-content" style="display:flex; flex-direction:column; gap:14px; overflow-y:auto;">
+                <div class="worker-state" id="worker-state">
+                    <span class="worker-dot" id="worker-dot"></span>
+                    <span class="worker-state-text" id="worker-state-text">Reading…</span>
+                </div>
+                <div class="worker-state-why" id="worker-state-why"></div>
+
+                <div class="ps-section-title">Work</div>
+                <div class="ps-grid" id="worker-work"></div>
+
+                <div class="ps-section-title">Hardware</div>
+                <div class="ps-grid" id="worker-hardware"></div>
+
+                <div class="ps-demo-note">
+                    A phone browser exposes almost nothing about the hardware. Battery is
+                    read through the Battery Status API where the browser implements it —
+                    Chrome on Android does, Firefox and iOS Safari do not. There is no web
+                    API for thermal state at all, so thermal always reads
+                    <b>unknown</b> here. It is left visible rather than removed so that a
+                    later native reading has somewhere honest to land.
+                </div>
+
+                <button type="button" class="glass-btn" style="min-height:44px;" onclick="workerRefresh()">Refresh</button>
+            </div>
+        </div>
+
         <div class="window glass-panel" id="win-dashboard" style="top: 60px; left: 120px; width: 720px; height: 620px; display: none;">
             <div class="window-header" onmousedown="dragWindow(event, 'win-dashboard')">
                 <span class="window-title">📊 Dashboard</span>
@@ -740,6 +784,9 @@
         <button type="button" onclick="openDashboard()" class="dock-btn" data-win="win-dashboard" title="Dashboard">
             <span class="dock-ico">📊</span><span class="dock-lbl">Dash</span>
         </button>
+        <button type="button" onclick="openWorker()" class="dock-btn" data-win="win-worker" title="This device">
+            <span class="dock-ico">📱</span><span class="dock-lbl">This device</span>
+        </button>
         <button type="button" onclick="openDevices()" class="dock-btn" data-win="win-devices" title="Devices & Permissions">
             <span class="dock-ico">🔐</span><span class="dock-lbl">Devices</span>
         </button>
@@ -763,7 +810,7 @@
         </button>
     </nav>
 
-    <script src="script.js?v=20260721"></script>
+    <script src="script.js?v=20260721b"></script>
     <script src="hyperspace.js?v=5"></script>
 
 </body>

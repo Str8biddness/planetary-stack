@@ -3983,3 +3983,154 @@ function psEvidenceBadge(status) {
     return '<span class="ps-badge ps-badge-unsigned" title="Provenance could not be determined.">' +
         '⚠ ' + psEscape(status) + '</span>';
 }
+
+/* ------------------------------------------- this device (phone-sized view)
+ *
+ * A phone opens the same desktop, but on a phone the only question that
+ * matters is "what is THIS machine doing right now". That is what this view
+ * answers, from endpoints that already exist:
+ *   /api/settings  -> is a worker configured on this desktop, and which node
+ *   /api/devices   -> is that node actually permitted to run work
+ *   /api/jobs/{id} -> the state of the jobs this browser is tracking
+ * plus the Battery Status API for battery, where the browser implements it.
+ *
+ * Nothing here invents a reading. Where a value cannot be read it is rendered
+ * as the word "unknown", never as a plausible number.
+ */
+
+function openWorker() {
+    toggleWindow('win-worker');
+    if (document.getElementById('win-worker').style.display !== 'none') workerRefresh();
+}
+
+/* Battery Status API: Chrome on Android implements it, Firefox and iOS Safari
+   do not. Absence is reported, not filled in. */
+async function workerReadBattery() {
+    if (!navigator.getBattery) return null;
+    try {
+        return await navigator.getBattery();
+    } catch (e) {
+        return null;
+    }
+}
+
+async function workerRefresh() {
+    const dot = document.getElementById('worker-dot');
+    const stateText = document.getElementById('worker-state-text');
+    const why = document.getElementById('worker-state-why');
+    const work = document.getElementById('worker-work');
+    const hardware = document.getElementById('worker-hardware');
+    if (!work || !hardware) return;
+
+    work.innerHTML = '<div class="ps-empty">Loading…</div>';
+
+    let settings = null;
+    let devices = null;
+    try {
+        const [setResp, devResp] = await Promise.all([
+            psFetch('/api/settings'),
+            psFetch('/api/devices'),
+        ]);
+        if (setResp.ok) settings = await setResp.json();
+        if (devResp.ok) devices = (await devResp.json()).devices || [];
+    } catch (e) { /* handled below */ }
+
+    /* Job states for the jobs this browser is tracking. A job the controller
+       will not talk about is counted as unreadable, not as finished. */
+    jobsLoadRemembered();
+    const tracked = (meshJobs && meshJobs.ids ? meshJobs.ids : []).slice();
+    let running = 0;
+    let completed = 0;
+    let unreadable = 0;
+    for (const jobId of tracked) {
+        try {
+            const resp = await psFetch('/api/jobs/' + encodeURIComponent(jobId));
+            if (!resp.ok) { unreadable += 1; continue; }
+            const record = await resp.json();
+            if (record.state === 'admitted') running += 1;
+            else if (record.state === 'completed') completed += 1;
+        } catch (e) {
+            unreadable += 1;
+        }
+    }
+
+    /* Working / idle / paused, each derived from something real. */
+    let state = 'unknown';
+    let reason = 'The controller could not be reached, so what this device is doing is unknown.';
+    let tone = 'unknown';
+
+    if (settings === null) {
+        state = 'Unknown';
+        reason = 'Controller unreachable — this device’s state could not be read.';
+    } else if (!settings.worker_node_id) {
+        state = 'Idle';
+        tone = 'idle';
+        reason = 'No worker is configured on this desktop, so it never picks up mesh work.';
+    } else {
+        const me = (devices || []).filter(function (d) { return d.device_id === settings.worker_node_id; })[0];
+        if (devices === null) {
+            state = 'Unknown';
+            reason = 'Worker ' + settings.worker_node_id + ' is configured, but the device list ' +
+                'could not be read, so its permission to run work is unknown.';
+        } else if (!me) {
+            state = 'Paused';
+            tone = 'paused';
+            reason = 'Worker ' + settings.worker_node_id + ' is configured but has no device ' +
+                'record, so nothing is permitted to run on it.';
+        } else if (!me.capabilities || !me.capabilities.run_inference) {
+            state = 'Paused';
+            tone = 'paused';
+            reason = 'You have not allowed this device to run work. Turn on "run inference" ' +
+                'for it under Devices & permissions.';
+        } else if (running > 0) {
+            state = 'Working';
+            tone = 'working';
+            reason = running + ' job(s) admitted and not yet finished.';
+        } else {
+            state = 'Idle';
+            tone = 'idle';
+            reason = 'Allowed to run work, with nothing admitted right now.';
+        }
+    }
+
+    if (stateText) stateText.textContent = state;
+    if (dot) dot.className = 'worker-dot worker-dot-' + tone;
+    if (why) why.textContent = reason;
+
+    work.innerHTML =
+        dashCard('Items completed', settings === null ? 'unknown' : String(completed),
+                 'of ' + tracked.length + ' job(s) tracked in this browser') +
+        dashCard('Running now', settings === null ? 'unknown' : String(running),
+                 unreadable ? unreadable + ' tracked job(s) could not be read' : 'admitted, not yet finished') +
+        dashCard('Worker node', settings && settings.worker_node_id ? settings.worker_node_id : 'None',
+                 settings === null ? 'could not be read' : 'configured on this desktop');
+
+    /* Hardware. Battery may resolve after the controller call; thermal never
+       resolves, because no web API exposes it. */
+    const battery = await workerReadBattery();
+    let batteryValue = 'unknown';
+    let batterySub = 'this browser does not expose the Battery Status API';
+    if (battery && typeof battery.level === 'number') {
+        batteryValue = Math.round(battery.level * 100) + '%';
+        batterySub = battery.charging ? 'charging' : 'on battery';
+    }
+
+    hardware.innerHTML =
+        dashCard('Battery', batteryValue, batterySub) +
+        dashCard('Thermal', 'unknown', 'no browser API reports thermal state');
+}
+
+/* ------------------------------------------------ installable app (PWA)
+ *
+ * The service worker caches the app shell so an installed home-screen icon
+ * still opens when the shell is not running. Registration is best-effort:
+ * a browser without service worker support, or a context the browser does
+ * not consider secure, simply keeps the plain page.
+ */
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function (err) {
+            console.warn('[pwa] service worker not registered:', err);
+        });
+    });
+}
