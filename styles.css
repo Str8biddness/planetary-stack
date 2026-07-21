@@ -1,0 +1,11 @@
+
+/* Single global navigation: the top bar names the current workspace. */
+.ps-ws-title {
+    font-size: var(--t-h2);
+    font-weight: var(--w-section);
+    letter-spacing: -0.01em;
+    margin: 0;
+    white-space: nowrap;
+    flex: none;
+}
+@media (max-width: 1100px) { .ps-ws-title { display: none; } }
