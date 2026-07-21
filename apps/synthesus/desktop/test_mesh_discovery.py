@@ -10,6 +10,7 @@ was contacted here.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime
 
@@ -32,7 +33,7 @@ DESKTOP = "node:private-mesh:dakin-chronos"
 
 
 def _record(node_id, *, not_after="2026-07-27T18:41:12Z", status="active", **overrides):
-    digest = format(abs(hash(node_id)) % (16**64), "064x")
+    digest = hashlib.sha256(node_id.encode("utf-8")).hexdigest()
     record = {
         "schema": RECORD_SCHEMA,
         "account_id": "account:private-mesh:home",
