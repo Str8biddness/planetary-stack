@@ -2604,3 +2604,74 @@ NEXT PIECES, in order
   be blocked in some webviews — the code is still shown in the field as a
   fallback. NO FINISH_CHECKLIST box checked.
 
+
+## 2026-07-21 — Distributed, seam-safe tile rendering for the forge
+
+### Work completed
+
+- Added `services/forge_render/` — a portable CPU renderer plus a distribution
+  layer, so a single heavy image can be rendered across mesh nodes.
+- `engine.py`: a pinned CPU raymarcher (`ENGINE_VERSION = "forge-cpu-1"`)
+  mirroring the WebGL scene math (4 scenes, soft shadow, fresnel glow, palette,
+  vignette, grain) plus a dependency-free RGB PNG encoder (stdlib zlib). Every
+  pixel is computed from the FULL frame coordinates and its absolute position,
+  so a tile is the same bytes as the whole frame — proven byte-identical. The
+  one screen-space effect, bloom, renders on a padded tile and crops; overlap
+  >= radius reproduces the whole frame, overlap 0 seams.
+- `farm.py`: `RenderJob` (pins the engine version), uniform and
+  capability-weighted tiling, a discrete-event `steal_schedule` (the next free
+  node pulls the next tile — fast nodes render more, a straggler holds one),
+  a `WorkStealingScheduler` with a thread-safe shared queue and fail-closed
+  compositing, and `plan_render` — the adaptive local-vs-distribute decision.
+- Why a CPU engine when WebGL exists: distribution needs byte-identical output
+  on every node; a phone in proot has no reliable headless WebGL, and mixing a
+  GPU coordinator with CPU workers is the version skew that seams. All nodes run
+  this one pinned engine for distributed renders; WebGL stays for local preview.
+- `benchmark.py`: the small measurement — local render, single tile, and one
+  real Unisync round-trip — and the crossover.
+- Added `tests/forge_render/test_tile_rendering.py` (17 tests): byte-identical
+  tiling, the bloom overlap seam/fix, engine-version refusal (per-tile and
+  whole-job fail-closed), work-stealing distribution + straggler tolerance,
+  thread-safe queue, composite gap/overlap refusal, adaptive local/distribute,
+  and that the output is a real PNG with real tonal range (not a mock fill).
+
+### Commands run and their real output
+
+- `.venv/bin/python -m pytest tests/forge_render -q` -> `17 passed in ~1.2s`.
+- `.venv/bin/python -m pytest tests -q` -> `45 failed, 465 passed, 1 skipped,
+  2 errors`. Prior this session: 448 passed. Delta +17, zero new failures (the
+  45+2 remain the pre-existing arm64 architecture-literal issue).
+
+### MEASURED — the three numbers on this host (aarch64, pure-Python engine)
+
+At 96x72, quality 64, 3 nodes:
+- boolean sculpture: local 216.6 ms, single tile 7.6 ms, mesh round-trip
+  8.66 ms, crossover >= 39.0 ms.
+- gyroid: local 134.5 ms, single tile 4.6 ms, round-trip 8.31 ms, crossover
+  >= 37.4 ms.
+Reading: a scene that renders locally in more than ~39 ms is predicted to win
+by distributing across 3 nodes here; cheaper scenes stay local. Both test
+scenes are well above that, so they distribute.
+
+### RENDERED — not simulated
+
+- Rendered a 240x160 gyroid with bloom via the distributed path across three
+  weighted workers (12 tiles), composited it, and confirmed the composite is
+  byte-identical to a single whole-frame render (seamless). Wrote a real PNG
+  (83,873 bytes) and viewed it — a glowing woven purple orb with bloom and
+  grain. The CPU engine produces a genuinely good image.
+
+### HONEST GAPS
+
+- The mesh round-trip is measured over the IN-PROCESS transport: it captures
+  framing, auth and receipt but NOT the mTLS handshake or the wire, so it is a
+  LOWER BOUND. Real LAN overhead is larger and the true crossover is higher.
+  The physical mTLS path cannot run on this arm64 host (pre-existing).
+- `WorkStealingScheduler.render()` executes all tiles on this one host, so its
+  per-node tile counts are round-robin, not timing-driven; the speed-aware
+  stealing (fast node gets more, straggler tolerance) is proven by
+  `steal_schedule` and its tests, not by a physical multi-node run.
+- The distributed engine is the CPU renderer, not the WebGL one; they are close
+  but not asserted pixel-identical to each other. Not wired into the desktop UI
+  yet (needs live nodes to be meaningful). NO FINISH_CHECKLIST box checked.
+
