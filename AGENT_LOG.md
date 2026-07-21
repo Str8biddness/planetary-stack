@@ -2170,3 +2170,82 @@ marks the start; each landed piece gets its own honest entry.
   survive measurement; "a household's idle devices index a corpus overnight,
   privately" would.
 - NO FINISH_CHECKLIST box checked.
+### PLANNED — spare-node mesh: Termux workers, namespace SSI, drive sync
+Recording the development thread so the decisions and the corrections survive.
+
+WHAT THE OWNER IS BUILDING TOWARD
+- Recycle spare/idle hardware (old phones, spare PCs) into mesh workers. E-waste
+  framing is genuine and sellable: "your old phones become your AI".
+- Each node runs a terminal reachable from the one Web Desktop UI, exactly as
+  terminal_server.py already streams a PTY over WebSocket into xterm.js.
+- A shared namespace ("expansion drive") every node reaches, partitioned by
+  role, with automated push/pull keeping the mesh current.
+
+CORRECTIONS MADE DURING THIS THREAD (each one changed the plan)
+1. "Harvest/uncompute the GPU": REJECTED, four times, on physics. Computation is
+   not a fluid; a render produces its output and the energy leaves as heat.
+   Uncomputation is real (compute -> copy out -> uncompute) but recovers clean
+   workspace, NOT extra work. Rendering is also not invertible (rasterisation is
+   many-to-one and lossy). AND there is no gatekeeper to fool: a WebGPU compute
+   shader already gets full utilisation on submission. The door is open.
+2. THE STEELMAN THAT DOES WORK: make the render BE the computation (classic
+   GPGPU-via-fragment-shaders). The wallpaper's shader is the embedding kernel;
+   the texture holds the vectors. One pass, two purposes, ledger closes.
+   Caveats: 8-bit framebuffers destroy vector precision (need float textures),
+   readback stalls the pipeline, and on WebGPU you should just use compute
+   shaders. Fragment path is the WebGL2 fallback only.
+3. GeometricEmbedder is the strongest asset for mobile: DETERMINISTIC frequency
+   maps, no learned weights, so NO MODEL TO LOAD, no VRAM ceiling, no
+   quantisation problem — and pure position arithmetic, which is exactly what a
+   shader wants. The real "point compute at the phone" play.
+4. MY OBJECTIONS ABOUT MOBILE WERE WRONG FOR THE ACTUAL TARGET. Background
+   suspension, battery drain and thermal urgency all assume a phone someone is
+   USING. A dedicated spare node sits on a shelf on a charger with nothing else
+   running: Termux + wake lock runs indefinitely, nothing backgrounds it.
+5. THE ROOTING PROBLEM IS ALREADY SOLVED AND SHIPPED: docs/TERMUX.md in the
+   mobile repo — Termux + proot-distro Debian ARM64 -> normal installer ->
+   headless on localhost:8081. Sanctioned path, no root, no exploit. The whole
+   uncompute exploration was routing around a problem the owner had already
+   solved by a better route.
+   BUT that doc states it "hasn't been mechanically verified against a physical
+   device". NOBODY HAS RUN IT. Needs one spare phone and an afternoon.
+6. SSI: I initially refused the term citing the owner's own coordinator.py
+   ("It is NOT a single system image ... we do not fake it"). The owner pushed
+   back and was PARTLY RIGHT and I conceded: there are two SSIs. Kernel-level
+   (MOSIX/OpenSSI: process migration, shared address space) is impossible here.
+   NAMESPACE-level (Plan 9 / 9P: unify the namespace and the machine boundary
+   stops mattering) is exactly what this is, is legitimate, and has pedigree.
+   Position it as Plan 9-style namespace SSI. Still true: no mid-run process
+   migration (jobs must stay idempotent and re-runnable — the lease + fencing
+   token model already assumes this), and no mount on Android.
+7. "Expansion drive" is NOT a disk. Its endpoints are /drive/ingest, /paste,
+   /preview, /sources, /remotes with rclone — a grounding INGESTION pipeline.
+   "Mount it on every node" is really "every node reaches the same grounded
+   corpus", i.e. a replication problem. ContentAddressedStore IS the abstracted
+   cache the owner was describing, and it already exists.
+8. PER-OS ROUTING (owner's insight, correct): one logical namespace, a different
+   local realisation per platform. Linux/macOS rclone mount (FUSE) or sync;
+   Windows rclone mount via WinFsp; Android/Termux rclone SYNC ONLY (proot has
+   no CAP_SYS_ADMIN, no FUSE); iOS nothing. Use rclone, NOT provider apps —
+   Drive/Dropbox on Android expose content:// via the Storage Access Framework,
+   not POSIX paths, and stream rather than materialise files.
+
+THE HARD GUARD THAT MUST BE BUILT WITH THIS, NOT AFTER
+- Three zones with DIFFERENT transports, not one drive with mixed partitions:
+    system/node state  — per node, never shared
+    code (GitHub)      — LEAVES the house by design
+    personal grounding — mesh CAS + mTLS ONLY, NEVER a cloud provider
+- If the shared hub is Google Drive/Dropbox, personal data leaves the home and
+  the product's central claim dies. The failure is SILENT — a misrouted sync
+  does not error, it just uploads someone's private files. Needs an enforced
+  boundary, not a convention.
+
+NEXT PIECES, in order
+  a. Physically verify the Termux path on one spare phone (cheapest, highest
+     information — converts the best-documented path from theory to fact).
+  b. Termux node terminal: same PTY-over-WebSocket pattern, so every spare node
+     is manageable from the one UI.
+  c. Zone model + enforcement point for the three storage zones.
+  d. Role/capability advertisement so placement routes by role.
+  e. Push/pull sync over the CAS.
+- NOTHING IN THIS ENTRY IS BUILT. NO FINISH_CHECKLIST box checked.
