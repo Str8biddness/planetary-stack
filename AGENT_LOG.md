@@ -1373,3 +1373,28 @@ marks the start; each landed piece gets its own honest entry.
   (mesh_http_post adapter) and step 3 (node identity mapping, which is what
   actually kills the response-injection attack) are not started.
 - NO FINISH_CHECKLIST box checked.
+### step 1 BLOCKED on physical run — the response leg has no authority
+- Attempted the two-machine physical run of the paired exchange. It cannot be
+  run: `services/unisync/exchange.py` does not authorize against the production
+  `SignedLeaseValidator`. Verified with the GENUINE signed lease + request from
+  the 2026-07-20 physical pull evidence:
+    leg-1 context authorizes: YES
+    leg-2 derived context:    NO -> "transfer destination is not the leased node"
+- Two independent blockers:
+  1. a lease pins one destination node (mesh_lease.py:179), and leg 2 delivers
+     to the requester — a different node;
+  2. the transferred object must be an exact content reference in the signed
+     request (mesh_lease.py:189-196), and a response digest cannot exist before
+     the handler runs. This one is not fixable by issuing a second lease.
+- Why the step-1 tests passed anyway: they inject the permissive test
+  StrictValidator, which enforces neither rule. That is the gap; the unit tests
+  were not wrong, they were scoped too narrowly to catch it.
+- Recorded: docs/design/EXCHANGE_RESPONSE_AUTHORITY.md; a regression guard in
+  tests/unisync/test_exchange.py that pins the exact rejection using the real
+  signed documents; a DO-NOT-WIRE banner at the top of exchange.py.
+- Likely direction (NOT built, NOT agreed): a bounded response slot in the
+  signed request, mirroring how a CHAL request already declares `outputs` as a
+  slot rather than a digest. That is a CONTRACTS change needing its own review.
+- PHYSICAL EXCHANGE RUN: NOT DONE. Step 2 (mesh_http_post) must not start until
+  this is resolved — it would be built on an unauthorizable transport.
+- NO FINISH_CHECKLIST box checked.
