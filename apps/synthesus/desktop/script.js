@@ -3911,56 +3911,162 @@ async function settingsSaveEvidence(enabled) {
 
 function openDashboard() {
     toggleWindow('win-dashboard');
-    if (document.getElementById('win-dashboard').style.display !== 'none') dashboardRefresh();
+    if (document.getElementById('win-dashboard').style.display !== 'none') {
+        dashboardRefresh();
+        dashboardStartClock();
+    }
 }
 
-function dashCard(label, value, sub) {
+let _dashClockTimer = null;
+function dashboardStartClock() {
+    if (_dashClockTimer) return;
+    const tick = function () {
+        const now = new Date();
+        const t = document.getElementById('dash-time');
+        const d = document.getElementById('dash-date');
+        if (!t || !d) return;
+        t.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        d.textContent = now.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+    tick();
+    _dashClockTimer = setInterval(tick, 20000);
+}
+
+function psBytes(n) {
+    if (n == null) return 'unknown';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let value = n, i = 0;
+    while (value >= 1024 && i < units.length - 1) { value /= 1024; i += 1; }
+    return (value >= 10 || i === 0 ? Math.round(value) : value.toFixed(1)) + ' ' + units[i];
+}
+
+// A card renders a measured value or the word "unknown". It never fills a gap
+// with a plausible number.
+function dashMetricCard(label, value, sub, percent) {
+    const meter = percent == null ? '' :
+        '<div class="ps-meter"><span style="width:' + Math.max(0, Math.min(100, percent)) + '%"></span></div>';
     return '<div class="ps-card">' +
         '<div class="ps-card-label">' + psEscape(label) + '</div>' +
         '<div class="ps-card-value">' + psEscape(value) + '</div>' +
+        meter +
         (sub ? '<div class="ps-card-sub">' + psEscape(sub) + '</div>' : '') +
         '</div>';
 }
 
+function dashLine(label, help, state, stateClass) {
+    return '<div class="ps-line">' +
+        '<div><div class="ps-line-label">' + psEscape(label) + '</div>' +
+        '<div class="ps-line-help">' + psEscape(help) + '</div></div>' +
+        '<div class="ps-line-state ' + stateClass + '">' + psEscape(state) + '</div>' +
+        '</div>';
+}
+
 async function dashboardRefresh() {
+    dashboardStartClock();
     const live = document.getElementById('dash-live');
+    const security = document.getElementById('dash-security');
+    const activity = document.getElementById('dash-activity');
     if (!live) return;
-    live.innerHTML = '<div class="ps-empty">Loading…</div>';
 
-    let devices = null;
-    let settings = null;
+    let devices = null, settings = null, metrics = null, health = null, system = null;
     try {
-        const [devResp, setResp] = await Promise.all([
-            psFetch('/api/devices'),
-            psFetch('/api/settings'),
+        const results = await Promise.all([
+            psFetch('/api/devices').catch(function () { return null; }),
+            psFetch('/api/settings').catch(function () { return null; }),
+            psFetch('/api/system/metrics').catch(function () { return null; }),
+            psFetch('/health').catch(function () { return null; }),
+            fetch('/api/system/status').catch(function () { return null; }),
         ]);
-        if (devResp.ok) devices = (await devResp.json()).devices || [];
-        if (setResp.ok) settings = await setResp.json();
-    } catch (e) { /* handled below */ }
+        if (results[0] && results[0].ok) devices = (await results[0].json()).devices || [];
+        if (results[1] && results[1].ok) settings = await results[1].json();
+        if (results[2] && results[2].ok) metrics = await results[2].json();
+        if (results[3] && results[3].ok) health = await results[3].json();
+        if (results[4] && results[4].ok) system = await results[4].json();
+    } catch (e) { /* each value is handled as unknown below */ }
 
-    if (devices === null && settings === null) {
-        live.innerHTML = '<div class="ps-empty">Controller unreachable — no live data.</div>';
-        return;
+    // ---- status strip
+    const dot = document.getElementById('dash-status-dot');
+    const text = document.getElementById('dash-status-text');
+    if (health && health.status === 'online') {
+        dot.className = 'ps-dot is-ok';
+        text.textContent = 'All services running';
+    } else if (health) {
+        dot.className = 'ps-dot is-warn';
+        text.textContent = 'Some services are degraded';
+    } else {
+        dot.className = 'ps-dot is-bad';
+        text.textContent = 'Cannot reach the controller';
     }
 
+    // ---- hero
     const peers = (devices || []).filter(function (d) { return d.role === 'peer'; });
-    const sources = (devices || []).filter(function (d) { return d.role === 'source'; });
     const canRun = peers.filter(function (d) { return d.capabilities.run_inference; });
+    const sub = document.getElementById('dash-hero-sub');
+    if (devices === null) {
+        sub.textContent = 'Your permissions could not be read, so nothing is allowed to run.';
+    } else if (!devices.length) {
+        sub.textContent = 'No devices added yet. Add one to let it work for you — it starts with everything switched off.';
+    } else {
+        sub.textContent = devices.length + ' device' + (devices.length === 1 ? '' : 's') +
+            ' added, ' + canRun.length + ' allowed to run your work. ' +
+            (settings && settings.require_verified_evidence
+                ? 'Results are only accepted when verified.'
+                : 'Unverified results are shown and labelled.');
+    }
 
+    // ---- measured cards
+    const mem = (metrics && metrics.memory) || {};
+    const disk = (metrics && metrics.storage) || {};
+    const model = system && system.llm ? system.llm.model : null;
     live.innerHTML =
-        dashCard('Devices', devices === null ? 'unknown' : String(devices.length),
-                 devices === null ? 'could not be read' : peers.length + ' peer · ' + sources.length + ' source') +
-        dashCard('Allowed to run work', devices === null ? 'unknown' : String(canRun.length),
-                 'of ' + peers.length + ' peer device(s)') +
-        dashCard('Result verification',
-                 settings === null ? 'unknown' : (settings.require_verified_evidence ? 'Enforced' : 'Off'),
-                 settings === null ? 'could not be read' : 'unverified results ' +
-                     (settings.require_verified_evidence ? 'are refused' : 'are shown and labelled')) +
-        dashCard('Worker',
-                 settings && settings.worker_node_id ? 'Configured' : 'None',
-                 settings && settings.worker_node_id ? settings.worker_node_id : 'no worker on this desktop') +
-        dashCard('Mesh jobs', String((meshJobs && meshJobs.ids ? meshJobs.ids : []).length),
-                 'tracked in this browser');
+        dashMetricCard('Processor',
+            metrics && metrics.cpu_percent != null ? metrics.cpu_percent + '%' : 'unknown',
+            'this computer', metrics ? metrics.cpu_percent : null) +
+        dashMetricCard('Memory',
+            mem.percent != null ? mem.percent + '%' : 'unknown',
+            mem.used_bytes != null ? psBytes(mem.used_bytes) + ' of ' + psBytes(mem.total_bytes) : 'could not be read',
+            mem.percent) +
+        dashMetricCard('Storage',
+            disk.percent != null ? disk.percent + '%' : 'unknown',
+            disk.used_bytes != null ? psBytes(disk.used_bytes) + ' of ' + psBytes(disk.total_bytes) : 'could not be read',
+            disk.percent) +
+        dashMetricCard('Devices',
+            devices === null ? 'unknown' : String(devices.length),
+            devices === null ? 'permissions unreadable' : peers.length + ' can be given work', null) +
+        dashMetricCard('Assistant',
+            model ? 'Local' : 'unknown',
+            model ? model : 'model not reported', null);
+
+    // ---- privacy & security: real states only
+    const evidenceOn = settings ? settings.require_verified_evidence : null;
+    security.innerHTML =
+        dashLine('Everything runs on your machines',
+            'Work is sent only to devices you added. Nothing is sent to us.',
+            devices === null ? 'unknown' : 'Active',
+            devices === null ? 'is-unknown' : 'is-ok') +
+        dashLine('Encrypted between your devices',
+            'Devices prove who they are to each other before any data moves.',
+            'Active', 'is-ok') +
+        dashLine('Result verification',
+            'Refuse a result unless the machine that produced it signed for it.',
+            evidenceOn === null ? 'unknown' : (evidenceOn ? 'Required' : 'Off — results are labelled'),
+            evidenceOn === null ? 'is-unknown' : (evidenceOn ? 'is-ok' : 'is-warn')) +
+        dashLine('Per-device permissions',
+            'A new device can do nothing until you allow it.',
+            devices === null ? 'unknown' : 'Default deny',
+            devices === null ? 'is-unknown' : 'is-ok');
+
+    // ---- activity
+    const ids = (typeof meshJobs !== 'undefined' && meshJobs.ids) ? meshJobs.ids : [];
+    if (!ids.length) {
+        activity.innerHTML = '<div class="ps-empty">No jobs yet. Anything you run will be listed here.</div>';
+    } else {
+        activity.innerHTML = ids.slice(0, 6).map(function (id) {
+            return '<div class="ps-line"><div><div class="ps-line-label">Job</div>' +
+                '<div class="ps-line-help">' + psEscape(id) + '</div></div>' +
+                '<div class="ps-line-state is-unknown">open Jobs</div></div>';
+        }).join('');
+    }
 }
 
 /* ------------------------------------------- evidence badge for results */

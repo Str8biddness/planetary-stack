@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Synthesus Planetary OS Ultra</title>
     <link rel="icon" type="image/png" href="assets/synthesus-icon.png">
-    <link rel="stylesheet" href="styles.css?v=20260721">
+    <link rel="stylesheet" href="styles.css?v=20260721b">
     <!-- No external font CDN: the shell assets render locally and remain available offline.
          Uses locally-installed Outfit/Fira Code if present, else a
          native system stack. To pin the exact look later, self-host the woff2 via @font-face. -->
@@ -653,72 +653,85 @@
 
         <!-- Dashboard — mixed. Cards backed by live endpoints render live;
              everything else is tagged DEMO and is deliberately not wired. -->
-        <div class="window glass-panel" id="win-dashboard" style="top: 60px; left: 120px; width: 720px; height: 620px; display: none;">
+        <div class="window glass-panel" id="win-dashboard" style="top: 40px; left: 90px; width: 1020px; height: 700px; display: none;">
             <div class="window-header" onmousedown="dragWindow(event, 'win-dashboard')">
-                <span class="window-title">📊 Dashboard</span>
+                <span class="window-title">Overview</span>
                 <div class="window-controls"><button class="win-btn minimize" onclick="minimizeWindow(this)" style="background: #facc15;"></button><button class="win-btn maximize" onclick="maximizeWindow(this)" style="background: #22c55e;"></button><button class="win-btn close" onclick="toggleWindow('win-dashboard')"></button></div>
             </div>
-            <div class="window-content" style="display:flex; flex-direction:column; gap:14px; overflow-y:auto;">
-                <div class="ps-section-title">Your mesh</div>
-                <div class="ps-grid" id="dash-live"></div>
+            <div class="window-content ps-shell">
+                <!-- Left rail: plain nouns, no jargon. Each entry opens a real window. -->
+                <nav class="ps-rail" aria-label="Sections">
+                    <button class="ps-rail-item is-active" onclick="dashboardRefresh()">
+                        <span class="ps-rail-ico">◱</span><span>Overview</span></button>
+                    <button class="ps-rail-item" onclick="openDevices()">
+                        <span class="ps-rail-ico">◉</span><span>Devices</span></button>
+                    <button class="ps-rail-item" onclick="toggleWindow('win-jobs')">
+                        <span class="ps-rail-ico">▤</span><span>Jobs</span></button>
+                    <button class="ps-rail-item" onclick="toggleWindow('win-chat')">
+                        <span class="ps-rail-ico">◈</span><span>Assistant</span></button>
+                    <button class="ps-rail-item" onclick="toggleWindow('win-drive')">
+                        <span class="ps-rail-ico">▧</span><span>Storage</span></button>
+                    <button class="ps-rail-item" onclick="toggleWindow('win-explorer')">
+                        <span class="ps-rail-ico">▭</span><span>Files</span></button>
+                    <button class="ps-rail-item" onclick="spawnTerminalWindow()">
+                        <span class="ps-rail-ico">▸</span><span>Terminal</span></button>
+                    <button class="ps-rail-item" onclick="openSettings()">
+                        <span class="ps-rail-ico">⚙</span><span>Settings</span></button>
+                    <div class="ps-rail-spacer"></div>
+                    <div class="ps-rail-user">
+                        <div class="ps-rail-user-name" id="dash-user">Signed in</div>
+                        <div class="ps-rail-user-sub" id="dash-user-sub">This computer</div>
+                    </div>
+                </nav>
 
-                <div class="ps-demo-note">
-                    The panels below are <b>design mock-ups</b>. They are not connected to
-                    anything and their numbers are fixed. They are here to show the visual
-                    direction only — nothing below this line reflects your system.
-                </div>
-                <div class="ps-grid">
-                    <div class="ps-card demo-chrome">
-                        <div class="ps-card-label">CPU</div>
-                        <div class="ps-card-value">36%</div>
-                        <div class="ps-meter"><span style="width:36%"></span></div>
+                <div class="ps-main">
+                    <!-- Status strip. Every value here is measured or says unknown. -->
+                    <div class="ps-topbar">
+                        <div class="ps-status" id="dash-status">
+                            <span class="ps-dot" id="dash-status-dot"></span>
+                            <span id="dash-status-text">Checking…</span>
+                        </div>
+                        <div class="ps-clock">
+                            <div class="ps-clock-time" id="dash-time">--:--</div>
+                            <div class="ps-clock-date" id="dash-date"></div>
+                        </div>
                     </div>
-                    <div class="ps-card demo-chrome">
-                        <div class="ps-card-label">Memory</div>
-                        <div class="ps-card-value">7.1 GB</div>
-                        <div class="ps-meter"><span style="width:58%"></span></div>
-                    </div>
-                    <div class="ps-card demo-chrome">
-                        <div class="ps-card-label">Storage</div>
-                        <div class="ps-card-value">412 GB</div>
-                        <div class="ps-meter"><span style="width:44%"></span></div>
-                    </div>
-                    <div class="ps-card demo-chrome">
-                        <div class="ps-card-label">Network</div>
-                        <div class="ps-card-value">18 Mb/s</div>
-                        <div class="ps-card-sub">↑ 3.2 &nbsp; ↓ 14.8</div>
-                    </div>
-                    <div class="ps-card demo-chrome">
-                        <div class="ps-card-label">Weather</div>
-                        <div class="ps-card-value">14°</div>
-                        <div class="ps-card-sub">Overcast</div>
-                    </div>
-                    <div class="ps-card demo-chrome">
-                        <div class="ps-card-label">Now playing</div>
-                        <div class="ps-card-value" style="font-size:1rem;">—</div>
-                        <div class="ps-card-sub">◀◀ &nbsp; ▶ &nbsp; ▶▶</div>
-                    </div>
-                    <div class="ps-card demo-chrome">
-                        <div class="ps-card-label">Calendar</div>
-                        <div class="ps-card-value" style="font-size:1rem;">No events</div>
-                        <div class="ps-card-sub">Not connected</div>
-                    </div>
-                    <div class="ps-card demo-chrome">
-                        <div class="ps-card-label">Notes</div>
-                        <div class="ps-card-value" style="font-size:1rem;">—</div>
-                        <div class="ps-card-sub">Scratchpad mock</div>
-                    </div>
-                    <div class="ps-card demo-chrome">
-                        <div class="ps-card-label">Project</div>
-                        <div class="ps-card-value" style="font-size:1rem;">Sample</div>
-                        <div class="ps-meter"><span style="width:70%"></span></div>
-                        <div class="ps-card-sub">Single-user product — no teams</div>
+
+                    <section class="ps-hero">
+                        <div class="ps-hero-copy">
+                            <div class="ps-hero-eyebrow">Welcome back</div>
+                            <h2 class="ps-hero-title" id="dash-hero-name">Your private AI</h2>
+                            <p class="ps-hero-sub" id="dash-hero-sub">Checking your setup…</p>
+                            <div class="ps-hero-actions">
+                                <button class="ps-cta" onclick="openDevices()">Add a device</button>
+                                <button class="ps-cta ps-cta-ghost" onclick="toggleWindow('win-jobs')">Run a job</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="ps-grid" id="dash-live"></div>
+
+                    <div class="ps-two-col">
+                        <section class="ps-panel">
+                            <div class="ps-panel-head">
+                                <h3>Privacy &amp; security</h3>
+                                <span class="ps-panel-note">What is protecting your data right now</span>
+                            </div>
+                            <div id="dash-security"></div>
+                        </section>
+                        <section class="ps-panel">
+                            <div class="ps-panel-head">
+                                <h3>Recent activity</h3>
+                                <span class="ps-panel-note">Jobs this computer has tracked</span>
+                            </div>
+                            <div id="dash-activity"></div>
+                        </section>
                     </div>
                 </div>
             </div>
         </div>
 
-    <nav class="dock" id="os-dock" aria-label="System dock">
+        <nav class="dock" id="os-dock" aria-label="System dock">
         <button type="button" onclick="toggleVitals()" class="dock-btn" data-win="win-vitals" title="System Vitals">
             <span class="dock-ico">📡</span><span class="dock-lbl">Vitals</span>
         </button>
@@ -763,7 +776,7 @@
         </button>
     </nav>
 
-    <script src="script.js?v=20260721"></script>
+    <script src="script.js?v=20260721b"></script>
     <script src="hyperspace.js?v=5"></script>
 
 </body>

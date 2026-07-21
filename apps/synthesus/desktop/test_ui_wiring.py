@@ -64,18 +64,41 @@ def test_result_viewer_has_a_provenance_badge_host():
     assert "X-Synthesus-Evidence-Status" in SCRIPT
 
 
-def test_demo_panels_are_visibly_marked():
-    """Any mock-up panel must carry the DEMO treatment.
+def test_dashboard_ships_no_mock_panels():
+    """The Overview surface carries no fabricated data.
 
-    Shipping a panel that looks live but is not is the visual form of
-    overclaiming, so the marker is asserted rather than trusted.
+    The blueprint's decorative widgets (weather, music, calendar, fake CPU
+    gauges) were replaced by measured values from /api/system/metrics. This
+    asserts none of them crept back: the dashboard must contain no element
+    tagged `demo-chrome`, because a panel that looks live but is not is the
+    visual form of overclaiming.
     """
+    dashboard = HTML[HTML.index('id="win-dashboard"') : HTML.index('<nav class="dock"')]
+    assert "demo-chrome" not in dashboard, "a mock panel is back on the dashboard"
+    # The DEMO treatment stays in the stylesheet so anything genuinely
+    # unbacked in future is marked rather than passed off as real.
     assert ".demo-chrome::after" in STYLES
     assert 'content: "DEMO"' in STYLES
-    assert "ps-demo-note" in HTML
-    # The mock cards are inside the dashboard and each one is tagged.
+
+
+def test_dashboard_metrics_come_from_the_metrics_endpoint():
+    """Numbers on the Overview are read, not written into the markup."""
+    assert "/api/system/metrics" in SCRIPT
     dashboard = HTML[HTML.index('id="win-dashboard"') : HTML.index('<nav class="dock"')]
-    assert dashboard.count("demo-chrome") >= 8, "mock cards are not all marked DEMO"
+    # No hardcoded percentages in the dashboard markup.
+    assert not re.search(r">\s*\d+%\s*<", dashboard), "a percentage is hardcoded in the markup"
+
+
+def test_overview_wording_avoids_invented_jargon():
+    """Plain professional nouns, per the agreed direction.
+
+    Guards against the mock-up's vocabulary being copied in wholesale; those
+    words imply capabilities this product does not have.
+    """
+    dashboard = HTML[HTML.index('id="win-dashboard"') : HTML.index('<nav class="dock"')]
+    banned = ("GODMODE", "QUANTUM", "SYNAPSE", "NEURAL", "HEMISPHERIC", "PROTOCOL")
+    found = [word for word in banned if word.lower() in dashboard.lower()]
+    assert not found, f"invented jargon on the Overview: {found}"
 
 
 def test_live_dashboard_reports_unknown_rather_than_guessing():

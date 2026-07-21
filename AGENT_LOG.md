@@ -1820,3 +1820,44 @@ marks the start; each landed piece gets its own honest entry.
   snapshot retired. Every original archived under /home/dakin/planetary-stack-
   archive/.
 - NO FINISH_CHECKLIST box checked.
+### Overview surface — mock-up layout, professional wording, measured data
+- Owner supplied a reference design (GHOSTKEY OS) and asked for that look "with
+  professional comfortable wording". Took the STRUCTURE, rejected the VOCABULARY.
+- WORDING MAP (the explicit ask). Left column is the reference, right is what
+  shipped, chosen so no label implies a capability that does not exist:
+    QUANTUM CORE        -> Devices
+    AI SYNAPSE          -> Assistant
+    ENTER GODMODE       -> Add a device / Run a job (real actions)
+    QUAD-HEMISPHERIC…   -> "3 devices added, 1 allowed to run your work"
+    ACTIVE PROTOCOLS    -> Privacy & security
+    RSAFM / IMPOSTER TRACE / QUANTUM FIREWALL / LDM MODE
+                        -> Everything runs on your machines / Encrypted between
+                           your devices / Result verification / Per-device
+                           permissions
+    QUANTUM TIMELINE    -> Recent activity
+    STORE               -> dropped (there is no store)
+  A test now FAILS the build if GODMODE/QUANTUM/SYNAPSE/NEURAL/HEMISPHERIC/
+  PROTOCOL appear on the Overview.
+- NEW: apps/synthesus/desktop/host_metrics.py — REAL host readings from
+  /proc/stat, /proc/meminfo and statvfs. No psutil dependency, no invented
+  numbers: anything unreadable is null and renders as "unknown". CPU is a rate,
+  so the first sample only sets a baseline; synthesusd primes it at startup so
+  the first dashboard read shows a real figure. GET /api/system/metrics (authed).
+- The nine DEMO cards from the previous dashboard are GONE, replaced by measured
+  values (processor, memory, storage, devices, assistant model). The test that
+  used to assert "all mock cards are marked DEMO" now asserts the stronger
+  property: the dashboard contains NO demo-chrome element at all, and no
+  hardcoded percentage in the markup. The DEMO styling stays in the stylesheet
+  for anything genuinely unbacked in future.
+- Privacy & security panel states only real things, and says "unknown" when the
+  controller cannot be read rather than showing a reassuring green tick.
+- Asset version bumped to v=20260721b (the cache-buster I missed last time).
+- Verified live against the running app: /api/system/metrics returns
+  cpu 93.2%, memory 78.5%, storage 48.2% on first read; the served index.html
+  contains the 8 rail items, hero, security and activity panels.
+  Desktop suite: 78 passed.
+- HONEST GAP, STILL UNCHANGED: no browser tools in this session. NOBODY HAS SEEN
+  THIS RENDER. Layout, contrast, spacing and whether the rail/hero fit the
+  window are unverified. The owner has not yet confirmed the earlier dock change
+  was even visible to them.
+- NO FINISH_CHECKLIST box checked.
