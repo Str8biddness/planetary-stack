@@ -1721,3 +1721,56 @@ marks the start; each landed piece gets its own honest entry.
     check a chain, or consult a CRL. An owner-controlled registry file that
     lies would be believed.
 - NO FINISH_CHECKLIST box checked.
+### CORRECTION — commit 9fed4c4 carried work its message does not describe
+- My PR #43 ("Controller-side issuance of response grants") ALSO contains, with
+  no mention in its title, body, commit message or AGENT_LOG entry:
+    apps/synthesus/desktop/mesh_discovery.py   207 lines (new module + endpoint)
+    apps/synthesus/desktop/synthesusd.py        +36
+    apps/synthesus/desktop/script.js           +113
+    apps/synthesus/desktop/index.html           +15
+    .../test_mesh_discovery.py.tmp.9366.…      180 (Write-tool temp artifact)
+- CAUSE, and it is mine: I briefed a subagent to work in the SAME checkout I was
+  working in (/home/dakin/planetary-stack-finish) and then ran `git add -A`.
+  That staged whatever the agent had written to disk at that instant. The agent
+  did nothing wrong. `isolation: "worktree"` exists to prevent exactly this and
+  I did not use it. Do not run a blanket stage in a checkout a subagent shares.
+- CONSEQUENCE: a new HTTP endpoint and a 207-line module reached main
+  unreviewed and unattributed, under a commit describing something else.
+- REMEDY CHOSEN: annotate, do not rewrite. 9fed4c4 is already on origin/main;
+  rewriting published history would break anything already pulled. PR #44
+  carries the tests, the missing description, and renames the temp artifact to
+  its proper name. This entry is the durable record that 9fed4c4's message is
+  incomplete. NOT deleted, NOT hidden.
+
+### ONE APP — three copies collapsed to one
+- Symptom the owner hit: the desktop icon did not boot any of this session's
+  frontend work.
+- Root cause: ~/.local/bin/synthesus set
+  SYNTHESUS_HOME=/home/dakin/planetary-stack/apps/synthesus — a DIFFERENT
+  checkout of the same remote, on branch fix/desktop-terminal-root at cf9c6ed,
+  which has no device_policy.py and zero restyle classes in styles.css. The
+  icon had been launching an older app the whole time.
+- A THIRD copy existed at ~/.local/share/synthesus/desktop, an install-time
+  snapshot dated 2026-07-15, drifting from both checkouts.
+- FIXED: SYNTHESUS_HOME now points at
+  /home/dakin/planetary-stack-finish/apps/synthesus (the canonical tree); both
+  .desktop entries' Icon= repointed to the repo asset; the install snapshot
+  moved aside to desktop.retired-2026-07-21 with a RETIRED.txt explaining why.
+  Verified with the launcher's OWN python that launch.sh, synthesus_native_shell
+  .py, device_policy.py, mesh_discovery.py and the runtime command all resolve
+  and compile, and that the devices/settings windows and restyle are present.
+- NOTHING DESTROYED. /home/dakin/planetary-stack had uncommitted work and two
+  stashes (one labelled "not authored by this agent"). All preserved BEFORE any
+  change in /home/dakin/planetary-stack-archive/: all-refs.bundle (every ref),
+  uncommitted-worktree.patch, stash0-f001-not-authored-by-agent.patch,
+  stash1-f030-online-revocation.patch, the installed snapshot tarball, and
+  .before copies of the launcher and both .desktop files.
+- WORTH THE OWNER'S ATTENTION: the uncommitted work in the old checkout is not
+  junk — it is onboarding UI (win-account-setup, win-node-enroll, win-resources:
+  account setup, node enrollment token/identity, CPU/RAM/storage sharing
+  sliders). It overlaps the device-discovery work and is NOT in main. Decide
+  whether to port it; the patch is in the archive.
+- HONEST GAP: THE APP STILL HAS NOT BEEN LAUNCHED OR RENDERED. Everything above
+  is resolution and compile checks. No browser tools in this session, so there
+  is still no proof the UI opens or lays out correctly.
+- NO FINISH_CHECKLIST box checked.
