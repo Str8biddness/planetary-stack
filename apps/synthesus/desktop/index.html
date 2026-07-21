@@ -576,6 +576,21 @@
                     default — a new device starts with every capability off.
                 </p>
 
+                <!-- Discovered candidates — REAL: wired to
+                     /api/devices/discovered. Listing a node here grants it
+                     NOTHING; "Add" creates a row with every capability off. -->
+                <div class="ps-section-title" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>Discovered on your mesh</span>
+                    <button class="glass-btn" style="font-size:0.7rem;" onclick="devicesDiscover()">Refresh</button>
+                </div>
+                <p style="font-size:0.78rem; color:var(--text-secondary); line-height:1.5;">
+                    Nodes already enrolled in your mesh. Being enrolled is not permission —
+                    adding one from here still starts it with every capability off.
+                    Cameras, TVs and sensors are never enrolled, so they never appear here;
+                    add those by hand below as a <b>source</b>.
+                </p>
+                <div id="dev-discovered" style="display:flex; flex-direction:column; gap:10px;"></div>
+
                 <div class="ps-section-title">Add a device</div>
                 <div style="display:flex; flex-direction:column; gap:8px;">
                     <input type="text" id="dev-add-id" class="glass-input" placeholder="Device id (e.g. node:private-mesh:workshop-pc)">

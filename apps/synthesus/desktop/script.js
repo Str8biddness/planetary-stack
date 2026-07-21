@@ -3618,6 +3618,9 @@ function openDevices() {
 }
 
 async function devicesRefresh() {
+    // Candidates depend on which devices already have rows, so the two lists
+    // are always re-read together.
+    devicesDiscover();
     const list = document.getElementById('dev-list');
     if (!list) return;
     list.innerHTML = '<div class="ps-empty">Loading…</div>';
@@ -3641,6 +3644,116 @@ async function devicesRefresh() {
         return;
     }
     list.innerHTML = devices.map(devicesRenderRow).join('');
+}
+
+/* Discovered candidates.
+
+   These rows are read out of the mesh enrollment registry. Rendering one
+   grants nothing: the Add button posts to the same /api/devices endpoint the
+   manual form uses, and the controller creates the row with every capability
+   off. Enrollment is not consent. */
+
+const DISCOVERY_REASON_TEXT = {
+    mesh_module_unavailable: 'The mesh services are not available to this desktop, ' +
+        'so enrolled nodes cannot be listed. Nothing is assumed about them.',
+    registry_missing: 'No mesh enrollment registry was found. If you have not enrolled ' +
+        'any nodes yet, this is normal — add devices by hand below.',
+    registry_unreadable: 'The mesh enrollment registry could not be read. No devices ' +
+        'are shown rather than guessed ones.',
+    registry_empty: 'Your mesh has no enrolled nodes yet.',
+    all_enrolled_nodes_already_listed: 'Every enrolled node already has a row below.',
+};
+
+async function devicesDiscover() {
+    const host = document.getElementById('dev-discovered');
+    if (!host) return;
+    host.innerHTML = '<div class="ps-empty">Looking for enrolled nodes…</div>';
+    let payload;
+    try {
+        const resp = await psFetch('/api/devices/discovered');
+        if (!resp.ok) {
+            host.innerHTML = '<div class="ps-empty">Could not check your mesh (' +
+                resp.status + '). No candidates are shown.</div>';
+            return;
+        }
+        payload = await resp.json();
+    } catch (e) {
+        host.innerHTML = '<div class="ps-empty">Controller unreachable. No candidates are shown.</div>';
+        return;
+    }
+    const candidates = (payload && payload.candidates) || [];
+    if (!candidates.length) {
+        const reason = payload && payload.reason;
+        host.innerHTML = '<div class="ps-empty">' +
+            psEscape(DISCOVERY_REASON_TEXT[reason] || ('No enrolled nodes to offer (' +
+                (reason || 'no reason given') + ').')) + '</div>';
+        return;
+    }
+    host.innerHTML = candidates.map(devicesRenderCandidate).join('');
+}
+
+function devicesRenderCandidate(node) {
+    /* An expired or revoked enrollment is shown, not hidden — an owner whose
+       node vanished from this list would reasonably conclude it was gone. It
+       is shown as unusable, with the reason, and cannot be added. */
+    let flag = '';
+    if (node.revoked) {
+        flag = 'REVOKED' + (node.revocation_reason ? ' — ' + node.revocation_reason : '');
+    } else if (node.expired) {
+        flag = 'CERTIFICATE EXPIRED ' + (node.not_after || '');
+    }
+    const sans = (node.sans || []).join(', ');
+    const action = node.available
+        ? '<button class="glass-btn primary-btn" style="font-size:0.7rem;" onclick="devicesAddDiscovered(\'' +
+          psEscape(node.node_id) + '\',\'' + psEscape(node.suggested_display_name) + '\')">Add</button>'
+        : '<span class="ps-role ps-role-source">unavailable</span>';
+
+    return '' +
+        '<div class="ps-device">' +
+            '<div class="ps-device-head">' +
+                '<div>' +
+                    '<div class="ps-device-name">' + psEscape(node.suggested_display_name) + '</div>' +
+                    '<div class="ps-device-id">' + psEscape(node.node_id) + '</div>' +
+                '</div>' +
+                '<div style="display:flex; align-items:center; gap:8px;">' + action + '</div>' +
+            '</div>' +
+            (flag
+                ? '<div class="ps-cap-help" style="color:#fb7185;">' + psEscape(flag) + '</div>'
+                : '') +
+            '<div class="ps-cap-help">Certificate ' +
+                psEscape(node.certificate_sha256_short || '') + '… · expires ' +
+                psEscape(node.not_after || 'unknown') +
+                (sans ? ' · ' + psEscape(sans) : '') + '</div>' +
+            '<div class="ps-cap-help">Adding this node grants it nothing. ' +
+                'It arrives with every capability switched off.</div>' +
+        '</div>';
+}
+
+async function devicesAddDiscovered(nodeId, displayName) {
+    const status = document.getElementById('dev-add-status');
+    if (status) status.textContent = 'Adding ' + nodeId + '…';
+    try {
+        const resp = await psFetch('/api/devices', {
+            method: 'POST',
+            body: JSON.stringify({
+                device_id: nodeId,
+                display_name: displayName || nodeId,
+                // Only enrolled mesh nodes are ever discovered, so the role is
+                // always peer here. A source is never enrolled and can only be
+                // added by hand.
+                role: 'peer',
+            }),
+        });
+        const body = await resp.json().catch(function () { return {}; });
+        if (status) {
+            status.textContent = resp.ok
+                ? 'Added with every capability off.'
+                : (body.error || ('Could not add device (' + resp.status + ').'));
+        }
+    } catch (e) {
+        if (status) status.textContent = 'Controller unreachable.';
+    }
+    devicesRefresh();
 }
 
 function devicesRenderRow(device) {

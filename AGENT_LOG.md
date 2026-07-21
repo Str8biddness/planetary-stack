@@ -1613,3 +1613,31 @@ marks the start; each landed piece gets its own honest entry.
   scheduler/controller path yet (tests build them directly); swarm's
   mesh_http_post adapter not started; browser UI unrendered.
 - NO FINISH_CHECKLIST box checked.
+### controller-side grant issuance
+- services/response_grants.py: `build_grant_issuer` mints controller-signed
+  ResponseGrants. The controller is the trust root in a same-account mesh, so
+  the owner's desktop authorizes its own devices to answer it.
+- PROTOCOL CEILING (answers proposal open question 3): MAX_GRANT_BYTES = 1 MiB
+  and MAX_GRANT_TTL_SECONDS = 600 bound every grant regardless of what a caller
+  asks for. Over-large requests are REFUSED, not silently clamped — quietly
+  narrowing would hide a caller bug. Wildcard/list media types refused; exact
+  types only. Self-addressed grants refused.
+- remote_pipeline attaches `pipeline.issue_response_grant`, signed with the
+  persistent owner-only controller identity already on disk.
+- Tests: 10, mostly refusals (ceiling refused not clamped, wildcard media types,
+  self-addressed, ttl bounds, bool-as-int, another controller's key does not
+  verify, injected clock) plus issuer/verifier agreement and a pipeline-level
+  test that the grant verifies against the on-disk controller key.
+  tests/private_mesh: 111 passed.
+- PHYSICAL CHECK against the REAL signed lease/request from 2026-07-20:
+    real lease   : lease:bbf2c5843caf745d83d3924e095c03e2
+    grant signed : grant:physical:0001 ceiling 4096
+    RETURN LEG AUTHORIZED for the real result 5df96635… (314 B)
+    ceiling refused 314 B under a 128 B grant
+  Evidence: docs/evidence/GRANT_ISSUANCE_2026-07-21.md
+- HONEST GAP — THIS IS NOT A LIVE TWO-MACHINE EXCHANGE. It replays recorded real
+  documents; no socket was opened between .54 and .55. A live physical exchange
+  needs exchange-serve/exchange-request commands in mesh_node_cli.py, which DO
+  NOT EXIST YET. Nothing in the scheduler auto-issues a grant during placement.
+  swarm's mesh_http_post adapter not started (its traffic is still plaintext).
+- NO FINISH_CHECKLIST box checked.

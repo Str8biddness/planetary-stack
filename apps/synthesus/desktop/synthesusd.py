@@ -57,6 +57,10 @@ from device_policy import (  # noqa: E402
     DevicePolicyError,
     DevicePolicyStore,
 )
+from mesh_discovery import (  # noqa: E402
+    discover_enrolled_nodes,
+    registry_path_from_environment,
+)
 
 log = logging.getLogger("synthesusd")
 
@@ -396,6 +400,7 @@ def create_app(
     job_pipeline: Any = None,
     device_policy: Any = None,
     worker_node_id: str | None = None,
+    mesh_registry_path: Path | str | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -410,6 +415,8 @@ def create_app(
         device_policy = DevicePolicyStore(DEVICE_POLICY_PATH)
     if worker_node_id is None:
         worker_node_id = _worker_node_id()
+    if mesh_registry_path is None:
+        mesh_registry_path = registry_path_from_environment()
 
     app = FastAPI(title="synthesusd", version="0.1.0", lifespan=lifespan)
     app.add_middleware(
@@ -795,6 +802,35 @@ def create_app(
                 status_code=500, content={"error": "policy_unreadable", "detail": str(exc)}
             )
         return {"devices": rows}
+
+    @app.get("/api/devices/discovered")
+    async def list_discovered_devices(request: Request):
+        """Enrolled mesh nodes that are not yet device rows.
+
+        READ ONLY, and grants nothing. The response is a list of candidates the
+        owner may choose to add; adding still goes through POST /api/devices,
+        which creates the row with every capability off. A registry that is
+        missing or unreadable returns an empty list plus a reason with HTTP 200,
+        because the permissions window has to keep working on a machine with no
+        mesh state — the alternative is an error that hides the owner's real
+        devices behind a failure about a file they have never heard of.
+        """
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        try:
+            rows = await asyncio.to_thread(device_policy.devices)
+        except DevicePolicyError as exc:
+            # Same failure shape as GET /api/devices: if we cannot read the
+            # policy we do not know what is already listed, and we will not
+            # guess. Matches the sibling endpoint so the UI handles one case.
+            return JSONResponse(
+                status_code=500, content={"error": "policy_unreadable", "detail": str(exc)}
+            )
+        known = [row["device_id"] for row in rows]
+        found = await asyncio.to_thread(
+            lambda: discover_enrolled_nodes(mesh_registry_path, known_device_ids=known)
+        )
+        return found
 
     @app.post("/api/devices")
     async def add_device(request: Request):
