@@ -28,3 +28,6 @@ downloads/
 .venv/
 *.egg-info/
 __pycache__/
+
+# Compiled forge core — built locally, never committed (see native/Makefile)
+services/forge_render/native/*.so

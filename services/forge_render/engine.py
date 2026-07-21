@@ -28,7 +28,9 @@ must refuse the job rather than contribute a mismatched tile.
 
 from __future__ import annotations
 
+import ctypes as _ctypes
 import math
+from pathlib import Path as _Path
 import struct
 import zlib
 from dataclasses import dataclass
@@ -292,6 +294,56 @@ def _to_byte(c: float) -> int:
     return int(_clamp(c, 0.0, 1.0) * 255.0 + 0.5)
 
 
+
+
+# ------------------------------------------------------------------- native
+# A C++ transcription of this module lives in native/forge_core.cpp. It is
+# byte-identical to the Python path (asserted by test) and 20-100x faster, so
+# it is used when built and silently skipped when not — a checkout without a
+# compiler still renders, just slowly.
+#
+# The .so is built WITHOUT -march=native and WITH -ffp-contract=off. Both
+# matter: either would let two nodes with different CPUs produce different
+# pixels, which shows up as seams at tile boundaries.
+_NATIVE = None
+_NATIVE_TRIED = False
+
+
+class _CRecipe(_ctypes.Structure):
+    _fields_ = [
+        ("mode", _ctypes.c_int), ("iters", _ctypes.c_int), ("blend", _ctypes.c_int),
+        ("hue", _ctypes.c_int), ("glow", _ctypes.c_int), ("palette", _ctypes.c_int),
+        ("cam", _ctypes.c_int),
+    ]
+
+
+def _native():
+    """Load the compiled core once, or return None. Never raises."""
+    global _NATIVE, _NATIVE_TRIED
+    if _NATIVE_TRIED:
+        return _NATIVE
+    _NATIVE_TRIED = True
+    so = _Path(__file__).with_name("native") / "libforge_core.so"
+    if not so.exists():
+        return None
+    try:
+        lib = _ctypes.CDLL(str(so))
+        lib.forge_render_region.argtypes = (
+            [_ctypes.POINTER(_CRecipe)] + [_ctypes.c_int] * 7
+            + [_ctypes.POINTER(_ctypes.c_uint8)]
+        )
+        lib.forge_render_region.restype = None
+        _NATIVE = lib
+    except OSError:
+        _NATIVE = None
+    return _NATIVE
+
+
+def native_available() -> bool:
+    """Whether the compiled core is in use. Reported, never assumed."""
+    return _native() is not None
+
+
 # ------------------------------------------------------------------- surfaces
 class Surface:
     """A tight RGB pixel buffer covering an absolute region of the full frame."""
@@ -312,7 +364,35 @@ class Surface:
 
 
 def render_region(rc: Recipe, full_w: int, full_h: int, x0: int, y0: int, x1: int, y1: int, *, quality: int = 64) -> Surface:
-    """Render absolute rect [x0,x1)×[y0,y1) using full-frame coordinates."""
+    """Render absolute rect [x0,x1)×[y0,y1) using full-frame coordinates.
+
+    Uses the compiled core when available; the pure-Python path below is the
+    reference implementation and produces identical bytes.
+    """
+    # Clamp to the frame BEFORE dispatching. The Python reference does this
+    # first, and `render_tile` routinely asks for a padded rect that hangs off
+    # the edge — an unclamped native call returns a differently-sized surface
+    # and the composite no longer matches the whole frame.
+    x0 = max(0, x0)
+    y0 = max(0, y0)
+    x1 = min(full_w, x1)
+    y1 = min(full_h, y1)
+    lib = _native()
+    if lib is not None:
+        w, h = x1 - x0, y1 - y0
+        if w <= 0 or h <= 0:
+            return Surface(x0, y0, max(0, w), max(0, h))
+        buf = (_ctypes.c_uint8 * (w * h * 3))()
+        cr = _CRecipe(rc.mode, rc.iters, rc.blend, rc.hue, rc.glow, rc.palette, rc.cam)
+        lib.forge_render_region(
+            _ctypes.byref(cr), full_w, full_h, x0, y0, x1, y1, quality, buf
+        )
+        return Surface(x0, y0, w, h, bytearray(buf))
+    return _render_region_python(rc, full_w, full_h, x0, y0, x1, y1, quality=quality)
+
+
+def _render_region_python(rc: Recipe, full_w: int, full_h: int, x0: int, y0: int, x1: int, y1: int, *, quality: int = 64) -> Surface:
+    """Reference implementation. Kept as the definition of correct output."""
     x0 = max(0, x0)
     y0 = max(0, y0)
     x1 = min(full_w, x1)

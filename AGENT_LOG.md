@@ -2708,3 +2708,62 @@ scenes are well above that, so they distribute.
   benchmark's roundtrip figure is a local measurement, not .54<->.55. The forge
   UI has never been rendered in a browser.
 - NO FINISH_CHECKLIST box checked.
+### CORRECTION + native forge core (20-127x, byte-identical)
+- I SPECULATED THAT THE C++ KERNEL MIGHT NOT COMPILE OR MIGHT BE SCAFFOLDING.
+  That was wrong and unfounded. Owner pushed back; owner was right.
+  What I had actually verified was only: `_synthesus_kernel` is not importable
+  in this venv, and there are no build artifacts in the tree. Neither says
+  anything about whether the code works.
+  My search was also sloppy: I looked for CMakeCache.txt (a build OUTPUT)
+  instead of CMakeLists.txt (the build DEFINITION), and concluded there was no
+  build system.
+- THE KERNEL BUILDS AND RUNS. `cmake -DBUILD_PYBIND=OFF` then make:
+  `[100%] Built target synthesus_kernel`, producing zo_kernel, test_vmm,
+  test_emul. Only unused-parameter warnings across 66 sources.
+  `zo_kernel` starts: "[ZO] Synthesus kernel ready (stdin IPC)" and answers
+  line-delimited JSON:
+    {"query":"what is a gyroid lattice"}
+    -> {"response":"[PPBRS] Pattern match ...","confidence":0.7,
+        "module_used":"ppbrs","found":true}
+- WHY IT WASN'T RUNNING HERE: build-time tools missing, nothing to do with the
+  code. cmake and pybind11 were absent (pip-installed, no sudo). python3-dev
+  headers are still absent, which is the ONLY reason `_synthesus_kernel` cannot
+  be imported. The stdin IPC path needs none of that and works today.
+- WHY IT WAS INVISIBLE: every Python caller wraps the import in try/except and
+  logs a warning nobody reads, then silently uses a Python fallback forever.
+  Those handlers should log loudly or refuse.
+- geometric_engine.cpp is the EMBEDDER (word_to_vector, SSE cosine resonance,
+  predict_next) — not a renderer. No C++ SDF code existed, so the forge port is
+  new code rather than wiring.
+- BUILT services/forge_render/native/forge_core.cpp — a direct transcription of
+  engine.py: same algorithm, same operation order, double precision, and
+  Python's floor-modulo reproduced exactly (C's fmod differs for negatives).
+- BUILD FLAGS ARE LOAD-BEARING, NOT STYLE. The Makefile deliberately OMITS
+  -march=native and sets -ffp-contract=off. Either would let two nodes with
+  different CPUs produce different pixels and seam at tile boundaries.
+- MEASURED, byte-identical to the Python reference in every case:
+    96x96   mode 0  75.6x   mode 1  32.6x   mode 2  27.4x   mode 3  22.6x
+    256x256   13.5s -> 0.143s   (94x)
+    384x384   39.3s -> 0.309s   (127x)
+    1024x1024 q64            2.16s
+  ENGINE_VERSION stays forge-cpu-1 because output is identical — a mixed mesh
+  of native and Python nodes still composites without seams.
+- A BUG OF MINE, CAUGHT BY EMERGENT'S TEST: the Python reference clamps the
+  region to the frame first; my native wrapper passed the unclamped rect
+  through. render_tile routinely asks for a padded rect that hangs off the
+  edge, so padded tiles came back a different size and
+  test_bloom_needs_an_overlap_margin_or_it_seams failed. Their seam test found
+  a real defect in my port. Fixed by clamping before dispatch.
+- CONSEQUENCE WORTH NOTING: this changes when distribution pays. The earlier
+  benchmark put the crossover at ~193ms with 3 nodes; a full 256x256 now takes
+  143ms, i.e. BELOW the crossover. Distributing small frames is now a net loss;
+  the win moves to large/high-quality frames (1024x1024 at 2.16s). The adaptive
+  local-vs-distribute logic matters more, and its threshold must be re-derived.
+- The .so is gitignored and built via native/Makefile. Python fallback is intact
+  and tested, so a checkout with no compiler still renders.
+- Tests: 4 native-parity tests (per mode, tile-vs-full-frame, palette variants,
+  and the Python path standing alone). forge_render + desktop: 134 passed.
+- NOT DONE: pybind11 module (needs python3-dev), wiring the kernel's stdin IPC
+  to anything, ARM/cross-architecture determinism check (the seam risk between
+  a phone and an x86 desktop is UNTESTED).
+- NO FINISH_CHECKLIST box checked.
