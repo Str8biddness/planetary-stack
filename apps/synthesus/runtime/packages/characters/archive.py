@@ -42,6 +42,19 @@ from pathlib import Path
 from typing import Any
 
 ARCHIVE_SCHEMA = "planetary.synthesus.character_archive.v1"
+
+# Terms travel INSIDE the manifest, so they are covered by the archive digest.
+# A licence carried as a loose sibling file can be dropped in transit; one
+# committed to the digest cannot be removed without the archive failing
+# verification.
+DEFAULT_LICENCE = {
+    "id": "LicenseRef-Synthesus-Character-Content-1.0",
+    "name": "Synthesus Character Content Licence 1.0",
+    "holder": "Dakin Ellegood",
+    "redistribution": "prohibited",
+    "training_use": "prohibited",
+    "engine_licence": "AGPL-3.0-or-later (separate work)",
+}
 ARCHIVE_SUFFIX = ".sxc"
 MANIFEST_NAME = "manifest.json"
 
@@ -100,6 +113,8 @@ def _character_id(bio_bytes: bytes) -> str:
 def build_archive(
     character_dir: Path | str,
     destination: Path | str | None = None,
+    *,
+    licence: dict[str, Any] | None = None,
 ) -> Path:
     """Build a deterministic archive from a character directory.
 
@@ -124,6 +139,7 @@ def build_archive(
     manifest: dict[str, Any] = {
         "schema": ARCHIVE_SCHEMA,
         "character_id": character_id,
+        "licence": dict(licence or DEFAULT_LICENCE),
         "members": {name: _digest(data) for name, data in sorted(members.items())},
         "member_bytes": {name: len(data) for name, data in sorted(members.items())},
     }
@@ -178,6 +194,10 @@ def verify_archive(archive_path: Path | str) -> dict[str, Any]:
     recorded = manifest.get("members")
     if not isinstance(recorded, dict) or not recorded:
         raise CharacterArchiveError("manifest records no members")
+
+    terms = manifest.get("licence")
+    if not isinstance(terms, dict) or not terms.get("id"):
+        raise CharacterArchiveError("manifest carries no licence terms")
 
     # The archive digest must cover exactly this manifest.
     stated = manifest.get("archive_sha256")

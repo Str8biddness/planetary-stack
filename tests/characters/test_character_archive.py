@@ -177,3 +177,46 @@ def test_not_a_zip_is_refused(tmp_path):
     bogus.write_bytes(b"this is not a zip file")
     with pytest.raises(CharacterArchiveError, match="not a readable character archive"):
         read_manifest(bogus)
+
+
+def test_manifest_carries_licence_terms():
+    """Terms travel inside the digest, not as a droppable sibling file."""
+    manifest = verify_archive(SHIPPED)
+    terms = manifest["licence"]
+    assert terms["id"] == "LicenseRef-Synthesus-Character-Content-1.0"
+    assert terms["redistribution"] == "prohibited"
+    assert terms["training_use"] == "prohibited"
+    # The engine's separate licence is named, so the two works stay distinct.
+    assert "AGPL" in terms["engine_licence"]
+
+
+def test_stripping_the_licence_breaks_the_archive(tmp_path):
+    """Removing the terms invalidates the archive rather than freeing it."""
+    archive = build_archive(_character(tmp_path), tmp_path / "lic.sxc")
+
+    def mutate(items):
+        manifest = json.loads(items["manifest.json"])
+        del manifest["licence"]
+        items["manifest.json"] = json.dumps(
+            manifest, sort_keys=True, separators=(",", ":")).encode()
+        return items
+
+    stripped = _repack(archive, tmp_path / "stripped-lic.sxc", mutate)
+    with pytest.raises(CharacterArchiveError, match="licence|archive digest"):
+        verify_archive(stripped)
+
+
+def test_swapping_the_licence_breaks_the_digest(tmp_path):
+    """Rewriting the terms to something permissive does not verify."""
+    archive = build_archive(_character(tmp_path), tmp_path / "lic2.sxc")
+
+    def mutate(items):
+        manifest = json.loads(items["manifest.json"])
+        manifest["licence"]["redistribution"] = "permitted"
+        items["manifest.json"] = json.dumps(
+            manifest, sort_keys=True, separators=(",", ":")).encode()
+        return items
+
+    swapped = _repack(archive, tmp_path / "swapped-lic.sxc", mutate)
+    with pytest.raises(CharacterArchiveError, match="archive digest"):
+        verify_archive(swapped)

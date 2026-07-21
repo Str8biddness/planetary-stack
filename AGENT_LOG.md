@@ -1988,3 +1988,39 @@ marks the start; each landed piece gets its own honest entry.
   would not satisfy that; the formulation in this doc could. Until a number and
   status are supplied, product material says PROPRIETARY, not patented.
 - NO FINISH_CHECKLIST box checked.
+### LICENCE CORRECTION + character content separated from the engine
+- I PREVIOUSLY TOLD THE OWNER "no license file — all rights reserved" for the
+  public repos. THAT WAS WRONG. `gh repo view` reported licenseInfo: none and I
+  repeated it without opening the file. The actual licence is AGPL-3.0:
+  apps/synthesus/LICENSE, the public mobile repo's LICENSE, and LICENSES.md all
+  say so. Correcting it here because the wrong version was acted on.
+- Consequence explained to the owner: AGPL grants use/modify/REDISTRIBUTE.
+  Anyone who took a copy during the public window holds an IRREVOCABLE licence;
+  making the repos private stopped further distribution but revoked nothing.
+  "Characters others cannot resell" is not enforceable under AGPL for whatever
+  the licence covers.
+- Owner confirmed AGPL is BY CHOICE, not inherited obligation. Verified: git log
+  on apps/synthesus shows a single contributor across three of his own
+  identities, so he can relicense going forward without third-party consent.
+- BUILT the split that lets him keep the open engine AND sell characters:
+  * characters/LICENSE — Synthesus Character Content Licence 1.0. Covers
+    CONTENT ONLY (bio/personality/knowledge/patterns/.sxc/identity chains),
+    explicitly NOT the engine; states it adds no restrictions to AGPL code.
+    Prohibits redistribution, resale, and training/distillation use. Includes a
+    "your history is yours" clause — chain entries from the customer's own use
+    are their data and the licence does not permit collecting them.
+  * Licence terms now travel INSIDE the archive manifest, covered by
+    archive_sha256, because a sibling LICENSE file can be dropped in transit.
+    Stripping or swapping the terms invalidates the archive (2 new tests).
+  * LICENSES.md updated: engine and character content recorded as separate
+    works, with a rule against mixing the paths in either direction.
+- Rebuilt characters/synthesus.sxc; archive_sha256 is now
+  c7d35c1e4fbb495839d701d44cd0c2bf12359a57806c7b0e76cc637b61cfed1b (was
+  bbbff85f… before the licence field). Identity genesis derives from this, so
+  the digest change is expected; nothing has shipped to a customer yet.
+- The licence file states plainly that it was drafted as an engineering
+  artefact and NOT reviewed by a lawyer, and that protection here is LEGAL not
+  technical — content runs on hardware the customer controls and no technical
+  measure prevents reading it.
+- Tests: characters suite 25 -> 28 passed.
+- NO FINISH_CHECKLIST box checked.
