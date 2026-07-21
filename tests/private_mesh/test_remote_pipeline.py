@@ -191,3 +191,76 @@ def test_two_jobs_reuse_one_session_capability(tmp_path, monkeypatch):
     second = pipeline.submit(bundle=_bundle(), workload_kind="evaluation")
     assert first.state is JobState.COMPLETED, first.reason
     assert second.state is JobState.COMPLETED, second.reason
+
+
+def test_execution_evidence_is_signed_by_the_worker_and_verifies(tmp_path, monkeypatch):
+    """End-to-end provenance: the worker signs its evidence with the contract
+    key the desktop learned at enrollment, and the desktop verifies it.
+
+    Self-attestation, not hardware attestation — see
+    services/private_mesh/evidence_signing.py.
+    """
+    import aivm.execution as _aivm
+
+    class _Runner(_aivm.PodmanExecutor):
+        def __init__(self, policy, *, authority_verifier, runner=None, **kw):
+            super().__init__(
+                policy, authority_verifier=authority_verifier, runner=FakeModelRunner(), **kw
+            )
+
+    monkeypatch.setattr(_aivm, "PodmanExecutor", _Runner)
+    config = _config(tmp_path)
+    carrier = _DeliveringCarrier()
+    pipeline = build_remote_pipeline(
+        config, state_dir=tmp_path / "authority", clock=_clock, carrier=carrier
+    )
+    assert pipeline is not None
+    carrier.deliver_objects(
+        config.target,
+        (
+            (hashlib.sha256(DOCUMENT_PAYLOAD).hexdigest(), DOCUMENT_PAYLOAD),
+            (hashlib.sha256(MODEL_PAYLOAD).hexdigest(), MODEL_PAYLOAD),
+        ),
+    )
+    record = pipeline.submit(bundle=_bundle(), workload_kind="evaluation")
+    assert record.state is JobState.COMPLETED, record.reason
+
+    backend = pipeline._backend
+    assert backend.evidence_public_key is not None, "desktop must hold the node key"
+    assert backend.last_evidence_status == "verified", backend.last_evidence_status
+
+
+def test_evidence_signed_by_the_wrong_key_is_reported_invalid(tmp_path, monkeypatch):
+    """A signature from a key the desktop did not enroll must not pass."""
+    import aivm.execution as _aivm
+
+    class _Runner(_aivm.PodmanExecutor):
+        def __init__(self, policy, *, authority_verifier, runner=None, **kw):
+            super().__init__(
+                policy, authority_verifier=authority_verifier, runner=FakeModelRunner(), **kw
+            )
+
+    monkeypatch.setattr(_aivm, "PodmanExecutor", _Runner)
+    config = _config(tmp_path)
+    carrier = _DeliveringCarrier()
+    pipeline = build_remote_pipeline(
+        config, state_dir=tmp_path / "authority", clock=_clock, carrier=carrier
+    )
+    assert pipeline is not None
+    carrier.deliver_objects(
+        config.target,
+        (
+            (hashlib.sha256(DOCUMENT_PAYLOAD).hexdigest(), DOCUMENT_PAYLOAD),
+            (hashlib.sha256(MODEL_PAYLOAD).hexdigest(), MODEL_PAYLOAD),
+        ),
+    )
+    # Swap in an unrelated key: the worker's real signature must now fail.
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    pipeline._backend.evidence_public_key = (
+        Ed25519PrivateKey.generate().public_key().public_bytes_raw()
+    )
+    record = pipeline.submit(bundle=_bundle(), workload_kind="evaluation")
+    assert record.state is JobState.COMPLETED, record.reason
+    status = pipeline._backend.last_evidence_status
+    assert status.startswith("invalid:"), status

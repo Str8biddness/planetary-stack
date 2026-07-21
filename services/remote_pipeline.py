@@ -258,6 +258,12 @@ def build_remote_pipeline(
         carrier=active_carrier,
         keys=worker_keys,
         inventory=inventory.model_dump(mode="json", by_alias=True),
+        # The worker signs its execution evidence with the contract key we
+        # learned at enrollment, so provenance is verifiable here. Enforcement
+        # is a policy decision made above this layer; the backend always
+        # verifies and always reports the outcome.
+        evidence_public_key=node_record.public_key_bytes(),
+        evidence_key_id=node_record.key_id,
         **config.to_backend_kwargs(),
     )
 

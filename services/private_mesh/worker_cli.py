@@ -34,6 +34,7 @@ from cryptography.hazmat.primitives.serialization import (
 from contracts.chal_vsource.v1.canonical import document_sha256
 from contracts.chal_vsource.v1.models import ResourceInventory
 from services.private_mesh.node_agent import Ed25519DocumentVerifier, NodeAgent
+from services.private_mesh.evidence_signing import sign_evidence
 from services.vsource import Ed25519DocumentSigner, KeyRecord, sign_contract_document
 
 
@@ -762,6 +763,21 @@ def execute_job(*, state_dir: Path, payload: dict[str, Any]) -> dict[str, Any]:
         ],
         "report_base64": (
             _b64url_encode(execution.report) if execution.report is not None else None
+        ),
+        # Detached node signature over the execution evidence. Signed with the
+        # node's existing contract key (the one that signs inventories), so the
+        # desktop can verify provenance against the key it learned at
+        # enrollment. Self-attestation, not hardware attestation — see
+        # services/private_mesh/evidence_signing.py.
+        "evidence_signature": (
+            sign_evidence(
+                execution.report,
+                account_id=identity.account_id,
+                node_id=identity.node_id,
+                signer=identity.signer,
+            )
+            if execution.report is not None
+            else None
         ),
         "error": (
             execution.error.model_dump(mode="json", by_alias=True)

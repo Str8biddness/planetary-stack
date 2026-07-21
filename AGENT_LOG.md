@@ -1398,3 +1398,99 @@ marks the start; each landed piece gets its own honest entry.
 - PHYSICAL EXCHANGE RUN: NOT DONE. Step 2 (mesh_http_post) must not start until
   this is resolved — it would be built on an unauthorizable transport.
 - NO FINISH_CHECKLIST box checked.
+### design proposal written — bounded response slots (UNREVIEWED)
+- docs/design/PROPOSAL_BOUNDED_RESPONSE_SLOT.md: proposed fix for the blocker in
+  EXCHANGE_RESPONSE_AUTHORITY.md. NOT implemented, NOT agreed.
+- Shape: (1) a `ResponseSlot` declared inside the controller-signed request
+  (so it is already covered by request_sha256 and needs no new trust root),
+  pinning responder node, destination node, max_byte_length and an exact
+  media_type; (2) an atomically minted lease PAIR per placement, so the
+  invariant "a lease authorizes delivery to exactly one node" is preserved
+  rather than eroded — mesh_lease.py:179 stays as-is; (3) one narrowly scoped
+  alternative branch in SignedLeaseValidator where the object digest is
+  unconstrained but size, media type, responder, destination, and single-use
+  are all enforced.
+- Stated plainly in the doc: the digest of a computed result CANNOT be
+  pre-approved, so "owner pre-approves exact bytes" is lost for responses and
+  replaced by "owner pre-approves a bounded, single-use, attributable channel".
+  A compromised-but-enrolled responder can return arbitrary bytes within the
+  bound. That is the irreducible cost of computing on a machine you do not
+  fully control; the proposal argues for bounding blast radius + attribution
+  rather than pretending the guarantee survives.
+- Flagged as a real cost: TWO wire-format changes (ChalRequest gains slots;
+  TransferContext gains slot_id, and from_wire enforces an exact field set), so
+  every node is affected and staging matters.
+- Five open questions left for the owner, the first being whether a bounded
+  attributable channel is sufficient for the product's privacy claim — if not,
+  the honest conclusion is that the mesh should not carry inference at all.
+- exchange.py remains do-not-wire. PHYSICAL EXCHANGE RUN: STILL NOT DONE.
+- NO FINISH_CHECKLIST box checked.
+### proposal revision 2 — owner answered open question 2 YES (evidence required)
+- Owner decision 2026-07-21: filling a response slot MUST carry an execution
+  evidence document. Now a REQUIREMENT of the mechanism, not an option.
+- §3 added: a slot fill is one canonical `ResponseEnvelope` carrying the result
+  bytes AND the AIVM ExecutionEvidence record, ed25519-signed by the responder's
+  node contract key. One object keeps max_byte_length meaningful as a total.
+- Fit is good: ExecutionEvidence already exists (podman.py:806) and already
+  carries manifest_sha256, lease_id/lease_sha256/fencing_token, node_id,
+  immutable_image_ref, entrypoint_id, input_set_sha256, output_set_sha256, and
+  host capability evidence (rootless, seccomp_enabled, image_digest). It came
+  back as output cdb217a7… in today's physical end-to-end run.
+- NEW WORK FOUND: ExecutionEvidence is produced UNSIGNED — chal_adapter.py
+  serialises and hashes it, nothing signs it. Signing needs no new trust
+  material (node contract keys are already in the trust bundle and already
+  verified for inventories) but the signing path, envelope type and verifier
+  are new code. Added to the cost section.
+- Added receipt-side checks (signature -> responder_node_id; evidence lease and
+  manifest digests; image digest; entrypoint; input set; output_set_sha256
+  covers result_sha256; rootless + seccomp true) and 5 more threat-table rows.
+- Added a "self-attestation" section stating plainly that a compromised node
+  holds its own key and CAN sign a false record — this is self-attestation, not
+  hardware attestation, and must never be marketed as the latter (added to the
+  NOT-proposed list). What it does buy: everything around the output is pinned
+  to owner-signed values so the lie has one narrow place to live; the lie
+  becomes a durable non-repudiable signed artifact; and for deterministic
+  profiles (5df96635… is byte-identical across every proven path) the owner can
+  re-execute and compare, making the check complete rather than partial.
+- New follow-on question left open: reject a fill when rootless/seccomp are
+  false, or record a warning? Proposal assumes REJECT.
+- STILL PROPOSAL ONLY. Nothing implemented. exchange.py remains do-not-wire.
+  PHYSICAL EXCHANGE RUN: STILL NOT DONE. NO FINISH_CHECKLIST box checked.
+### sequence step 1 — execution evidence is now SIGNED by the node
+- Owner direction: go in sequence — (1) evidence signing, (2) permissions +
+  settings backend, (3) UI redesign. Enforcement toggle is meaningless until
+  the evidence is actually signed, so signing goes first.
+- services/private_mesh/evidence_signing.py: detached ed25519 signature over
+  the AIVM execution evidence, using the node's EXISTING contract key (the one
+  that already signs inventories and is already in the mesh trust bundle). No
+  new key, no new trust root. Envelope binds account, node, evidence digest and
+  byte length; signing bytes carry a domain-separation prefix so a signature
+  can never verify as another document type.
+- worker_cli execute response gained `evidence_signature`; remote_backend
+  verifies it against the contract public key the desktop learned AT ENROLLMENT
+  (remote_pipeline passes node_record's key), and records
+  `last_evidence_status` = verified | unsigned | unverifiable | invalid:<why>.
+  Verification ALWAYS runs and the outcome is ALWAYS recorded — enforcement is
+  a separate policy decision that belongs to step 2, so a user who turns
+  enforcement off can still be shown which state a result is in.
+- Tests: 9 signing unit tests (tampered bytes, rewritten digest, another node's
+  key, wrong account/node binding, wrong key id, envelope shape, empty and
+  oversized refusals, and a domain-separation check that the raw canonical JSON
+  is NOT what was signed); 2 pipeline tests proving a real job's evidence is
+  signed by the worker and verifies on the desktop, and that an unenrolled key
+  is reported invalid. tests/private_mesh: 99 -> 110 passed.
+- HONEST: this is SELF-attestation. A compromised node holds its own key and
+  can sign a false record. Every node still reports attestation: unverified.
+  Value is that everything around the output is pinned to owner-signed values
+  and a lie becomes a durable non-repudiable artifact; for deterministic
+  profiles the owner can re-execute and compare.
+- PHYSICALLY VERIFIED on .54/.55 after commit: job:d53af58e20741e01-5551c606
+  completed, result 5df96635… (314 B, byte-identical again), evidence
+  4bfe2f4c…, EVIDENCE STATUS: verified, signing key
+  key:private-mesh-node:d06e6a0c3f4e02fff57d — the desktop verified against the
+  key learned AT ENROLLMENT, not one supplied with the response. Evidence:
+  docs/evidence/EVIDENCE_SIGNING_PHYSICAL_2026-07-21.md
+- GAPS: enforcement policy not built (step 2); status not surfaced in any UI
+  (step 3); negative cases (wrong key, tampered bytes) proven by UNIT TEST only,
+  not on hardware; browser HTTP layer not driven in the physical run.
+- NO FINISH_CHECKLIST box checked.
