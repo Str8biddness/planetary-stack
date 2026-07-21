@@ -1484,6 +1484,13 @@ marks the start; each landed piece gets its own honest entry.
   Value is that everything around the output is pinned to owner-signed values
   and a lie becomes a durable non-repudiable artifact; for deterministic
   profiles the owner can re-execute and compare.
+- PHYSICALLY VERIFIED on .54/.55 after commit: job:d53af58e20741e01-5551c606
+  completed, result 5df96635… (314 B, byte-identical again), evidence
+  4bfe2f4c…, EVIDENCE STATUS: verified, signing key
+  key:private-mesh-node:d06e6a0c3f4e02fff57d — the desktop verified against the
+  key learned AT ENROLLMENT, not one supplied with the response. Evidence:
+  docs/evidence/EVIDENCE_SIGNING_PHYSICAL_2026-07-21.md
 - GAPS: enforcement policy not built (step 2); status not surfaced in any UI
-  (step 3); NOT yet run on physical hardware at time of commit.
+  (step 3); negative cases (wrong key, tampered bytes) proven by UNIT TEST only,
+  not on hardware; browser HTTP layer not driven in the physical run.
 - NO FINISH_CHECKLIST box checked.
