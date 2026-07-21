@@ -2138,3 +2138,35 @@ marks the start; each landed piece gets its own honest entry.
   problem — owner controls the OS, apps sandboxed, no content recognition, and
   most homes have several. TVs are the harder case and the smaller win.
 - NO FINISH_CHECKLIST box checked.
+### mobile worker design — corrected the "heavy wallpaper as compute" inversion
+- Owner's proposal: mobile app opens a WebSocket to the desktop, plays a heavy
+  live wallpaper, animates the phone "funnelling compute", acts as an autonomous
+  acceleration funnel.
+- WHAT IS RIGHT: WebSocket phone->desktop (same pattern terminal_server.py
+  already uses for the PTY); auto-connect on the home LAN after the owner grants
+  run_inference once; a visual that makes the mesh legible.
+- THE INVERSION, corrected in the spec: A HEAVY LIVE WALLPAPER DOES NOT PRODUCE
+  USEFUL COMPUTE. Rendering an expensive animation burns GPU on rendering an
+  expensive animation. It does not warm the GPU into availability or unlock
+  capacity. If the phone renders a heavy visual AND runs compute shaders they
+  CONTEND for the same silicon — the animation steals throughput from the work
+  it depicts and brings forward thermal throttling. Rule: the COMPUTE is the GPU
+  work (WebGPU compute shaders); the VISUAL is cheap and DRIVEN BY telemetry.
+  A light visualisation of real state is worth building ("my phone did 4,000
+  embeddings last night and nothing left the house" is the product in one
+  sentence). An expensive shader that looks busy is theatre that costs
+  throughput.
+- MOBILE OS CONSTRAINTS recorded because they decide the design: background
+  tabs are throttled/suspended (iOS strictest), so a worker needs screen-on and
+  foreground — "autonomous" means RESUMES WHEN ELIGIBLE, not runs unattended.
+  Thermals bound sustained load to minutes; design for bursts and the
+  overnight-on-charger case. Battery is the owner's: decline below threshold,
+  prefer charging.
+- HONEST POSITIONING recorded: a phone does NOT accelerate a desktop that has a
+  discrete GPU — its GPU is a small fraction and coordination exceeds the gain
+  for single requests. It helps with several idle devices on parallel work, a
+  coordinator with integrated graphics only, or overnight batch where
+  wall-clock does not matter. "Phone accelerates an RTX desktop" would not
+  survive measurement; "a household's idle devices index a corpus overnight,
+  privately" would.
+- NO FINISH_CHECKLIST box checked.

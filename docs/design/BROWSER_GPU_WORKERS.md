@@ -152,6 +152,67 @@ aggregate FLOPS of a home is real but modest against one good GPU.
 The honest headline is not "your home is a datacentre". It is: **your home's
 idle silicon becomes one addressable pool for parallel work, privately.**
 
+## The mobile worker
+
+The phone connects to the desktop over a WebSocket — the same pattern
+`terminal_server.py` already uses for the PTY — and offers capacity once the
+owner has granted that device `run_inference`. Auto-connect on the home LAN is
+good product design: the owner grants once, and thereafter the phone simply
+contributes when it can.
+
+### The inversion to avoid
+
+A heavy live wallpaper does not produce useful compute.
+
+Rendering an expensive animation burns GPU cycles on *rendering an expensive
+animation*. It does not warm the GPU into availability, and it does not unlock
+capacity for anything else. If the phone is both rendering a heavy visual and
+running compute shaders, the two contend for the same silicon — the animation
+directly steals throughput from the work it is supposed to represent, and on a
+thermally-limited phone it also brings forward the point at which the whole
+device throttles.
+
+So the rule is inverted from the intuition:
+
+* the **compute** must be the GPU work — WebGPU compute shaders doing the
+  actual embedding, scoring or image operation;
+* the **visual** must be cheap, and must be *driven by* real telemetry rather
+  than being the load itself.
+
+A lightweight visualisation showing genuine state — idle, working, how many
+items completed, throttled, declined — is worth building. It makes the mesh
+legible, which is otherwise its weakest quality: "my phone did 4,000 embeddings
+last night and nothing left the house" is the whole product in one sentence.
+An expensive shader that merely looks busy is theatre that costs throughput.
+
+### Constraints the mobile OS imposes, which decide the design
+
+* **Background execution stops.** Mobile browsers aggressively throttle or
+  suspend background tabs; iOS is strictest. A worker generally requires the
+  screen on and the page foregrounded. "Autonomous" therefore means *resumes
+  automatically when eligible*, not *runs unattended in the background*.
+* **Thermals bound sustained load.** A phone under continuous GPU load throttles
+  within minutes and gets hot in the owner's hand. Design for bursts, and for
+  the charging-and-idle case (overnight, on a charger) rather than continuous
+  contribution.
+* **Battery is the owner's, not ours.** Decline below a threshold, and prefer
+  charging state. A worker that flattens someone's phone loses the account.
+
+### Where a phone actually helps
+
+Not by accelerating a desktop that already has a discrete GPU — a phone GPU is
+a small fraction of one, and for a single request the coordination cost exceeds
+the gain. It helps when:
+
+* there are **several** idle devices and the work is embarrassingly parallel;
+* the coordinator has **no discrete GPU** (integrated graphics only);
+* the work is **overnight batch** where wall-clock does not matter — indexing a
+  corpus by morning, with every device on a charger.
+
+Claiming a phone "accelerates" an RTX-class desktop would not survive
+measurement. Claiming a household's idle devices index a corpus overnight,
+privately, would.
+
 ## Status
 
 - Not built. No worker, no executor, no measurement.
