@@ -1774,3 +1774,49 @@ marks the start; each landed piece gets its own honest entry.
   is resolution and compile checks. No browser tools in this session, so there
   is still no proof the UI opens or lays out correctly.
 - NO FINISH_CHECKLIST box checked.
+### THE DESKTOP HAD NEVER ACTUALLY BOOTED — three faults, all real
+- Owner reported the icon launched nothing. Running it directly found three
+  separate faults, in order:
+  1. `RuntimeError: Synthesus accounts require a unique per-install JWT secret`.
+     The env file at ~/.local/share/synthesus/synthesus.env had six variables
+     and no SYNTHESUS_JWT_SECRET. NOT caused by repointing SYNTHESUS_HOME — it
+     was EXPOSED by it: the old checkout's accounts.py has no
+     require_secure_configuration at all, so it booted because it lacked the
+     hardening. The install predates the requirement. Fixed OUTSIDE the repo by
+     appending a secret generated exactly as install.sh does
+     (secrets.token_urlsafe(48)) to that 0600 env file; original archived to
+     /home/dakin/planetary-stack-archive/synthesus.env.before.
+  2. `ModuleNotFoundError: No module named 'services'` — synthesusd.py imports
+     services.* from the repo root but is launched with cwd inside desktop/, so
+     the root was never on sys.path. _REPO_ROOT already existed for other uses
+     and simply was not used for imports. THIS MEANS THE CANONICAL APP HAD
+     NEVER SUCCESSFULLY BOOTED; the desktop work shipped in PRs #40/#41 was
+     never once exercised at runtime before today.
+  3. A single failure killed the whole desktop: `pipeline =
+     _build_job_pipeline(settings)` sat unprotected at module scope, so any
+     exception took synthesusd down and the shell then refused to start. Wrong
+     by design — _build_job_pipeline already documents fail-closed-to-None and
+     the desktop is useful with no mesh worker. Now degrades and logs.
+- FOURTH fault, and it is mine: index.html cache-busts its own assets with
+  `styles.css?v=NNNN` / `script.js?v=NNNN`. I rewrote both files across the
+  restyle and NEVER BUMPED THE VERSION, so WebKit reused what it already had for
+  the same URL. Bumped to v=20260721. The app has this mechanism precisely to
+  prevent what happened and I walked past it.
+- VERIFIED LIVE against the running app (not from the source tree):
+    /api/settings -> require_verified_evidence true, roles [peer, source]
+    /api/devices -> {"devices":[]}
+    /api/devices/discovered -> registry_missing, empty list (fail-soft works)
+    served index.html -> dock now reads
+      Vitals Config Chat Image Voice Drive DASH DEVICES SETTINGS Jobs Files ...
+    served styles.css -> 17 restyle-token matches; script.js -> new handlers
+  Desktop suite: 76 passed.
+- HONEST GAP, UNCHANGED AND IMPORTANT: I still have NO browser tools. Every
+  check above is HTTP-level. Nobody has confirmed the UI actually RENDERS —
+  layout, contrast, z-index and whether the Devices/Settings windows open are
+  all still unverified. The owner has not yet reported seeing the new dock.
+- Machine-level changes made OUTSIDE the repo (recorded here because they are
+  not in any diff): SYNTHESUS_HOME repointed in ~/.local/bin/synthesus; both
+  .desktop icons repointed; JWT secret appended to synthesus.env; install
+  snapshot retired. Every original archived under /home/dakin/planetary-stack-
+  archive/.
+- NO FINISH_CHECKLIST box checked.
