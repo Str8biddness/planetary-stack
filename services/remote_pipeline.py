@@ -49,6 +49,7 @@ from services.private_mesh.ssh_smoke import (
 )
 from services.remote_backend import RemoteExecutionBackend
 from services.remote_worker_config import RemoteWorkerConfig
+from services.response_grants import build_grant_issuer
 from services.vsource import (
     Ed25519DocumentSigner,
     KeyRecord,
@@ -307,7 +308,16 @@ def build_remote_pipeline(
         _capability_cache["not_before"] = now
         return doc
 
-    return LocalJobPipeline(
+    # The controller is this account's trust root, so it also mints the
+    # authority for a computed answer to travel home. Attached to the pipeline
+    # (rather than returned separately) so callers that already hold a pipeline
+    # can issue a grant for a job they placed. Bounded by the protocol ceiling
+    # in services/response_grants.py regardless of what a caller asks for.
+    grant_issuer = build_grant_issuer(
+        signer=controller, account_id=account_id, clock=clock
+    )
+
+    pipeline = LocalJobPipeline(
         control_plane=control_plane,
         backend=backend,
         request_signer=controller,
@@ -320,3 +330,5 @@ def build_remote_pipeline(
         resource_vector=dict(_RESOURCE_VECTOR),
         result_loader=result_loader,
     )
+    pipeline.issue_response_grant = grant_issuer
+    return pipeline
