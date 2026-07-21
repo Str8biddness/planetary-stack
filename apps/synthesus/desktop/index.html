@@ -274,6 +274,7 @@
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;">
                         <span style="color:#cbd5e1; font-size:0.85rem; display:flex; align-items:center; gap:6px; flex:1; min-width:0;">
                             <span id="jobs-result-verified" style="display:none; flex:none; font-size:0.68rem; font-weight:700; color:#4ade80; border:1px solid rgba(74,222,128,.4); background:rgba(74,222,128,.12); border-radius:999px; padding:1px 7px;" title="The controller only returns bytes that re-hash to the requested SHA-256 digest. It does not attest to the correctness of the model or its prediction.">✓ VERIFIED BYTES</span>
+                            <span id="jobs-result-evidence" style="flex:none;"></span>
                             <span style="flex:none;">Result</span>
                             <code id="jobs-result-sha" style="font-size:0.7rem; color:#64748b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></code>
                         </span>
@@ -559,6 +560,149 @@
     </div>
 
     <!-- OS Taskbar (Dock) — labels + data-win for active glow -->
+
+        <!-- Devices & Permissions — REAL: wired to /api/devices. Per-device
+             rows with capability toggles inside, phone-style. A `source`
+             device (camera/TV/sensor) can never hold an execution or result
+             capability; the controller refuses it, and so does this UI. -->
+        <div class="window glass-panel" id="win-devices" style="top: 90px; left: 300px; width: 560px; height: 600px; display: none;">
+            <div class="window-header" onmousedown="dragWindow(event, 'win-devices')">
+                <span class="window-title">🔐 Devices &amp; Permissions</span>
+                <div class="window-controls"><button class="win-btn minimize" onclick="minimizeWindow(this)" style="background: #facc15;"></button><button class="win-btn maximize" onclick="maximizeWindow(this)" style="background: #22c55e;"></button><button class="win-btn close" onclick="toggleWindow('win-devices')"></button></div>
+            </div>
+            <div class="window-content" style="display:flex; flex-direction:column; gap:12px; overflow-y:auto;">
+                <p style="font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">
+                    Permission is always granted to a <b>named device</b>. Nothing is allowed by
+                    default — a new device starts with every capability off.
+                </p>
+
+                <div class="ps-section-title">Add a device</div>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <input type="text" id="dev-add-id" class="glass-input" placeholder="Device id (e.g. node:private-mesh:workshop-pc)">
+                    <input type="text" id="dev-add-name" class="glass-input" placeholder="Display name">
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <select id="dev-add-role" class="glass-input" style="flex:1;">
+                            <option value="peer">Peer — an enrolled mesh node that can run work</option>
+                            <option value="source">Source — a camera / TV / sensor, data only</option>
+                        </select>
+                        <button class="glass-btn primary-btn" onclick="devicesAdd()">Add</button>
+                    </div>
+                    <div id="dev-add-status" style="font-size:0.78rem; color:var(--text-secondary); min-height:1.2em;"></div>
+                </div>
+
+                <div class="ps-section-title">Your devices</div>
+                <div id="dev-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+            </div>
+        </div>
+
+        <!-- Settings — REAL: wired to /api/settings. -->
+        <div class="window glass-panel" id="win-settings" style="top: 120px; left: 360px; width: 520px; height: 520px; display: none;">
+            <div class="window-header" onmousedown="dragWindow(event, 'win-settings')">
+                <span class="window-title">⚙️ Settings</span>
+                <div class="window-controls"><button class="win-btn minimize" onclick="minimizeWindow(this)" style="background: #facc15;"></button><button class="win-btn maximize" onclick="maximizeWindow(this)" style="background: #22c55e;"></button><button class="win-btn close" onclick="toggleWindow('win-settings')"></button></div>
+            </div>
+            <div class="window-content" style="display:flex; flex-direction:column; gap:14px; overflow-y:auto;">
+                <div class="ps-section-title">Result verification</div>
+                <div class="ps-device">
+                    <div class="ps-cap" style="border-top:none;">
+                        <div>
+                            <div class="ps-cap-name">Require verified evidence</div>
+                            <div class="ps-cap-help">
+                                Refuse a result unless the machine that produced it signed a valid
+                                execution record. Turn this off and results are still checked and
+                                still labelled — you just are not blocked.
+                            </div>
+                        </div>
+                        <label class="ps-switch">
+                            <input type="checkbox" id="set-evidence" onchange="settingsSaveEvidence(this.checked)">
+                            <span></span>
+                        </label>
+                    </div>
+                    <div id="set-evidence-status" style="font-size:0.76rem; color:var(--text-secondary); min-height:1.1em;"></div>
+                </div>
+
+                <div style="font-size:0.74rem; color:var(--text-muted); line-height:1.55;">
+                    <b>What a verified result means.</b> The machine that ran the work signed a
+                    record naming the image, entrypoint, inputs and lease it used, and this
+                    desktop checked that signature against the key it recorded when the device
+                    was enrolled. It proves which machine produced the result and that the
+                    approved image and inputs were named — it does <b>not</b> prove that machine
+                    is honest. A compromised device holds its own key. Hardware attestation is
+                    not available yet.
+                </div>
+
+                <div class="ps-section-title">Worker</div>
+                <div id="set-worker" style="font-size:0.78rem; color:var(--text-secondary);"></div>
+            </div>
+        </div>
+
+        <!-- Dashboard — mixed. Cards backed by live endpoints render live;
+             everything else is tagged DEMO and is deliberately not wired. -->
+        <div class="window glass-panel" id="win-dashboard" style="top: 60px; left: 120px; width: 720px; height: 620px; display: none;">
+            <div class="window-header" onmousedown="dragWindow(event, 'win-dashboard')">
+                <span class="window-title">📊 Dashboard</span>
+                <div class="window-controls"><button class="win-btn minimize" onclick="minimizeWindow(this)" style="background: #facc15;"></button><button class="win-btn maximize" onclick="maximizeWindow(this)" style="background: #22c55e;"></button><button class="win-btn close" onclick="toggleWindow('win-dashboard')"></button></div>
+            </div>
+            <div class="window-content" style="display:flex; flex-direction:column; gap:14px; overflow-y:auto;">
+                <div class="ps-section-title">Your mesh</div>
+                <div class="ps-grid" id="dash-live"></div>
+
+                <div class="ps-demo-note">
+                    The panels below are <b>design mock-ups</b>. They are not connected to
+                    anything and their numbers are fixed. They are here to show the visual
+                    direction only — nothing below this line reflects your system.
+                </div>
+                <div class="ps-grid">
+                    <div class="ps-card demo-chrome">
+                        <div class="ps-card-label">CPU</div>
+                        <div class="ps-card-value">36%</div>
+                        <div class="ps-meter"><span style="width:36%"></span></div>
+                    </div>
+                    <div class="ps-card demo-chrome">
+                        <div class="ps-card-label">Memory</div>
+                        <div class="ps-card-value">7.1 GB</div>
+                        <div class="ps-meter"><span style="width:58%"></span></div>
+                    </div>
+                    <div class="ps-card demo-chrome">
+                        <div class="ps-card-label">Storage</div>
+                        <div class="ps-card-value">412 GB</div>
+                        <div class="ps-meter"><span style="width:44%"></span></div>
+                    </div>
+                    <div class="ps-card demo-chrome">
+                        <div class="ps-card-label">Network</div>
+                        <div class="ps-card-value">18 Mb/s</div>
+                        <div class="ps-card-sub">↑ 3.2 &nbsp; ↓ 14.8</div>
+                    </div>
+                    <div class="ps-card demo-chrome">
+                        <div class="ps-card-label">Weather</div>
+                        <div class="ps-card-value">14°</div>
+                        <div class="ps-card-sub">Overcast</div>
+                    </div>
+                    <div class="ps-card demo-chrome">
+                        <div class="ps-card-label">Now playing</div>
+                        <div class="ps-card-value" style="font-size:1rem;">—</div>
+                        <div class="ps-card-sub">◀◀ &nbsp; ▶ &nbsp; ▶▶</div>
+                    </div>
+                    <div class="ps-card demo-chrome">
+                        <div class="ps-card-label">Calendar</div>
+                        <div class="ps-card-value" style="font-size:1rem;">No events</div>
+                        <div class="ps-card-sub">Not connected</div>
+                    </div>
+                    <div class="ps-card demo-chrome">
+                        <div class="ps-card-label">Notes</div>
+                        <div class="ps-card-value" style="font-size:1rem;">—</div>
+                        <div class="ps-card-sub">Scratchpad mock</div>
+                    </div>
+                    <div class="ps-card demo-chrome">
+                        <div class="ps-card-label">Project</div>
+                        <div class="ps-card-value" style="font-size:1rem;">Sample</div>
+                        <div class="ps-meter"><span style="width:70%"></span></div>
+                        <div class="ps-card-sub">Single-user product — no teams</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     <nav class="dock" id="os-dock" aria-label="System dock">
         <button type="button" onclick="toggleVitals()" class="dock-btn" data-win="win-vitals" title="System Vitals">
             <span class="dock-ico">📡</span><span class="dock-lbl">Vitals</span>
@@ -577,6 +721,15 @@
         </button>
         <button type="button" onclick="toggleWindow('win-drive')" class="dock-btn" data-win="win-drive" title="Expansion Drive">
             <span class="dock-ico">💽</span><span class="dock-lbl">Drive</span>
+        </button>
+        <button type="button" onclick="openDashboard()" class="dock-btn" data-win="win-dashboard" title="Dashboard">
+            <span class="dock-ico">📊</span><span class="dock-lbl">Dash</span>
+        </button>
+        <button type="button" onclick="openDevices()" class="dock-btn" data-win="win-devices" title="Devices & Permissions">
+            <span class="dock-ico">🔐</span><span class="dock-lbl">Devices</span>
+        </button>
+        <button type="button" onclick="openSettings()" class="dock-btn" data-win="win-settings" title="Settings">
+            <span class="dock-ico">⚙️</span><span class="dock-lbl">Settings</span>
         </button>
         <button type="button" onclick="toggleWindow('win-jobs')" class="dock-btn" data-win="win-jobs" title="Mesh Jobs">
             <span class="dock-ico">🛰️</span><span class="dock-lbl">Jobs</span>

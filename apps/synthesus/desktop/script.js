@@ -3528,6 +3528,19 @@ async function jobsViewResult(jobId, sha256) {
                     : 'Result not found (404).';
             } else if (resp.status === 401) {
                 msg = 'Not authorized — re-authenticate to view results.';
+            } else if (resp.status === 403) {
+                let capability = '';
+                try { capability = (await resp.json()).capability || ''; } catch (e) { /* ignore */ }
+                msg = capability === 'return_results'
+                    ? 'This device is not allowed to return results to you. ' +
+                      'Enable "Return results to me" for it in Devices & Permissions.'
+                    : 'This device is not permitted for that action.';
+            } else if (resp.status === 409) {
+                let status = '';
+                try { status = (await resp.json()).evidence_status || ''; } catch (e) { /* ignore */ }
+                msg = 'Refused: the result could not be verified (' + status + '). ' +
+                      'You require verified evidence in Settings; turn it off to view ' +
+                      'unverified results, which will be labelled.';
             } else {
                 msg = 'Result unavailable (' + resp.status + ').';
             }
@@ -3537,6 +3550,15 @@ async function jobsViewResult(jobId, sha256) {
         // The endpoint only returns bytes that re-hash to the requested digest,
         // so a 200 here means the payload is byte-exact for this SHA-256.
         if (verifiedEl) verifiedEl.style.display = 'inline-block';
+        // Byte-exactness and PROVENANCE are different claims. The controller
+        // reports the provenance state on every result, including when the
+        // owner has turned enforcement off, so the difference is never silent.
+        const badgeHost = document.getElementById('jobs-result-evidence');
+        if (badgeHost) {
+            badgeHost.innerHTML = psEvidenceBadge(
+                resp.headers.get('X-Synthesus-Evidence-Status')
+            );
+        }
         const text = await resp.text();
         let data = null;
         try { data = JSON.parse(text); } catch (e) { data = null; }
@@ -3553,3 +3575,298 @@ async function jobsViewResult(jobId, sha256) {
 
 jobsLoadRemembered();
 if (meshJobs.ids.length) setTimeout(jobsRefreshAll, 1500);
+
+/* =====================================================================
+   Devices & Permissions, Settings, Dashboard.
+
+   Everything here talks to the real controller endpoints. Where a value
+   cannot be obtained, it is shown as unknown — never guessed, and never
+   rendered as if it were verified.
+   ===================================================================== */
+
+const CAPABILITY_HELP = {
+    run_inference: 'May run your workloads on this device.',
+    return_results: 'May send result bytes back to this desktop.',
+    provide_input: 'May supply input data. Cannot run work or return results.',
+};
+
+const CAPABILITY_LABEL = {
+    run_inference: 'Run my workloads',
+    return_results: 'Return results to me',
+    provide_input: 'Provide input data',
+};
+
+function psEscape(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+}
+
+async function psFetch(path, options) {
+    const opts = Object.assign({}, options || {});
+    opts.headers = jobsAuthHeaders(
+        Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {})
+    );
+    return fetch(path, opts);
+}
+
+/* ------------------------------------------------------------ devices */
+
+function openDevices() {
+    toggleWindow('win-devices');
+    if (document.getElementById('win-devices').style.display !== 'none') devicesRefresh();
+}
+
+async function devicesRefresh() {
+    const list = document.getElementById('dev-list');
+    if (!list) return;
+    list.innerHTML = '<div class="ps-empty">Loading…</div>';
+    let payload;
+    try {
+        const resp = await psFetch('/api/devices');
+        if (!resp.ok) {
+            list.innerHTML = '<div class="ps-empty">Could not read your permissions (' +
+                resp.status + '). Nothing is permitted while this cannot be read.</div>';
+            return;
+        }
+        payload = await resp.json();
+    } catch (e) {
+        list.innerHTML = '<div class="ps-empty">Controller unreachable. Nothing is permitted.</div>';
+        return;
+    }
+    const devices = (payload && payload.devices) || [];
+    if (!devices.length) {
+        list.innerHTML = '<div class="ps-empty">No devices yet. Add one above — ' +
+            'it will start with every capability switched off.</div>';
+        return;
+    }
+    list.innerHTML = devices.map(devicesRenderRow).join('');
+}
+
+function devicesRenderRow(device) {
+    const roleClass = device.role === 'peer' ? 'ps-role-peer' : 'ps-role-source';
+    const caps = Object.keys(device.capabilities).sort().map(function (name) {
+        const id = 'cap-' + device.device_id.replace(/[^a-zA-Z0-9_-]/g, '_') + '-' + name;
+        return '' +
+            '<div class="ps-cap">' +
+                '<div>' +
+                    '<div class="ps-cap-name">' + psEscape(CAPABILITY_LABEL[name] || name) + '</div>' +
+                    '<div class="ps-cap-help">' + psEscape(CAPABILITY_HELP[name] || '') + '</div>' +
+                '</div>' +
+                '<label class="ps-switch">' +
+                    '<input type="checkbox" id="' + id + '"' +
+                        (device.capabilities[name] ? ' checked' : '') +
+                        ' onchange="devicesToggle(\'' + psEscape(device.device_id) + '\',\'' +
+                        name + '\', this.checked)">' +
+                    '<span></span>' +
+                '</label>' +
+            '</div>';
+    }).join('');
+
+    const sourceNote = device.role === 'source'
+        ? '<div class="ps-cap-help" style="padding-top:6px;">A source device never holds a mesh ' +
+          'certificate and can never be granted execution or results — cameras and TVs are among ' +
+          'the most-compromised devices on a home network.</div>'
+        : '';
+
+    return '' +
+        '<div class="ps-device">' +
+            '<div class="ps-device-head">' +
+                '<div>' +
+                    '<div class="ps-device-name">' + psEscape(device.display_name) + '</div>' +
+                    '<div class="ps-device-id">' + psEscape(device.device_id) + '</div>' +
+                '</div>' +
+                '<div style="display:flex; align-items:center; gap:8px;">' +
+                    '<span class="ps-role ' + roleClass + '">' + psEscape(device.role) + '</span>' +
+                    '<button class="glass-btn" style="font-size:0.7rem;" onclick="devicesRemove(\'' +
+                        psEscape(device.device_id) + '\')">Remove</button>' +
+                '</div>' +
+            '</div>' +
+            caps +
+            sourceNote +
+        '</div>';
+}
+
+async function devicesAdd() {
+    const status = document.getElementById('dev-add-status');
+    const deviceId = document.getElementById('dev-add-id').value.trim();
+    const displayName = document.getElementById('dev-add-name').value.trim();
+    const role = document.getElementById('dev-add-role').value;
+    if (!deviceId || !displayName) {
+        status.textContent = 'A device id and a name are both required.';
+        return;
+    }
+    status.textContent = 'Adding…';
+    try {
+        const resp = await psFetch('/api/devices', {
+            method: 'POST',
+            body: JSON.stringify({ device_id: deviceId, display_name: displayName, role: role }),
+        });
+        const body = await resp.json().catch(function () { return {}; });
+        if (!resp.ok) {
+            status.textContent = body.error || ('Could not add device (' + resp.status + ').');
+            return;
+        }
+        status.textContent = 'Added with every capability off.';
+        document.getElementById('dev-add-id').value = '';
+        document.getElementById('dev-add-name').value = '';
+        devicesRefresh();
+    } catch (e) {
+        status.textContent = 'Controller unreachable.';
+    }
+}
+
+async function devicesToggle(deviceId, capability, enabled) {
+    const body = {};
+    body[capability] = enabled;
+    try {
+        const resp = await psFetch(
+            '/api/devices/' + encodeURIComponent(deviceId) + '/capabilities',
+            { method: 'PUT', body: JSON.stringify({ capabilities: body }) }
+        );
+        if (!resp.ok) {
+            const payload = await resp.json().catch(function () { return {}; });
+            alert(payload.error || 'That permission was refused.');
+        }
+    } catch (e) {
+        alert('Controller unreachable — the permission was not changed.');
+    }
+    // Always re-read: the switch must show what the controller actually stored,
+    // not what we optimistically clicked.
+    devicesRefresh();
+}
+
+async function devicesRemove(deviceId) {
+    if (!confirm('Remove ' + deviceId + '? It will lose every permission.')) return;
+    try {
+        await psFetch('/api/devices/' + encodeURIComponent(deviceId), { method: 'DELETE' });
+    } catch (e) { /* refresh reports the true state */ }
+    devicesRefresh();
+}
+
+/* ----------------------------------------------------------- settings */
+
+function openSettings() {
+    toggleWindow('win-settings');
+    if (document.getElementById('win-settings').style.display !== 'none') settingsRefresh();
+}
+
+async function settingsRefresh() {
+    const toggle = document.getElementById('set-evidence');
+    const status = document.getElementById('set-evidence-status');
+    const worker = document.getElementById('set-worker');
+    try {
+        const resp = await psFetch('/api/settings');
+        if (!resp.ok) {
+            status.textContent = 'Could not read settings (' + resp.status + ').';
+            toggle.disabled = true;
+            return;
+        }
+        const payload = await resp.json();
+        toggle.checked = !!payload.require_verified_evidence;
+        toggle.disabled = false;
+        status.textContent = payload.require_verified_evidence
+            ? 'On — unverified results are refused.'
+            : 'Off — unverified results are shown, and labelled.';
+        worker.textContent = payload.worker_node_id
+            ? payload.worker_node_id
+            : 'No worker configured on this desktop.';
+    } catch (e) {
+        status.textContent = 'Controller unreachable.';
+        toggle.disabled = true;
+    }
+}
+
+async function settingsSaveEvidence(enabled) {
+    const status = document.getElementById('set-evidence-status');
+    status.textContent = 'Saving…';
+    try {
+        const resp = await psFetch('/api/settings/evidence', {
+            method: 'PUT',
+            body: JSON.stringify({ enabled: !!enabled }),
+        });
+        if (!resp.ok) {
+            status.textContent = 'Could not save (' + resp.status + ').';
+        }
+    } catch (e) {
+        status.textContent = 'Controller unreachable.';
+    }
+    settingsRefresh();
+}
+
+/* ---------------------------------------------------------- dashboard */
+
+function openDashboard() {
+    toggleWindow('win-dashboard');
+    if (document.getElementById('win-dashboard').style.display !== 'none') dashboardRefresh();
+}
+
+function dashCard(label, value, sub) {
+    return '<div class="ps-card">' +
+        '<div class="ps-card-label">' + psEscape(label) + '</div>' +
+        '<div class="ps-card-value">' + psEscape(value) + '</div>' +
+        (sub ? '<div class="ps-card-sub">' + psEscape(sub) + '</div>' : '') +
+        '</div>';
+}
+
+async function dashboardRefresh() {
+    const live = document.getElementById('dash-live');
+    if (!live) return;
+    live.innerHTML = '<div class="ps-empty">Loading…</div>';
+
+    let devices = null;
+    let settings = null;
+    try {
+        const [devResp, setResp] = await Promise.all([
+            psFetch('/api/devices'),
+            psFetch('/api/settings'),
+        ]);
+        if (devResp.ok) devices = (await devResp.json()).devices || [];
+        if (setResp.ok) settings = await setResp.json();
+    } catch (e) { /* handled below */ }
+
+    if (devices === null && settings === null) {
+        live.innerHTML = '<div class="ps-empty">Controller unreachable — no live data.</div>';
+        return;
+    }
+
+    const peers = (devices || []).filter(function (d) { return d.role === 'peer'; });
+    const sources = (devices || []).filter(function (d) { return d.role === 'source'; });
+    const canRun = peers.filter(function (d) { return d.capabilities.run_inference; });
+
+    live.innerHTML =
+        dashCard('Devices', devices === null ? 'unknown' : String(devices.length),
+                 devices === null ? 'could not be read' : peers.length + ' peer · ' + sources.length + ' source') +
+        dashCard('Allowed to run work', devices === null ? 'unknown' : String(canRun.length),
+                 'of ' + peers.length + ' peer device(s)') +
+        dashCard('Result verification',
+                 settings === null ? 'unknown' : (settings.require_verified_evidence ? 'Enforced' : 'Off'),
+                 settings === null ? 'could not be read' : 'unverified results ' +
+                     (settings.require_verified_evidence ? 'are refused' : 'are shown and labelled')) +
+        dashCard('Worker',
+                 settings && settings.worker_node_id ? 'Configured' : 'None',
+                 settings && settings.worker_node_id ? settings.worker_node_id : 'no worker on this desktop') +
+        dashCard('Mesh jobs', String((meshJobs && meshJobs.ids ? meshJobs.ids : []).length),
+                 'tracked in this browser');
+}
+
+/* ------------------------------------------- evidence badge for results */
+
+function psEvidenceBadge(status) {
+    if (!status) return '';
+    if (status === 'verified') {
+        return '<span class="ps-badge ps-badge-verified" title="The machine that produced this ' +
+            'signed a valid execution record, checked against the key recorded at enrollment. ' +
+            'This does not prove that machine is honest.">✓ Verified</span>';
+    }
+    if (status.indexOf('invalid:') === 0) {
+        return '<span class="ps-badge ps-badge-invalid" title="' + psEscape(status) +
+            '">✕ Signature did not verify</span>';
+    }
+    if (status === 'unsigned') {
+        return '<span class="ps-badge ps-badge-unsigned" title="No execution record was signed ' +
+            'for this result.">⚠ Unsigned</span>';
+    }
+    return '<span class="ps-badge ps-badge-unsigned" title="Provenance could not be determined.">' +
+        '⚠ ' + psEscape(status) + '</span>';
+}
