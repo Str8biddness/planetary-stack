@@ -299,6 +299,57 @@ class ChalRequest(StrictContract):
     signature: Signature
 
 
+class ResponseGrant(StrictContract):
+    """Controller authority for ONE computed response to travel home.
+
+    A lease authorizes delivery TO a leased node, so it cannot carry a result
+    back to the requester; and a computed result's digest cannot be named in a
+    request signed before the work ran. A grant closes both gaps without
+    weakening either rule: it is a separate controller-signed document that
+    authorizes exactly one bounded response, from one named responder, to one
+    named destination, answering one exact request digest.
+
+    The response digest is deliberately absent — that is the concession, and it
+    is irreducible: nobody can hash a computation that has not happened. What is
+    bound instead is everything around it, so the unconstrained value sits in a
+    single narrow place surrounded by owner-signed values.
+
+    Deliberately NOT part of `ChalRequest`: adding a field there would change
+    the canonical bytes of every request ever signed, invalidating existing
+    signatures and recorded evidence digests.
+    """
+
+    schema_id: Literal["planetary.chal.response_grant.v1"] = Field(
+        ...,
+        alias="schema",
+    )
+    grant_id: Identifier
+    account_id: Identifier
+    # The exact signed request this response answers.
+    request_sha256: Sha256
+    # The lease under which the forward leg ran, so a grant cannot be paired
+    # with an unrelated placement.
+    lease_id: Identifier
+    lease_sha256: Sha256
+    fencing_token: Annotated[JsonInteger, Field(ge=1)]
+    # Exactly one node may fill it, and exactly one may receive it.
+    responder_node_id: Identifier
+    destination_node_id: Identifier
+    # Hard ceiling and an exact media type. No wildcards, no lists.
+    max_byte_length: Annotated[JsonInteger, Field(ge=1, le=8 * 1024 * 1024)]
+    media_type: Annotated[str, Field(min_length=3, max_length=128)]
+    transport: TransportKind
+    issued_at: CanonicalTimestamp
+    ttl_seconds: Annotated[JsonInteger, Field(ge=1, le=3_600)]
+    signature: Signature
+
+    @model_validator(mode="after")
+    def require_distinct_endpoints(self) -> "ResponseGrant":
+        if self.responder_node_id == self.destination_node_id:
+            raise ValueError("response grant endpoints must differ")
+        return self
+
+
 class ErrorCode(StrEnum):
     INVALID_REQUEST = "invalid_request"
     UNAUTHORIZED = "unauthorized"
@@ -1108,6 +1159,7 @@ __all__ = [
     "PlacementResult",
     "RequestConstraints",
     "ResourceInventory",
+    "ResponseGrant",
     "ResourceVector",
     "ResponseStatus",
     "SCHEMA_EXPORTS",

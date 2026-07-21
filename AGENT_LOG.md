@@ -1564,3 +1564,52 @@ marks the start; each landed piece gets its own honest entry.
   it. Also: device rows are still added by hand — nothing populates them from
   the enrollment registry yet.
 - NO FINISH_CHECKLIST box checked.
+### response grants — the return leg now has authority (blocker CLEARED)
+- Owner: "make it true", plus a decisive clarification of the product claim —
+  PRIVATELY MEANS YOUR DATA STAYS ON YOUR AI BACKEND, NOT UNHACKABLE. That
+  answers proposal open question 1: the bar is DATA LOCALITY, not proving your
+  own machine is honest. A compromised node of your own returning bad bytes is
+  not a locality failure; data readable by a device that is not part of your
+  backend IS. Recorded because it changes what the design must guarantee.
+- DESIGN CHANGE from the proposal, found by checking canonicalization first:
+  canonical_document_bytes uses model_dump(by_alias=True), which includes
+  defaults — so adding a response-slot field to ChalRequest would have changed
+  the canonical bytes of EVERY request ever signed, invalidating every
+  signature and every recorded evidence digest. Verified against the physical
+  pull evidence before writing any of it.
+  => Response authority is a SEPARATE controller-signed document,
+  `planetary.chal.response_grant.v1`. Result: NO wire-format changes at all,
+  versus the two the proposal budgeted for. Also resolves proposal open
+  question 5 (distinct document, not a lease pair) — and the lease pair is no
+  longer needed, since the grant IS the return authority.
+- contracts: ResponseGrant binds request_sha256, the forward lease (id, digest,
+  fencing token), exactly one responder and one destination, a hard
+  max_byte_length, an exact media_type, transport, and its own window. It does
+  NOT bind the response digest — irreducible, and the concession is confined to
+  that single value.
+- services/unisync/mesh_grant.py: parse_signed_grant +
+  SignedResponseGrantValidator (same shape as SignedLeaseValidator, so the
+  transport cannot tell which authority it is talking to) + a payload builder.
+  Single-use fence tolerates frame re-validation of the same object but refuses
+  a different one.
+- mesh_lease.py:179 UNCHANGED. The rule that caught the blocker was preserved,
+  not weakened.
+- exchange.py: do-not-wire banner REMOVED; docstring now points at the grant.
+- BUG FOUND AND FIXED BY THE WIRED TEST: the validator's peer check required the
+  peer to be the responder, which is only true when receiving — it rejected the
+  responder's own upload. Both ends call the same validator, so the check is now
+  "peer must be a party to this grant"; direction is already bound by
+  require_authorized's role check plus the context/grant comparison. This only
+  surfaced over real TCP, not in unit tests.
+- Tests: 12 grant tests (incl. the decisive one — the SAME genuine signed lease
+  and request from the 2026-07-20 physical pull that previously failed with
+  "transfer destination is not the leased node" now authorize the return leg)
+  + 2 wired exchange tests over real TCP/TLS with a really-signed grant and NO
+  permissive validator on the return direction + a guard that existing document
+  digests did not change. tests/unisync: 112 passed.
+- The old regression guard was KEPT, not deleted — a lease still cannot carry a
+  response, and that is why grants exist.
+- GAPS: not run on physical hardware yet; nothing issues grants in the
+  scheduler/controller path yet (tests build them directly); swarm's
+  mesh_http_post adapter not started; browser UI unrendered.
+- NO FINISH_CHECKLIST box checked.
