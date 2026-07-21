@@ -1322,4 +1322,21 @@ marks the start; each landed piece gets its own honest entry.
   result endpoint; full desktop suite 35 passed.
 - Remaining for a live browser demo: a running synthesusd configured with a
   worker execution env (env vars) so a real job executes end-to-end; the
-  transport, loader, endpoint, and UI are all in place and proven.
+  transport, loader, endpoint, and UI are all in place and proven.### END-TO-END PHYSICAL: job submitted -> executed -> result pulled (2026-07-21)
+- One desktop process built a real signed workload bundle
+  (`cc8667875c1ccee04b29fc5a44805dbcd0a727fe2f357a9bcf5828359a337e71`, 1914 B),
+  enrolled the worker, submitted it, and the worker (.54) executed the real
+  text-classify ONNX profile in rootless Podman: `job:cc8667875c1ccee0-d5a3e64b`
+  state **completed**, outputs `5df96635…` (result) + `cdb217a7…` (evidence).
+- `pipeline.result()` then pulled the genuine **314 bytes** back to the desktop
+  over the firewall-free desktop-initiated mTLS pull. Result digest is
+  byte-identical to every prior physical execution path.
+- Committed `tools/demo_browser_result.py` as the reproducible harness and
+  docs/evidence/F020_END_TO_END_JOB_TO_RESULT_PHYSICAL_2026-07-21.md.
+- HONEST GAPS: the **browser UI was not driven in this run** — this exercises
+  the two pipeline methods the HTTP handlers call, not the HTTP layer or the
+  rendered Mesh Jobs window. Input artifacts were staged directly into the
+  worker inbox (mTLS input delivery proven separately in F020_MESH_WORKLOAD).
+  Harness carries machine-specific constants; it is not an installer.
+  Rotation/revocation/NAT-traversal/attestation/production-CA still unproven.
+- NO FINISH_CHECKLIST box checked.
