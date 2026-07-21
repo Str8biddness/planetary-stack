@@ -1,7 +1,7 @@
 From 8261fc8e463abcfecbf95d2904d36fb58b07d21c Mon Sep 17 00:00:00 2001
 From: synthesus-agent <agent@synthesus.local>
 Date: Tue, 21 Jul 2026 17:52:01 +0000
-Subject: [PATCH 1/2] Phase 3: zone-aware expansion-drive sync; plus offline
+Subject: [PATCH 1/3] Phase 3: zone-aware expansion-drive sync; plus offline
  CSG+SDF image forge
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -1657,7 +1657,7 @@ index 0000000..7a2e6c4
 From 8b10973858582f67e1bb0d6cf30b63cd5eaf6ac2 Mon Sep 17 00:00:00 2001
 From: synthesus-agent <agent@synthesus.local>
 Date: Tue, 21 Jul 2026 18:02:11 +0000
-Subject: [PATCH 2/2] Image Forge v2: shareable recipe codes, 6 presets, gyroid
+Subject: [PATCH 2/3] Image Forge v2: shareable recipe codes, 6 presets, gyroid
  scene, soft shadows/AO/fresnel glow, palettes, vignette+grain (offline,
  purple-only)
 
@@ -2508,6 +2508,1241 @@ index 3728abb..6b81af3 100644
 +    assert "PRESETS" in FORGE
 +    for scene in ("Boolean sculpture", "Infinite carved field", "Menger sponge", "Gyroid lattice"):
 +        assert scene in FORGE
+-- 
+2.39.5
+
+
+From cead52972967ac07c99afe91a6625f6883d5a952 Mon Sep 17 00:00:00 2001
+From: synthesus-agent <agent@synthesus.local>
+Date: Tue, 21 Jul 2026 18:19:44 +0000
+Subject: [PATCH 3/3] Distributed forge rendering: pinned CPU engine,
+ work-stealing tiler, seamless composite, bloom overlap margin, adaptive
+ local/distribute + benchmark
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Portable CPU raymarcher (forge-cpu-1) so every node renders byte-identically —
+no version-skew seams. Tiles compute from full-frame coordinates (seamless by
+construction); the one screen-space effect (bloom) uses an overlap margin, with
+a test proving overlap>=radius reproduces the whole frame and overlap=0 seams.
+Work-stealing scheduler (fast node pulls more, straggler holds one), engine
+version pinned+refused on mismatch, fail-closed compositing, adaptive plan_render,
+and a 3-number benchmark (local/tile/mesh round-trip -> crossover). 17 tests.
+---
+ AGENT_LOG.md                              |  71 ++++
+ services/forge_render/__init__.py         |  47 +++
+ services/forge_render/benchmark.py        | 123 +++++++
+ services/forge_render/engine.py           | 423 ++++++++++++++++++++++
+ services/forge_render/farm.py             | 253 +++++++++++++
+ tests/forge_render/__init__.py            |   1 +
+ tests/forge_render/test_tile_rendering.py | 236 ++++++++++++
+ 7 files changed, 1154 insertions(+)
+ create mode 100644 services/forge_render/__init__.py
+ create mode 100644 services/forge_render/benchmark.py
+ create mode 100644 services/forge_render/engine.py
+ create mode 100644 services/forge_render/farm.py
+ create mode 100644 tests/forge_render/__init__.py
+ create mode 100644 tests/forge_render/test_tile_rendering.py
+
+diff --git a/AGENT_LOG.md b/AGENT_LOG.md
+index c228fc2..715c9c2 100644
+--- a/AGENT_LOG.md
++++ b/AGENT_LOG.md
+@@ -2604,3 +2604,74 @@ NEXT PIECES, in order
+   be blocked in some webviews — the code is still shown in the field as a
+   fallback. NO FINISH_CHECKLIST box checked.
+ 
++
++## 2026-07-21 — Distributed, seam-safe tile rendering for the forge
++
++### Work completed
++
++- Added `services/forge_render/` — a portable CPU renderer plus a distribution
++  layer, so a single heavy image can be rendered across mesh nodes.
++- `engine.py`: a pinned CPU raymarcher (`ENGINE_VERSION = "forge-cpu-1"`)
++  mirroring the WebGL scene math (4 scenes, soft shadow, fresnel glow, palette,
++  vignette, grain) plus a dependency-free RGB PNG encoder (stdlib zlib). Every
++  pixel is computed from the FULL frame coordinates and its absolute position,
++  so a tile is the same bytes as the whole frame — proven byte-identical. The
++  one screen-space effect, bloom, renders on a padded tile and crops; overlap
++  >= radius reproduces the whole frame, overlap 0 seams.
++- `farm.py`: `RenderJob` (pins the engine version), uniform and
++  capability-weighted tiling, a discrete-event `steal_schedule` (the next free
++  node pulls the next tile — fast nodes render more, a straggler holds one),
++  a `WorkStealingScheduler` with a thread-safe shared queue and fail-closed
++  compositing, and `plan_render` — the adaptive local-vs-distribute decision.
++- Why a CPU engine when WebGL exists: distribution needs byte-identical output
++  on every node; a phone in proot has no reliable headless WebGL, and mixing a
++  GPU coordinator with CPU workers is the version skew that seams. All nodes run
++  this one pinned engine for distributed renders; WebGL stays for local preview.
++- `benchmark.py`: the small measurement — local render, single tile, and one
++  real Unisync round-trip — and the crossover.
++- Added `tests/forge_render/test_tile_rendering.py` (17 tests): byte-identical
++  tiling, the bloom overlap seam/fix, engine-version refusal (per-tile and
++  whole-job fail-closed), work-stealing distribution + straggler tolerance,
++  thread-safe queue, composite gap/overlap refusal, adaptive local/distribute,
++  and that the output is a real PNG with real tonal range (not a mock fill).
++
++### Commands run and their real output
++
++- `.venv/bin/python -m pytest tests/forge_render -q` -> `17 passed in ~1.2s`.
++- `.venv/bin/python -m pytest tests -q` -> `45 failed, 465 passed, 1 skipped,
++  2 errors`. Prior this session: 448 passed. Delta +17, zero new failures (the
++  45+2 remain the pre-existing arm64 architecture-literal issue).
++
++### MEASURED — the three numbers on this host (aarch64, pure-Python engine)
++
++At 96x72, quality 64, 3 nodes:
++- boolean sculpture: local 216.6 ms, single tile 7.6 ms, mesh round-trip
++  8.66 ms, crossover >= 39.0 ms.
++- gyroid: local 134.5 ms, single tile 4.6 ms, round-trip 8.31 ms, crossover
++  >= 37.4 ms.
++Reading: a scene that renders locally in more than ~39 ms is predicted to win
++by distributing across 3 nodes here; cheaper scenes stay local. Both test
++scenes are well above that, so they distribute.
++
++### RENDERED — not simulated
++
++- Rendered a 240x160 gyroid with bloom via the distributed path across three
++  weighted workers (12 tiles), composited it, and confirmed the composite is
++  byte-identical to a single whole-frame render (seamless). Wrote a real PNG
++  (83,873 bytes) and viewed it — a glowing woven purple orb with bloom and
++  grain. The CPU engine produces a genuinely good image.
++
++### HONEST GAPS
++
++- The mesh round-trip is measured over the IN-PROCESS transport: it captures
++  framing, auth and receipt but NOT the mTLS handshake or the wire, so it is a
++  LOWER BOUND. Real LAN overhead is larger and the true crossover is higher.
++  The physical mTLS path cannot run on this arm64 host (pre-existing).
++- `WorkStealingScheduler.render()` executes all tiles on this one host, so its
++  per-node tile counts are round-robin, not timing-driven; the speed-aware
++  stealing (fast node gets more, straggler tolerance) is proven by
++  `steal_schedule` and its tests, not by a physical multi-node run.
++- The distributed engine is the CPU renderer, not the WebGL one; they are close
++  but not asserted pixel-identical to each other. Not wired into the desktop UI
++  yet (needs live nodes to be meaningful). NO FINISH_CHECKLIST box checked.
++
+diff --git a/services/forge_render/__init__.py b/services/forge_render/__init__.py
+new file mode 100644
+index 0000000..e0803cb
+--- /dev/null
++++ b/services/forge_render/__init__.py
+@@ -0,0 +1,47 @@
++"""Distributed, seam-safe tile rendering for the Synthesus forge."""
++
++from .engine import (
++    ENGINE_VERSION,
++    SCENES,
++    EngineVersionMismatch,
++    Recipe,
++    Surface,
++    composite,
++    render_full,
++    render_region,
++    render_tile,
++    to_png,
++)
++from .farm import (
++    RenderJob,
++    RenderPlan,
++    TileResult,
++    WorkStealingScheduler,
++    Worker,
++    capability_weighted_tiles,
++    estimate_cost,
++    plan_render,
++    split_tiles,
++)
++
++__all__ = [
++    "ENGINE_VERSION",
++    "EngineVersionMismatch",
++    "Recipe",
++    "RenderJob",
++    "RenderPlan",
++    "SCENES",
++    "Surface",
++    "TileResult",
++    "Worker",
++    "WorkStealingScheduler",
++    "capability_weighted_tiles",
++    "composite",
++    "estimate_cost",
++    "plan_render",
++    "render_full",
++    "render_region",
++    "render_tile",
++    "split_tiles",
++    "to_png",
++]
+diff --git a/services/forge_render/benchmark.py b/services/forge_render/benchmark.py
+new file mode 100644
+index 0000000..0cf17e8
+--- /dev/null
++++ b/services/forge_render/benchmark.py
+@@ -0,0 +1,123 @@
++"""The small measurement that decides whether distributing pays.
++
++Three numbers on real hardware:
++
++    1. local render   — time to render a representative scene here.
++    2. single tile    — time to render one tile of it.
++    3. mesh round-trip — time to move a recipe-sized object through the real
++                         Unisync transport once (lease-bound framing, auth,
++                         chunking, receipt).
++
++From them, the crossover: the local render time above which distributing to N
++nodes is predicted to win. Below it, coordination costs more than the work and
++the scene should render locally.
++
++Honesty: the round-trip here uses the in-process transport, so it captures
++framing/auth/verify but NOT the mTLS handshake or the wire. It is a lower bound
++on real mesh overhead; a physical LAN number will be larger.
++"""
++
++from __future__ import annotations
++
++import time
++from dataclasses import dataclass
++from datetime import UTC, datetime, timedelta
++from pathlib import Path
++
++from services.unisync import (
++    ContentAddressedStore,
++    InProcessObjectTransport,
++    TransferContext,
++)
++from services.unisync.contracts import AuthorizationError
++
++from .engine import Recipe, render_full, render_region
++from .farm import split_tiles
++
++
++class _AllowValidator:
++    def validate_transfer(self, context, peer_identity=None):
++        return None
++
++
++@dataclass(frozen=True)
++class Measurement:
++    local_seconds: float
++    tile_seconds: float
++    roundtrip_seconds: float
++    node_count: int
++    crossover_local_seconds: float
++
++    def summary(self) -> str:
++        return (
++            f"local={self.local_seconds*1000:.1f}ms "
++            f"tile={self.tile_seconds*1000:.1f}ms "
++            f"roundtrip={self.roundtrip_seconds*1000:.2f}ms "
++            f"crossover>={self.crossover_local_seconds*1000:.1f}ms "
++            f"(nodes={self.node_count})"
++        )
++
++
++def time_local_render(recipe: Recipe, w: int, h: int, *, quality: int = 64) -> float:
++    start = time.perf_counter()
++    render_full(recipe, w, h, quality=quality)
++    return time.perf_counter() - start
++
++
++def time_single_tile(recipe: Recipe, w: int, h: int, *, quality: int = 64, cols: int = 4, rows: int = 4) -> float:
++    rect = split_tiles(w, h, cols, rows)[0]
++    start = time.perf_counter()
++    render_region(recipe, w, h, rect[0], rect[1], rect[2], rect[3], quality=quality)
++    return time.perf_counter() - start
++
++
++def time_mesh_roundtrip(*, payload_bytes: int = 4096, repeats: int = 20, tmp: Path | None = None) -> float:
++    import tempfile
++
++    base = Path(tmp or tempfile.mkdtemp(prefix="forge-bench-"))
++    src = ContentAddressedStore(base / "src")
++    payload = b"forge-recipe-payload" * (payload_bytes // 20 + 1)
++    payload = payload[:payload_bytes]
++    digest = src.put_bytes(payload)
++    transport = InProcessObjectTransport(validator=_AllowValidator())
++    best = float("inf")
++    for i in range(repeats):
++        dst = base / f"dst-{i}"
++        ctx = TransferContext(
++            account_id="account:bench",
++            request_sha256="1" * 64,
++            lease_id="lease:bench",
++            lease_sha256="2" * 64,
++            fencing_token=1,
++            selected_transport="local_process",
++            source_node_id="node:coordinator",
++            destination_node_id="node:worker",
++            object_sha256=digest,
++            byte_length=len(payload),
++            expires_at=datetime.now(UTC) + timedelta(minutes=5),
++        )
++        start = time.perf_counter()
++        transport.upload_object(context=ctx, source_root=src.root, destination_root=dst)
++        best = min(best, time.perf_counter() - start)
++    return best
++
++
++def measure(recipe: Recipe, w: int, h: int, *, quality: int = 64, node_count: int = 3) -> Measurement:
++    local = time_local_render(recipe, w, h, quality=quality)
++    tile = time_single_tile(recipe, w, h, quality=quality)
++    rt = time_mesh_roundtrip()
++    # Distribution predicted time ~ node_count round-trips + local/node_count.
++    # Solve for the local time L at which distribution just wins:
++    #   overhead + L/node_count < L   =>   L > overhead * node_count / (node_count - 1)
++    overhead = rt * node_count
++    if node_count > 1:
++        crossover = overhead * node_count / (node_count - 1)
++    else:
++        crossover = float("inf")
++    return Measurement(
++        local_seconds=local,
++        tile_seconds=tile,
++        roundtrip_seconds=rt,
++        node_count=node_count,
++        crossover_local_seconds=crossover,
++    )
+diff --git a/services/forge_render/engine.py b/services/forge_render/engine.py
+new file mode 100644
+index 0000000..d16af0c
+--- /dev/null
++++ b/services/forge_render/engine.py
+@@ -0,0 +1,423 @@
++"""Canonical portable CPU renderer for the Synthesus forge.
++
++Why a CPU engine when the desktop already has WebGL: distributed rendering only
++works if *every* node produces byte-identical pixels for the same job. A phone
++worker inside proot has no reliable headless WebGL, and mixing a GPU coordinator
++with CPU workers is precisely the "version skew" that puts seams through the
++image. So the distributed path uses ONE pinned engine — this one — on the
++coordinator's own tiles as well as the workers'. The WebGL path stays for
++interactive local preview.
++
++Two honesty-critical properties:
++
++* Every pixel is computed from the FULL image coordinates (`full_w`, `full_h`)
++  and its absolute pixel position, never from the tile's own size. The camera,
++  vignette and grain are therefore identical whether a pixel is rendered alone,
++  in a tile, or as part of the whole frame. That is what makes tiling seamless
++  for the raymarch and its per-pixel effects — proven by a byte-equality test.
++
++* The one genuinely screen-space effect, bloom, reads neighbours. A tile that
++  does not carry an overlap margin wide enough for the blur radius will differ
++  at its inner boundaries — the classic distributed-rendering seam. `render_tile`
++  renders a padded region and crops it, and the test proves overlap>=radius
++  reproduces the whole-frame result while overlap=0 does not.
++
++The engine version is pinned into every job; a node whose engine version differs
++must refuse the job rather than contribute a mismatched tile.
++"""
++
++from __future__ import annotations
++
++import math
++import struct
++import zlib
++from dataclasses import dataclass
++
++ENGINE_VERSION = "forge-cpu-1"
++
++SCENES = ("Boolean sculpture", "Infinite carved field", "Menger sponge", "Gyroid lattice")
++_HUE_MIN, _HUE_MAX = 260, 320
++
++
++class EngineVersionMismatch(RuntimeError):
++    """A render job pinned a different engine version than this node runs."""
++
++
++@dataclass(frozen=True)
++class Recipe:
++    """The whole scene description — a few dozen bytes, the thing we ship."""
++
++    mode: int = 0
++    iters: int = 6
++    blend: int = 35
++    hue: int = 285
++    glow: int = 60
++    palette: int = 0
++    cam: int = 42
++
++    @classmethod
++    def from_code(cls, code: str) -> "Recipe":
++        parts = str(code).strip().split(".")
++        if parts[0] != "SF1" or len(parts) < 8:
++            raise ValueError("not an SF1 recipe code")
++        n = [int(x) for x in parts[1:8]]
++        return cls(
++            mode=_clamp_int(n[0], 0, len(SCENES) - 1),
++            iters=_clamp_int(n[1], 1, 10),
++            blend=_clamp_int(n[2], 0, 100),
++            hue=_clamp_int(n[3], _HUE_MIN, _HUE_MAX),
++            glow=_clamp_int(n[4], 0, 100),
++            palette=_clamp_int(n[5], 0, 3),
++            cam=_clamp_int(n[6], 30, 52),
++        )
++
++    def to_code(self) -> str:
++        return ".".join(
++            str(v)
++            for v in ("SF1", self.mode, self.iters, self.blend, self.hue, self.glow, self.palette, self.cam)
++        )
++
++
++def _clamp_int(v: int, lo: int, hi: int) -> int:
++    return lo if v < lo else hi if v > hi else v
++
++
++def _clamp(v: float, lo: float, hi: float) -> float:
++    return lo if v < lo else hi if v > hi else v
++
++
++# --------------------------------------------------------- colour (purple-only)
++def _hsl_to_rgb(h: float, s: float, l: float) -> tuple[float, float, float]:
++    h = ((h % 360) + 360) % 360 / 360.0
++
++    def f(n: float) -> float:
++        k = (n + h * 12) % 12
++        a = s * min(l, 1 - l)
++        return l - a * max(-1.0, min(k - 3, min(9 - k, 1.0)))
++
++    return f(0), f(8), f(4)
++
++
++def _palette(hue: int, palette: int) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
++    profiles = [
++        (0.62, 0.50, 0.50, 0.86),
++        (0.78, 0.50, 0.60, 0.88),
++        (0.72, 0.38, 0.62, 0.80),
++        (0.50, 0.62, 0.35, 0.94),
++    ]
++    sa, la, sb, lb = profiles[palette % len(profiles)]
++    return _hsl_to_rgb(hue, sa, la), _hsl_to_rgb(hue + 12, sb, lb)
++
++
++# ------------------------------------------------------------------- SDF scene
++def _sd_sphere(p, r):
++    return math.sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]) - r
++
++
++def _sd_box(p, b):
++    qx, qy, qz = abs(p[0]) - b[0], abs(p[1]) - b[1], abs(p[2]) - b[2]
++    ox, oy, oz = max(qx, 0.0), max(qy, 0.0), max(qz, 0.0)
++    outside = math.sqrt(ox * ox + oy * oy + oz * oz)
++    inside = min(max(qx, max(qy, qz)), 0.0)
++    return outside + inside
++
++
++def _op_smooth_union(a, b, k):
++    h = _clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0)
++    return b * (1 - h) + a * h - k * h * (1.0 - h)
++
++
++def _scene(p, rc: Recipe) -> float:
++    mode = rc.mode
++    if mode == 1:
++        q = (((p[0] + 2.0) % 4.0) - 2.0, ((p[1] + 2.0) % 4.0) - 2.0, ((p[2] + 2.0) % 4.0) - 2.0)
++        box = _sd_box(q, (1.0, 1.0, 1.0))
++        return max(-_sd_sphere(q, 1.2), box)
++    if mode == 2:
++        d = _sd_box(p, (1.0, 1.0, 1.0))
++        s = 1.0
++        for m in range(min(rc.iters, 10)):
++            ax = ((p[0] * s) % 2.0) - 1.0
++            ay = ((p[1] * s) % 2.0) - 1.0
++            az = ((p[2] * s) % 2.0) - 1.0
++            s *= 3.0
++            rx, ry, rz = abs(1.0 - 3.0 * abs(ax)), abs(1.0 - 3.0 * abs(ay)), abs(1.0 - 3.0 * abs(az))
++            da, db, dc = max(rx, ry), max(ry, rz), max(rz, rx)
++            c = (min(da, min(db, dc)) - 1.0) / s
++            d = max(d, c)
++        return d
++    if mode == 3:
++        sc = 2.0 + rc.iters * 0.6
++        g = abs(
++            math.sin(p[0] * sc) * math.cos(p[1] * sc)
++            + math.sin(p[1] * sc) * math.cos(p[2] * sc)
++            + math.sin(p[2] * sc) * math.cos(p[0] * sc)
++        ) / sc - 0.03
++        g *= 0.5
++        return max(g, _sd_sphere(p, 1.7))
++    box = _sd_box(p, (1.15, 1.15, 1.15))
++    sph = _sd_sphere(p, 1.5)
++    solid = max(box, sph)
++    solid = max(-_sd_sphere(p, 0.72), solid)
++    orbit = _sd_sphere((p[0] - 0.0, p[1], p[2] - 1.9), 0.55)  # t=0 pose
++    return _op_smooth_union(orbit, solid, max(rc.blend / 100.0, 0.001))
++
++
++def _normal(p, rc: Recipe):
++    e = 0.0012
++    dx = _scene((p[0] + e, p[1], p[2]), rc) - _scene((p[0] - e, p[1], p[2]), rc)
++    dy = _scene((p[0], p[1] + e, p[2]), rc) - _scene((p[0], p[1] - e, p[2]), rc)
++    dz = _scene((p[0], p[1], p[2] + e), rc) - _scene((p[0], p[1], p[2] - e), rc)
++    ln = math.sqrt(dx * dx + dy * dy + dz * dz) or 1.0
++    return dx / ln, dy / ln, dz / ln
++
++
++def _soft_shadow(ro, rd, rc: Recipe) -> float:
++    res = 1.0
++    t = 0.03
++    for _ in range(20):
++        p = (ro[0] + rd[0] * t, ro[1] + rd[1] * t, ro[2] + rd[2] * t)
++        h = _scene(p, rc)
++        if h < 0.001:
++            return 0.0
++        res = min(res, 9.0 * h / t)
++        t += _clamp(h, 0.02, 0.3)
++        if t > 7.0:
++            break
++    return _clamp(res, 0.0, 1.0)
++
++
++def _shade(px: int, py: int, full_w: int, full_h: int, rc: Recipe, cols, *, quality: int):
++    """One pixel, computed only from absolute coordinates and full dimensions."""
++    col_a, col_b = cols
++    # uv from FULL image — this is what makes a tile agree with the whole frame.
++    u = (px * 2.0 + 1.0 - full_w) / full_h
++    v = (full_h - (py * 2.0 + 1.0)) / full_h  # flip y so it matches GL
++    dist = rc.cam * 0.1
++    ro = (0.0, 1.4, dist)  # fixed t=0 pose for deterministic distribution
++    # camera basis looking at origin
++    flen = math.sqrt(ro[0] ** 2 + ro[1] ** 2 + ro[2] ** 2)
++    fw = (-ro[0] / flen, -ro[1] / flen, -ro[2] / flen)
++    rtx = fw[2] * 1.0 - fw[1] * 0.0
++    rty = fw[0] * 0.0 - fw[2] * 0.0
++    rtz = fw[1] * 0.0 - fw[0] * 1.0
++    rl = math.sqrt(rtx * rtx + rty * rty + rtz * rtz) or 1.0
++    rt = (rtx / rl, rty / rl, rtz / rl)
++    up = (fw[1] * rt[2] - fw[2] * rt[1], fw[2] * rt[0] - fw[0] * rt[2], fw[0] * rt[1] - fw[1] * rt[0])
++    rdx = u * rt[0] + v * up[0] + 1.6 * fw[0]
++    rdy = u * rt[1] + v * up[1] + 1.6 * fw[1]
++    rdz = u * rt[2] + v * up[2] + 1.6 * fw[2]
++    rl = math.sqrt(rdx * rdx + rdy * rdy + rdz * rdz) or 1.0
++    rd = (rdx / rl, rdy / rl, rdz / rl)
++
++    t = 0.0
++    hit = False
++    for _ in range(quality):
++        p = (ro[0] + rd[0] * t, ro[1] + rd[1] * t, ro[2] + rd[2] * t)
++        d = _scene(p, rc)
++        if d < 0.001:
++            hit = True
++            break
++        t += d
++        if t > 40.0:
++            break
++
++    glow = rc.glow / 100.0
++    gy = _clamp(v * 0.5 + 0.5, 0.0, 1.0)
++    sky = (
++        0.015 * (1 - gy) + col_a[0] * 0.10 * gy,
++        0.012 * (1 - gy) + col_a[1] * 0.10 * gy,
++        0.020 * (1 - gy) + col_a[2] * 0.10 * gy,
++    )
++    halo = glow * 0.06 * math.exp(-2.5 * math.sqrt(u * u + v * v))
++    r, g, b = sky[0] + col_b[0] * halo, sky[1] + col_b[1] * halo, sky[2] + col_b[2] * halo
++
++    if hit:
++        p = (ro[0] + rd[0] * t, ro[1] + rd[1] * t, ro[2] + rd[2] * t)
++        n = _normal(p, rc)
++        ld = (0.5698, 0.8288, 0.3625)  # normalised (0.55,0.8,0.35)
++        dif = _clamp(n[0] * ld[0] + n[1] * ld[1] + n[2] * ld[2], 0.0, 1.0)
++        sh = _soft_shadow((p[0] + n[0] * 0.01, p[1] + n[1] * 0.01, p[2] + n[2] * 0.01), ld, rc)
++        ndv = _clamp(-(n[0] * rd[0] + n[1] * rd[1] + n[2] * rd[2]), 0.0, 1.0)
++        fres = (1.0 - ndv) ** 3
++        mixf = 0.35 + 0.5 * dif
++        base = (
++            col_a[0] * (1 - mixf) + col_b[0] * mixf,
++            col_a[1] * (1 - mixf) + col_b[1] * mixf,
++            col_a[2] * (1 - mixf) + col_b[2] * mixf,
++        )
++        lit = 0.14 + 0.9 * dif * sh
++        r = base[0] * lit + col_b[0] * fres * (0.6 + glow)
++        g = base[1] * lit + col_b[1] * fres * (0.6 + glow)
++        b = base[2] * lit + col_b[2] * fres * (0.6 + glow)
++        haze = _clamp(t / 40.0, 0.0, 1.0)
++        r = r * (1 - haze) + sky[0] * haze
++        g = g * (1 - haze) + sky[1] * haze
++        b = b * (1 - haze) + sky[2] * haze
++
++    # vignette (uses full-image uv) + deterministic grain (absolute pixel coord)
++    vig = 1.0 - 0.30 * (u * u + v * v) * 0.25
++    r, g, b = r * vig, g * vig, b * vig
++    grain = (_hash21(px, py) - 0.5) * 0.035
++    r, g, b = r + grain, g + grain, b + grain
++    # gamma
++    return (_to_byte(r), _to_byte(g), _to_byte(b))
++
++
++def _hash21(x: int, y: int) -> float:
++    # deterministic per absolute pixel — identical in a tile or the whole frame
++    v = (x * 374761393 + y * 668265263) & 0xFFFFFFFF
++    v = (v ^ (v >> 13)) * 1274126177 & 0xFFFFFFFF
++    return ((v ^ (v >> 16)) & 0xFFFFFFFF) / 4294967296.0
++
++
++def _to_byte(c: float) -> int:
++    c = c if c > 0.0 else 0.0
++    c = c ** 0.4545
++    return int(_clamp(c, 0.0, 1.0) * 255.0 + 0.5)
++
++
++# ------------------------------------------------------------------- surfaces
++class Surface:
++    """A tight RGB pixel buffer covering an absolute region of the full frame."""
++
++    __slots__ = ("x0", "y0", "w", "h", "data")
++
++    def __init__(self, x0: int, y0: int, w: int, h: int, data: bytearray | None = None) -> None:
++        self.x0, self.y0, self.w, self.h = x0, y0, w, h
++        self.data = data if data is not None else bytearray(w * h * 3)
++
++    def px(self, ax: int, ay: int) -> tuple[int, int, int]:
++        i = ((ay - self.y0) * self.w + (ax - self.x0)) * 3
++        return self.data[i], self.data[i + 1], self.data[i + 2]
++
++    def set(self, ax: int, ay: int, rgb: tuple[int, int, int]) -> None:
++        i = ((ay - self.y0) * self.w + (ax - self.x0)) * 3
++        self.data[i], self.data[i + 1], self.data[i + 2] = rgb
++
++
++def render_region(rc: Recipe, full_w: int, full_h: int, x0: int, y0: int, x1: int, y1: int, *, quality: int = 64) -> Surface:
++    """Render absolute rect [x0,x1)×[y0,y1) using full-frame coordinates."""
++    x0 = max(0, x0)
++    y0 = max(0, y0)
++    x1 = min(full_w, x1)
++    y1 = min(full_h, y1)
++    cols = _palette(rc.hue, rc.palette)
++    surf = Surface(x0, y0, x1 - x0, y1 - y0)
++    for ay in range(y0, y1):
++        for ax in range(x0, x1):
++            surf.set(ax, ay, _shade(ax, ay, full_w, full_h, rc, cols, quality=quality))
++    return surf
++
++
++def _box_blur_bright(surf: Surface, radius: int, strength: float) -> Surface:
++    """Screen-space bloom: blur the bright parts and add them back.
++
++    Samples clamp to the SURFACE bounds. On the whole frame the surface is the
++    image, so this clamps to the image edge. On a padded tile the surface is the
++    padded region, so an interior output pixel needs its neighbours within
++    `radius` to be present — i.e. overlap>=radius — or the clamp uses the wrong
++    edge and the boundary differs. That difference is the seam.
++    """
++    if radius <= 0 or strength <= 0:
++        return surf
++    w, h = surf.w, surf.h
++    out = Surface(surf.x0, surf.y0, w, h, bytearray(surf.data))
++    n = (2 * radius + 1) ** 2
++    for ly in range(h):
++        for lx in range(w):
++            sr = sg = sb = 0
++            for dy in range(-radius, radius + 1):
++                yy = min(max(ly + dy, 0), h - 1)
++                for dx in range(-radius, radius + 1):
++                    xx = min(max(lx + dx, 0), w - 1)
++                    i = (yy * w + xx) * 3
++                    sr += surf.data[i]
++                    sg += surf.data[i + 1]
++                    sb += surf.data[i + 2]
++            i = (ly * w + lx) * 3
++            out.data[i] = min(255, surf.data[i] + int((sr / n) * strength))
++            out.data[i + 1] = min(255, surf.data[i + 1] + int((sg / n) * strength))
++            out.data[i + 2] = min(255, surf.data[i + 2] + int((sb / n) * strength))
++    return out
++
++
++def render_full(rc: Recipe, w: int, h: int, *, quality: int = 64, bloom_radius: int = 0, bloom_strength: float = 0.0) -> Surface:
++    surf = render_region(rc, w, h, 0, 0, w, h, quality=quality)
++    if bloom_radius > 0:
++        surf = _box_blur_bright(surf, bloom_radius, bloom_strength)
++    return surf
++
++
++def render_tile(
++    rc: Recipe,
++    full_w: int,
++    full_h: int,
++    rect: tuple[int, int, int, int],
++    *,
++    quality: int = 64,
++    overlap: int = 0,
++    bloom_radius: int = 0,
++    bloom_strength: float = 0.0,
++    engine_version: str = ENGINE_VERSION,
++) -> Surface:
++    """Render one tile. Refuses if the pinned engine version is not ours.
++
++    Renders the tile padded by `overlap`, applies bloom on the padded surface,
++    then crops back to `rect`. With overlap>=bloom_radius the crop is identical
++    to the whole-frame result.
++    """
++    if engine_version != ENGINE_VERSION:
++        raise EngineVersionMismatch(
++            f"job pinned engine {engine_version!r}; this node runs {ENGINE_VERSION!r}"
++        )
++    x0, y0, x1, y1 = rect
++    pad = overlap
++    padded = render_region(rc, full_w, full_h, x0 - pad, y0 - pad, x1 + pad, y1 + pad, quality=quality)
++    if bloom_radius > 0:
++        padded = _box_blur_bright(padded, bloom_radius, bloom_strength)
++    cx0 = max(0, x0)
++    cy0 = max(0, y0)
++    cx1 = min(full_w, x1)
++    cy1 = min(full_h, y1)
++    out = Surface(cx0, cy0, cx1 - cx0, cy1 - cy0)
++    for ay in range(cy0, cy1):
++        for ax in range(cx0, cx1):
++            out.set(ax, ay, padded.px(ax, ay))
++    return out
++
++
++def composite(surfaces: list[Surface], w: int, h: int) -> Surface:
++    """Assemble tiles into the full frame. Refuses gaps and overlaps."""
++    full = Surface(0, 0, w, h)
++    covered = bytearray(w * h)
++    for s in surfaces:
++        for ay in range(s.y0, s.y0 + s.h):
++            for ax in range(s.x0, s.x0 + s.w):
++                if not (0 <= ax < w and 0 <= ay < h):
++                    raise ValueError("tile lies outside the frame")
++                ci = ay * w + ax
++                if covered[ci]:
++                    raise ValueError("tiles overlap; a pixel was rendered twice")
++                covered[ci] = 1
++                full.set(ax, ay, s.px(ax, ay))
++    if any(c == 0 for c in covered):
++        raise ValueError("frame is not fully covered by the tiles")
++    return full
++
++
++def to_png(surf: Surface) -> bytes:
++    """Minimal, dependency-free RGB8 PNG encoder (stdlib zlib only)."""
++    w, h = surf.w, surf.h
++    raw = bytearray()
++    for y in range(h):
++        raw.append(0)  # filter type 0
++        start = y * w * 3
++        raw.extend(surf.data[start:start + w * 3])
++
++    def chunk(tag: bytes, payload: bytes) -> bytes:
++        return struct.pack(">I", len(payload)) + tag + payload + struct.pack(">I", zlib.crc32(tag + payload) & 0xFFFFFFFF)
++
++    sig = b"\x89PNG\r\n\x1a\n"
++    ihdr = struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)
++    return sig + chunk(b"IHDR", ihdr) + chunk(b"IDAT", zlib.compress(bytes(raw), 6)) + chunk(b"IEND", b"")
+diff --git a/services/forge_render/farm.py b/services/forge_render/farm.py
+new file mode 100644
+index 0000000..8cd5cd7
+--- /dev/null
++++ b/services/forge_render/farm.py
+@@ -0,0 +1,253 @@
++"""Adaptive, work-stealing distribution of a forge render across mesh nodes.
++
++The scene graph is tiny (an SF1 recipe — dozens of bytes), so distribution ships
++a description out and gets a tile back: coarse-grained, the shape that wins on a
++LAN when render time dwarfs coordination. The three failure modes are handled
++explicitly:
++
++* Seams from version skew  -> the job pins `engine_version`; a node whose engine
++  differs refuses rather than contribute a mismatched tile.
++* Cross-boundary effects    -> `RenderJob.overlap` carries a margin >= the bloom
++  radius; tiles render padded and crop.
++* Stragglers                -> a single tile queue with work-stealing: whichever
++  node is free pulls the next tile, so a slow phone holds at most one tile and
++  never blocks the others.
++
++And the decision that makes it worth doing at all is adaptive: `plan_render`
++estimates the work, and distributes only when the predicted distributed time
++(mesh overhead + parallel render) beats the local time. Cheap scenes stay local.
++"""
++
++from __future__ import annotations
++
++import heapq
++import threading
++from dataclasses import dataclass
++
++from .engine import ENGINE_VERSION, EngineVersionMismatch, Recipe, Surface, composite, render_tile
++
++# Relative per-scene weight — heavier scenes cost more per pixel to march.
++_SCENE_WEIGHT = (1.0, 1.1, 1.6, 1.5)
++
++
++@dataclass(frozen=True)
++class RenderJob:
++    recipe: Recipe
++    full_w: int
++    full_h: int
++    engine_version: str = ENGINE_VERSION
++    quality: int = 64
++    overlap: int = 0
++    bloom_radius: int = 0
++    bloom_strength: float = 0.0
++
++
++@dataclass(frozen=True)
++class Worker:
++    node_id: str
++    engine_version: str = ENGINE_VERSION
++    # pixels the node can shade per second, relative — used for weighting only.
++    speed: float = 1.0
++
++    def matches(self, job: RenderJob) -> bool:
++        return self.engine_version == job.engine_version
++
++
++@dataclass(frozen=True)
++class TileResult:
++    node_id: str
++    rect: tuple[int, int, int, int]
++    surface: Surface
++
++
++@dataclass(frozen=True)
++class RenderPlan:
++    distribute: bool
++    local_seconds: float
++    distributed_seconds: float
++    reason: str
++    estimate: float
++
++
++def split_tiles(w: int, h: int, cols: int, rows: int) -> list[tuple[int, int, int, int]]:
++    """A uniform grid that covers the frame exactly (no gaps, no overlap)."""
++    cols = max(1, cols)
++    rows = max(1, rows)
++    xs = [round(w * i / cols) for i in range(cols + 1)]
++    ys = [round(h * i / rows) for i in range(rows + 1)]
++    tiles = []
++    for r in range(rows):
++        for c in range(cols):
++            tiles.append((xs[c], ys[r], xs[c + 1], ys[r + 1]))
++    return tiles
++
++
++def capability_weighted_tiles(w: int, h: int, workers: list[Worker], *, per_worker: int = 4) -> list[tuple[int, int, int, int]]:
++    """Many small tiles so a work-stealing pool self-balances.
++
++    More, smaller tiles let fast nodes pull extra work while a straggler holds
++    just one. Tile count scales with the pool so there is always surplus to
++    steal.
++    """
++    n = max(1, len(workers)) * max(1, per_worker)
++    cols = max(1, int(round(n ** 0.5)))
++    rows = max(1, (n + cols - 1) // cols)
++    return split_tiles(w, h, cols, rows)
++
++
++def estimate_cost(recipe: Recipe, w: int, h: int, *, quality: int = 64) -> float:
++    """Abstract cost ~ ray-march evaluations. Used only for the local/distribute
++    decision, never presented to the user as a real time."""
++    return float(w) * float(h) * float(quality) * _SCENE_WEIGHT[recipe.mode % len(_SCENE_WEIGHT)]
++
++
++def _tile_area(rect: tuple[int, int, int, int]) -> int:
++    x0, y0, x1, y1 = rect
++    return max(0, x1 - x0) * max(0, y1 - y0)
++
++
++def steal_schedule(
++    tiles: list[tuple[int, int, int, int]], workers: list[Worker]
++) -> tuple[dict[str, list[int]], float]:
++    """Discrete-event work-stealing: the next free node takes the next tile.
++
++    Returns the tile indices each node rendered and the makespan (finish time of
++    the slowest node), both derived from real tile areas and node speeds.
++    """
++    if not workers:
++        raise EngineVersionMismatch("no node matches the pinned engine version")
++    by_id = {w.node_id: w for w in workers}
++    clocks = {w.node_id: 0.0 for w in workers}
++    assignment: dict[str, list[int]] = {w.node_id: [] for w in workers}
++    heap = [(0.0, w.node_id) for w in workers]
++    heapq.heapify(heap)
++    for idx in range(len(tiles)):
++        t, wid = heapq.heappop(heap)
++        w = by_id[wid]
++        cost = _tile_area(tiles[idx]) / max(w.speed, 1e-9)
++        clocks[wid] = t + cost
++        assignment[wid].append(idx)
++        heapq.heappush(heap, (clocks[wid], wid))
++    return assignment, max(clocks.values(), default=0.0)
++
++
++class WorkStealingScheduler:
++    """Runs a job across a worker pool with a shared, thread-safe tile queue."""
++
++    def __init__(self, job: RenderJob) -> None:
++        self.job = job
++
++    def eligible(self, workers: list[Worker]) -> list[Worker]:
++        matching = [w for w in workers if w.matches(self.job)]
++        if not matching:
++            raise EngineVersionMismatch(
++                f"no node runs the pinned engine {self.job.engine_version!r}"
++            )
++        return matching
++
++    def _render_tile(self, node_id: str, rect: tuple[int, int, int, int]) -> TileResult:
++        surf = render_tile(
++            self.job.recipe,
++            self.job.full_w,
++            self.job.full_h,
++            rect,
++            quality=self.job.quality,
++            overlap=self.job.overlap,
++            bloom_radius=self.job.bloom_radius,
++            bloom_strength=self.job.bloom_strength,
++            engine_version=self.job.engine_version,  # refuses on mismatch
++        )
++        return TileResult(node_id=node_id, rect=rect, surface=surf)
++
++    def render(
++        self, tiles: list[tuple[int, int, int, int]], workers: list[Worker], *, concurrent: bool = False
++    ) -> tuple[Surface, list[TileResult]]:
++        """Render every tile exactly once, stealing from a shared queue, and
++        composite the frame. `concurrent` uses real threads to prove the queue
++        is safe; the default is deterministic single-thread draining."""
++        pool = self.eligible(workers)
++        queue: list[int] = list(range(len(tiles)))
++        lock = threading.Lock()
++        results: list[TileResult] = []
++        # round-robin the free node; with real timing a faster node would pull
++        # more, but correctness (each tile once) does not depend on timing.
++        order = iter(pool)
++
++        def next_worker() -> Worker:
++            nonlocal order
++            try:
++                return next(order)
++            except StopIteration:
++                order = iter(pool)
++                return next(order)
++
++        def drain() -> None:
++            while True:
++                with lock:
++                    if not queue:
++                        return
++                    idx = queue.pop(0)
++                    w = next_worker()
++                res = self._render_tile(w.node_id, tiles[idx])
++                with lock:
++                    results.append(res)
++
++        if concurrent:
++            threads = [threading.Thread(target=drain) for _ in pool]
++            for t in threads:
++                t.start()
++            for t in threads:
++                t.join()
++        else:
++            drain()
++
++        frame = composite([r.surface for r in results], self.job.full_w, self.job.full_h)
++        return frame, results
++
++
++def plan_render(
++    job: RenderJob,
++    workers: list[Worker],
++    *,
++    local_rate: float,
++    mesh_overhead_seconds: float,
++) -> RenderPlan:
++    """Decide local vs distributed from measured numbers.
++
++    * local_rate            — pixels/second this coordinator shades (measured).
++    * mesh_overhead_seconds — one job's lease+mTLS+transfer+receipt (measured).
++
++    Distribute only if the predicted distributed time beats local. A single node,
++    or a scene cheaper than the coordination cost, stays local.
++    """
++    est = estimate_cost(job.recipe, job.full_w, job.full_h, quality=job.quality)
++    local_seconds = est / max(local_rate, 1e-9)
++
++    matching = [w for w in workers if w.matches(job)]
++    total_rate = sum(w.speed for w in matching) * max(local_rate, 1e-9) / max(
++        (matching[0].speed if matching else 1.0), 1e-9
++    )
++    if len(matching) <= 1:
++        return RenderPlan(
++            distribute=False,
++            local_seconds=local_seconds,
++            distributed_seconds=float("inf"),
++            reason="only one eligible node — nothing to distribute to",
++            estimate=est,
++        )
++    # ideal parallel render time + one round of mesh overhead per remote node
++    parallel_render = est / max(total_rate, 1e-9)
++    distributed_seconds = mesh_overhead_seconds + parallel_render
++    if distributed_seconds < local_seconds:
++        reason = "render dwarfs coordination — the house renders it"
++        distribute = True
++    else:
++        reason = "coordination costs more than the render — keep it local"
++        distribute = False
++    return RenderPlan(
++        distribute=distribute,
++        local_seconds=local_seconds,
++        distributed_seconds=distributed_seconds,
++        reason=reason,
++        estimate=est,
++    )
+diff --git a/tests/forge_render/__init__.py b/tests/forge_render/__init__.py
+new file mode 100644
+index 0000000..cce881a
+--- /dev/null
++++ b/tests/forge_render/__init__.py
+@@ -0,0 +1 @@
++"""Distributed forge rendering tests."""
+diff --git a/tests/forge_render/test_tile_rendering.py b/tests/forge_render/test_tile_rendering.py
+new file mode 100644
+index 0000000..98ac20f
+--- /dev/null
++++ b/tests/forge_render/test_tile_rendering.py
+@@ -0,0 +1,236 @@
++"""Distributed forge rendering — correctness and the three failure modes.
++
++House style: prove the refusals, not just the happy path. The dangerous, silent
++outcomes here are a seam (a tile rendered against the wrong coordinates or a
++skewed engine) and a straggler that quietly makes distribution slower than doing
++the work locally. Each has a test that would fail loudly if the guard were
++removed.
++"""
++
++from __future__ import annotations
++
++import pytest
++
++from services.forge_render.engine import (
++    ENGINE_VERSION,
++    EngineVersionMismatch,
++    Recipe,
++    Surface,
++    composite,
++    render_full,
++    render_tile,
++    to_png,
++)
++from services.forge_render.farm import (
++    RenderJob,
++    Worker,
++    WorkStealingScheduler,
++    capability_weighted_tiles,
++    estimate_cost,
++    plan_render,
++    split_tiles,
++    steal_schedule,
++)
++
++W, H = 64, 48
++QUALITY = 40
++RECIPE = Recipe.from_code("SF1.0.6.42.285.60.0.42")
++GYROID = Recipe.from_code("SF1.3.5.30.312.90.1.38")
++
++
++def _bytes(surf: Surface) -> bytes:
++    return bytes(surf.data)
++
++
++# ----------------------------------------------------------------- seamless
++
++
++def test_tiles_composite_byte_identically_to_the_whole_frame():
++    """The core claim: every pixel is computed from full-frame coordinates, so
++    a tiled render is the same image as a single render — no seam."""
++    full = render_full(RECIPE, W, H, quality=QUALITY)
++    job = RenderJob(recipe=RECIPE, full_w=W, full_h=H, quality=QUALITY)
++    frame, results = WorkStealingScheduler(job).render(
++        split_tiles(W, H, 3, 2), [Worker("desk"), Worker("phone", speed=0.2)]
++    )
++    assert len(results) == 6
++    assert _bytes(frame) == _bytes(full)
++
++
++def test_tile_offset_matters_a_tile_is_not_its_own_little_image():
++    """A tile rendered as if it were the whole frame would not match. This
++    guards the full_w/full_h coordinate discipline that prevents seams."""
++    full = render_full(RECIPE, W, H, quality=QUALITY)
++    rect = (W // 2, 0, W, H // 2)
++    correct = render_tile(RECIPE, W, H, rect, quality=QUALITY)
++    # Same pixels as the whole frame in that rect.
++    for ay in range(rect[1], rect[3]):
++        for ax in range(rect[0], rect[2]):
++            assert correct.px(ax, ay) == full.px(ax, ay)
++
++
++# --------------------------------------------------- cross-boundary effects
++
++
++def test_bloom_needs_an_overlap_margin_or_it_seams():
++    """A screen-space effect reads neighbours. Without an overlap margin the
++    tile boundaries differ from the whole frame; with overlap>=radius they are
++    identical. This is the classic distributed-rendering seam and its fix."""
++    r = 2
++    full = render_full(GYROID, W, H, quality=QUALITY, bloom_radius=r, bloom_strength=0.6)
++    tiles = split_tiles(W, H, 3, 2)
++
++    def build(overlap):
++        job = RenderJob(
++            recipe=GYROID, full_w=W, full_h=H, quality=QUALITY,
++            overlap=overlap, bloom_radius=r, bloom_strength=0.6,
++        )
++        frame, _ = WorkStealingScheduler(job).render(tiles, [Worker("a"), Worker("b")])
++        return frame
++
++    assert _bytes(build(0)) != _bytes(full), "no-overlap bloom should seam"
++    assert _bytes(build(r)) == _bytes(full), "overlap>=radius must reproduce the whole frame"
++
++
++# ----------------------------------------------------- version-skew refusal
++
++
++def test_a_node_refuses_a_job_pinned_to_a_different_engine():
++    with pytest.raises(EngineVersionMismatch, match="pinned engine"):
++        render_tile(RECIPE, W, H, (0, 0, 10, 10), engine_version="forge-cpu-999")
++
++
++def test_scheduler_fails_closed_when_no_node_matches_the_engine():
++    job = RenderJob(recipe=RECIPE, full_w=W, full_h=H, quality=QUALITY)
++    stale = [Worker("old-1", engine_version="forge-cpu-0"), Worker("old-2", engine_version="forge-cpu-0")]
++    with pytest.raises(EngineVersionMismatch, match="no node"):
++        WorkStealingScheduler(job).render(split_tiles(W, H, 2, 2), stale)
++
++
++def test_mismatched_nodes_are_excluded_not_silently_used():
++    job = RenderJob(recipe=RECIPE, full_w=W, full_h=H, quality=QUALITY)
++    workers = [Worker("good"), Worker("stale", engine_version="forge-cpu-0")]
++    eligible = WorkStealingScheduler(job).eligible(workers)
++    assert [w.node_id for w in eligible] == ["good"]
++
++
++# ------------------------------------------------------------ work-stealing
++
++
++def test_work_stealing_gives_the_fast_node_more_tiles_and_covers_each_once():
++    tiles = split_tiles(W, H, 4, 4)
++    assign, makespan = steal_schedule(tiles, [Worker("fast", speed=4.0), Worker("slow", speed=0.5)])
++    # every tile assigned exactly once
++    all_idx = sorted(i for lst in assign.values() for i in lst)
++    assert all_idx == list(range(len(tiles)))
++    # the fast node pulled more than the straggler
++    assert len(assign["fast"]) > len(assign["slow"])
++    assert makespan > 0
++
++
++def test_a_straggler_does_not_block_the_others():
++    """One very slow node must hold at most a small share; the rest drain the
++    queue. Compare makespan to a hypothetical world where the straggler got an
++    equal split."""
++    tiles = split_tiles(W, H, 4, 4)
++    workers = [Worker("desk", speed=8.0), Worker("phone", speed=0.1)]
++    assign, makespan = steal_schedule(tiles, workers)
++    # equal-split makespan: phone renders half the tiles at 0.1 -> huge
++    half_area = sum(
++        (t[2] - t[0]) * (t[3] - t[1]) for t in tiles[len(tiles) // 2:]
++    )
++    equal_split_makespan = half_area / 0.1
++    assert makespan < equal_split_makespan
++    assert len(assign["phone"]) < len(assign["desk"])
++
++
++def test_the_shared_queue_is_thread_safe():
++    """Real threads draining one queue must still render each tile exactly once."""
++    job = RenderJob(recipe=RECIPE, full_w=W, full_h=H, quality=QUALITY)
++    full = render_full(RECIPE, W, H, quality=QUALITY)
++    tiles = split_tiles(W, H, 4, 2)
++    frame, results = WorkStealingScheduler(job).render(
++        tiles, [Worker("a"), Worker("b"), Worker("c")], concurrent=True
++    )
++    assert len(results) == len(tiles)
++    assert _bytes(frame) == _bytes(full)
++
++
++# ------------------------------------------------------------- compositing
++
++
++def test_composite_refuses_a_gap():
++    tiles = split_tiles(W, H, 2, 2)
++    surfs = [render_tile(RECIPE, W, H, t, quality=QUALITY) for t in tiles[:-1]]  # drop one
++    with pytest.raises(ValueError, match="not fully covered"):
++        composite(surfs, W, H)
++
++
++def test_composite_refuses_an_overlap():
++    a = render_tile(RECIPE, W, H, (0, 0, W, H), quality=QUALITY)
++    b = render_tile(RECIPE, W, H, (0, 0, 10, 10), quality=QUALITY)
++    with pytest.raises(ValueError, match="rendered twice"):
++        composite([a, b], W, H)
++
++
++# --------------------------------------------------------------- adaptive
++
++
++def test_cheap_scene_stays_local_and_heavy_scene_distributes():
++    workers = [Worker("a"), Worker("b"), Worker("c")]
++    cheap = plan_render(
++        RenderJob(RECIPE, 48, 32, quality=32), workers, local_rate=200000, mesh_overhead_seconds=0.4
++    )
++    heavy = plan_render(
++        RenderJob(GYROID, 2048, 2048, quality=128), workers, local_rate=200000, mesh_overhead_seconds=0.4
++    )
++    assert cheap.distribute is False
++    assert heavy.distribute is True
++    assert heavy.distributed_seconds < heavy.local_seconds
++
++
++def test_a_single_node_never_distributes():
++    plan = plan_render(
++        RenderJob(GYROID, 4096, 4096, quality=128), [Worker("only")], local_rate=100000, mesh_overhead_seconds=0.1
++    )
++    assert plan.distribute is False
++    assert "one eligible node" in plan.reason
++
++
++def test_estimate_scales_with_pixels_and_scene_weight():
++    small = estimate_cost(RECIPE, 100, 100, quality=64)
++    big = estimate_cost(RECIPE, 200, 200, quality=64)
++    assert big == pytest.approx(small * 4)
++    # the gyroid is weighted heavier than the boolean sculpture
++    assert estimate_cost(GYROID, 100, 100) > estimate_cost(RECIPE, 100, 100)
++
++
++# ------------------------------------------------- real output, not mock
++
++
++def test_output_is_a_real_png_of_a_real_scene():
++    """The composited frame is a genuine render: a valid PNG with both dark
++    background and lit surface — not a flat fill or a fabricated placeholder."""
++    full = render_full(RECIPE, W, H, quality=QUALITY)
++    png = to_png(full)
++    assert png[:8] == b"\x89PNG\r\n\x1a\n"
++    assert b"IEND" in png
++    lo, hi = min(full.data), max(full.data)
++    assert lo < 30 and hi > 180, "image has no tonal range — would be a flat/mock fill"
++    distinct = len(set(bytes(full.data[i:i + 3]) for i in range(0, len(full.data), 3)))
++    assert distinct > 50, "too few distinct colours to be a real render"
++
++
++def test_capability_weighted_tiling_produces_surplus_tiles_to_steal():
++    tiles = capability_weighted_tiles(W, H, [Worker("a"), Worker("b")], per_worker=4)
++    # more tiles than nodes, so a work-stealing pool always has surplus.
++    assert len(tiles) > 2
++    # they still cover the frame exactly (composite would accept them).
++    from services.forge_render.engine import render_tile as rt
++    surfs = [rt(RECIPE, W, H, t, quality=20) for t in tiles]
++    composite(surfs, W, H)  # raises if not an exact cover
++
++
++def test_engine_version_is_pinned_and_visible():
++    assert ENGINE_VERSION == "forge-cpu-1"
++    assert RenderJob(RECIPE, W, H).engine_version == ENGINE_VERSION
 -- 
 2.39.5
 

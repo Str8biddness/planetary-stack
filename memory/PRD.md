@@ -38,6 +38,11 @@ Deliverable exported as `/app/synthesus_phase3_and_forge.patch` (commit on branc
 access or apply the patch and open the PR).
 
 ## Backlog / not done
+- **Distributed forge rendering** (`services/forge_render/`): pinned CPU engine,
+  work-stealing tiler, seamless composite, bloom overlap margin, adaptive
+  local/distribute, real 3-number benchmark (crossover ~39ms/3 nodes here).
+  17 tests. NOT wired into desktop UI (needs live nodes); mesh round-trip is an
+  in-process lower bound.
 - **Phase 2 — desktop front end** (login screen, AI-chat centrepiece, terminal
   restyle, empty states, bring Vitals/Config onto the design system). LARGE;
   deferred. Owner listed this second after Phase 3.
