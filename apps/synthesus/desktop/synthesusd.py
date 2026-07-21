@@ -51,6 +51,13 @@ _SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9_.-]{1,96}$")
 _MAX_JOB_BUNDLE_BASE64_CHARS = 12 * 1024 * 1024
 _LOOPBACK_BIND_HOSTS = {"127.0.0.1", "localhost", "::1"}
 _KNOWN_DEFAULT_API_KEY = "dev-key-change-me"
+from device_policy import (  # noqa: E402
+    ALL_CAPABILITIES,
+    ROLES,
+    DevicePolicyError,
+    DevicePolicyStore,
+)
+
 log = logging.getLogger("synthesusd")
 
 
@@ -356,12 +363,39 @@ def _build_job_pipeline(settings: ControllerSettings) -> Any:
         return None
 
 
+DEVICE_POLICY_PATH = "~/.synthesus/device-policy.json"
+
+
+def _worker_node_id() -> str | None:
+    """Node id of the configured worker, or None when none is configured."""
+    try:
+        from services.remote_worker_config import load_remote_worker_config
+
+        config = load_remote_worker_config(os.environ)
+    except Exception:
+        return None
+    return None if config is None else config.target.node_id
+
+
+def _evidence_status(job_pipeline: Any) -> str:
+    """Provenance state of the most recent execution on this pipeline.
+
+    Returns "unavailable" rather than guessing when the backend cannot report
+    one — an unknown provenance is never reported as a verified one.
+    """
+    backend = getattr(job_pipeline, "_backend", None)
+    status = getattr(backend, "last_evidence_status", None)
+    return status if isinstance(status, str) and status else "unavailable"
+
+
 def create_app(
     settings: ControllerSettings,
     *,
     runtime_transport: httpx.AsyncBaseTransport | None = None,
     terminal_transport: httpx.AsyncBaseTransport | None = None,
     job_pipeline: Any = None,
+    device_policy: Any = None,
+    worker_node_id: str | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -371,6 +405,11 @@ def create_app(
         finally:
             watchdog.cancel()
             await asyncio.gather(watchdog, return_exceptions=True)
+
+    if device_policy is None:
+        device_policy = DevicePolicyStore(DEVICE_POLICY_PATH)
+    if worker_node_id is None:
+        worker_node_id = _worker_node_id()
 
     app = FastAPI(title="synthesusd", version="0.1.0", lifespan=lifespan)
     app.add_middleware(
@@ -478,6 +517,19 @@ def create_app(
             bundle = base64.b64decode(encoded, validate=True)
         except (binascii.Error, ValueError):
             return JSONResponse(status_code=400, content={"error": "invalid_request"})
+        # Permission gate: this desktop will not dispatch work to a device the
+        # owner has not explicitly allowed to run it. Default-deny.
+        if worker_node_id is None or not await asyncio.to_thread(
+            device_policy.is_allowed, worker_node_id, "run_inference"
+        ):
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "error": "device_not_permitted",
+                    "capability": "run_inference",
+                    "device_id": worker_node_id,
+                },
+            )
         try:
             record = await asyncio.to_thread(
                 job_pipeline.submit,
@@ -505,11 +557,37 @@ def create_app(
             return JSONResponse(status_code=401, content={"error": "unauthorized"})
         if job_pipeline is None:
             return JSONResponse(status_code=503, content={"error": "jobs_unavailable"})
+        if worker_node_id is None or not await asyncio.to_thread(
+            device_policy.is_allowed, worker_node_id, "return_results"
+        ):
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "error": "device_not_permitted",
+                    "capability": "return_results",
+                    "device_id": worker_node_id,
+                },
+            )
+        # Provenance is always evaluated; the policy decides whether an
+        # unverified result is refused or merely flagged. Either way the state
+        # travels with the bytes so the UI can badge it honestly.
+        status = _evidence_status(job_pipeline)
+        if status != "verified" and await asyncio.to_thread(
+            device_policy.require_verified_evidence
+        ):
+            return JSONResponse(
+                status_code=409,
+                content={"error": "evidence_not_verified", "evidence_status": status},
+            )
         loaded = await asyncio.to_thread(job_pipeline.result, job_id, output_sha256)
         if loaded is None:
             return JSONResponse(status_code=404, content={"error": "result_not_found"})
         payload, media_type = loaded
-        return Response(content=payload, media_type=media_type)
+        return Response(
+            content=payload,
+            media_type=media_type,
+            headers={"X-Synthesus-Evidence-Status": status},
+        )
 
     @app.post("/api/jobs/{job_id}/cancel")
     async def cancel_job(job_id: str, request: Request):
@@ -664,6 +742,110 @@ def create_app(
                 await websocket.close(code=1011, reason="terminal proxy failure")
             except Exception:
                 pass
+
+
+    # ---------------------------------------------------------------- settings
+
+    @app.get("/api/settings")
+    async def get_settings(request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        try:
+            policy = await asyncio.to_thread(device_policy.load)
+        except DevicePolicyError as exc:
+            return JSONResponse(
+                status_code=500, content={"error": "policy_unreadable", "detail": str(exc)}
+            )
+        return {
+            "require_verified_evidence": policy["require_verified_evidence"],
+            "worker_node_id": worker_node_id,
+            "capabilities": list(ALL_CAPABILITIES),
+            "roles": list(ROLES),
+        }
+
+    @app.put("/api/settings/evidence")
+    async def set_evidence_policy(request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+        enabled = body.get("enabled") if isinstance(body, dict) else None
+        if not isinstance(enabled, bool):
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+        try:
+            policy = await asyncio.to_thread(
+                device_policy.set_require_verified_evidence, enabled
+            )
+        except DevicePolicyError as exc:
+            return JSONResponse(status_code=400, content={"error": str(exc)})
+        return {"require_verified_evidence": policy["require_verified_evidence"]}
+
+    # ----------------------------------------------------------------- devices
+
+    @app.get("/api/devices")
+    async def list_devices(request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        try:
+            rows = await asyncio.to_thread(device_policy.devices)
+        except DevicePolicyError as exc:
+            return JSONResponse(
+                status_code=500, content={"error": "policy_unreadable", "detail": str(exc)}
+            )
+        return {"devices": rows}
+
+    @app.post("/api/devices")
+    async def add_device(request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+        if not isinstance(body, dict):
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+        try:
+            device = await asyncio.to_thread(
+                lambda: device_policy.add_device(
+                    device_id=body.get("device_id"),
+                    display_name=body.get("display_name"),
+                    role=body.get("role"),
+                )
+            )
+        except DevicePolicyError as exc:
+            return JSONResponse(status_code=400, content={"error": str(exc)})
+        return device
+
+    @app.put("/api/devices/{device_id}/capabilities")
+    async def set_device_capabilities(device_id: str, request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+        capabilities = body.get("capabilities") if isinstance(body, dict) else None
+        if not isinstance(capabilities, dict):
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+        try:
+            device = await asyncio.to_thread(
+                device_policy.set_capabilities, device_id, capabilities
+            )
+        except DevicePolicyError as exc:
+            return JSONResponse(status_code=400, content={"error": str(exc)})
+        return device
+
+    @app.delete("/api/devices/{device_id}")
+    async def delete_device(device_id: str, request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        try:
+            await asyncio.to_thread(device_policy.remove_device, device_id)
+        except DevicePolicyError as exc:
+            return JSONResponse(status_code=404, content={"error": str(exc)})
+        return {"removed": device_id}
 
     return app
 

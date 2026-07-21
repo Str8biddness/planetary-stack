@@ -69,11 +69,38 @@ class _FakeResultPipeline:
         return None
 
 
+def _permissive_policy(tmp_path, node_id="node:test:worker"):
+    """Policy store granting the test worker both peer capabilities.
+
+    Job submission and result return are default-deny, so a test that wants to
+    exercise the happy path must grant permission explicitly — the same as a
+    real owner would.
+    """
+    from device_policy import DevicePolicyStore
+
+    store = DevicePolicyStore(tmp_path / "policy" / "device-policy.json")
+    store.add_device(device_id=node_id, display_name="Test worker", role="peer")
+    store.set_capabilities(
+        node_id, {"run_inference": True, "return_results": True}
+    )
+    # These tests exercise job/result plumbing, not provenance. Evidence
+    # enforcement is ON by default and would refuse a stub pipeline that
+    # reports no provenance at all; that behaviour has its own tests in
+    # test_device_policy_endpoints.py.
+    store.set_require_verified_evidence(False)
+    return store
+
+
 def test_result_endpoint_returns_exact_bytes_missing_and_unauthorized(tmp_path):
     terminal_socket = tmp_path / "terminal.sock"
     terminal_socket.touch()
     pipeline = _FakeResultPipeline()
-    app = synthesusd.create_app(_settings(terminal_socket), job_pipeline=pipeline)
+    app = synthesusd.create_app(
+        _settings(terminal_socket),
+        job_pipeline=pipeline,
+        device_policy=_permissive_policy(tmp_path),
+        worker_node_id="node:test:worker",
+    )
 
     async def exercise():
         async with httpx.AsyncClient(

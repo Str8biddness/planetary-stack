@@ -1494,3 +1494,37 @@ marks the start; each landed piece gets its own honest entry.
   (step 3); negative cases (wrong key, tampered bytes) proven by UNIT TEST only,
   not on hardware; browser HTTP layer not driven in the physical run.
 - NO FINISH_CHECKLIST box checked.
+### sequence step 2 — per-device permissions + settings backend
+- Owner direction: per-device rows with capability toggles inside (phone-style).
+- apps/synthesus/desktop/device_policy.py: owner-only (0600) JSON policy with
+  atomic writes. DEFAULT-DENY everywhere — an absent or unreadable policy file
+  grants nothing, and an unreadable policy still ENFORCES evidence (fails safe
+  in both directions).
+- Two device roles, and the distinction is load-bearing: `peer` (enrolled mesh
+  node; capabilities run_inference, return_results) vs `source` (camera / TV /
+  sensor; capability provide_input ONLY). set_capabilities REFUSES to grant a
+  source an execution or result capability — the camera boundary is enforced in
+  the store, not in the UI, so hand-editing the file cannot buy it either
+  (tested). This is the trust-zone finding made real: contracts still admit only
+  trust_zone=personal_cell, so there is no tier below peer; sources therefore
+  must never become peers.
+- Capabilities are named for what they let a device do and each has a real
+  enforcement point. Adding one without an enforcement point would be a lie told
+  in a settings screen.
+- synthesusd: POST /api/jobs now requires run_inference on the configured
+  worker; GET results requires return_results AND consults the evidence policy.
+  Enforcement ON -> unverified result refused 409 with the reason. Enforcement
+  OFF -> served 200 but ALWAYS badged via X-Synthesus-Evidence-Status, so
+  turning it off never makes the difference invisible. Unknown provenance
+  reports "unavailable", never "verified".
+- New API: GET /api/settings, PUT /api/settings/evidence, GET/POST /api/devices,
+  PUT /api/devices/{id}/capabilities, DELETE /api/devices/{id}. All authed.
+- Tests: 14 store + 10 endpoint. Three pre-existing desktop tests started
+  failing when default-deny landed — CORRECT behaviour; updated to grant
+  permission explicitly and opt out of enforcement, with a comment saying why.
+  Desktop suite 30 -> 40 passed.
+- GAPS: no UI yet (step 3) — these are endpoints only. Device rows are manual;
+  nothing auto-populates them from the enrollment registry. NOT run against a
+  physical worker (the pipeline used in endpoint tests is a stub; the real
+  provenance path was physically proven separately on 2026-07-21).
+- NO FINISH_CHECKLIST box checked.
