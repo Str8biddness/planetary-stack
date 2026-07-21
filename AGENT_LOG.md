@@ -2400,3 +2400,33 @@ NEXT PIECES, in order
 - No token counting — the conversation bound is CHARACTERS of serialised JSON,
   which is a proxy for tokens, not a measurement of them.
 - NO FINISH_CHECKLIST box checked.
+### BRIEFING ERROR (mine) + tests/characters name collision
+- I briefed BOTH subagents to branch from `main`, then described the contents of
+  my own UNMERGED branch (PR #47) as if they were on main: design-system.css,
+  host_metrics.py, /api/system/metrics, the purple palette, the Overview
+  surface, the ps-rail, assets/synthesus-mark-*.png. None of it was on main.
+  Verified after the fact with `git cat-file -e origin/main:<path>` — all ABSENT
+  on main, PRESENT on feat/dashboard-shell.
+- The PWA agent's report was CORRECT ON EVERY POINT. It built against the actual
+  tree, refused to restyle the product to match a brief it could not verify, and
+  documented all five divergences. That is the right behaviour when handed a
+  wrong spec, and the error was mine, not its.
+- CONSEQUENCE: PR #50 (mobile PWA) targets the PRE-Overview desktop — breakpoints
+  820/380 against the old dock-and-windows shell, icons generated from
+  synthesus-icon.png rather than the mark set, and no design-system tokens. It
+  needs rebasing onto merged main before it is useful. NOT merged.
+- Merge order run: #47 (foundation) -> #48 (storage zones) -> #49 (agent
+  harness). #48 and #49 both conflicted on AGENT_LOG.md; resolved by KEEPING
+  BOTH SIDES of every conflict — a log entry is never dropped to resolve a merge.
+- NAME COLLISION FOUND WHILE MERGING: the agent added tests/characters/__init__.py,
+  correctly following the convention (tests/unisync, tests/vsource,
+  tests/private_mesh all have one). But `tests/characters` SHADOWS the runtime
+  package `characters` (apps/synthesus/runtime/packages/characters) as soon as it
+  becomes a package — `from characters.archive import ...` then resolves to the
+  test package. Two test modules failed collection.
+  FIXED by renaming to tests/character_system and keeping the __init__.py, with
+  the reason recorded in that file's docstring. Deleting the __init__.py would
+  have left an unexplained inconsistency for the next person to trip over.
+- Full suite after the rename: 475 passed, 1 skipped (the skip is the opt-in
+  live-Ollama integration test, which skips when /api/tags does not answer).
+- NO FINISH_CHECKLIST box checked.
