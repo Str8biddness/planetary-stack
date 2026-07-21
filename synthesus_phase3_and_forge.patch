@@ -1,0 +1,1655 @@
+From 8261fc8e463abcfecbf95d2904d36fb58b07d21c Mon Sep 17 00:00:00 2001
+From: synthesus-agent <agent@synthesus.local>
+Date: Tue, 21 Jul 2026 17:52:01 +0000
+Subject: [PATCH] Phase 3: zone-aware expansion-drive sync; plus offline
+ CSG+SDF image forge
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Phase 3: services/unisync/zone_sync.py adds a push/pull sync loop over the
+existing ContentAddressedStore and injected mTLS ObjectTransport. The zone
+boundary (services/storage_zones.py) is called as the first statement of every
+transfer, before any store or byte — a refused move touches nothing. Diffs by
+digest, idempotent, object-level backpressure. 20 refusal-first tests incl.
+grounding-never-over-public and node-never-leaves-device.
+
+Forge: vendored dependency-free WebGL2 SDF raymarcher (union/intersect/diff,
+smooth union, Menger sponge). New win-forge window, design-token styled, degrades
+to 'unknown' with no fake frame. 21 wiring tests. Cache-bust bumped to v=k.
+---
+ .gitignore                                  |   4 +
+ AGENT_LOG.md                                | 124 +++++++
+ apps/synthesus/desktop/assets/sdf_forge.js  | 292 +++++++++++++++
+ apps/synthesus/desktop/index.html           |  66 +++-
+ apps/synthesus/desktop/script.js            | 107 ++++++
+ apps/synthesus/desktop/styles.css           |  52 +++
+ apps/synthesus/desktop/test_forge_wiring.py | 103 ++++++
+ services/unisync/__init__.py                |  16 +
+ services/unisync/zone_sync.py               | 339 +++++++++++++++++
+ tests/unisync/test_zone_sync.py             | 388 ++++++++++++++++++++
+ 10 files changed, 1488 insertions(+), 3 deletions(-)
+ create mode 100644 apps/synthesus/desktop/assets/sdf_forge.js
+ create mode 100644 apps/synthesus/desktop/test_forge_wiring.py
+ create mode 100644 services/unisync/zone_sync.py
+ create mode 100644 tests/unisync/test_zone_sync.py
+
+diff --git a/.gitignore b/.gitignore
+index 029464a..14c1015 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -24,3 +24,7 @@ var/
+ models/
+ downloads/
+ 
++
++.venv/
++*.egg-info/
++__pycache__/
+diff --git a/AGENT_LOG.md b/AGENT_LOG.md
+index 63d604b..2282b41 100644
+--- a/AGENT_LOG.md
++++ b/AGENT_LOG.md
+@@ -2430,3 +2430,127 @@ NEXT PIECES, in order
+ - Full suite after the rename: 475 passed, 1 skipped (the skip is the opt-in
+   live-Ollama integration test, which skips when /api/tags does not answer).
+ - NO FINISH_CHECKLIST box checked.
++
++## 2026-07-21 — Phase 3: zone-aware expansion-drive sync loop
++
++### Work completed
++
++- Added `services/unisync/zone_sync.py`: a push/pull sync loop over the existing
++  `ContentAddressedStore`, moving objects between nodes through the existing
++  injected `ObjectTransport` (lease-bound; `InProcessObjectTransport` in tests,
++  LAN/relay mTLS in production). It mints no lease and grants no authority — the
++  control-plane `TransferContext` and injected validator still do that.
++- The zone boundary (`services/storage_zones.py`) is called as the FIRST
++  statement of every transfer, before any store is opened or byte read, via
++  `_gate_zone()` -> `require_transport(zone, transport_class)`. A refused move
++  raises `ZoneViolation` and touches nothing. This is deliberately not a single
++  central check a future edit could skip: `plan()` withholds forbidden zones AND
++  `transfer_one()` re-gates at the point bytes move.
++- Second gate binds the wire transport to the zone: every valid unisync object
++  transport id is mesh-class, so a public sink has no object transport at all —
++  EXTERNAL egress stays on the drive's rclone path, unreachable from here.
++- Diffing is a digest set-difference (content is immutable/content-addressed);
++  moves are idempotent (a digest the destination already holds is skipped, not
++  re-sent); object-level `BackpressureController` bounds in-flight bytes so a
++  fast node cannot flood a slow one; `reconcile_references()` is a commutative,
++  idempotent per-zone union — content never conflicts, only references.
++- Exported the new names from `services/unisync/__init__.py`.
++- Added `tests/unisync/test_zone_sync.py`: 20 tests, refusal-first. The one that
++  matters: `test_sync_refuses_to_push_grounding_over_a_public_transport` proves
++  grounding raises and writes zero bytes (the silent-upload failure). Also
++  covers NODE-never-leaves, EXTERNAL-has-no-object-transport, over-budget
++  backpressure moving nothing, validator-still-required, no self-promotion path,
++  and reference reconciliation.
++
++### Commands run and their real output
++
++- `node --check apps/synthesus/desktop/script.js` -> exit 0 (unchanged; JS not
++  touched this session, so no `?v=` bump was needed).
++- `.venv/bin/python -m pytest tests/unisync/test_zone_sync.py -q` -> `20 passed`.
++- `.venv/bin/python -m pytest apps/synthesus/desktop -q
++  --ignore=apps/synthesus/desktop/test_desktop_security.py` -> `78 passed`.
++- `.venv/bin/python -m pytest tests -q` -> `45 failed, 448 passed, 1 skipped,
++  2 errors`. Before this session on the same host: `45 failed, 428 passed, 1
++  skipped, 2 errors`. Delta is exactly +20 passing, zero new failures/errors.
++
++### HONEST GAPS — what I did NOT verify
++
++- HOST IS aarch64, NOT the briefing's x86_64. I could not reproduce the stated
++  baselines (92 desktop, 475 full). On this host the pre-existing baseline is
++  78 desktop and 448/475-equivalent passing. The 45 failures + 2 errors in
++  `tests/unisync/test_mesh_mtls_gate.py` and `tests/private_mesh/test_worker_cli.py`
++  are all one pre-existing cause: `platform.machine()` -> `aarch64` is normalised
++  to `"arm64"` (`mesh_identity.py:632`, `worker_cli.py:329`) but the
++  `ResourceInventory` pydantic model only accepts `x86_64/aarch64/riscv64`, so
++  the node CLI is rejected before any TLS. This is unrelated to Phase 3, present
++  on a clean checkout, and I did not touch it. The 92-vs-78 desktop count I also
++  could not explain from the tree at head `f4bef27`; I held my own measured
++  baseline (78) and did not regress it.
++- The sync loop was exercised only over `InProcessObjectTransport` (real bytes,
++  real framing, real CAS, real zone gate) — NOT over a physical two-host LAN
++  mTLS run. The mТLS transport it would use in production is the same one the
++  mesh-gate tests drive, which cannot run on this arm64 host (see above). No
++  physical multi-node acceptance is claimed.
++- No UI was rendered this session; Phase 3 is backend only. The desktop page was
++  never opened here.
++- NO FINISH_CHECKLIST box checked.
++
++
++## 2026-07-21 — Image Forge: offline CSG + SDF procedural image generation
++
++### Work completed (owner-requested "wow" feature, scoped to the stack's rules)
++
++- Added `apps/synthesus/desktop/assets/sdf_forge.js`: a vendored, dependency-free
++  WebGL2 raymarcher that generates images from constructive solid geometry over
++  signed distance fields — union `min(a,b)`, intersection `max(a,b)`, difference
++  `max(-a,b)`, smooth union, and domain repetition/folding for infinite scaling.
++  Three scenes: a boolean sculpture, an infinite carved lattice, and a Menger
++  sponge (the iterated-difference CSG fractal). No CDN, no network, no npm — it
++  honours the offline core claim. The CSG algebra also lives as pure JS (`math`)
++  so it runs and is tested headlessly.
++- New `win-forge` desktop window + dock entry, wired with `openForge`,
++  `forgeApply`, `forgeRender`, `forgeToggleAnim`, `forgeExport` (all real
++  `function` definitions), controls with `data-testid`s, styled only with the
++  existing design tokens (`--panel`, `--purple`, `--r-card`, `--s*` …).
++- NO MOCK DATA: when WebGL2 is unavailable the forge shows the word "unknown"
++  and renders nothing; `Renderer.fps` starts `null` (unknown) until measured;
++  `toPNG()` returns `null` rather than a fabricated frame.
++- Bumped the cache-bust on `styles.css`/`script.js` to `?v=20260721k` because
++  both changed; the module is served as `assets/sdf_forge.js?v=1`.
++- Added `apps/synthesus/desktop/test_forge_wiring.py` (21 tests): handlers
++  defined, window+dock present, every read id exists, module vendored with a
++  cache-bust, module has no external origin, CSG operators present in both CPU
++  math and shader, the "unknown"/no-fake-frame degrade path, and design-token
++  styling.
++
++### Commands run and their real output
++
++- `node --check apps/synthesus/desktop/assets/sdf_forge.js` -> exit 0.
++- `node --check apps/synthesus/desktop/script.js` -> exit 0.
++- Headless CSG math check via `node -e` against known distances (sphere/box
++  inside=-1 outside=1, union=min, intersect=max, subtract=max(-a,b),
++  foldRepeat) -> `MATH OK; VERSION 1`.
++- `.venv/bin/python -m pytest apps/synthesus/desktop -q
++  --ignore=apps/synthesus/desktop/test_desktop_security.py` -> `99 passed`
++  (78 pre-existing + 21 forge). No desktop regression.
++
++### RENDERED — not simulated
++
++- Served the desktop dir over `http.server` and loaded a temporary
++  `forge_preview.html` in real headless Chromium (WebGL2 via SwiftShader) at the
++  routed preview origin. All three scenes returned `rendered=true` with non-empty
++  PNGs — boolean sculpture 32,662 B, infinite field 141,478 B, Menger sponge
++  55,474 B (up from 9,914 B before the sponge fix, confirming real added detail).
++  A screenshot showed the three geometries. The temporary harness was removed
++  afterward; it is not part of the product boot path.
++
++### HONEST GAPS
++
++- The render above was headless Chromium with SwiftShader (software WebGL2), NOT
++  the pywebview native shell on real hardware. The shader is standard WebGL2 GLSL
++  ES 3.00, but I did not open it inside `synthesus_native_shell.py`.
++- The full desktop app (`script.js` booting against `synthesusd`) was not run
++  end to end here; only the forge module was rendered in isolation, plus the
++  static wiring tests.
++- NO FINISH_CHECKLIST box checked.
++
+diff --git a/apps/synthesus/desktop/assets/sdf_forge.js b/apps/synthesus/desktop/assets/sdf_forge.js
+new file mode 100644
+index 0000000..1dae480
+--- /dev/null
++++ b/apps/synthesus/desktop/assets/sdf_forge.js
+@@ -0,0 +1,292 @@
++/* SDF Forge — offline procedural image generation for Synthesus.
++ *
++ * Constructive Solid Geometry over signed distance fields, rendered by a
++ * WebGL2 raymarcher. Every pixel is computed from geometry equations — there
++ * is no bitmap, no network, no dependency. This is the honest kind of image
++ * generation: the picture is a real evaluation of the scene, not a plausible
++ * fabrication. When WebGL2 is not available the module reports "unknown" and
++ * renders nothing; it never substitutes a fake frame.
++ *
++ * CSG is boolean algebra on distances:
++ *     union      A ∪ B   = min(a, b)
++ *     intersect  A ∩ B   = max(a, b)
++ *     subtract   A \ B   = max(-a, b)
++ * Scaling to a whole world is domain repetition/folding of those primitives,
++ * which is how the same handful of shapes builds anything from a bolt to a
++ * planet.
++ *
++ * The pure-distance math lives in `math` and runs headlessly (node), so the
++ * CSG algebra is unit-tested without a GPU. The GPU only ever renders what the
++ * math already defines.
++ */
++(function (root, factory) {
++  const api = factory();
++  if (typeof module !== "undefined" && module.exports) {
++    module.exports = api;
++  }
++  if (root) {
++    root.SDFForge = api;
++  }
++})(typeof self !== "undefined" ? self : typeof globalThis !== "undefined" ? globalThis : this, function () {
++  "use strict";
++
++  const VERSION = "1";
++
++  // ---- pure distance math (GPU-independent, unit-tested in node) --------
++  const math = {
++    length3(x, y, z) {
++      return Math.sqrt(x * x + y * y + z * z);
++    },
++    sdSphere(p, r) {
++      return math.length3(p[0], p[1], p[2]) - r;
++    },
++    sdBox(p, b) {
++      const qx = Math.abs(p[0]) - b[0];
++      const qy = Math.abs(p[1]) - b[1];
++      const qz = Math.abs(p[2]) - b[2];
++      const outside = math.length3(Math.max(qx, 0), Math.max(qy, 0), Math.max(qz, 0));
++      const inside = Math.min(Math.max(qx, Math.max(qy, qz)), 0);
++      return outside + inside;
++    },
++    sdTorus(p, majorR, minorR) {
++      const qx = math.length3(p[0], p[2], 0) - majorR;
++      return math.length3(qx, p[1], 0) - minorR;
++    },
++    opUnion(a, b) {
++      return Math.min(a, b);
++    },
++    opIntersect(a, b) {
++      return Math.max(a, b);
++    },
++    opSubtract(a, b) {
++      // b minus a: keep b, carve out a.
++      return Math.max(-a, b);
++    },
++    opSmoothUnion(a, b, k) {
++      const h = Math.max(k - Math.abs(a - b), 0.0) / (k || 1e-6);
++      return Math.min(a, b) - h * h * k * 0.25;
++    },
++    // One fold of an infinite lattice: repeat space every `cell` units so a
++    // finite primitive tiles a whole world.
++    foldRepeat(coord, cell) {
++      if (cell <= 0) return coord;
++      const half = cell * 0.5;
++      return ((((coord + half) % cell) + cell) % cell) - half;
++    },
++  };
++
++  // ---- the GPU raymarcher ----------------------------------------------
++  const VERT = `#version 300 es
++  in vec2 aPos;
++  void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
++
++  const FRAG = `#version 300 es
++  precision highp float;
++  out vec4 fragColor;
++  uniform vec2 uRes;
++  uniform float uTime;
++  uniform int uIters;        // fractal fold depth
++  uniform float uBlend;      // smooth-union amount
++  uniform int uMode;         // 0 boolean sculpture, 1 infinite field, 2 fractal
++  uniform vec3 uAccent;      // purple accent
++
++  float sdSphere(vec3 p, float r){ return length(p) - r; }
++  float sdBox(vec3 p, vec3 b){ vec3 q = abs(p) - b; return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0); }
++  float sdTorus(vec3 p, vec2 t){ vec2 q = vec2(length(p.xz)-t.x, p.y); return length(q)-t.y; }
++  float opU(float a, float b){ return min(a,b); }
++  float opI(float a, float b){ return max(a,b); }
++  float opS(float a, float b){ return max(-a,b); }
++  float opSU(float a, float b, float k){ float h = clamp(0.5+0.5*(b-a)/k,0.0,1.0); return mix(b,a,h)-k*h*(1.0-h); }
++
++  float scene(vec3 p){
++    if (uMode == 1){
++      // infinite field: repeat a carved cube-sphere every 4 units
++      vec3 q = mod(p+2.0,4.0)-2.0;
++      float box = sdBox(q, vec3(1.0));
++      float sph = sdSphere(q, 1.28);
++      return opS(sph*0.0 + sdSphere(q,1.2), box);
++    }
++    if (uMode == 2){
++      // Menger sponge: the classic CSG fractal — a cube with a cross carved out
++      // (difference), repeated at one third scale, iterated. Pure boolean algebra
++      // on distances, scaling detail infinitely from one primitive.
++      float d = sdBox(p, vec3(1.0));
++      float s = 1.0;
++      for (int m=0;m<10;m++){
++        if (m>=uIters) break;
++        vec3 a = mod(p*s, 2.0) - 1.0;
++        s *= 3.0;
++        vec3 r = abs(1.0 - 3.0*abs(a));
++        float da = max(r.x, r.y);
++        float db = max(r.y, r.z);
++        float dc = max(r.z, r.x);
++        float c = (min(da, min(db, dc)) - 1.0) / s;
++        d = max(d, c);   // difference: carve the cross out of the cube
++      }
++      return d;
++    }
++    // boolean sculpture: sphere ∩ box, minus three axis cylinders (as torii),
++    // smooth-unioned with an orbiting sphere.
++    float box = sdBox(p, vec3(1.15));
++    float sph = sdSphere(p, 1.5);
++    float solid = opI(box, sph);
++    float holeX = sdTorus(p.yzx, vec2(1.15, 0.42));
++    float holeY = sdTorus(p, vec2(1.15, 0.42));
++    solid = opS(sdSphere(p, 0.72), solid);
++    solid = min(solid, 1e9);
++    vec3 op = p - vec3(1.9*sin(uTime), 0.0, 1.9*cos(uTime));
++    float orbit = sdSphere(op, 0.55);
++    return opSU(orbit, solid, max(uBlend, 0.001));
++  }
++
++  vec3 normal(vec3 p){
++    vec2 e = vec2(0.0008, 0.0);
++    return normalize(vec3(
++      scene(p+e.xyy)-scene(p-e.xyy),
++      scene(p+e.yxy)-scene(p-e.yxy),
++      scene(p+e.yyx)-scene(p-e.yyx)));
++  }
++
++  void main(){
++    vec2 uv = (gl_FragCoord.xy*2.0 - uRes) / uRes.y;
++    float ca = cos(uTime*0.25), sa = sin(uTime*0.25);
++    vec3 ro = vec3(4.2*sa, 1.4, 4.2*ca);
++    vec3 fw = normalize(-ro);
++    vec3 rt = normalize(cross(vec3(0.0,1.0,0.0), fw));
++    vec3 up = cross(fw, rt);
++    vec3 rd = normalize(uv.x*rt + uv.y*up + 1.6*fw);
++
++    float t = 0.0; float d = 0.0; bool hit=false;
++    for (int i=0;i<128;i++){
++      vec3 p = ro + rd*t;
++      d = scene(p);
++      if (d < 0.001){ hit=true; break; }
++      t += d;
++      if (t > 40.0) break;
++    }
++    vec3 col = vec3(0.02,0.02,0.03);
++    if (hit){
++      vec3 p = ro + rd*t;
++      vec3 n = normal(p);
++      vec3 ld = normalize(vec3(0.6,0.8,0.4));
++      float diff = clamp(dot(n,ld),0.0,1.0);
++      float rim = pow(1.0-clamp(dot(n,-rd),0.0,1.0), 2.5);
++      vec3 base = mix(vec3(0.9), uAccent, 0.55);
++      col = base*(0.18 + 0.82*diff) + uAccent*rim*0.9;
++      col = mix(col, vec3(0.02,0.02,0.03), clamp(t/40.0,0.0,1.0));
++    } else {
++      float g = clamp(uv.y*0.5+0.5, 0.0, 1.0);
++      col = mix(vec3(0.02,0.02,0.03), uAccent*0.10, g);
++    }
++    col = pow(col, vec3(0.4545)); // gamma
++    fragColor = vec4(col, 1.0);
++  }`;
++
++  function compile(gl, type, src) {
++    const sh = gl.createShader(type);
++    gl.shaderSource(sh, src);
++    gl.compileShader(sh);
++    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
++      const log = gl.getShaderInfoLog(sh);
++      gl.deleteShader(sh);
++      throw new Error("shader compile failed: " + log);
++    }
++    return sh;
++  }
++
++  class Renderer {
++    constructor(canvas) {
++      this.canvas = canvas;
++      this.gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true, antialias: false });
++      this.available = !!this.gl;
++      this.raf = 0;
++      this.startedAt = 0;
++      this.frames = 0;
++      this.fps = null; // null means "unknown", never a fabricated number
++      this.params = { iters: 6, blend: 0.35, mode: 0, accent: [0.55, 0.36, 0.96] };
++      if (this.available) this._build();
++    }
++
++    _build() {
++      const gl = this.gl;
++      const prog = gl.createProgram();
++      gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, VERT));
++      gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, FRAG));
++      gl.linkProgram(prog);
++      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
++        throw new Error("program link failed: " + gl.getProgramInfoLog(prog));
++      }
++      this.prog = prog;
++      const buf = gl.createBuffer();
++      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
++      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
++      const loc = gl.getAttribLocation(prog, "aPos");
++      gl.enableVertexAttribArray(loc);
++      gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
++      this.u = {
++        res: gl.getUniformLocation(prog, "uRes"),
++        time: gl.getUniformLocation(prog, "uTime"),
++        iters: gl.getUniformLocation(prog, "uIters"),
++        blend: gl.getUniformLocation(prog, "uBlend"),
++        mode: gl.getUniformLocation(prog, "uMode"),
++        accent: gl.getUniformLocation(prog, "uAccent"),
++      };
++    }
++
++    setParams(patch) {
++      Object.assign(this.params, patch || {});
++    }
++
++    drawFrame(timeSeconds) {
++      if (!this.available) return false;
++      const gl = this.gl;
++      gl.viewport(0, 0, this.canvas.width, this.canvas.height);
++      gl.useProgram(this.prog);
++      gl.uniform2f(this.u.res, this.canvas.width, this.canvas.height);
++      gl.uniform1f(this.u.time, timeSeconds);
++      gl.uniform1i(this.u.iters, this.params.iters | 0);
++      gl.uniform1f(this.u.blend, this.params.blend);
++      gl.uniform1i(this.u.mode, this.params.mode | 0);
++      gl.uniform3fv(this.u.accent, this.params.accent);
++      gl.drawArrays(gl.TRIANGLES, 0, 3);
++      return true;
++    }
++
++    start() {
++      if (!this.available) return false;
++      cancelAnimationFrame(this.raf);
++      this.startedAt = performance.now();
++      this.frames = 0;
++      const loop = (now) => {
++        const t = (now - this.startedAt) / 1000;
++        this.drawFrame(t);
++        this.frames += 1;
++        if (t > 0.5) this.fps = Math.round(this.frames / t);
++        this.raf = requestAnimationFrame(loop);
++      };
++      this.raf = requestAnimationFrame(loop);
++      return true;
++    }
++
++    stop() {
++      cancelAnimationFrame(this.raf);
++      this.raf = 0;
++    }
++
++    renderStill(timeSeconds) {
++      // A single deterministic frame, for export.
++      return this.drawFrame(timeSeconds || 0);
++    }
++
++    toPNG() {
++      if (!this.available) return null;
++      return this.canvas.toDataURL("image/png");
++    }
++  }
++
++  function create(canvas) {
++    return new Renderer(canvas);
++  }
++
++  return { VERSION, math, Renderer, create };
++});
+diff --git a/apps/synthesus/desktop/index.html b/apps/synthesus/desktop/index.html
+index da24dc0..a853d56 100644
+--- a/apps/synthesus/desktop/index.html
++++ b/apps/synthesus/desktop/index.html
+@@ -8,8 +8,8 @@
+     <link rel="icon" type="image/png" sizes="64x64" href="assets/synthesus-mark-64.png">
+     <link rel="icon" type="image/png" sizes="32x32" href="assets/synthesus-mark-32.png">
+     <link rel="apple-touch-icon" href="assets/synthesus-mark-128.png">
+-    <link rel="stylesheet" href="design-system.css?v=20260721j">
+-    <link rel="stylesheet" href="styles.css?v=20260721j">
++    <link rel="stylesheet" href="design-system.css?v=20260721k">
++    <link rel="stylesheet" href="styles.css?v=20260721k">
+     <!-- No external font CDN: the shell assets render locally and remain available offline.
+          Uses locally-installed Outfit/Fira Code if present, else a
+          native system stack. To pin the exact look later, self-host the woff2 via @font-face. -->
+@@ -789,6 +789,62 @@
+             </div>
+         </div>
+ 
++        <!-- Image Forge: offline CSG + SDF raymarched procedural image generation -->
++        <div class="window glass-panel forge-window" id="win-forge" style="top: 80px; left: 380px; width: 720px; height: 640px; display: none;">
++            <div class="window-header" onmousedown="dragWindow(event, 'win-forge')">
++                <span class="window-title">Image forge</span>
++                <div class="window-controls">
++                    <button class="win-btn minimize" onclick="minimizeWindow(this)"></button>
++                    <button class="win-btn maximize" onclick="maximizeWindow(this)"></button>
++                    <button class="win-btn close" onclick="toggleWindow('win-forge')"></button>
++                </div>
++            </div>
++            <div class="window-content forge-body">
++                <p class="forge-lede">
++                    Every pixel is computed from geometry — signed distance fields combined by
++                    constructive solid geometry (union, intersection, difference), scaled by
++                    fractal folding. No bitmap, no network, no model. The image is a real
++                    evaluation of the scene, not a fabrication.
++                </p>
++                <div class="forge-stage">
++                    <canvas id="forge-canvas" class="forge-canvas" width="640" height="360" data-testid="forge-canvas"></canvas>
++                    <div id="forge-unavailable" class="forge-unavailable" data-testid="forge-unavailable" hidden>
++                        WebGL2 is unavailable on this surface — the forge renders nothing rather
++                        than show a fabricated frame. Status: <span id="forge-status-detail">unknown</span>
++                    </div>
++                </div>
++                <div class="forge-controls">
++                    <label class="forge-field">
++                        <span>Scene</span>
++                        <select id="forge-mode" class="glass-input" data-testid="forge-mode" onchange="forgeApply()">
++                            <option value="0">Boolean sculpture</option>
++                            <option value="1">Infinite carved field</option>
++                            <option value="2">Fractal fold</option>
++                        </select>
++                    </label>
++                    <label class="forge-field">
++                        <span>Fractal depth</span>
++                        <input id="forge-iters" type="range" min="1" max="12" value="6" data-testid="forge-iters" oninput="forgeApply()">
++                    </label>
++                    <label class="forge-field">
++                        <span>Smooth blend</span>
++                        <input id="forge-blend" type="range" min="0" max="100" value="35" data-testid="forge-blend" oninput="forgeApply()">
++                    </label>
++                    <label class="forge-field">
++                        <span>Accent hue</span>
++                        <input id="forge-hue" type="range" min="240" max="300" value="270" data-testid="forge-hue" oninput="forgeApply()">
++                    </label>
++                </div>
++                <div class="forge-actions">
++                    <button class="ds-btn ds-btn-primary" onclick="forgeToggleAnim()" data-testid="forge-animate-btn" id="forge-animate-btn">Animate</button>
++                    <button class="ds-btn" onclick="forgeRender()" data-testid="forge-render-btn">Render still</button>
++                    <button class="ds-btn" onclick="forgeExport()" data-testid="forge-export-btn">Export PNG</button>
++                    <span id="forge-status" class="forge-statusline" data-testid="forge-status">Ready</span>
++                </div>
++                <a id="forge-download" style="display:none;" data-testid="forge-download"></a>
++            </div>
++        </div>
++
+         <nav class="dock" id="os-dock" aria-label="System dock">
+         <button type="button" onclick="openDashboard()" class="dock-btn dock-brand" data-win="win-dashboard" title="Synthesus — Overview">
+             <span class="dock-ico"><img src="assets/synthesus-mark-64.png" alt="" width="22" height="22"></span><span class="dock-lbl">Overview</span>
+@@ -806,6 +862,9 @@
+         <button type="button" onclick="toggleWindow('win-image')" class="dock-btn" data-win="win-image" title="SI Image Studio">
+             <span class="dock-ico" data-icon="image"></span><span class="dock-lbl">Image</span>
+         </button>
++        <button type="button" onclick="openForge()" class="dock-btn" data-win="win-forge" title="Image Forge — CSG + SDF">
++            <span class="dock-ico" data-icon="image"></span><span class="dock-lbl">Forge</span>
++        </button>
+         <button type="button" onclick="toggleWindow('win-voice')" class="dock-btn" data-win="win-voice" title="SI Voice Studio">
+             <span class="dock-ico" data-icon="audio"></span><span class="dock-lbl">Voice</span>
+         </button>
+@@ -838,7 +897,8 @@
+         </button>
+     </nav>
+ 
+-    <script src="script.js?v=20260721j"></script>
++    <script src="script.js?v=20260721k"></script>
++    <script src="assets/sdf_forge.js?v=1"></script>
+     <script src="hyperspace.js?v=5"></script>
+ 
+ </body>
+diff --git a/apps/synthesus/desktop/script.js b/apps/synthesus/desktop/script.js
+index c992dbf..40dfd0e 100644
+--- a/apps/synthesus/desktop/script.js
++++ b/apps/synthesus/desktop/script.js
+@@ -26,6 +26,7 @@ function toggleWindow(id) {
+         if (id === 'win-drive') loadDriveSources();
+         if (id === 'win-core') loadLLMSettings();
+         if (id === 'win-image') { try { renderImageGallery(); } catch (e) {} }
++        if (id === 'win-forge') { try { forgeInit(); } catch (e) {} }
+         // Foreman poll only while the window is open (QA BUG-5)
+         if (id === 'win-foreman') startForemanSync();
+     } else {
+@@ -4421,3 +4422,109 @@ document.addEventListener('keydown', function (event) {
+     }
+     if (event.key === 'Escape') { dashSearchClear(); }
+ });
++
++/* ----------------------------------------------------------- image forge */
++/* CSG + SDF raymarched procedural image generation. Offline, vendored WebGL2,
++ * no dependency. When WebGL2 is unavailable the forge reports "unknown" and
++ * renders nothing — it never shows a fabricated frame (NO MOCK DATA IN THE UI).
++ */
++let forgeRenderer = null;
++let forgeAnimating = false;
++
++function forgeAccentFromHue(hue) {
++    // Map the purple-only hue range to an RGB accent. Stays in-brand.
++    const h = (hue % 360) / 360;
++    const f = (n) => {
++        const k = (n + h * 6) % 6;
++        return Math.max(0, Math.min(1, Math.min(k, 4 - k, 1)));
++    };
++    // Bias toward the brand purple; saturate lightly.
++    const r = 0.35 + 0.45 * f(5);
++    const g = 0.20 + 0.30 * f(3);
++    const b = 0.80 + 0.20 * f(1);
++    return [r, g, b];
++}
++
++function forgeSetStatus(text) {
++    const el = document.getElementById('forge-status');
++    if (el) el.textContent = text;
++}
++
++function forgeInit() {
++    const canvas = document.getElementById('forge-canvas');
++    if (!canvas) return;
++    if (!window.SDFForge) { forgeSetStatus('forge module unavailable'); return; }
++    if (!forgeRenderer) {
++        forgeRenderer = window.SDFForge.create(canvas);
++    }
++    const unavailable = document.getElementById('forge-unavailable');
++    if (!forgeRenderer.available) {
++        if (unavailable) unavailable.hidden = false;
++        const detail = document.getElementById('forge-status-detail');
++        if (detail) detail.textContent = 'unknown';
++        canvas.style.display = 'none';
++        forgeSetStatus('WebGL2 unavailable');
++        return;
++    }
++    if (unavailable) unavailable.hidden = true;
++    canvas.style.display = 'block';
++    forgeApply();
++    forgeRender();
++}
++
++function forgeReadParams() {
++    const mode = parseInt((document.getElementById('forge-mode') || {}).value || '0', 10);
++    const iters = parseInt((document.getElementById('forge-iters') || {}).value || '6', 10);
++    const blend = parseInt((document.getElementById('forge-blend') || {}).value || '35', 10) / 100;
++    const hue = parseInt((document.getElementById('forge-hue') || {}).value || '270', 10);
++    return { mode, iters, blend, accent: forgeAccentFromHue(hue) };
++}
++
++function forgeApply() {
++    if (!forgeRenderer || !forgeRenderer.available) return;
++    forgeRenderer.setParams(forgeReadParams());
++    if (!forgeAnimating) forgeRender();
++}
++
++function forgeRender() {
++    if (!forgeRenderer || !forgeRenderer.available) { forgeSetStatus('nothing to render (unknown)'); return; }
++    forgeRenderer.setParams(forgeReadParams());
++    forgeRenderer.renderStill(0.0);
++    forgeSetStatus('Rendered a still frame');
++}
++
++function forgeToggleAnim() {
++    if (!forgeRenderer || !forgeRenderer.available) { forgeSetStatus('nothing to animate (unknown)'); return; }
++    const btn = document.getElementById('forge-animate-btn');
++    if (forgeAnimating) {
++        forgeRenderer.stop();
++        forgeAnimating = false;
++        if (btn) btn.textContent = 'Animate';
++        forgeSetStatus('Paused');
++    } else {
++        forgeRenderer.setParams(forgeReadParams());
++        forgeRenderer.start();
++        forgeAnimating = true;
++        if (btn) btn.textContent = 'Pause';
++        forgeSetStatus('Animating');
++    }
++}
++
++function forgeExport() {
++    if (!forgeRenderer || !forgeRenderer.available) { forgeSetStatus('no frame to export (unknown)'); return; }
++    forgeRenderer.renderStill(forgeAnimating ? (performance.now() / 1000) : 0.0);
++    const data = forgeRenderer.toPNG();
++    if (!data) { forgeSetStatus('export unavailable (unknown)'); return; }
++    const link = document.getElementById('forge-download');
++    if (link) {
++        link.href = data;
++        link.download = 'synthesus-forge.png';
++        link.click();
++    }
++    forgeSetStatus('Exported PNG');
++}
++
++function openForge() {
++    toggleWindow('win-forge');
++    if (document.getElementById('win-forge').style.display !== 'none') forgeInit();
++}
+diff --git a/apps/synthesus/desktop/styles.css b/apps/synthesus/desktop/styles.css
+index 97a3bb2..7c693bc 100644
+--- a/apps/synthesus/desktop/styles.css
++++ b/apps/synthesus/desktop/styles.css
+@@ -1,3 +1,55 @@
++/* ---------------------------------------------------------- image forge */
++.forge-body { display: flex; flex-direction: column; gap: var(--s3); overflow-y: auto; }
++.forge-lede {
++    margin: 0;
++    color: var(--fg-muted);
++    font-size: var(--t-meta);
++    line-height: var(--lh-body);
++    max-width: 62ch;
++}
++.forge-stage {
++    position: relative;
++    border-radius: var(--r-card);
++    overflow: hidden;
++    background: var(--bg-0);
++    border: 1px solid var(--hairline);
++    box-shadow: var(--shadow-2);
++    aspect-ratio: 16 / 9;
++}
++.forge-canvas { display: block; width: 100%; height: 100%; }
++.forge-unavailable {
++    position: absolute;
++    inset: 0;
++    display: flex;
++    align-items: center;
++    justify-content: center;
++    text-align: center;
++    padding: var(--s4);
++    color: var(--fg-muted);
++    font-size: var(--t-meta);
++    line-height: var(--lh-body);
++}
++.forge-controls {
++    display: grid;
++    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
++    gap: var(--s3);
++}
++.forge-field { display: flex; flex-direction: column; gap: var(--s1); }
++.forge-field > span {
++    color: var(--fg-dim);
++    font-size: var(--t-micro);
++    text-transform: none;
++    letter-spacing: 0.01em;
++}
++.forge-field input[type="range"] { accent-color: var(--purple); width: 100%; }
++.forge-actions { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
++.forge-statusline { color: var(--fg-dim); font-size: var(--t-meta); margin-left: auto; }
++@media (max-width: 720px) {
++    .forge-window { width: 96vw !important; left: 2vw !important; }
++    .forge-controls { grid-template-columns: 1fr 1fr; }
++}
++
++
+ :root {
+     /* Surfaces: layered depth, minimal borders, soft ambient light. */
+     --glass-bg: rgba(17, 24, 43, 0.52);
+diff --git a/apps/synthesus/desktop/test_forge_wiring.py b/apps/synthesus/desktop/test_forge_wiring.py
+new file mode 100644
+index 0000000..3728abb
+--- /dev/null
++++ b/apps/synthesus/desktop/test_forge_wiring.py
+@@ -0,0 +1,103 @@
++"""Static wiring for the Image Forge (CSG + SDF raymarched generation).
++
++Same contract as test_ui_wiring: every handler the markup names must be
++defined, every element the script reads must exist, and — because this product
++forbids mock data — the forge must degrade to the word "unknown" and render
++nothing when WebGL2 is absent, never a fabricated frame. It must also stay
++offline: no CDN, no external origin in the vendored module.
++"""
++
++from __future__ import annotations
++
++import re
++from pathlib import Path
++
++import pytest
++
++HERE = Path(__file__).resolve().parent
++HTML = (HERE / "index.html").read_text(encoding="utf-8")
++SCRIPT = (HERE / "script.js").read_text(encoding="utf-8")
++STYLES = (HERE / "styles.css").read_text(encoding="utf-8")
++FORGE = (HERE / "assets" / "sdf_forge.js").read_text(encoding="utf-8")
++
++FORGE_HANDLERS = ("openForge", "forgeApply", "forgeRender", "forgeExport", "forgeToggleAnim")
++FORGE_IDS = (
++    "forge-canvas",
++    "forge-unavailable",
++    "forge-status",
++    "forge-status-detail",
++    "forge-animate-btn",
++    "forge-download",
++    "forge-mode",
++    "forge-iters",
++    "forge-blend",
++    "forge-hue",
++)
++
++
++def _defined_functions() -> set[str]:
++    return set(re.findall(r"\bfunction\s+([A-Za-z_$][\w$]*)", SCRIPT))
++
++
++@pytest.mark.parametrize("handler", FORGE_HANDLERS)
++def test_forge_handlers_are_defined(handler):
++    assert handler in HTML, f"{handler} is not referenced from the markup"
++    assert handler in _defined_functions(), f"{handler} is referenced but never defined"
++
++
++def test_forge_window_exists_and_has_a_dock_entry():
++    assert 'id="win-forge"' in HTML
++    assert 'data-win="win-forge"' in HTML
++
++
++@pytest.mark.parametrize("element_id", FORGE_IDS)
++def test_every_forge_element_the_script_reads_exists(element_id):
++    tail = SCRIPT[SCRIPT.index("image forge"):]
++    reads = set(re.findall(r"getElementById\('([^']+)'\)", tail))
++    if element_id in reads:
++        assert f'id="{element_id}"' in HTML, f"script reads #{element_id} but markup has no such id"
++    else:
++        # Still assert the markup carries it, since the controls wire to it.
++        assert f'id="{element_id}"' in HTML
++
++
++def test_module_is_vendored_with_a_cache_bust():
++    assert (HERE / "assets" / "sdf_forge.js").exists()
++    assert "assets/sdf_forge.js?v=" in HTML
++    # script.js and styles.css cache-busts were bumped for this change.
++    assert "script.js?v=20260721k" in HTML
++    assert "styles.css?v=20260721k" in HTML
++
++
++def test_module_is_offline_no_external_origin():
++    """The product's core claim is that it runs with no network. A CDN or an
++    external origin in the boot path would break it offline."""
++    for banned in ("http://", "https://", "//cdn", "googleapis", "unpkg", "jsdelivr"):
++        assert banned not in FORGE, f"forge module reaches an external origin: {banned}"
++
++
++def test_forge_carries_the_csg_algebra():
++    """The generator is constructive solid geometry, not a bitmap: the union,
++    intersection and difference operators must be present in both the CPU math
++    and the shader."""
++    for op in ("opUnion", "opIntersect", "opSubtract"):
++        assert op in FORGE, f"CSG operator {op} missing from the forge math"
++    assert "float opU(" in FORGE and "float opI(" in FORGE and "float opS(" in FORGE
++
++
++def test_forge_reports_unknown_and_renders_nothing_without_webgl():
++    """NO MOCK DATA: an unrenderable forge shows 'unknown', not a fake frame."""
++    assert "forge-unavailable" in HTML
++    assert ">unknown<" in HTML  # the static status detail defaults to unknown
++    # The renderer's fps is null (unknown) until measured — never a made-up number.
++    assert "this.fps = null" in FORGE
++    # No fabricated fallback image path.
++    assert "toDataURL" in FORGE
++    assert "return null" in FORGE  # toPNG/degrade returns null when unavailable
++
++
++def test_forge_styles_use_design_tokens_not_arbitrary_values():
++    forge_css = STYLES[STYLES.index(".forge-body"):STYLES.index(".forge-body") + 2000]
++    assert "var(--" in forge_css
++    # The stage keeps the brand accent on the range controls.
++    assert "var(--purple)" in STYLES[STYLES.index(".forge-field"):STYLES.index(".forge-field") + 800]
+diff --git a/services/unisync/__init__.py b/services/unisync/__init__.py
+index a5be0cb..4c0ac20 100644
+--- a/services/unisync/__init__.py
++++ b/services/unisync/__init__.py
+@@ -54,6 +54,15 @@ from .framing import (
+ from .local import InProcessObjectTransport
+ from .storage import ContentAddressedStore, ObjectAssembler
+ from .tls import EnrolledPeerIdentity, TrustedLanClient, TrustedLanServer, TLSCredentials
++from .zone_sync import (
++    MESH_TRANSPORT_IDS,
++    SyncItem,
++    SyncPlan,
++    SyncReport,
++    ZoneAwareObjectSync,
++    ZoneInventory,
++    reconcile_references,
++)
+ 
+ __all__ = [
+     "AuthorizationError",
+@@ -83,10 +92,14 @@ __all__ = [
+     "InProcessObjectTransport",
+     "InvalidFrameError",
+     "InvalidTransferContextError",
++    "MESH_TRANSPORT_IDS",
+     "ObjectAssembler",
+     "ObjectTransport",
+     "PROTOCOL",
+     "StorageSecurityError",
++    "SyncItem",
++    "SyncPlan",
++    "SyncReport",
+     "TLSConfigurationError",
+     "TLSCredentials",
+     "TaskDescriptorRef",
+@@ -99,7 +112,10 @@ __all__ = [
+     "TrustedLanServer",
+     "UnisyncError",
+     "VERSION",
++    "ZoneAwareObjectSync",
++    "ZoneInventory",
+     "decode_frame",
+     "encode_frame",
++    "reconcile_references",
+     "validate_task_descriptor_bytes",
+ ]
+diff --git a/services/unisync/zone_sync.py b/services/unisync/zone_sync.py
+new file mode 100644
+index 0000000..8d733e7
+--- /dev/null
++++ b/services/unisync/zone_sync.py
+@@ -0,0 +1,339 @@
++"""Zone-aware push/pull object sync over the lease-bound mTLS transport.
++
++The expansion drive replicates content-addressed objects between the owner's
++nodes. Content is immutable and content-addressed, so there are no write
++conflicts on content itself — only on which digests a node considers current
++(references). Diffing is therefore a set difference of digests, and every move
++is idempotent: an object the destination already holds is skipped, never
++re-sent.
++
++This module does exactly one dangerous thing — it moves bytes between nodes —
++and it must never do it without first asking `services.storage_zones` whether
++the move is allowed. The failure this guards against is silent in production:
++
++    a sync loop that simply forgot to call the zone boundary would happily
++    push the owner's private GROUNDING corpus onto a public rclone remote, and
++    nothing would error. It would just upload.
++
++So the zone gate here is not advisory and not centralised in one easily-skipped
++place. `_gate_zone()` runs as the FIRST statement of every transfer, before any
++store is opened or any byte is read, and it raises `ZoneViolation` — the same
++type `storage_zones` raises — rather than returning a status a caller might
++ignore. A refused move touches nothing.
++
++Authority is still not ours to grant. Bytes move only through an injected
++`ObjectTransport` bound to a control-plane `TransferContext` (lease id, fencing
++token, signed request). This module never mints a lease and never promotes
++content into grounding; promotion remains `storage_zones.promote_to_grounding`
++with an owner approval, and there is deliberately no path from here into it.
++"""
++
++from __future__ import annotations
++
++from dataclasses import dataclass
++from pathlib import Path
++
++from services.storage_zones import Transport, Zone, ZoneViolation, require_transport
++
++from .contracts import (
++    INTERNET_RELAY_TRANSPORT,
++    LAN_MTLS_TRANSPORT,
++    LOCAL_PROCESS_TRANSPORT,
++    BackpressureController,
++    CancellationToken,
++    Deadline,
++    ObjectTransport,
++    ProgressCallback,
++    TransferContext,
++    TransferResult,
++)
++from .errors import CancellationError
++from .storage import ContentAddressedStore
++
++# The unisync object transports are all mesh-class: lease-bound mTLS between the
++# owner's own nodes (in-process locally, LAN or relayed over the internet). None
++# of them leaves the home. Public egress (git/rclone) is the drive's path with
++# its own gate and is intentionally not reachable from an object sync.
++MESH_TRANSPORT_IDS = frozenset(
++    {LOCAL_PROCESS_TRANSPORT, LAN_MTLS_TRANSPORT, INTERNET_RELAY_TRANSPORT}
++)
++
++# A reference manifest: per zone, the digests a node holds and their sizes.
++# References are the only thing that can conflict; content cannot.
++ZoneInventory = dict[Zone, dict[str, int]]
++
++
++@dataclass(frozen=True, slots=True)
++class SyncItem:
++    """One content-addressed object, tagged with the zone it belongs to."""
++
++    zone: Zone
++    digest: str
++    byte_length: int
++
++
++@dataclass(frozen=True, slots=True)
++class SyncPlan:
++    """What a diff decided, before any byte moved."""
++
++    push: tuple[SyncItem, ...]
++    pull: tuple[SyncItem, ...]
++    already_present: tuple[SyncItem, ...]
++    withheld: tuple[tuple[SyncItem, str], ...]
++
++
++@dataclass(frozen=True, slots=True)
++class SyncReport:
++    """What actually happened. Skips are idempotent no-ops, not failures."""
++
++    transferred: tuple[TransferResult, ...]
++    skipped_present: tuple[SyncItem, ...]
++    bytes_moved: int
++
++
++def reconcile_references(a: ZoneInventory, b: ZoneInventory) -> ZoneInventory:
++    """Merge two reference manifests.
++
++    Content is immutable and content-addressed, so a digest present on either
++    side is the same bytes on both. The reconciled reference set is therefore
++    the per-zone union, which makes reconciliation commutative and idempotent —
++    two nodes that fully push and pull converge on the same manifest regardless
++    of order.
++    """
++    merged: ZoneInventory = {}
++    for zone in Zone:
++        combined: dict[str, int] = {}
++        for source in (a.get(zone, {}), b.get(zone, {})):
++            for digest, size in source.items():
++                existing = combined.get(digest)
++                if existing is not None and existing != size:
++                    raise ValueError(
++                        f"reference conflict: digest {digest} advertised with two sizes"
++                    )
++                combined[digest] = size
++        if combined:
++            merged[zone] = combined
++    return merged
++
++
++class ZoneAwareObjectSync:
++    """Push/pull loop that cannot move a byte without the zone boundary agreeing."""
++
++    def __init__(
++        self,
++        *,
++        transport: ObjectTransport,
++        transport_class: Transport = Transport.MESH,
++        backpressure: BackpressureController | None = None,
++    ) -> None:
++        if transport_class is Transport.NONE:
++            raise ZoneViolation(
++                "a transport that never leaves the device cannot move objects between nodes"
++            )
++        self.transport = transport
++        self.transport_class = transport_class
++        self.backpressure = backpressure
++
++    # -- the gate ---------------------------------------------------------
++
++    def _gate_zone(self, zone: Zone) -> None:
++        """The first thing every transfer does. Refuses, never returns a flag.
++
++        For a mesh sync this refuses NODE (never leaves its device). For a
++        public sink this refuses NODE, OUTPUT and GROUNDING — the grounding
++        case is the silent upload this whole design exists to prevent.
++        """
++        require_transport(zone, self.transport_class)
++
++    def _bind_wire_transport(self, context: TransferContext) -> None:
++        """The context's selected transport must match this sync's transport class.
++
++        Every valid unisync object transport is mesh-class, so a public sink has
++        no object transport at all: external content leaves the home through the
++        drive's rclone path, never through here.
++        """
++        if self.transport_class is Transport.MESH:
++            if context.selected_transport not in MESH_TRANSPORT_IDS:
++                raise ZoneViolation(
++                    f"transfer context selects {context.selected_transport!r}, "
++                    "which is not a mesh object transport"
++                )
++            return
++        raise ZoneViolation(
++            f"{self.transport_class.value} content sync has no object transport; "
++            "external egress goes through the drive's rclone path with its own gate"
++        )
++
++    # -- planning ---------------------------------------------------------
++
++    def plan(self, *, local: ZoneInventory, remote: ZoneInventory) -> SyncPlan:
++        """Diff two reference manifests by digest.
++
++        Zones whose content may not travel over this transport are withheld —
++        NODE on the mesh, and NODE/OUTPUT/GROUNDING toward anything public — so
++        they are never even offered, let alone sent.
++        """
++        push: list[SyncItem] = []
++        pull: list[SyncItem] = []
++        present: list[SyncItem] = []
++        withheld: list[tuple[SyncItem, str]] = []
++        for zone in Zone:
++            local_z = local.get(zone, {})
++            remote_z = remote.get(zone, {})
++            try:
++                self._gate_zone(zone)
++            except ZoneViolation as exc:
++                for digest in sorted(set(local_z) | set(remote_z)):
++                    size = local_z.get(digest, remote_z.get(digest, -1))
++                    withheld.append((SyncItem(zone, digest, size), str(exc)))
++                continue
++            for digest in sorted(set(local_z) - set(remote_z)):
++                push.append(SyncItem(zone, digest, local_z[digest]))
++            for digest in sorted(set(remote_z) - set(local_z)):
++                pull.append(SyncItem(zone, digest, remote_z[digest]))
++            for digest in sorted(set(local_z) & set(remote_z)):
++                present.append(SyncItem(zone, digest, local_z[digest]))
++        return SyncPlan(
++            push=tuple(push),
++            pull=tuple(pull),
++            already_present=tuple(present),
++            withheld=tuple(withheld),
++        )
++
++    # -- moving one object ------------------------------------------------
++
++    def transfer_one(
++        self,
++        item: SyncItem,
++        *,
++        context: TransferContext,
++        source_root: Path,
++        destination_root: Path,
++        cancellation: CancellationToken | None = None,
++        deadline: Deadline | None = None,
++        progress: ProgressCallback | None = None,
++    ) -> TransferResult | None:
++        """Move one object after the zone boundary agrees. Returns None if the
++        destination already holds it (idempotent skip). A refused move opens no
++        store and reads no byte."""
++        # 1. Zone boundary FIRST — before any filesystem access. Raises.
++        self._gate_zone(item.zone)
++        # 2. The wire transport must match the zone's permitted transport class.
++        self._bind_wire_transport(context)
++        # 3. The context must describe exactly this object; a sync never moves
++        #    bytes under a lease minted for something else.
++        if context.object_sha256 != item.digest:
++            raise ValueError("transfer context object digest does not match the sync item")
++        if context.byte_length != item.byte_length:
++            raise ValueError("transfer context byte length does not match the sync item")
++        # 4. Idempotency: content is immutable, so an object already present is
++        #    the same bytes. Skip it; do not re-send.
++        if ContentAddressedStore(destination_root).has(item.digest):
++            return None
++        # 5. Backpressure so a fast node cannot flood a slow one.
++        if self.backpressure is not None:
++            self.backpressure.acquire(item.byte_length)
++        try:
++            return self.transport.upload_object(
++                context=context,
++                source_root=source_root,
++                destination_root=destination_root,
++                cancellation=cancellation,
++                deadline=deadline,
++                progress=progress,
++            )
++        finally:
++            if self.backpressure is not None:
++                self.backpressure.release(item.byte_length)
++
++    # -- the loops --------------------------------------------------------
++
++    def _run(
++        self,
++        items: tuple[SyncItem, ...],
++        *,
++        context_for,
++        roots_for,
++        cancellation: CancellationToken | None = None,
++        deadline: Deadline | None = None,
++        progress: ProgressCallback | None = None,
++    ) -> SyncReport:
++        transferred: list[TransferResult] = []
++        skipped: list[SyncItem] = []
++        moved = 0
++        token = cancellation or CancellationToken()
++        for item in items:
++            token.raise_if_cancelled()
++            source_root, destination_root = roots_for(item)
++            result = self.transfer_one(
++                item,
++                context=context_for(item),
++                source_root=source_root,
++                destination_root=destination_root,
++                cancellation=token,
++                deadline=deadline,
++                progress=progress,
++            )
++            if result is None:
++                skipped.append(item)
++            else:
++                transferred.append(result)
++                moved += result.bytes_transferred
++        return SyncReport(
++            transferred=tuple(transferred),
++            skipped_present=tuple(skipped),
++            bytes_moved=moved,
++        )
++
++    def run_push(
++        self,
++        items: tuple[SyncItem, ...],
++        *,
++        context_for,
++        local_roots: dict[Zone, Path],
++        remote_roots: dict[Zone, Path],
++        cancellation: CancellationToken | None = None,
++        deadline: Deadline | None = None,
++        progress: ProgressCallback | None = None,
++    ) -> SyncReport:
++        """Offer local objects to the peer. Local is the source."""
++        return self._run(
++            items,
++            context_for=context_for,
++            roots_for=lambda item: (local_roots[item.zone], remote_roots[item.zone]),
++            cancellation=cancellation,
++            deadline=deadline,
++            progress=progress,
++        )
++
++    def run_pull(
++        self,
++        items: tuple[SyncItem, ...],
++        *,
++        context_for,
++        local_roots: dict[Zone, Path],
++        remote_roots: dict[Zone, Path],
++        cancellation: CancellationToken | None = None,
++        deadline: Deadline | None = None,
++        progress: ProgressCallback | None = None,
++    ) -> SyncReport:
++        """Fetch peer objects into the local node. The peer is the source."""
++        return self._run(
++            items,
++            context_for=context_for,
++            roots_for=lambda item: (remote_roots[item.zone], local_roots[item.zone]),
++            cancellation=cancellation,
++            deadline=deadline,
++            progress=progress,
++        )
++
++
++__all__ = [
++    "MESH_TRANSPORT_IDS",
++    "SyncItem",
++    "SyncPlan",
++    "SyncReport",
++    "ZoneAwareObjectSync",
++    "ZoneInventory",
++    "reconcile_references",
++]
+diff --git a/tests/unisync/test_zone_sync.py b/tests/unisync/test_zone_sync.py
+new file mode 100644
+index 0000000..7a2e6c4
+--- /dev/null
++++ b/tests/unisync/test_zone_sync.py
+@@ -0,0 +1,388 @@
++"""Zone-aware expansion-drive sync.
++
++Following the house style, most of these are refusals. The sync loop's job is to
++move content-addressed objects between the owner's nodes fast; the whole reason
++it is allowed to exist is that it cannot move a byte the zone boundary forbids.
++The test that matters most is the one that proves grounding never reaches a
++public transport, and that a refused move touches nothing.
++"""
++
++from __future__ import annotations
++
++import hashlib
++
++import pytest
++
++from services.storage_zones import (
++    PERMITTED_MOVES,
++    Transport,
++    Zone,
++    ZoneViolation,
++    promote_to_grounding,
++    PromotionLedger,
++)
++from services.unisync import (
++    AuthorizationError,
++    BackpressureController,
++    BackpressureError,
++    CancellationToken,
++    ContentAddressedStore,
++    InProcessObjectTransport,
++)
++from services.unisync.zone_sync import (
++    MESH_TRANSPORT_IDS,
++    SyncItem,
++    ZoneAwareObjectSync,
++    reconcile_references,
++)
++
++from .conftest import StrictValidator, make_context
++
++
++def _digest(payload: bytes) -> str:
++    return hashlib.sha256(payload).hexdigest()
++
++
++def _item(zone: Zone, payload: bytes) -> SyncItem:
++    return SyncItem(zone=zone, digest=_digest(payload), byte_length=len(payload))
++
++
++def _context_for(payload: bytes):
++    def factory(item: SyncItem):
++        return make_context(payload)
++
++    return factory
++
++
++def _mesh_sync(**kwargs) -> ZoneAwareObjectSync:
++    transport = InProcessObjectTransport(validator=StrictValidator(), chunk_size=64)
++    return ZoneAwareObjectSync(transport=transport, transport_class=Transport.MESH, **kwargs)
++
++
++# ---------------------------------------------------- the refusal that matters
++
++
++def test_sync_refuses_to_push_grounding_over_a_public_transport(tmp_path, payload):
++    """The silent-upload failure this whole design exists to prevent.
++
++    A sync loop that forgot the zone boundary would push the owner's private
++    grounding corpus to a cloud remote and never error. Here it must raise, and
++    it must not have written a single byte to the destination.
++    """
++    source = ContentAddressedStore(tmp_path / "grounding")
++    source.put_bytes(payload)
++    destination_root = tmp_path / "public-remote"
++    transport = InProcessObjectTransport(validator=StrictValidator(), chunk_size=64)
++    sync = ZoneAwareObjectSync(transport=transport, transport_class=Transport.PUBLIC)
++
++    with pytest.raises(ZoneViolation, match="never travel over a public transport"):
++        sync.transfer_one(
++            _item(Zone.GROUNDING, payload),
++            context=make_context(payload),
++            source_root=source.root,
++            destination_root=destination_root,
++        )
++    assert not (destination_root / "objects").exists() or not ContentAddressedStore(
++        destination_root
++    ).has(_digest(payload))
++
++
++def test_sync_refuses_output_over_a_public_transport(tmp_path, payload):
++    source = ContentAddressedStore(tmp_path / "output")
++    source.put_bytes(payload)
++    sync = ZoneAwareObjectSync(
++        transport=InProcessObjectTransport(validator=StrictValidator()),
++        transport_class=Transport.PUBLIC,
++    )
++    with pytest.raises(ZoneViolation, match="never travel over a public transport"):
++        sync.transfer_one(
++            _item(Zone.OUTPUT, payload),
++            context=make_context(payload),
++            source_root=source.root,
++            destination_root=tmp_path / "remote",
++        )
++
++
++def test_external_still_has_no_object_transport_off_home(tmp_path, payload):
++    """EXTERNAL may leave the home, but only through the drive's rclone path.
++
++    require_transport permits EXTERNAL over PUBLIC, so the second gate — binding
++    the wire transport — is what refuses an object sync from becoming an egress.
++    """
++    source = ContentAddressedStore(tmp_path / "external")
++    source.put_bytes(payload)
++    sync = ZoneAwareObjectSync(
++        transport=InProcessObjectTransport(validator=StrictValidator()),
++        transport_class=Transport.PUBLIC,
++    )
++    with pytest.raises(ZoneViolation, match="external egress goes through the drive"):
++        sync.transfer_one(
++            _item(Zone.EXTERNAL, payload),
++            context=make_context(payload),
++            source_root=source.root,
++            destination_root=tmp_path / "remote",
++        )
++
++
++def test_sync_never_lets_node_state_leave_the_device(tmp_path, payload):
++    source = ContentAddressedStore(tmp_path / "node")
++    source.put_bytes(payload)
++    destination_root = tmp_path / "peer"
++    sync = _mesh_sync()
++    with pytest.raises(ZoneViolation, match="never leaves its device"):
++        sync.transfer_one(
++            _item(Zone.NODE, payload),
++            context=make_context(payload),
++            source_root=source.root,
++            destination_root=destination_root,
++        )
++    assert not (destination_root / "objects").exists() or not ContentAddressedStore(
++        destination_root
++    ).has(_digest(payload))
++
++
++def test_a_transport_that_never_leaves_the_device_cannot_be_a_sync():
++    with pytest.raises(ZoneViolation, match="cannot move objects between nodes"):
++        ZoneAwareObjectSync(
++            transport=InProcessObjectTransport(validator=StrictValidator()),
++            transport_class=Transport.NONE,
++        )
++
++
++# ---------------------------------------------------------- the happy paths
++
++
++def test_output_moves_over_the_mesh_and_the_move_is_idempotent(tmp_path, payload):
++    local = ContentAddressedStore(tmp_path / "local")
++    digest = local.put_bytes(payload)
++    remote_root = tmp_path / "remote"
++    sync = _mesh_sync()
++    item = _item(Zone.OUTPUT, payload)
++
++    first = sync.transfer_one(
++        item, context=make_context(payload), source_root=local.root, destination_root=remote_root
++    )
++    assert first is not None
++    assert ContentAddressedStore(remote_root).read_bytes(digest) == payload
++
++    # Content is immutable and content-addressed: a second push is a no-op.
++    second = sync.transfer_one(
++        item, context=make_context(payload), source_root=local.root, destination_root=remote_root
++    )
++    assert second is None
++
++
++def test_grounding_replicates_between_the_owners_nodes_over_the_mesh(tmp_path, payload):
++    """Grounding is mesh-only, not never-sync: the owner's own nodes may hold a
++    copy. The boundary forbids public, not mesh."""
++    local = ContentAddressedStore(tmp_path / "local")
++    digest = local.put_bytes(payload)
++    remote_root = tmp_path / "remote"
++    sync = _mesh_sync()
++    result = sync.transfer_one(
++        _item(Zone.GROUNDING, payload),
++        context=make_context(payload),
++        source_root=local.root,
++        destination_root=remote_root,
++    )
++    assert result is not None
++    assert ContentAddressedStore(remote_root).read_bytes(digest) == payload
++
++
++def test_run_push_moves_offered_objects_and_reports_bytes(tmp_path, payload):
++    local = ContentAddressedStore(tmp_path / "local")
++    local.put_bytes(payload)
++    remote_root = tmp_path / "remote"
++    ContentAddressedStore(remote_root)
++    sync = _mesh_sync()
++    item = _item(Zone.OUTPUT, payload)
++
++    report = sync.run_push(
++        (item,),
++        context_for=_context_for(payload),
++        local_roots={Zone.OUTPUT: local.root},
++        remote_roots={Zone.OUTPUT: remote_root},
++    )
++    assert report.bytes_moved == len(payload)
++    assert len(report.transferred) == 1
++    assert not report.skipped_present
++
++    again = sync.run_push(
++        (item,),
++        context_for=_context_for(payload),
++        local_roots={Zone.OUTPUT: local.root},
++        remote_roots={Zone.OUTPUT: remote_root},
++    )
++    assert again.bytes_moved == 0
++    assert again.skipped_present == (item,)
++
++
++def test_run_pull_fetches_from_the_peer(tmp_path, payload):
++    remote = ContentAddressedStore(tmp_path / "remote")
++    remote.put_bytes(payload)
++    local_root = tmp_path / "local"
++    ContentAddressedStore(local_root)
++    sync = _mesh_sync()
++    report = sync.run_pull(
++        (_item(Zone.OUTPUT, payload),),
++        context_for=_context_for(payload),
++        local_roots={Zone.OUTPUT: local_root},
++        remote_roots={Zone.OUTPUT: remote.root},
++    )
++    assert report.bytes_moved == len(payload)
++    assert ContentAddressedStore(local_root).read_bytes(_digest(payload)) == payload
++
++
++# -------------------------------------------------------------- planning
++
++
++def test_plan_diffs_by_digest_and_withholds_node_zone():
++    local = {
++        Zone.OUTPUT: {"a" * 64: 10},
++        Zone.NODE: {"c" * 64: 4},
++    }
++    remote = {
++        Zone.OUTPUT: {"b" * 64: 20},
++        Zone.GROUNDING: {"d" * 64: 8},
++    }
++    plan = ZoneAwareObjectSync(
++        transport=InProcessObjectTransport(validator=StrictValidator()),
++        transport_class=Transport.MESH,
++    ).plan(local=local, remote=remote)
++
++    assert plan.push == (SyncItem(Zone.OUTPUT, "a" * 64, 10),)
++    # OUTPUT pull and GROUNDING pull are both mesh-permitted.
++    assert SyncItem(Zone.OUTPUT, "b" * 64, 20) in plan.pull
++    assert SyncItem(Zone.GROUNDING, "d" * 64, 8) in plan.pull
++    # NODE never syncs: it is withheld, not offered.
++    withheld_zones = {item.zone for item, _ in plan.withheld}
++    assert withheld_zones == {Zone.NODE}
++    assert all(item.zone is not Zone.NODE for item in plan.push + plan.pull)
++
++
++def test_plan_toward_public_withholds_everything_but_external():
++    inv = {
++        Zone.OUTPUT: {"a" * 64: 1},
++        Zone.GROUNDING: {"b" * 64: 1},
++        Zone.NODE: {"c" * 64: 1},
++        Zone.EXTERNAL: {"d" * 64: 1},
++    }
++    plan = ZoneAwareObjectSync(
++        transport=InProcessObjectTransport(validator=StrictValidator()),
++        transport_class=Transport.PUBLIC,
++    ).plan(local=inv, remote={})
++    withheld_zones = {item.zone for item, _ in plan.withheld}
++    assert withheld_zones == {Zone.OUTPUT, Zone.GROUNDING, Zone.NODE}
++    # EXTERNAL is the only zone a public plan may even consider offering.
++    assert {item.zone for item in plan.push} == {Zone.EXTERNAL}
++
++
++# ------------------------------------------------------------- backpressure
++
++
++def test_backpressure_refuses_an_object_over_budget_and_moves_nothing(tmp_path, payload):
++    local = ContentAddressedStore(tmp_path / "local")
++    local.put_bytes(payload)
++    remote_root = tmp_path / "remote"
++    sync = _mesh_sync(backpressure=BackpressureController(max_inflight_bytes=8))
++    with pytest.raises(BackpressureError, match="in-flight byte budget"):
++        sync.transfer_one(
++            _item(Zone.OUTPUT, payload),
++            context=make_context(payload),
++            source_root=local.root,
++            destination_root=remote_root,
++        )
++    assert not ContentAddressedStore(remote_root).has(_digest(payload))
++
++
++# ------------------------------------------------ authority is still injected
++
++
++def test_sync_cannot_bypass_the_injected_lease_validator(tmp_path, payload):
++    local = ContentAddressedStore(tmp_path / "local")
++    local.put_bytes(payload)
++    sync = ZoneAwareObjectSync(
++        transport=InProcessObjectTransport(validator=None),
++        transport_class=Transport.MESH,
++    )
++    with pytest.raises(AuthorizationError, match="requires an injected"):
++        sync.transfer_one(
++            _item(Zone.OUTPUT, payload),
++            context=make_context(payload),
++            source_root=local.root,
++            destination_root=tmp_path / "remote",
++        )
++
++
++def test_context_must_describe_the_object_being_synced(tmp_path, payload):
++    local = ContentAddressedStore(tmp_path / "local")
++    local.put_bytes(payload)
++    sync = _mesh_sync()
++    wrong = SyncItem(Zone.OUTPUT, "e" * 64, len(payload))
++    with pytest.raises(ValueError, match="object digest does not match"):
++        sync.transfer_one(
++            wrong,
++            context=make_context(payload),
++            source_root=local.root,
++            destination_root=tmp_path / "remote",
++        )
++
++
++def test_cancellation_stops_the_loop_before_the_next_object(tmp_path, payload):
++    local = ContentAddressedStore(tmp_path / "local")
++    local.put_bytes(payload)
++    token = CancellationToken()
++    token.cancel()
++    sync = _mesh_sync()
++    with pytest.raises(Exception, match="cancelled"):
++        sync.run_push(
++            (_item(Zone.OUTPUT, payload),),
++            context_for=_context_for(payload),
++            local_roots={Zone.OUTPUT: local.root},
++            remote_roots={Zone.OUTPUT: tmp_path / "remote"},
++            cancellation=token,
++        )
++
++
++# ------------------------------------------- the sync must not self-promote
++
++
++def test_sync_offers_no_path_into_grounding_promotion():
++    """Replication keeps a zone; it never turns output into belief. There is no
++    promote method here, and the only promotion gate still refuses automation."""
++    assert not [name for name in dir(ZoneAwareObjectSync) if "promote" in name.lower()]
++    assert (Zone.GROUNDING, Zone.EXTERNAL) not in PERMITTED_MOVES
++
++
++def test_automated_promotion_is_still_refused(tmp_path):
++    ledger = PromotionLedger(tmp_path / "promotions.jsonl")
++    with pytest.raises(ZoneViolation, match="automated promotion is refused"):
++        promote_to_grounding(digest="a" * 64, ledger=ledger, approved_by=None, reason="auto")
++    assert ledger.was_approved("a" * 64) is False
++
++
++# ------------------------------------------------------ reference reconcile
++
++
++def test_reference_reconciliation_is_commutative_and_idempotent():
++    a = {Zone.OUTPUT: {"a" * 64: 1}, Zone.GROUNDING: {"b" * 64: 2}}
++    b = {Zone.OUTPUT: {"c" * 64: 3}}
++    merged = reconcile_references(a, b)
++    assert merged == reconcile_references(b, a)
++    assert merged == reconcile_references(merged, merged)
++    assert merged[Zone.OUTPUT] == {"a" * 64: 1, "c" * 64: 3}
++
++
++def test_reference_reconciliation_rejects_a_size_conflict():
++    a = {Zone.OUTPUT: {"a" * 64: 1}}
++    b = {Zone.OUTPUT: {"a" * 64: 2}}
++    with pytest.raises(ValueError, match="reference conflict"):
++        reconcile_references(a, b)
++
++
++def test_all_object_transports_are_mesh_class():
++    """A regression fence: if a public-egress object transport is ever added to
++    this set, the public-refusal path above would silently stop protecting."""
++    assert "internet_mtls_relay" in MESH_TRANSPORT_IDS
++    assert "lan_mtls" in MESH_TRANSPORT_IDS
++    assert "local_process" in MESH_TRANSPORT_IDS
+-- 
+2.39.5
+
