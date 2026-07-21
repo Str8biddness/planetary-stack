@@ -17,7 +17,7 @@ import threading
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from .contracts import (
     AuthenticatedPeerIdentity,
@@ -522,7 +522,13 @@ class TrustedLanServer:
         tls_sock: ssl.SSLSocket,
         *,
         peer_identity: AuthenticatedPeerIdentity | None = None,
+        on_context: Callable[[TransferContext], None] | None = None,
     ) -> dict[str, Any] | None:
+        """Receive one object. `on_context` sees the peer's declared transfer
+        context before any authorization runs; raising from it fails the
+        transfer closed. Paired request/response exchanges use this to bind the
+        second leg to the first leg's lease (see `services/unisync/exchange.py`).
+        """
         assembler = None
         transfer_context: TransferContext | None = None
         try:
@@ -537,6 +543,8 @@ class TrustedLanServer:
             if not isinstance(context_payload, dict):
                 raise TLSConfigurationError("start frame is missing transfer_context")
             transfer_context = TransferContext.from_wire(context_payload)
+            if on_context is not None:
+                on_context(transfer_context)
             require_authorized(
                 transfer_context,
                 validator=self.validator,
