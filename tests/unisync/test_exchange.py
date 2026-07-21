@@ -245,11 +245,12 @@ def test_derived_response_is_rejected_by_the_real_signed_lease_validator():
     """The response leg has no authority under a real lease. See
     docs/design/EXCHANGE_RESPONSE_AUTHORITY.md.
 
-    This is a REGRESSION GUARD for a known blocker, not a passing feature: it
-    pins the exact reason `exchange.py` cannot yet be wired to a production
-    validator, using the genuine signed documents from the 2026-07-20 physical
-    pull. When the contracts gain a bounded response slot, this test should be
-    replaced by one that asserts the response leg authorizes.
+    This remains TRUE and is why `ResponseGrant` exists: a lease authorizes
+    delivery to exactly ONE leased node, so it can never carry a result back to
+    the requester. The fix was not to weaken this rule but to add a separate
+    controller-signed authority for the return direction — see
+    tests/unisync/test_mesh_grant.py, where the same physical documents DO
+    authorize the return leg once a grant is present.
     """
     import json
     from pathlib import Path
@@ -287,3 +288,159 @@ def test_derived_response_is_rejected_by_the_real_signed_lease_validator():
     )
     with pytest.raises(AuthorizationError, match="destination is not the leased node"):
         SignedLeaseValidator(expected_context=response_context, **common)
+
+
+def test_exchange_runs_under_a_real_signed_grant_over_real_tcp(tmp_path, certs):
+    """The wired path: leg 2 authorized by a real controller-signed grant.
+
+    Leg 1 keeps the ordinary transfer validator; leg 2 is validated by
+    `SignedResponseGrantValidator` parsing a genuinely signed `ResponseGrant`.
+    Real TCP, real TLS 1.3, real certificates, real ed25519 signature — no
+    permissive validator on the return direction.
+    """
+    from datetime import UTC, datetime
+
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from contracts.chal_vsource.v1.models import ResponseGrant
+    from services.unisync.mesh_grant import (
+        SignedResponseGrantValidator,
+        build_response_grant_payload,
+    )
+    from services.vsource import Ed25519DocumentSigner, sign_contract_document
+
+    request_context = make_context(PROMPT, transport="lan_mtls")
+    controller_key = Ed25519PrivateKey.generate()
+    controller = Ed25519DocumentSigner("key:controller:test:0001", controller_key)
+    grant = sign_contract_document(
+        ResponseGrant,
+        build_response_grant_payload(
+            grant_id="grant:test:live",
+            account_id=request_context.account_id,
+            request_sha256=request_context.request_sha256,
+            lease_id=request_context.lease_id,
+            lease_sha256=request_context.lease_sha256,
+            fencing_token=request_context.fencing_token,
+            responder_node_id=request_context.destination_node_id,
+            destination_node_id=request_context.source_node_id,
+            max_byte_length=4096,
+            media_type="application/json",
+            issued_at=datetime.now(UTC),
+        ),
+        controller,
+    ).model_dump(mode="json", by_alias=True)
+
+    def grant_validator():
+        return SignedResponseGrantValidator(
+            grant_wire=grant,
+            request_sha256=request_context.request_sha256,
+            controller_key_id="key:controller:test:0001",
+            controller_public_key=controller_key.public_key().public_bytes_raw(),
+            expected_source_node_id=request_context.destination_node_id,
+            expected_destination_node_id=request_context.source_node_id,
+        )
+
+    outbox = ContentAddressedStore(tmp_path / "requester-outbox")
+    outbox.put_bytes(PROMPT)
+
+    client, receiver = _requester(tmp_path, certs)
+    # THE POINT: the return leg is authorized by the signed grant.
+    receiver.validator = grant_validator()
+
+    resp_receiver, responder = _responder(tmp_path, certs)
+    responder.validator = grant_validator()
+
+    listen = socket.socket()
+    listen.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listen.bind(("127.0.0.1", 0))
+    listen.listen(1)
+    port = listen.getsockname()[1]
+    errors = []
+
+    def responder_side():
+        try:
+            conn, _ = listen.accept()
+            ctx = _server_context(responder.credentials)
+            tls = ctx.wrap_socket(conn, server_side=True)
+            try:
+                tls.settimeout(10)
+                serve_exchange_over_tls_socket(
+                    tls_sock=tls,
+                    receiver=resp_receiver,
+                    responder=responder,
+                    handler=lambda payload, ctx_: ANSWER,
+                    response_root=tmp_path / "responder-outbox",
+                )
+            finally:
+                tls.close()
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread = threading.Thread(target=responder_side)
+    thread.start()
+    try:
+        raw = socket.create_connection(("127.0.0.1", port), timeout=5)
+        receipt = request_over_dialed_socket(
+            raw_sock=raw,
+            client=client,
+            receiver=receiver,
+            request_context=request_context,
+            source_root=outbox.root,
+        )
+    finally:
+        thread.join(timeout=10)
+        listen.close()
+
+    if errors:
+        raise errors[0]
+    inbox = ContentAddressedStore(tmp_path / "requester" / "destination")
+    assert inbox.read_bytes(receipt["object_sha256"]) == ANSWER
+
+
+def test_a_response_over_the_granted_ceiling_is_refused_on_the_wire(tmp_path, certs):
+    """The byte ceiling is enforced by the transport, not just in unit tests."""
+    from datetime import UTC, datetime
+
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from contracts.chal_vsource.v1.models import ResponseGrant
+    from services.unisync.mesh_grant import (
+        SignedResponseGrantValidator,
+        build_response_grant_payload,
+    )
+    from services.vsource import Ed25519DocumentSigner, sign_contract_document
+
+    request_context = make_context(PROMPT, transport="lan_mtls")
+    controller_key = Ed25519PrivateKey.generate()
+    controller = Ed25519DocumentSigner("key:controller:test:0001", controller_key)
+    grant = sign_contract_document(
+        ResponseGrant,
+        build_response_grant_payload(
+            grant_id="grant:test:tiny",
+            account_id=request_context.account_id,
+            request_sha256=request_context.request_sha256,
+            lease_id=request_context.lease_id,
+            lease_sha256=request_context.lease_sha256,
+            fencing_token=request_context.fencing_token,
+            responder_node_id=request_context.destination_node_id,
+            destination_node_id=request_context.source_node_id,
+            max_byte_length=4,  # smaller than ANSWER
+            media_type="application/json",
+            issued_at=datetime.now(UTC),
+        ),
+        controller,
+    ).model_dump(mode="json", by_alias=True)
+
+    validator = SignedResponseGrantValidator(
+        grant_wire=grant,
+        request_sha256=request_context.request_sha256,
+        controller_key_id="key:controller:test:0001",
+        controller_public_key=controller_key.public_key().public_bytes_raw(),
+        expected_source_node_id=request_context.destination_node_id,
+        expected_destination_node_id=request_context.source_node_id,
+    )
+    oversized = derive_response_context(
+        request_context, response_sha256="f" * 64, byte_length=len(ANSWER)
+    )
+    with pytest.raises(AuthorizationError, match="byte ceiling"):
+        validator.validate_transfer(oversized)
