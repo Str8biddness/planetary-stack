@@ -32,6 +32,10 @@ from contracts.chal_vsource.v1.models import (
     LifecycleEvent,
     ResourceInventory,
 )
+from services.private_mesh.evidence_signing import (
+    EvidenceSignatureError,
+    verify_evidence_signature,
+)
 from services.private_mesh.node_agent import (
     NodeAdmissionResult,
     NodeAgentStatus,
@@ -84,6 +88,8 @@ class RemoteExecutionBackend:
         image_ref: str,
         image_digest: str,
         profile: str = "text-classification.v1",
+        evidence_public_key: bytes | None = None,
+        evidence_key_id: str | None = None,
     ) -> None:
         if "@sha256:" not in image_ref or image_ref.rsplit("@", 1)[1] != image_digest:
             raise RemoteBackendError("image_ref must be immutable and match image_digest")
@@ -95,7 +101,13 @@ class RemoteExecutionBackend:
         self.image_ref = image_ref
         self.image_digest = image_digest
         self.profile = profile
+        self.evidence_public_key = evidence_public_key
+        self.evidence_key_id = evidence_key_id
         self._pending_jobs: dict[str, dict[str, Any]] = {}
+        # Provenance outcome of the most recent execution, for callers that
+        # want to surface a trust badge. One of: "verified", "unsigned",
+        # "unverifiable" (no enrolled key), or "invalid:<reason>".
+        self.last_evidence_status: str | None = None
 
     def admit_lease(
         self,
@@ -272,6 +284,9 @@ class RemoteExecutionBackend:
         )
         report_b64 = execution.get("report_base64")
         report = base64.urlsafe_b64decode(report_b64 + "==") if report_b64 else None
+        self.last_evidence_status = self._check_evidence(
+            execution.get("evidence_signature"), report
+        )
         return NodeExecutionResult(
             status=status,
             accepted=execution.get("accepted", False),
@@ -281,6 +296,33 @@ class RemoteExecutionBackend:
             error=error,
             reason=execution.get("reason"),
         )
+
+    def _check_evidence(self, envelope: Any, report: bytes | None) -> str:
+        """Verify the worker's detached evidence signature; never raise.
+
+        Verification always runs and its outcome is always recorded, so a
+        caller that chooses not to *enforce* provenance can still show the user
+        which state a result is in. Enforcement belongs to the caller.
+        """
+
+        if report is None:
+            return "unsigned"
+        if envelope is None:
+            return "unsigned"
+        if self.evidence_public_key is None:
+            return "unverifiable"
+        try:
+            verify_evidence_signature(
+                envelope,
+                report,
+                account_id=self.account_id,
+                node_id=self.target.node_id,
+                public_key=self.evidence_public_key,
+                key_id=self.evidence_key_id,
+            )
+        except EvidenceSignatureError as exc:
+            return f"invalid:{exc}"
+        return "verified"
 
     def cancel(
         self,

@@ -1456,3 +1456,34 @@ marks the start; each landed piece gets its own honest entry.
   false, or record a warning? Proposal assumes REJECT.
 - STILL PROPOSAL ONLY. Nothing implemented. exchange.py remains do-not-wire.
   PHYSICAL EXCHANGE RUN: STILL NOT DONE. NO FINISH_CHECKLIST box checked.
+### sequence step 1 — execution evidence is now SIGNED by the node
+- Owner direction: go in sequence — (1) evidence signing, (2) permissions +
+  settings backend, (3) UI redesign. Enforcement toggle is meaningless until
+  the evidence is actually signed, so signing goes first.
+- services/private_mesh/evidence_signing.py: detached ed25519 signature over
+  the AIVM execution evidence, using the node's EXISTING contract key (the one
+  that already signs inventories and is already in the mesh trust bundle). No
+  new key, no new trust root. Envelope binds account, node, evidence digest and
+  byte length; signing bytes carry a domain-separation prefix so a signature
+  can never verify as another document type.
+- worker_cli execute response gained `evidence_signature`; remote_backend
+  verifies it against the contract public key the desktop learned AT ENROLLMENT
+  (remote_pipeline passes node_record's key), and records
+  `last_evidence_status` = verified | unsigned | unverifiable | invalid:<why>.
+  Verification ALWAYS runs and the outcome is ALWAYS recorded — enforcement is
+  a separate policy decision that belongs to step 2, so a user who turns
+  enforcement off can still be shown which state a result is in.
+- Tests: 9 signing unit tests (tampered bytes, rewritten digest, another node's
+  key, wrong account/node binding, wrong key id, envelope shape, empty and
+  oversized refusals, and a domain-separation check that the raw canonical JSON
+  is NOT what was signed); 2 pipeline tests proving a real job's evidence is
+  signed by the worker and verifies on the desktop, and that an unenrolled key
+  is reported invalid. tests/private_mesh: 99 -> 110 passed.
+- HONEST: this is SELF-attestation. A compromised node holds its own key and
+  can sign a false record. Every node still reports attestation: unverified.
+  Value is that everything around the output is pinned to owner-signed values
+  and a lie becomes a durable non-repudiable artifact; for deterministic
+  profiles the owner can re-execute and compare.
+- GAPS: enforcement policy not built (step 2); status not surfaced in any UI
+  (step 3); NOT yet run on physical hardware at time of commit.
+- NO FINISH_CHECKLIST box checked.
