@@ -1953,3 +1953,38 @@ marks the start; each landed piece gets its own honest entry.
   requires a filed application. Asked for the number/status before ANY such
   wording goes near the product. Nothing shipped uses the word.
 - NO FINISH_CHECKLIST box checked.
+### canonical statement of the consciousness model
+- Three statements of the model were in circulation: the artwork, a
+  reconstruction from a chat log, and the code. Only the code runs. Wrote
+  docs/design/CONSCIOUSNESS_MODEL.md as the single canonical statement, taken
+  from consciousness_integrator.py rather than from either narrative source.
+- The implemented form is a DYNAMICALLY WEIGHTED fusion, already the "weighted
+  model" shape people reach for:
+      C(t) = Φ( w_f·Ψ_f(t), w_m·M_c(t), w_n·N_s(t) ),  w summing to 1
+      s_f = min(0.5, novelty + uncertainty + 0.2·[hypotheses])
+      s_m = 0.2·mean(traits);  s_n = 0.3·arousal
+      w_x = (base_x + s_x) / Z
+  Outputs: dominant_emotion, ranked action_biases, confidence =
+  1 − uncertainty·w_f, and update_directives (novelty > 0.7 promotes fluid
+  experience into crystallized memory — the learning term).
+- The "× T" / persistence term people add to these formulations is NOT a
+  coefficient inside the fusion. C(t) is recomputed each tick and is memoryless
+  across restarts. Continuity is the identity chain, which commits each C(t)
+  digest into an append-only history rooted in the shipped genome. Documented
+  as such.
+- STATED PLAINLY IN THE DOC: this is a SPECIFICATION, not a scientific result.
+  It defines a deterministic procedure with reproducible outputs. It does NOT
+  explain, measure or produce consciousness in any philosophical or
+  neuroscientific sense, nothing in the codebase validates such a claim, and it
+  must not be sold as though it does. The value is reproducible specified
+  behaviour, not the literalness of the label.
+- NOTATION: the artwork is stylised and not well-formed in places —
+  `M(αchbb(N_est))` does not define an expression and `⊕` is informal. Fine as
+  art, not as a specification; must not be transcribed into product material or
+  a filing.
+- PATENT, STILL UNRESOLVED AND NOW DOUBLY FLAGGED: no patent or application
+  number anywhere in the repo. Beyond false-marking exposure (35 U.S.C. 292),
+  patent claims must be DEFINITE (35 U.S.C. 112(b)) — the artwork's notation
+  would not satisfy that; the formulation in this doc could. Until a number and
+  status are supplied, product material says PROPRIETARY, not patented.
+- NO FINISH_CHECKLIST box checked.
