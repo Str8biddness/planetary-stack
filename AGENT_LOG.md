@@ -2675,3 +2675,36 @@ scenes are well above that, so they distribute.
   but not asserted pixel-identical to each other. Not wired into the desktop UI
   yet (needs live nodes to be meaningful). NO FINISH_CHECKLIST box checked.
 
+### forge CPU engine — measured, then optimised with byte-identical output
+- Recovered Emergent's work (PR #52) and then MEASURED it rather than assuming.
+- PROFILE of a 128x128 q48 frame: `_scene` called 307,081 times (~19 per pixel:
+  raymarch steps + normal + soft shadow). `builtins.max` called 2,456,656 times
+  costing 2.39s — 20% of total runtime in call overhead alone.
+- Optimised the hot SDF primitives (`_sd_box`, `_sd_sphere`, `_op_smooth_union`)
+  by inlining max/min as conditionals. Identical results for floats; no
+  numerical change, so ENGINE_VERSION stays `forge-cpu-1` and mixed-version
+  nodes are unaffected.
+- VERIFIED BYTE-IDENTICAL against the pre-optimisation engine, all four scene
+  modes, sha256 over the pixel buffer:
+    mode 0 identical  2.58s -> 2.28s  1.13x
+    mode 1 identical  3.60s -> 2.43s  1.48x
+    mode 2 identical  6.31s -> 4.43s  1.42x
+    mode 3 identical  1.25s -> 1.27s  0.98x   (gyroid does not use _sd_box)
+  Byte-identity is the property that matters here — a changed pixel means tiles
+  rendered on different nodes disagree and seams appear.
+- RAN THEIR BENCHMARK (256x256, q48, 3 nodes):
+    local=13535.3ms  tile=446.3ms  roundtrip=43.00ms  crossover>=193.5ms
+  So distribution DOES pay for this workload, comfortably: overhead is ~10% of a
+  tile, and real renders are ~70x the crossover. 13.5s local -> roughly 5s
+  across three nodes.
+- NON-OBVIOUS CONCLUSION worth keeping: the CPU engine's slowness is exactly
+  what makes distribution worth doing. My earlier caution ("if a scene renders
+  in 300ms, distributing makes it slower") is answered by measurement — the
+  crossover is 193ms and real renders are 13,500ms.
+- PRODUCT SHAPE that follows: WebGL for interactive preview (real-time, local),
+  pinned CPU engine for final/high-res renders distributed across the mesh
+  (seam-safe, deterministic). That is what the engine docstring designed for.
+- STILL UNVERIFIED: no tile has ever crossed the mesh between real nodes. The
+  benchmark's roundtrip figure is a local measurement, not .54<->.55. The forge
+  UI has never been rendered in a browser.
+- NO FINISH_CHECKLIST box checked.

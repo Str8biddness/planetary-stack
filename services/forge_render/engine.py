@@ -111,19 +111,34 @@ def _palette(hue: int, palette: int) -> tuple[tuple[float, float, float], tuple[
 
 # ------------------------------------------------------------------- SDF scene
 def _sd_sphere(p, r):
-    return math.sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]) - r
+    x, y, z = p
+    return math.sqrt(x * x + y * y + z * z) - r
 
 
 def _sd_box(p, b):
-    qx, qy, qz = abs(p[0]) - b[0], abs(p[1]) - b[1], abs(p[2]) - b[2]
-    ox, oy, oz = max(qx, 0.0), max(qy, 0.0), max(qz, 0.0)
+    # Hot path: called ~300k times per 128x128 frame. `max`/`min` builtins were
+    # 20% of total runtime purely in call overhead, so they are inlined as
+    # conditionals here — identical results for floats, no numerical change.
+    qx = abs(p[0]) - b[0]
+    qy = abs(p[1]) - b[1]
+    qz = abs(p[2]) - b[2]
+    ox = qx if qx > 0.0 else 0.0
+    oy = qy if qy > 0.0 else 0.0
+    oz = qz if qz > 0.0 else 0.0
     outside = math.sqrt(ox * ox + oy * oy + oz * oz)
-    inside = min(max(qx, max(qy, qz)), 0.0)
+    m = qy if qy > qz else qz
+    if qx > m:
+        m = qx
+    inside = m if m < 0.0 else 0.0
     return outside + inside
 
 
 def _op_smooth_union(a, b, k):
-    h = _clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0)
+    h = 0.5 + 0.5 * (b - a) / k
+    if h < 0.0:
+        h = 0.0
+    elif h > 1.0:
+        h = 1.0
     return b * (1 - h) + a * h - k * h * (1.0 - h)
 
 
