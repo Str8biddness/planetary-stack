@@ -1398,3 +1398,61 @@ marks the start; each landed piece gets its own honest entry.
 - PHYSICAL EXCHANGE RUN: NOT DONE. Step 2 (mesh_http_post) must not start until
   this is resolved — it would be built on an unauthorizable transport.
 - NO FINISH_CHECKLIST box checked.
+### design proposal written — bounded response slots (UNREVIEWED)
+- docs/design/PROPOSAL_BOUNDED_RESPONSE_SLOT.md: proposed fix for the blocker in
+  EXCHANGE_RESPONSE_AUTHORITY.md. NOT implemented, NOT agreed.
+- Shape: (1) a `ResponseSlot` declared inside the controller-signed request
+  (so it is already covered by request_sha256 and needs no new trust root),
+  pinning responder node, destination node, max_byte_length and an exact
+  media_type; (2) an atomically minted lease PAIR per placement, so the
+  invariant "a lease authorizes delivery to exactly one node" is preserved
+  rather than eroded — mesh_lease.py:179 stays as-is; (3) one narrowly scoped
+  alternative branch in SignedLeaseValidator where the object digest is
+  unconstrained but size, media type, responder, destination, and single-use
+  are all enforced.
+- Stated plainly in the doc: the digest of a computed result CANNOT be
+  pre-approved, so "owner pre-approves exact bytes" is lost for responses and
+  replaced by "owner pre-approves a bounded, single-use, attributable channel".
+  A compromised-but-enrolled responder can return arbitrary bytes within the
+  bound. That is the irreducible cost of computing on a machine you do not
+  fully control; the proposal argues for bounding blast radius + attribution
+  rather than pretending the guarantee survives.
+- Flagged as a real cost: TWO wire-format changes (ChalRequest gains slots;
+  TransferContext gains slot_id, and from_wire enforces an exact field set), so
+  every node is affected and staging matters.
+- Five open questions left for the owner, the first being whether a bounded
+  attributable channel is sufficient for the product's privacy claim — if not,
+  the honest conclusion is that the mesh should not carry inference at all.
+- exchange.py remains do-not-wire. PHYSICAL EXCHANGE RUN: STILL NOT DONE.
+- NO FINISH_CHECKLIST box checked.
+### proposal revision 2 — owner answered open question 2 YES (evidence required)
+- Owner decision 2026-07-21: filling a response slot MUST carry an execution
+  evidence document. Now a REQUIREMENT of the mechanism, not an option.
+- §3 added: a slot fill is one canonical `ResponseEnvelope` carrying the result
+  bytes AND the AIVM ExecutionEvidence record, ed25519-signed by the responder's
+  node contract key. One object keeps max_byte_length meaningful as a total.
+- Fit is good: ExecutionEvidence already exists (podman.py:806) and already
+  carries manifest_sha256, lease_id/lease_sha256/fencing_token, node_id,
+  immutable_image_ref, entrypoint_id, input_set_sha256, output_set_sha256, and
+  host capability evidence (rootless, seccomp_enabled, image_digest). It came
+  back as output cdb217a7… in today's physical end-to-end run.
+- NEW WORK FOUND: ExecutionEvidence is produced UNSIGNED — chal_adapter.py
+  serialises and hashes it, nothing signs it. Signing needs no new trust
+  material (node contract keys are already in the trust bundle and already
+  verified for inventories) but the signing path, envelope type and verifier
+  are new code. Added to the cost section.
+- Added receipt-side checks (signature -> responder_node_id; evidence lease and
+  manifest digests; image digest; entrypoint; input set; output_set_sha256
+  covers result_sha256; rootless + seccomp true) and 5 more threat-table rows.
+- Added a "self-attestation" section stating plainly that a compromised node
+  holds its own key and CAN sign a false record — this is self-attestation, not
+  hardware attestation, and must never be marketed as the latter (added to the
+  NOT-proposed list). What it does buy: everything around the output is pinned
+  to owner-signed values so the lie has one narrow place to live; the lie
+  becomes a durable non-repudiable signed artifact; and for deterministic
+  profiles (5df96635… is byte-identical across every proven path) the owner can
+  re-execute and compare, making the check complete rather than partial.
+- New follow-on question left open: reject a fill when rootless/seccomp are
+  false, or record a warning? Proposal assumes REJECT.
+- STILL PROPOSAL ONLY. Nothing implemented. exchange.py remains do-not-wire.
+  PHYSICAL EXCHANGE RUN: STILL NOT DONE. NO FINISH_CHECKLIST box checked.
