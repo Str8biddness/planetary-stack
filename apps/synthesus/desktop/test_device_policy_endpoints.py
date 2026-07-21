@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
+import json
 
 import httpx
 import pytest
@@ -19,6 +21,44 @@ from test_synthesusd import _settings
 
 WORKER = "node:test:worker"
 BUNDLE = base64.b64encode(b"canonical manifest bytes").decode()
+
+
+def _enrollment_record(node_id):
+    """One record in the mesh's own wire shape. No real mesh is contacted."""
+    digest = hashlib.sha256(node_id.encode("utf-8")).hexdigest()
+    return {
+        "schema": "planetary.unisync.mesh_enrollment_record.v1",
+        "account_id": "account:test:home",
+        "node_id": node_id,
+        "sans": ["worker.mesh"],
+        "certificate_sha256": digest,
+        "public_key_sha256": digest[::-1],
+        "serial_hex": "18a6e72395e56464a52c5e795a5d1975b995bbbd",
+        "issuer": "CN=Unisync Mesh CA test",
+        "not_before": "2026-07-20T18:36:12Z",
+        # Far enough out that these tests do not start failing on a calendar
+        # boundary; expiry behaviour itself is covered in test_mesh_discovery.
+        "not_after": "2036-07-27T18:41:12Z",
+        "status": "active",
+        "revocation_reason": None,
+        "enrolled_at": "2026-07-20T18:41:12Z",
+        "revoked_at": None,
+    }
+
+
+def _write_registry(tmp_path, records):
+    path = tmp_path / "enrollments.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema": "planetary.unisync.mesh_enrollment_registry.v1",
+                "records": records,
+            }
+        ),
+        encoding="utf-8",
+    )
+    path.chmod(0o600)
+    return path
 
 
 class _StubPipeline:
@@ -47,7 +87,14 @@ class _StubPipeline:
         return None
 
 
-def _app(tmp_path, *, store=None, pipeline=None, worker_node_id=WORKER):
+def _app(
+    tmp_path,
+    *,
+    store=None,
+    pipeline=None,
+    worker_node_id=WORKER,
+    mesh_registry_path=None,
+):
     terminal_socket = tmp_path / "terminal.sock"
     terminal_socket.touch()
     return synthesusd.create_app(
@@ -55,6 +102,9 @@ def _app(tmp_path, *, store=None, pipeline=None, worker_node_id=WORKER):
         job_pipeline=pipeline if pipeline is not None else _StubPipeline(),
         device_policy=store or DevicePolicyStore(tmp_path / "p" / "policy.json"),
         worker_node_id=worker_node_id,
+        # Injected so no test depends on a mesh registry existing on the machine
+        # running it. Defaults to a path that does not exist.
+        mesh_registry_path=mesh_registry_path or (tmp_path / "no-such-registry.json"),
     )
 
 
@@ -219,6 +269,97 @@ def test_device_crud_round_trip(tmp_path, auth):
     assert toggled.json()["capabilities"]["run_inference"] is True
     assert removed.status_code == 200
     assert after.json()["devices"] == []
+
+
+def test_discovered_nodes_are_offered_but_grant_nothing(tmp_path, auth):
+    """THE property of discovery: enrollment is not consent.
+
+    A node discovered from the mesh registry must be able to do nothing at all
+    until the owner switches a capability on, exactly like a hand-typed row.
+    """
+    registry = _write_registry(tmp_path, [_enrollment_record(WORKER)])
+    store = DevicePolicyStore(tmp_path / "p" / "policy.json")
+    app = _app(tmp_path, store=store, mesh_registry_path=registry)
+
+    async def call(client):
+        discovered = await client.get("/api/devices/discovered", headers=auth)
+        candidate = discovered.json()["candidates"][0]
+        added = await client.post(
+            "/api/devices",
+            headers=auth,
+            json={
+                "device_id": candidate["node_id"],
+                "display_name": candidate["suggested_display_name"],
+                "role": "peer",
+            },
+        )
+        # And the controller still refuses it work, because nothing was granted.
+        job = await client.post("/api/jobs", headers=auth, json={"bundle_base64": BUNDLE})
+        return discovered, candidate, added, job
+
+    discovered, candidate, added, job = _run(app, call)
+    assert discovered.status_code == 200
+    assert candidate["node_id"] == WORKER
+    assert added.status_code == 200
+    assert added.json()["capabilities"] == {
+        "run_inference": False,
+        "return_results": False,
+    }
+    assert store.is_allowed(WORKER, "run_inference") is False
+    assert store.is_allowed(WORKER, "return_results") is False
+    assert job.status_code == 403
+    assert job.json()["error"] == "device_not_permitted"
+
+
+def test_discovery_does_not_write_to_the_policy(tmp_path, auth):
+    """Reading the candidate list must not create device rows by itself."""
+    registry = _write_registry(tmp_path, [_enrollment_record(WORKER)])
+    store = DevicePolicyStore(tmp_path / "p" / "policy.json")
+    app = _app(tmp_path, store=store, mesh_registry_path=registry)
+
+    async def call(client):
+        await client.get("/api/devices/discovered", headers=auth)
+        return await client.get("/api/devices", headers=auth)
+
+    assert _run(app, call).json()["devices"] == []
+    assert store.devices() == []
+
+
+def test_an_added_node_stops_being_offered(tmp_path, auth):
+    registry = _write_registry(tmp_path, [_enrollment_record(WORKER)])
+    store = DevicePolicyStore(tmp_path / "p" / "policy.json")
+    store.add_device(device_id=WORKER, display_name="Worker", role="peer")
+    app = _app(tmp_path, store=store, mesh_registry_path=registry)
+
+    async def call(client):
+        return await client.get("/api/devices/discovered", headers=auth)
+
+    body = _run(app, call).json()
+    assert body["candidates"] == []
+    assert body["reason"] == "all_enrolled_nodes_already_listed"
+
+
+def test_a_missing_registry_returns_an_empty_list_not_an_error(tmp_path, auth):
+    """The permissions window must still open on a machine with no mesh state."""
+    app = _app(tmp_path)
+
+    async def call(client):
+        return await client.get("/api/devices/discovered", headers=auth)
+
+    response = _run(app, call)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["candidates"] == []
+    assert body["reason"] == "registry_missing"
+
+
+def test_discovery_requires_auth(tmp_path):
+    app = _app(tmp_path)
+
+    async def call(client):
+        return await client.get("/api/devices/discovered")
+
+    assert _run(app, call).status_code == 401
 
 
 def test_settings_endpoints_require_auth(tmp_path):

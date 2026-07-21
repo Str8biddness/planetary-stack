@@ -25,6 +25,7 @@ NEW_HANDLERS = (
     "openSettings",
     "openDashboard",
     "devicesAdd",
+    "devicesDiscover",
     "settingsSaveEvidence",
 )
 
@@ -81,6 +82,41 @@ def test_live_dashboard_reports_unknown_rather_than_guessing():
     """A value that cannot be read must never render as a real number."""
     assert "'unknown'" in SCRIPT
     assert "Controller unreachable" in SCRIPT
+
+
+def test_discovered_section_exists_above_the_manual_add_form():
+    """Candidates are offered first; typing an id stays available underneath."""
+    devices = HTML[HTML.index('id="win-devices"') : HTML.index('id="win-settings"')]
+    assert 'id="dev-discovered"' in devices
+    assert devices.index("Discovered on your mesh") < devices.index("Add a device")
+
+
+def test_discovery_ui_says_a_source_can_never_be_discovered():
+    """Cameras and TVs hold no certificate, so they are never enrolled.
+
+    If the UI implied otherwise, an owner would wait for a camera to appear in
+    a list it can never appear in.
+    """
+    devices = HTML[HTML.index('id="win-devices"') : HTML.index('id="win-settings"')]
+    assert "never enrolled" in devices
+    assert "source" in devices
+
+
+def test_adding_a_discovered_node_says_it_grants_nothing():
+    """The consent claim is made in the UI copy, not just in the store."""
+    block = SCRIPT[SCRIPT.index("function devicesRenderCandidate") :]
+    block = block[: block.index("\nasync function devicesAddDiscovered")]
+    assert "grants it nothing" in block
+    # Expiry and revocation are rendered, not silently dropped.
+    assert "node.expired" in block and "node.revoked" in block
+    assert "node.available" in block
+
+
+def test_discovered_add_posts_the_peer_role_to_the_existing_endpoint():
+    add = SCRIPT[SCRIPT.index("async function devicesAddDiscovered") :]
+    add = add[: add.index("\n/* ----------------------------------------------------------- settings */")]
+    assert "'/api/devices'" in add
+    assert "role: 'peer'" in add
 
 
 def test_permissions_ui_refreshes_from_the_controller_after_a_toggle():

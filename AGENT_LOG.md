@@ -1641,3 +1641,83 @@ marks the start; each landed piece gets its own honest entry.
   NOT EXIST YET. Nothing in the scheduler auto-issues a grant during placement.
   swarm's mesh_http_post adapter not started (its traffic is still plaintext).
 - NO FINISH_CHECKLIST box checked.
+### device discovery — the permission list can now be populated from enrollment
+- Gap being closed (recorded at the end of step 3): device rows were added by
+  hand, so an owner had to retype `node:private-mesh:dakin-ms-7c95` exactly and
+  a typo produced a row that matched nothing.
+- apps/synthesus/desktop/mesh_discovery.py: read-only reader over the mesh
+  enrollment registry. It has NO write path and cannot reach DevicePolicyStore
+  at all, which is the structural form of the one property that matters here —
+  DISCOVERY GRANTS NOTHING. A discovered node is a candidate; adding it still
+  goes through add_device, which creates the row with every capability OFF.
+  Enrollment means a node can speak mTLS to its peers; it does not mean the
+  owner agreed to run work on it. Enrollment is not consent, and that sentence
+  is now a test, not a comment.
+- Reading is genuinely read-only: EnrollmentRegistry.__init__ CREATES the
+  registry file when absent, which is the wrong side effect for a window that
+  merely renders a list. So the file is parsed directly and every record is
+  validated through the mesh's own MeshEnrollmentRecord.from_wire. One invalid
+  record invalidates the whole read — a registry we only partly understand is a
+  registry we do not understand.
+- Every candidate field is copied out of a validated record: node_id,
+  account_id, certificate_sha256 (plus a display-only 16-char short form that
+  nothing ever compares), sans, not_after, expired, revoked, revocation_reason.
+  The suggested display name is the last segment of the node id VERBATIM —
+  deliberately not prettified, because turning `dakin-ms-7c95` into "Dakin MS
+  7C95" would be the product inventing words about the owner's hardware.
+- Expired and revoked enrollments are LISTED and FLAGGED, not hidden: an owner
+  whose node silently vanished would reasonably conclude it was gone. They are
+  listed as unavailable and cannot be added from the candidate list.
+- GET /api/devices/discovered (authed, read-only). A missing or unreadable
+  registry returns 200 with an empty list and a machine-readable reason
+  (mesh_module_unavailable / registry_missing / registry_unreadable /
+  registry_empty / all_enrolled_nodes_already_listed), never an error that
+  breaks the window and never a fabricated device. Registry path is injectable
+  (`create_app(mesh_registry_path=...)`) and env-overridable
+  (SYNTHESUS_MESH_REGISTRY), so no test depends on a real mesh existing.
+- UI: a "Discovered on your mesh" section above the manual add form, each
+  candidate showing fingerprint, expiry and SANs, with an Add button that POSTs
+  role: "peer" to the EXISTING /api/devices. The manual form stays for sources,
+  and the copy says plainly that cameras/TVs/sensors are never enrolled and so
+  can never appear in that list.
+- Tests: 13 discovery unit tests (candidate shape, already-listed exclusion,
+  expiry, revocation, missing/empty/malformed/directory registry, env config,
+  and a check that a candidate has no capability field at all) + 5 endpoint
+  tests (the decisive one: discover -> add -> the controller STILL refuses the
+  node work with 403 device_not_permitted, plus discovery writing nothing to
+  the policy) + 5 UI wiring tests. Desktop suite 53 -> 76 passed
+  (`.venv/bin/python -m pytest apps/synthesus/desktop -q
+  --ignore=apps/synthesus/desktop/test_desktop_security.py`). script.js checked
+  with node --check.
+- REPOSITORY ANOMALY, recorded because it is not mine to erase: while this work
+  was in progress, a CONCURRENT process in this same checkout swept the
+  uncommitted implementation files (mesh_discovery.py, and the synthesusd.py /
+  index.html / script.js edits) into the squash-merge of PR #43 ("Controller-
+  side issuance of response grants", 9fed4c4) and pushed them to main. That
+  commit's message and its AGENT_LOG entry describe response grants ONLY and
+  never mention device discovery, so those files reached main unattributed and
+  undescribed. It also carried in a Write-tool temp artifact,
+  test_mesh_discovery.py.tmp.9366.3f440db5fd6c, as a tracked file; this branch
+  deletes that artifact (an accidental duplicate, not a finding or a failed
+  attempt) and this entry is the description PR #43 did not carry. Consequence:
+  the feat/device-discovery diff contains the TESTS and this log entry, while
+  the implementation it tests is already on main under 9fed4c4.
+- HONEST GAPS:
+  * THE PAGE WAS NEVER RENDERED. No browser tools exist in this session, so
+    there is no screenshot and no proof the discovered section opens, lays out
+    or is even visible. The wiring tests catch missing handlers and missing
+    element ids; they cannot catch layout, contrast or z-index. A human must
+    open it.
+  * NO REAL MESH REGISTRY WAS READ. Every test registry is hand-written JSON in
+    the record wire shape copied from the 2026-07-20 physical pull evidence. No
+    enrolled node was contacted, and this was never run against
+    ~/.synthesus/mesh/enrollments.json on the physical .54/.55 nodes.
+  * The default registry path (~/.synthesus/mesh/enrollments.json) is a
+    CONVENTION chosen here; nothing in the mesh writes to it yet, so on a real
+    install today the endpoint will answer registry_missing until an operator
+    points SYNTHESUS_MESH_REGISTRY at the real registry directory's file.
+  * Discovery does not verify certificates. It reports what the registry
+    RECORDS about expiry and revocation; it does not re-parse a certificate,
+    check a chain, or consult a CRL. An owner-controlled registry file that
+    lies would be believed.
+- NO FINISH_CHECKLIST box checked.
