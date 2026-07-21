@@ -1340,3 +1340,36 @@ marks the start; each landed piece gets its own honest entry.
   Harness carries machine-specific constants; it is not an installer.
   Rotation/revocation/NAT-traversal/attestation/production-CA still unproven.
 - NO FINISH_CHECKLIST box checked.
+### step 1 landed — paired request/response over one lease-bound mTLS socket
+- Motivation: physically observed that synthesus-mobile-desktop's swarm
+  ClusterCoordinator posts prompts over PLAINTEXT HTTP with no Authorization
+  header, and accepts an arbitrary reply from an unauthenticated peer as a
+  genuine model answer (capture in docs/evidence/SWARM_CLEARTEXT_2026-07-21.md).
+  The mesh transport is the fix, but it only moved ONE object per connection.
+- services/unisync/exchange.py: an exchange is two ordinary object transfers on
+  one TLS socket. `derive_response_context` builds leg 2 from leg 1 keeping
+  account/request/lease/lease_sha/fencing/transport/expiry and swapping
+  source<->destination. `_require_derived_from` enforces that on the wire (wire
+  forms compared, since a round-tripped timestamp loses sub-second precision),
+  and rejects a response that merely echoes the request object.
+- services/unisync/tls.py: `_receive_upload` gained ONE optional kwarg,
+  `on_context`, invoked with the peer's declared TransferContext before any
+  authorization; raising fails closed. Requester uses it to enforce the lease
+  binding; responder uses it to capture the request context. No return-shape
+  change, so the pull-fetch result schema is untouched.
+- Every existing check runs unchanged on BOTH legs: TLS 1.3, mutual auth, SAN
+  pinning, enrollment binding, require_authorized with the correct peer role,
+  digest verification, receipt.
+- Tests (6, real TCP + real TLS + real certs): round trip returns the answer and
+  authorizes leg 2 with the responder as source under the same lease/fencing
+  token; a forged lease_id is rejected before the validator runs; a bumped
+  fencing token is rejected; echoing the request object back is rejected;
+  derivation keeps authority and swaps direction; a raising handler sends no
+  response. tests/unisync/test_tls_transport.py + test_hybrid_carrier.py: 27
+  passed (unchanged).
+- HONEST GAPS: transport primitive ONLY — no scheduling, no lease acquisition,
+  no application wiring; the caller supplies an authorized TransferContext.
+  NOT yet run between two physical machines (loopback sockets only). Step 2
+  (mesh_http_post adapter) and step 3 (node identity mapping, which is what
+  actually kills the response-injection attack) are not started.
+- NO FINISH_CHECKLIST box checked.
