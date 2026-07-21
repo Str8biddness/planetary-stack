@@ -2802,3 +2802,43 @@ scenes are well above that, so they distribute.
   end-to-end install.sh run into a clean prefix (the copy fix is reasoned and
   syntax-checked, NOT executed); ARM determinism for the forge core.
 - NO FINISH_CHECKLIST box checked.
+### forge polish — three real bugs found from the owner's screenshot
+- Owner rendered the Image Forge and sent a screenshot. Three defects, all
+  diagnosed from the tree rather than guessed:
+  1. GARBLED OVERLAPPING BANNER: `.forge-stage` sized itself only with
+     `aspect-ratio`. Where that is not honoured the box collapses to zero
+     height, the 100%-height canvas vanishes, and the absolutely-positioned
+     "WebGL2 unavailable" overlay crams on top of itself — exactly what the
+     screenshot showed. Fixed with a min-height fallback.
+  2. BLANK WHITE DROPDOWNS: Preset/Scene/Palette are native <select> with only
+     `.glass-input`, and nothing in either stylesheet targeted `select`. The
+     platform default (white) showed through on a dark panel. Styled
+     explicitly, including `option` background, with the appearance reset and a
+     drawn caret.
+  3. THE FORGE COULD NOT RENDER AT ALL IN THIS SHELL: WebGL2 is unavailable in
+     the GTK/WebKit surface, and the forge was client-side WebGL only. There
+     was NO server-side render path.
+- ADDED POST /api/forge/render — authed, bounded (32..2048px, quality 8..128),
+  accepts a recipe code or explicit fields, returns image/png with
+  X-Forge-Recipe (what actually rendered, so it is reproducible) and
+  X-Forge-Native (which engine served it). It uses the SAME pinned CPU engine
+  the distributed renderer uses, so a browser gets byte-identical output to any
+  mesh node — not a different, prettier fallback.
+- REFUSES a large frame when the native core is missing (>160k px) rather than
+  hanging the controller for a minute on the pure-Python path.
+- VERIFIED LIVE over HTTP against the running app: 512x512 quality 48 in 2.7s,
+  x-forge-native: 1, valid PNG, image inspected and correct.
+- FIXED A BRITTLE TEST OF THEIRS rather than working around it:
+  test_module_is_vendored_with_a_cache_bust pinned the LITERAL string
+  "script.js?v=20260721l", so every legitimate cache-bust bump broke it — which
+  trains people to edit the test instead of thinking. Now asserts the PROPERTY:
+  every local js/css asset carries a ?v= parameter. That still catches the
+  failure worth catching (an asset shipped with no cache-bust, which is how a
+  prior session shipped three rounds of invisible CSS).
+- Tests: 8 new endpoint tests, mostly refusals (unauthenticated, absurd size,
+  absurd quality, malformed recipe, native-missing large frame). Desktop +
+  forge_render: 134 passed.
+- NOT DONE: the chat interface does not call this endpoint yet — that is the
+  prompt -> scene-graph -> render path and it needs Recipe v2 to be worth much,
+  since a prompt can currently only select one of four scenes and turn knobs.
+- NO FINISH_CHECKLIST box checked.
