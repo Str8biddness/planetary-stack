@@ -2249,3 +2249,50 @@ NEXT PIECES, in order
   d. Role/capability advertisement so placement routes by role.
   e. Push/pull sync over the CAS.
 - NOTHING IN THIS ENTRY IS BUILT. NO FINISH_CHECKLIST box checked.
+### storage zones — the boundary that makes autonomous mesh sync safe
+- Built ahead of the push/pull loop, because the loop without this boundary is
+  a fast way to replicate a poisoned document to every node.
+- THE THREAT, restated: content addressing proves bytes arrived intact. It says
+  NOTHING about whether they are true. If a worker's model is prompt-injected
+  and writes a poisoned result, the mesh faithfully replicates the corruption at
+  full speed and every node grounds on it.
+- CONTAINER ISOLATION IS NOT THE CONTROL AT THIS LAYER. The owner was right and
+  I was reaching for the wrong tool: proot has no Podman, and if a worker's only
+  capability is "write output" there is no shell to sandbox. The control belongs
+  at the ZONE BOUNDARY.
+- services/storage_zones.py — four zones, three transports, one gate:
+    NODE      per-node state; transport NONE; never leaves the device
+    OUTPUT    worker results; transport MESH; circulating means AVAILABLE,
+              not BELIEVED
+    GROUNDING what the assistant treats as true; MESH only; worker_may_write
+              is FALSE
+    EXTERNAL  code/published material; transport PUBLIC; the ONLY zone marked
+              leaves_home (asserted by test — changing it changes the product's
+              claim)
+- Moves are an ALLOWLIST, not a denylist, because the dangerous direction is
+  the one nobody thought of. (GROUNDING -> EXTERNAL) is absent and a test
+  asserts its absence: that is personal data leaving the home.
+- THE GATE: promote_to_grounding() refuses approved_by=None. There is
+  deliberately NO bypass flag. A system that can promote its own output into
+  its own beliefs will eventually believe what a poisoned document told it to.
+- This is the owner's OWN earlier idea made structural — the memory
+  crystallization UI where a fact must be approved before it is written to long
+  term memory. It also maps onto the consciousness model already in the repo:
+  fluid is what the mesh circulates, crystallized is what the owner approved.
+- PromotionLedger: append-only, mode 0600, fsynced, records digest + who
+  approved + why + which node produced it + that result's evidence_status.
+  Grounding content absent from the ledger was never approved — the question
+  worth being able to answer after something goes wrong.
+- Tests (20, all refusals): grounding/output/node over a public transport,
+  worker writing to grounding or external, five forbidden moves,
+  GROUNDING->EXTERNAL absent from the allowlist, automated promotion refused,
+  ledger survives reopen, ledger is 0600, approval must name who and why,
+  provenance retained, and zone_of not fooled by `output/../grounding`.
+- HONEST SCOPE, in the module: this enforces WHERE content may go. It does not
+  judge whether content is TRUE and cannot detect a poisoned document. What it
+  guarantees is that a poisoned document cannot become grounding on its own,
+  and that personal content cannot reach an external transport by code alone.
+- NOT BUILT YET: the push/pull sync loop itself, and wiring these checks into
+  the existing transports (mesh_smoke / rclone paths). The boundary exists;
+  nothing calls it yet.
+- NO FINISH_CHECKLIST box checked.
