@@ -1820,3 +1820,107 @@ marks the start; each landed piece gets its own honest entry.
   snapshot retired. Every original archived under /home/dakin/planetary-stack-
   archive/.
 - NO FINISH_CHECKLIST box checked.
+
+### INSTALLABLE PHONE APP (PWA) — manifest, service worker, phone layout, "This device"
+- Branch `feat/mobile-pwa`. Goal: the Web Desktop installs to an Android home
+  screen from Chrome's "Add to Home Screen" with no Play Store, no TLS and no
+  external origin — the shell already serves from loopback on the device, which
+  browsers treat as a secure context.
+- ADDED:
+  * `apps/synthesus/desktop/manifest.webmanifest` — standalone display,
+    background/theme `#070a16` (the existing `--bg-space` token), start_url and
+    scope relative, 7 icons including the 192/512 pair Chrome requires to offer
+    installation at all, plus two maskable variants.
+  * `apps/synthesus/desktop/assets/synthesus-icon-{128,192,256,384,512}.png` and
+    `synthesus-maskable-{192,512}.png`, generated with Pillow from the existing
+    1254x1254 `synthesus-icon.png`. The maskable pair insets the mark to the 80%
+    safe zone on the same opaque black field.
+  * `apps/synthesus/desktop/sw.js` — versioned app-shell cache, old caches
+    deleted on activate, same-origin GET only, network-first for navigations
+    with a cached-document fallback so an installed icon still opens. It
+    refuses to touch `/api/`, `/ws`, `/terminal`, `/socket.io`: a cached API
+    response is a past number presented as a present one, which is the same
+    lie as inventing it.
+  * A phone-sized `win-worker` ("This device") surface plus dock entry, and
+    `workerRefresh()` in script.js.
+- CHANGED: index.html links the manifest and declares theme-color/apple-touch
+  icon and `viewport-fit=cover`; styles.css gains the phone layout; script.js
+  registers the service worker on load.
+- PHONE LAYOUT: at <=820px every `.window` becomes a full-screen sheet. This
+  needs `!important` because every window carries INLINE `top/left/width/height`
+  in pixels (e.g. win-dashboard is `left:120px; width:720px`), which nothing in
+  a stylesheet can beat otherwise. The 14px window-chrome dots are grown to a
+  44px hit area with transparent padding; the dock becomes one horizontally
+  scrollable row instead of four wrapped rows; `.ps-grid` drops to one column;
+  the 440px login card is clamped to the viewport; safe-area insets are honoured.
+- "THIS DEVICE" IS DERIVED FROM REAL READINGS ONLY. working/idle/paused comes
+  from `/api/settings` (is a worker configured) crossed with `/api/devices`
+  (is that node actually permitted to `run_inference`) and `/api/jobs/{id}`
+  (anything in state `admitted`). "Paused" is a real state — enrolled as a
+  worker but not allowed to run work. Items completed counts jobs in state
+  `completed` among the ids this browser is tracking, and says so in the
+  sub-label. Battery uses the Battery Status API. THERMAL RENDERS THE WORD
+  "unknown", ALWAYS, because no web API exposes thermal state; it is left
+  visible so a later native reading has an honest place to land.
+- BRIEF vs TREE — four things in my brief do not exist in this repository, and
+  I built against the tree, not the brief:
+  1. There is no `design-system.css` and no `--purple`/`--s1..--s6`/`--r-card`/
+     `--spring` tokens. The real tokens are in styles.css (`--accent-*`,
+     `--radius-*`, `--ease`).
+  2. The brief said "black/white/purple, no blue or cyan". The shipped product
+     is blue/violet/cyan (`--accent: #38bdf8`) throughout. I did not restyle the
+     product to match a brief; new CSS uses the tokens already in the file.
+  3. There are no `assets/synthesus-mark-{32,64,128,512}.png`. Only
+     `assets/synthesus-icon.png` existed, so the icon set was generated from it.
+  4. There is no "Overview surface", no sidebar rail, no right panel and no
+     1100px/1240px media queries. This is a floating-window desktop with a dock;
+     existing breakpoints were 720px and 420px. The mobile pass therefore adds
+     820px/380px rather than "extending" queries that are not there.
+  5. `/api/system/metrics` DOES NOT EXIST anywhere in the repository. I did not
+     create it. The worker view reads only endpoints that already exist, and a
+     test pins that set.
+- TESTS: 16 added to `test_ui_wiring.py` — manifest is valid JSON and every icon
+  it names exists on disk; every precached shell asset exists on disk; index
+  links the manifest; the service worker's `/api/` guard is proven to sit before
+  any `caches.match`/`caches.open`; cache versioning and cleanup; and an
+  absolute-URL budget. The URL test is an ALLOWLIST WITH EXACT COUNTS of the
+  URLs that were ALREADY in the tree (`http://' + window.location.host` x9,
+  `http://localhost:1234` x3, `https://rclone.org/install.sh` x1). A blanket
+  "no http:// anywhere" assertion would have failed on pre-existing code; this
+  version fails the moment a NEW one appears. The pre-existing ones are named in
+  the test, not hidden.
+- COMMANDS RUN:
+  * `.venv/bin/python -m pytest apps/synthesus/desktop -q --ignore=.../test_desktop_security.py`
+    -> 76 passed BEFORE, 92 passed AFTER. (My brief said the baseline was 78;
+    the observed baseline on this checkout is 76.)
+  * `node --check` on script.js and sw.js -> both clean.
+  * Served the directory with `python -m http.server` and curled the new files:
+    manifest.webmanifest 200 `application/manifest+json`, sw.js 200
+    `text/javascript`, both icons 200 `image/png`, and the manifest parsed as
+    JSON over the wire.
+- HONEST GAPS:
+  * THE PAGE WAS NEVER RENDERED AND THE APP WAS NEVER INSTALLED. There are no
+    browser tools in this session. Nobody has seen "Add to Home Screen" appear,
+    nobody has seen the icon on a home screen, nobody has seen it launch
+    fullscreen, and nobody has seen the phone layout. Every claim above about
+    layout is a claim about CSS I wrote, not about pixels anyone observed.
+  * THE SERVICE WORKER HAS NEVER EXECUTED. Not once. `node --check` proves it
+    parses; it does not prove install/activate/fetch behave. The offline launch
+    path in particular is entirely unexercised.
+  * NOT SERVED BY THE REAL SHELL. The HTTP check above used
+    `python -m http.server`, not `synthesus_native_shell.py`. The Flask route
+    `serve_static` will serve both files from the same directory and Python's
+    mimetypes already maps `.webmanifest`, but I did not boot the actual shell.
+  * BATTERY WAS NEVER READ. No phone was involved. `navigator.getBattery` was
+    never called in any browser, so the battery card is untested against a real
+    implementation, and the "unknown" fallback path is untested too.
+  * NO WORKER STATE WAS EVER OBSERVED. working/idle/paused was never seen
+    against a controller with a configured worker; the derivation is reasoned
+    from the endpoint shapes in synthesusd.py and device_policy.py.
+  * MASKABLE ICON SAFE ZONE NOT VISUALLY CHECKED. The 80% inset is the spec
+    number applied arithmetically; nobody looked at the result in a circular
+    mask to confirm the mark is not clipped.
+  * `test_desktop_security.py` still cannot be collected on this machine
+    (`ModuleNotFoundError: No module named 'jwt'`). Pre-existing, unrelated to
+    this change, and the reason the brief excludes it.
+- NO FINISH_CHECKLIST box checked.
