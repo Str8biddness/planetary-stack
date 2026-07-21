@@ -190,6 +190,11 @@ async def _parent_watchdog(parent_pid: int | None) -> None:
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
+# synthesusd is launched with its working directory inside `desktop/`, so the
+# repository root is not on sys.path and `services.*` cannot be imported. The
+# mesh job pipeline lives there, so without this the daemon dies at startup.
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 _DESKTOP_MESH_SAN = "desktop.mesh"
 
 
@@ -893,7 +898,13 @@ if __name__ == "__main__":
         raise SystemExit(str(exc)) from exc
     port = int(os.environ.get("SYNTHESUS_CONTROLLER_PORT", "5011"))
     
-    pipeline = _build_job_pipeline(settings)
+    try:
+        pipeline = _build_job_pipeline(settings)
+    except Exception as exc:
+        # The desktop is useful without a mesh worker. Losing remote jobs must
+        # degrade that one feature, not prevent the controller from starting.
+        log.warning("job pipeline unavailable; remote jobs disabled: %s", exc)
+        pipeline = None
     
     uvicorn.run(
         create_app(settings, job_pipeline=pipeline),
