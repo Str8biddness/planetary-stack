@@ -239,3 +239,51 @@ def test_handler_failure_does_not_leak_a_response(tmp_path, certs):
 
     with pytest.raises(Exception):
         _run_exchange(tmp_path, certs, handler)
+
+
+def test_derived_response_is_rejected_by_the_real_signed_lease_validator():
+    """The response leg has no authority under a real lease. See
+    docs/design/EXCHANGE_RESPONSE_AUTHORITY.md.
+
+    This is a REGRESSION GUARD for a known blocker, not a passing feature: it
+    pins the exact reason `exchange.py` cannot yet be wired to a production
+    validator, using the genuine signed documents from the 2026-07-20 physical
+    pull. When the contracts gain a bounded response slot, this test should be
+    replaced by one that asserts the response leg authorizes.
+    """
+    import json
+    from pathlib import Path
+
+    from services.unisync.mesh_common import b64url_decode
+    from services.unisync.mesh_lease import SignedLeaseValidator
+
+    evidence_path = (
+        Path(__file__).resolve().parents[2]
+        / "docs/evidence/F020_DESKTOP_INITIATED_PULL_PHYSICAL_2026-07-20.evidence.json"
+    )
+    evidence = json.loads(evidence_path.read_text())
+    documents = evidence["documents"]
+    trust = evidence["trust_bundle"]
+    request_context = TransferContext.from_wire(evidence["transfer"]["transfer_context"])
+    common = dict(
+        lease_wire=documents["active_lease"],
+        request_wire=documents["request"],
+        scheduler_key_id=trust["scheduler_key_id"],
+        scheduler_public_key=b64url_decode(
+            trust["scheduler_public_key_base64"], expected_bytes=32
+        ),
+        controller_key_id=trust["controller_key_id"],
+        controller_public_key=b64url_decode(
+            trust["controller_public_key_base64"], expected_bytes=32
+        ),
+    )
+
+    # The forward leg is genuinely authorized by these documents.
+    SignedLeaseValidator(expected_context=request_context, **common)
+
+    # The return leg is not: a lease authorizes delivery to ONE leased node.
+    response_context = derive_response_context(
+        request_context, response_sha256="d" * 64, byte_length=61
+    )
+    with pytest.raises(AuthorizationError, match="destination is not the leased node"):
+        SignedLeaseValidator(expected_context=response_context, **common)

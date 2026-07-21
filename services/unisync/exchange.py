@@ -26,6 +26,16 @@ Roles here are transfer roles, not TCP roles. Which side dialed is independent;
 `docs/design/DESKTOP_INITIATED_RESULT_PULL.md`, where the requester opens the
 connection outbound and therefore needs no inbound firewall.
 
+!! BLOCKED — DO NOT WIRE THIS INTO AN APPLICATION PATH YET !!
+The derivation above cannot be authorized by the production
+`SignedLeaseValidator`: a lease pins ONE destination node, so the return leg
+has no lease to travel under, and a response digest cannot be pre-declared as a
+content reference in a request signed before the handler ran. Verified against
+the genuine signed documents from the 2026-07-20 physical pull; see
+`docs/design/EXCHANGE_RESPONSE_AUTHORITY.md` and the regression guard in
+`tests/unisync/test_exchange.py`. This module works only with a validator that
+does not enforce those rules, which in this repo means the test validator.
+
 HONEST SCOPE: this is the transport primitive only. It does not schedule, does
 not acquire leases, and does not know what a "prompt" is — the caller supplies
 an already-authorized `TransferContext` and the responder supplies a handler.
