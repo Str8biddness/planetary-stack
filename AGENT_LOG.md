@@ -1398,3 +1398,30 @@ marks the start; each landed piece gets its own honest entry.
 - PHYSICAL EXCHANGE RUN: NOT DONE. Step 2 (mesh_http_post) must not start until
   this is resolved — it would be built on an unauthorizable transport.
 - NO FINISH_CHECKLIST box checked.
+### design proposal written — bounded response slots (UNREVIEWED)
+- docs/design/PROPOSAL_BOUNDED_RESPONSE_SLOT.md: proposed fix for the blocker in
+  EXCHANGE_RESPONSE_AUTHORITY.md. NOT implemented, NOT agreed.
+- Shape: (1) a `ResponseSlot` declared inside the controller-signed request
+  (so it is already covered by request_sha256 and needs no new trust root),
+  pinning responder node, destination node, max_byte_length and an exact
+  media_type; (2) an atomically minted lease PAIR per placement, so the
+  invariant "a lease authorizes delivery to exactly one node" is preserved
+  rather than eroded — mesh_lease.py:179 stays as-is; (3) one narrowly scoped
+  alternative branch in SignedLeaseValidator where the object digest is
+  unconstrained but size, media type, responder, destination, and single-use
+  are all enforced.
+- Stated plainly in the doc: the digest of a computed result CANNOT be
+  pre-approved, so "owner pre-approves exact bytes" is lost for responses and
+  replaced by "owner pre-approves a bounded, single-use, attributable channel".
+  A compromised-but-enrolled responder can return arbitrary bytes within the
+  bound. That is the irreducible cost of computing on a machine you do not
+  fully control; the proposal argues for bounding blast radius + attribution
+  rather than pretending the guarantee survives.
+- Flagged as a real cost: TWO wire-format changes (ChalRequest gains slots;
+  TransferContext gains slot_id, and from_wire enforces an exact field set), so
+  every node is affected and staging matters.
+- Five open questions left for the owner, the first being whether a bounded
+  attributable channel is sufficient for the product's privacy claim — if not,
+  the honest conclusion is that the mesh should not carry inference at all.
+- exchange.py remains do-not-wire. PHYSICAL EXCHANGE RUN: STILL NOT DONE.
+- NO FINISH_CHECKLIST box checked.
