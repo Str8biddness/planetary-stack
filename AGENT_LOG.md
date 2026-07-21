@@ -1906,3 +1906,50 @@ marks the start; each landed piece gets its own honest entry.
   screenshot predates this build. STILL NO BROWSER TOOLS — every visual claim is
   from served markup, not a render.
 - NO FINISH_CHECKLIST box checked.
+### identity layer — hash-chained continuity on the consciousness loop
+- Owner's design: a real identity layer running off the consciousness loop,
+  with narrative simulation adding variables and a continuous story; framed as
+  the moat ("characters others cannot reproduce").
+- What already existed: core/consciousness_integrator.py computes
+  C(t) = Psi_f(t) ⊕ M_c(t) ⊕ N_s(t); conscious_state.NarrativeState is already
+  labelled "N_s(t): Narrative Simulation / Identity State" with identity,
+  current_role, scene_tag, goals, emotional_tone, continuity_summary, timeline.
+  What was MISSING was continuity you can check — a character running for six
+  months was indistinguishable from a fresh copy of the same genome.
+- characters/identity.py: append-only hash chain.
+    genesis = H(archive_sha256 || character_id)
+    entry_n = H(entry_{n-1} || C(t) digest || narrative delta)
+    identity = chain head
+  Genesis binds to the SHIPPED .sxc digest, so a chain cannot be transplanted
+  onto another genome or another character. Persisted as JSON lines, fsynced,
+  re-verified on load. Only identity-bearing narrative fields are committed;
+  unknown fields are REFUSED (an entry is not a smuggling channel).
+- Demonstrated on the real shipped archive: genome bbbff85f…, genesis
+  2136152202a7ce22, head a3b8e25d0ff5c58a after 3 lived steps, chain verifies,
+  story renders as continuous narrative.
+- Tests (13, total characters suite 25): edited entry, reordered entries,
+  excised entry, forged appended entry, transplant onto another genome,
+  transplant onto another character, unknown narrative fields, survives reload,
+  deterministic state digest over the loop's dataclass, roots in the real
+  shipped archive, and the commercial one — a fresh copy of the genome shares
+  genesis but has NO history.
+- HONEST SCOPE recorded in the module and told to the owner plainly:
+  * The equations DO NOT make characters unreproducible. This is a local-first
+    product; the genome and consciousness_integrator.py ship to the customer's
+    own machine as readable JSON and Python. Obfuscation on hardware the other
+    party controls is not a boundary. "Others cannot reproduce it" is FALSE as
+    stated and must not be sold that way.
+  * What IS defensible: accumulated history (a buyer gets the genome at
+    genesis, not 50k lived entries), signed heads for issuance/authenticity,
+    keeping the GENERATOR off the shipped artifact, and the legal rights.
+  * The chain is tamper-EVIDENCE and continuity, NOT authenticity. The machine
+    owner can legitimately run their own chain forward — that is the product
+    working. Binding a chain to an issuer needs a signature over the head.
+    NOT built.
+- LEGAL FLAG RAISED TO OWNER, UNRESOLVED: the supplied image says "Patented".
+  Repo-wide search finds no patent or application number — only the comments
+  "Patent-Aligned State" and "patent equation". Marking a product patented
+  without a grant is false patent marking (35 U.S.C. 292); "patent pending"
+  requires a filed application. Asked for the number/status before ANY such
+  wording goes near the product. Nothing shipped uses the word.
+- NO FINISH_CHECKLIST box checked.
