@@ -183,7 +183,9 @@ def test_manifest_carries_licence_terms():
     """Terms travel inside the digest, not as a droppable sibling file."""
     manifest = verify_archive(SHIPPED)
     terms = manifest["licence"]
-    assert terms["id"] == "LicenseRef-Synthesus-Character-Content-1.0"
+    assert terms["id"] == "LicenseRef-Synthesus-Character-Content-1.1"
+    assert terms["model"] == "subscription"
+    assert terms["requires_entitlement"] is True
     assert terms["redistribution"] == "prohibited"
     assert terms["training_use"] == "prohibited"
     # The engine's separate licence is named, so the two works stay distinct.

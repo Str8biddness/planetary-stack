@@ -2024,3 +2024,47 @@ marks the start; each landed piece gets its own honest entry.
   measure prevents reading it.
 - Tests: characters suite 25 -> 28 passed.
 - NO FINISH_CHECKLIST box checked.
+### refined for SUBSCRIPTION (owner: the platform depends on subscription users)
+- A perpetual "install and run" grant is the wrong shape for subscriptions.
+  Rewrote the character licence to v1.1 (subscription) and built the
+  entitlement layer under it.
+- ARCHITECTURAL TENSION NAMED, NOT GLOSSED: a subscription must be checked, and
+  a local-first product must not send the customer's data anywhere. Resolution:
+  the vendor signs a SHORT-LIVED entitlement; the client verifies it OFFLINE
+  against a pinned ed25519 key. The only network event is RENEWAL, and it
+  discloses exactly one fact — this subscription is in use. The licence now
+  says plainly this is NOT "nothing leaves your machine", it is "nothing about
+  your work leaves your machine". A test asserts the entitlement carries no
+  telemetry-shaped field and pins its exact field set.
+- services/entitlement.py: issue/verify, domain-separated signature, 7-day
+  default term (max 31), 14-day default grace (max 90), plan scoping by
+  character id or "*", account binding, future-dated refusal, clock-skew
+  tolerance. Expiry is a STATE (active/grace/lapsed), not an exception, so the
+  caller can tell grace from lapse.
+- TWO PRODUCT RULES ENCODED IN CODE AND ASSERTED BY TEST, so they cannot erode
+  into policy later:
+  * GRACE IS NOT A CLIFF — an expired-but-in-grace subscription keeps running.
+    A local-first tool that bricks itself offline is a broken promise.
+  * LAPSE NEVER HOLDS DATA HOSTAGE — data_access_after_lapse() returns identity
+    chain readable + exportable, conversation history readable, local files
+    readable, and ONLY character_may_run False. A subscription buys the right
+    to RUN a character, never the right to withhold what the customer's own
+    machine recorded. The licence forbids deleting/encrypting/ransoming data on
+    the customer's hardware.
+- STATED IN THE LICENCE: entitlement checking is NOT copy protection and must
+  not be sold as DRM. The customer owns the hardware and can bypass it; its
+  purpose is to make the legitimate path automatic, not to defeat someone who
+  owns the computer.
+- Licence terms in the archive manifest updated to
+  LicenseRef-Synthesus-Character-Content-1.1 with model=subscription and
+  requires_entitlement=true, still covered by archive_sha256 (stripping or
+  rewriting them still fails verification). Rebuilt synthesus.sxc:
+  archive_sha256 5f28501c894cb560fda463dada389fe538b37e3547cca8b50f25e5b6f04f43eb.
+- A test I wrote was WRONG and I fixed it rather than the code: the "no usage
+  data" check substring-scanned the whole blob and matched "count" inside
+  "account_id". Now checks field NAMES.
+- Tests: characters suite 28 -> 41 passed.
+- NOT BUILT: the renewal client (fetch/store/refresh an entitlement), the
+  vendor-side issuing service, billing integration, and enforcement wiring into
+  the character loader. This is the primitive plus its terms, nothing more.
+- NO FINISH_CHECKLIST box checked.

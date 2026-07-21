@@ -48,8 +48,10 @@ ARCHIVE_SCHEMA = "planetary.synthesus.character_archive.v1"
 # committed to the digest cannot be removed without the archive failing
 # verification.
 DEFAULT_LICENCE = {
-    "id": "LicenseRef-Synthesus-Character-Content-1.0",
-    "name": "Synthesus Character Content Licence 1.0",
+    "id": "LicenseRef-Synthesus-Character-Content-1.1",
+    "name": "Synthesus Character Content Licence 1.1 (subscription)",
+    "model": "subscription",
+    "requires_entitlement": True,
     "holder": "Dakin Ellegood",
     "redistribution": "prohibited",
     "training_use": "prohibited",
