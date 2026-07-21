@@ -2767,3 +2767,38 @@ scenes are well above that, so they distribute.
   to anything, ARM/cross-architecture determinism check (the seam risk between
   a phone and an x86 desktop is UNTESTED).
 - NO FINISH_CHECKLIST box checked.
+### wiring the native work into the launcher and installer
+- SECOND CORRECTION ON THE KERNEL, sharper than the first: TWO zo_kernel
+  PROCESSES WERE ALREADY RUNNING under the live app (PIDs 2770/2771), the
+  binary was built at install time (2026-07-15), and SYNTHESUS_KERNEL_BIN is
+  set in the live env. The C++ kernel is built, configured AND IN USE. What is
+  absent is only the optional PYBIND module `_synthesus_kernel` (needs
+  python3-dev). I conflated "the pybind module will not import" with "the
+  kernel is not used". They are different integrations and the IPC one is live.
+- Built zo_kernel in the REPO tree too, so the app no longer depends on a
+  binary living in the retired install snapshot.
+- FOUND WHILE WIRING, and it is the real gap: INSTALL.SH ONLY COPIES desktop/
+  AND runtime/. Everything under repo-root services/ and contracts/ was never
+  copied. synthesusd imports services.remote_pipeline, services.result_transfer,
+  services.unisync.* — so A FRESH INSTALL WOULD RAISE ModuleNotFoundError AT
+  STARTUP and the desktop would refuse to boot. Confirmed: the retired install
+  tree has no services/ directory at all. Fixed by rsyncing both packages from
+  the repository root (with *.so excluded, since natives are built per-machine).
+- install.sh step 5b now builds both native cores and degrades LOUDLY:
+  * forge core via services/forge_render/native/Makefile (~90x on rendering)
+  * zo_kernel via cmake -DBUILD_PYBIND=OFF
+  Each failure prints a warn line naming the consequence rather than passing
+  silently. SYNTHESUS_KERNEL_BIN is now written to synthesus.env uncommented.
+- launch.sh now REPORTS native state at every start:
+    [native] forge core: enabled
+    [native] C++ kernel: /path/to/zo_kernel
+  or a MISSING line naming the cost and the build command. This is the direct
+  fix for the failure mode that hid the kernel for months — a swallowed import,
+  a pure-Python fallback, and nobody knowing why it was slow.
+- VERIFIED LIVE: restarted from the desktop icon; both native lines print
+  enabled, synthesusd READY, and the served page contains the forge window.
+  forge_render + desktop suites: 134 passed.
+- STILL NOT DONE: pybind module (needs python3-dev, i.e. sudo); a real
+  end-to-end install.sh run into a clean prefix (the copy fix is reasoned and
+  syntax-checked, NOT executed); ARM determinism for the forge core.
+- NO FINISH_CHECKLIST box checked.
