@@ -2842,3 +2842,58 @@ scenes are well above that, so they distribute.
   prompt -> scene-graph -> render path and it needs Recipe v2 to be worth much,
   since a prompt can currently only select one of four scenes and turn knobs.
 - NO FINISH_CHECKLIST box checked.
+### subscription plans + local model autoload
+- EMERGENT PRODUCED NOTHING ON THE SECOND RUN. Same branch
+  conflict_210726_1348em, still NO COMMON ANCESTOR with main, still 88 files,
+  still zero of the codebase (services/ apps/synthesus/ contracts/ all absent).
+  The two new commits touched only .emergent/cron/webhook-crons and
+  .emergent/emergent.yml — its own scheduling metadata. The patch file is
+  byte-identical to the one already recovered as PR #52.
+  ROOT CAUSE, from .emergent/emergent.yml:
+    "env_image_name": "fastapi_react_mongo_shadcn_base_image_cloud_arm"
+  Emergent boots a FastAPI+React+Mongo+shadcn container. That is what it
+  produces. This product is vanilla JS with no build step, no React, no Mongo,
+  plus a C++ kernel and a Python mesh. It does not clone-and-extend arbitrary
+  repos. This is a TOOL/PRODUCT MISMATCH, not a briefing failure — a second
+  brief was never going to fix it, and I should have concluded that from the
+  shape of the first branch rather than writing one.
+- LOCAL MODEL AUTOLOAD (the owner's earlier complaint): ollama was installed,
+  llama3.2 was on disk, SYNTHESUS_MODEL was set — the DAEMON JUST WAS NOT
+  RUNNING, and nothing started it. install.sh starts it once at install; no
+  boot after that did. launch.sh now starts it, waits for /api/tags to actually
+  answer, and reports state. It deliberately does NOT pull a model — that can
+  be gigabytes and must be the user's decision, not a launch surprise. A
+  missing model prints the exact `ollama pull` command.
+  VERIFIED LIVE: "[model] ollama: starting… / ready / llama3.2:3b: present".
+- SUBSCRIPTION PLANS. services/plans.py holds the tier model in one place with
+  the commercial reasoning written down so it can be argued with:
+  * FREE IS NOT A CRIPPLED PRODUCT, IT IS A SMALL ONE. Every feature is present
+    and reachable — mesh UI, forge, characters, identity chains. Free limits
+    SCALE (1 device, 1 character, 512x512, 25 renders/day), not features. A
+    free tier that hides features teaches users the product is small; one that
+    runs the whole product at small scale teaches them it is real.
+  * THE MESH IS THE UPGRADE. A single machine is a nice local AI; the second
+    device is the thing nobody else sells. Free therefore stops exactly where
+    the mesh begins, and shows the empty device list so the user can see
+    precisely what a subscription buys.
+  * Personal $12/mo (judgement call, annotated in the file): below the $15
+    line, marginal cost near zero since the compute is the user's. Enterprise
+    is None = "talk to us", NOT 0, which would render as free.
+  * LIMITS ARE SHOWN BEFORE THEY ARE HIT. /api/plans returns usage alongside
+    limits; the UI draws meters. A limit discovered by something breaking is a
+    bug, not a business model.
+- Billing is NOT wired. The UI says so explicitly ("Checkout not connected —
+  nothing has been charged or changed") instead of implying a working
+  checkout, and /api/plans returns billing_connected: false.
+- UI built as SEPARATE FILES (subscription.css / subscription.js) specifically
+  so it could land without conflicting with concurrent edits. index.html gains
+  only the two asset links, the window, and a dock entry.
+- Tests: 19 plan tests, most of them refusals — second device refused on free
+  and names a REAL upgrade plan, render ceiling stated in the pixels the user
+  sees, daily cap, mesh and custom characters refused on free, and an unknown
+  plan id falls back to free rather than accidentally unlocking the product.
+  Desktop + character_system: 249 passed, 1 skipped.
+- HONEST GAPS: no checkout, no payment provider, no per-account persistence —
+  current_plan_id is always "free" because there is no subscription to read.
+  The plans window has NOT been rendered in a browser.
+- NO FINISH_CHECKLIST box checked.

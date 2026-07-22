@@ -853,6 +853,50 @@ def create_app(
             },
         )
 
+    @app.get("/api/plans")
+    async def list_plans(request: Request):
+        """Plans, the current plan, and current usage against its limits.
+
+        Usage is returned so the UI can show a limit BEFORE it is reached. A
+        limit a user discovers by something breaking is a bug, not a business
+        model. Any figure that cannot be read is omitted rather than guessed,
+        and the UI renders those as "unknown".
+        """
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        try:
+            from services.plans import DEFAULT_PLAN, all_plans_wire
+        except Exception as exc:
+            return JSONResponse(
+                status_code=503, content={"error": "plans_unavailable", "detail": str(exc)}
+            )
+
+        usage: dict[str, Any] = {}
+        try:
+            usage["devices"] = len(await asyncio.to_thread(device_policy.devices))
+        except Exception:
+            pass  # omitted -> UI shows "unknown"
+        try:
+            from services.plans import get_plan  # noqa: F401
+            characters_dir = (
+                _REPO_ROOT / "apps" / "synthesus" / "runtime" / "packages" / "characters"
+            )
+            usage["characters"] = sum(
+                1 for p in characters_dir.iterdir()
+                if p.is_dir() and (p / "bio.json").exists()
+            )
+        except Exception:
+            pass
+
+        # Billing is not wired, so there is no subscription to read. Saying
+        # "free" is accurate for every current install rather than a placeholder.
+        return {
+            "plans": all_plans_wire(),
+            "current_plan_id": DEFAULT_PLAN,
+            "usage": usage,
+            "billing_connected": False,
+        }
+
     # ---------------------------------------------------------------- settings
 
     @app.get("/api/settings")

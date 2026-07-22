@@ -1,0 +1,120 @@
+/* =====================================================================
+   Subscription / plans surface.
+
+   Deliberately a separate stylesheet: the desktop's index.html, script.js and
+   styles.css are under concurrent edit, and a self-contained file can land
+   without conflicting with them.
+
+   Everything here uses design-system.css tokens. No new colours, no new
+   spacing values.
+   ===================================================================== */
+
+.plans {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--s2);
+    align-items: stretch;
+}
+
+.plan {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2);
+    padding: var(--s3);
+    border-radius: var(--r-card);
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    box-shadow: var(--elev-1);
+    transition: transform var(--t-base) var(--spring),
+                border-color var(--t-base) var(--spring),
+                box-shadow var(--t-base) var(--spring);
+}
+.plan:hover { transform: translateY(-2px); box-shadow: var(--elev-2); }
+
+/* The plan the user is on. Stated, not implied. */
+.plan.is-current {
+    border-color: var(--hairline-strong);
+    box-shadow: var(--elev-2), inset 0 0 0 1px rgba(167, 139, 250, 0.18);
+}
+.plan.is-recommended {
+    border-color: transparent;
+    box-shadow: var(--elev-2), 0 0 0 1px rgba(139, 92, 246, 0.55);
+}
+
+.plan-badge {
+    position: absolute;
+    top: calc(var(--s2) * -1 + 2px);
+    left: var(--s3);
+    padding: 3px 10px;
+    border-radius: var(--r-pill);
+    font-size: var(--t-micro);
+    font-weight: var(--w-section);
+    letter-spacing: 0.02em;
+    background: linear-gradient(135deg, var(--purple), var(--purple-light));
+    color: #07101f;
+}
+.plan-badge.is-plain {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--fg-muted);
+}
+
+.plan-name { font-size: var(--t-h2); font-weight: var(--w-section); }
+.plan-tagline { font-size: var(--t-meta); color: var(--fg-muted); min-height: 2.6em; }
+
+.plan-price { display: flex; align-items: baseline; gap: 6px; }
+.plan-price-amount { font-size: var(--t-title); font-weight: var(--w-title); letter-spacing: -0.02em; }
+.plan-price-period { font-size: var(--t-meta); color: var(--fg-dim); }
+
+.plan-highlights { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s1); }
+.plan-highlights li {
+    display: flex;
+    gap: var(--s1);
+    align-items: flex-start;
+    font-size: var(--t-meta);
+    color: var(--fg-muted);
+    line-height: var(--lh-body);
+}
+.plan-highlights li::before {
+    content: "";
+    flex: none;
+    width: 6px; height: 6px;
+    margin-top: 7px;
+    border-radius: 50%;
+    background: var(--purple-light);
+}
+
+.plan-cta { margin-top: auto; }
+.plan-cta .ds-btn { width: 100%; justify-content: center; }
+
+/* Current usage against the plan's limits — shown BEFORE a limit is hit. */
+.plan-usage {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s1);
+    padding: var(--s2);
+    border-radius: var(--r-btn);
+    background: rgba(255, 255, 255, 0.03);
+}
+.plan-usage-row { display: flex; justify-content: space-between; font-size: var(--t-meta); }
+.plan-usage-label { color: var(--fg-muted); }
+.plan-usage-value { color: var(--fg); font-weight: var(--w-button); }
+.plan-usage-value.is-at-limit { color: var(--warning); }
+
+.plan-meter { height: 4px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+.plan-meter > span {
+    display: block; height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--purple), var(--purple-light));
+    transition: width var(--t-slow) var(--spring);
+}
+.plan-meter.is-at-limit > span { background: var(--warning); }
+
+.plan-note {
+    font-size: var(--t-micro);
+    color: var(--fg-dim);
+    line-height: var(--lh-body);
+}
+
+@media (max-width: 720px) {
+    .plans { grid-template-columns: 1fr; }
+}

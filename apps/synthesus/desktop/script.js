@@ -4332,7 +4332,7 @@ const WORKSPACES = {
     storage:  { title: 'Files & storage',   windows: ['win-drive', 'win-explorer'] },
     security: { title: 'Devices & access',  windows: ['win-devices', 'win-jobs'] },
     system:   { title: 'System',            windows: ['win-vitals', 'win-core'] },
-    settings: { title: 'Settings',          windows: ['win-settings'] },
+    settings: { title: 'Settings',          windows: ['win-settings', 'win-plans'] },
 };
 
 let _wsCurrent = 'home';

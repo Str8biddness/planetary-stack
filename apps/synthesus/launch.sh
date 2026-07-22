@@ -156,6 +156,48 @@ else
   export SYNTHESUS_AGENTIC_ELEVATION=0
 fi
 
+# ---- local model readiness ---------------------------------------------
+# The app needs a live Ollama daemon at :11434 or chat silently degrades to a
+# fallback and the UI reports "Local model not loaded". install.sh starts the
+# daemon once; nothing restarted it on subsequent boots, so a machine that had
+# been rebooted came up with no model every time.
+#
+# This starts it if absent, waits for it to actually answer, and reports the
+# state plainly. It deliberately does NOT pull a model — that can be multiple
+# gigabytes and must be the user's decision, not a surprise during launch.
+ollama_ready() { curl -fsS --max-time 2 http://127.0.0.1:11434/api/tags >/dev/null 2>&1; }
+
+if ollama_ready; then
+  printf '[model] ollama: already running\n'
+elif command -v ollama >/dev/null 2>&1; then
+  printf '[model] ollama: starting…\n'
+  nohup ollama serve >/dev/null 2>&1 &
+  for _ in $(seq 1 20); do
+    ollama_ready && break
+    sleep 0.5
+  done
+  if ollama_ready; then
+    printf '[model] ollama: ready\n'
+  else
+    printf '[model] ollama: FAILED TO START — chat will run in fallback mode\n'
+  fi
+else
+  printf '[model] ollama: NOT INSTALLED — chat will run in fallback mode\n'
+fi
+
+# Confirm the configured model is actually present. A missing model is the
+# other half of "fallback mode" and is worth naming precisely, with the exact
+# command to fix it.
+if ollama_ready && [ -n "${SYNTHESUS_MODEL:-}" ]; then
+  if curl -fsS --max-time 3 http://127.0.0.1:11434/api/tags 2>/dev/null \
+       | grep -q "\"${SYNTHESUS_MODEL%%:*}"; then
+    printf '[model] %s: present\n' "$SYNTHESUS_MODEL"
+  else
+    printf '[model] %s: NOT PULLED — run: ollama pull %s\n' \
+      "$SYNTHESUS_MODEL" "$SYNTHESUS_MODEL"
+  fi
+fi
+
 # Report native acceleration state at startup. The failure mode this prevents:
 # a missing compiled core is swallowed by a try/except somewhere, the app runs
 # on a pure-Python fallback for months, and nobody knows why it is slow.

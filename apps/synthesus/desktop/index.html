@@ -9,6 +9,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="assets/synthesus-mark-32.png">
     <link rel="apple-touch-icon" href="assets/synthesus-mark-128.png">
     <link rel="stylesheet" href="design-system.css?v=20260721n">
+    <link rel="stylesheet" href="subscription.css?v=20260721n">
     <link rel="stylesheet" href="styles.css?v=20260721n">
     <!-- No external font CDN: the shell assets render locally and remain available offline.
          Uses locally-installed Outfit/Fira Code if present, else a
@@ -876,6 +877,27 @@
             </div>
         </div>
 
+
+        <!-- Plans — REAL: reads /api/plans. Billing is not connected and the
+             UI says so rather than implying a working checkout. -->
+        <div class="window glass-panel" id="win-plans" style="top: 70px; left: 200px; width: 900px; height: 620px; display: none;">
+            <div class="window-header" onmousedown="dragWindow(event, 'win-plans')">
+                <span class="window-title">Plans</span>
+                <div class="window-controls"><button class="win-btn minimize" onclick="minimizeWindow(this)" style="background: #facc15;"></button><button class="win-btn maximize" onclick="maximizeWindow(this)" style="background: #22c55e;"></button><button class="win-btn close" onclick="toggleWindow('win-plans')"></button></div>
+            </div>
+            <div class="window-content" style="display:flex; flex-direction:column; gap:var(--s3); overflow-y:auto;">
+                <div>
+                    <h2 style="margin:0 0 4px;">Your plan</h2>
+                    <p style="margin:0; font-size:var(--t-meta); color:var(--fg-muted); line-height:var(--lh-body);">
+                        Everything runs on hardware you own. A plan changes how much of it you
+                        can use at once — never where your data goes.
+                    </p>
+                </div>
+                <div id="plans-usage"></div>
+                <div class="plans" id="plans-list"></div>
+            </div>
+        </div>
+
         <nav class="dock" id="os-dock" aria-label="System dock">
         <button type="button" onclick="openDashboard()" class="dock-btn dock-brand" data-win="win-dashboard" title="Synthesus — Overview">
             <span class="dock-ico"><img src="assets/synthesus-mark-64.png" alt="" width="22" height="22"></span><span class="dock-lbl">Overview</span>
@@ -908,6 +930,9 @@
         <button type="button" onclick="openDevices()" class="dock-btn" data-win="win-devices" title="Devices & Permissions">
             <span class="dock-ico" data-icon="devices"></span><span class="dock-lbl">Devices</span>
         </button>
+        <button type="button" onclick="openPlans()" class="dock-btn" data-win="win-plans" title="Plans">
+            <span class="dock-ico" data-icon="star"></span><span class="dock-lbl">Plans</span>
+        </button>
         <button type="button" onclick="openSettings()" class="dock-btn" data-win="win-settings" title="Settings">
             <span class="dock-ico" data-icon="settings"></span><span class="dock-lbl">Settings</span>
         </button>
@@ -930,6 +955,7 @@
 
     <script src="script.js?v=20260721n"></script>
     <script src="assets/sdf_forge.js?v=2"></script>
+    <script src="subscription.js?v=20260721n"></script>
     <script src="hyperspace.js?v=5"></script>
 
 </body>
