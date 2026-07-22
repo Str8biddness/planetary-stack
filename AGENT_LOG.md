@@ -2897,3 +2897,17 @@ scenes are well above that, so they distribute.
   current_plan_id is always "free" because there is no subscription to read.
   The plans window has NOT been rendered in a browser.
 - NO FINISH_CHECKLIST box checked.
+### WORKSTREAM A — Make Recipe v2 reachable
+- IMPLEMENTED `RecipeV2` and `NodeV2` models with strict validation on construction (op codes known, child indices strictly less than parent, count bounded to 64).
+- IMPLEMENTED the `SF2` code format (compact binary struct -> base64url).
+- BOUND `forge_render_region_v2` via ctypes and added `render_full_v2` / `render_tile_v2`.
+- ADDED explicit refusal to render `RecipeV2` natively when the native core is missing (Python fallback is intentionally unsupported for v2).
+- WIRED `POST /api/forge/render` in `synthesusd.py` to accept `code` starting with `SF2.` or an explicit graph, returning `X-Forge-Recipe` with the v2 code.
+- TESTS added in `test_recipe_v2.py`: v1 byte-identity against committed fixtures (generated in this session), SF2 round-trip, malformed codes rejection, graph validation, determinism (same graph -> identical bytes), tile/whole-frame agreement, and native-missing refusal.
+- EXACT COMMANDS:
+  - `apps/synthesus/.venv/bin/python -m pytest tests/forge_render` -> 31 passed.
+  - `(cd apps/synthesus/desktop && apps/synthesus/.venv/bin/python -m pytest -q .)` -> 137 passed.
+- HONEST GAPS: 
+  - The page was never rendered; I did not visually confirm the UI change in a browser.
+  - I generated the v1 fixtures myself because they were missing in the codebase.
+

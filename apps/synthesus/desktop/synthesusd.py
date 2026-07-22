@@ -791,7 +791,7 @@ def create_app(
 
         try:
             from services.forge_render import Recipe, render_full, to_png
-            from services.forge_render.engine import native_available
+            from services.forge_render.engine import native_available, RecipeV2, NodeV2, render_full_v2
         except Exception as exc:
             return JSONResponse(
                 status_code=503,
@@ -813,20 +813,51 @@ def create_app(
         code = body.get("code")
         try:
             if isinstance(code, str) and code.strip():
-                recipe = Recipe.from_code(code.strip())
+                if code.strip().startswith("SF2."):
+                    recipe = RecipeV2.from_code(code.strip())
+                    is_v2 = True
+                else:
+                    recipe = Recipe.from_code(code.strip())
+                    is_v2 = False
+            elif "nodes" in body:
+                nodes_data = body["nodes"]
+                nodes = []
+                for n in nodes_data:
+                    nodes.append(NodeV2(
+                        op=int(n.get("op", 0)),
+                        a=int(n.get("a", -1)),
+                        b=int(n.get("b", -1)),
+                        p=tuple(float(x) for x in n.get("p", (0.0,)*6))
+                    ))
+                recipe = RecipeV2(
+                    nodes=nodes,
+                    root=int(body.get("root", 0)),
+                    hue=int(body.get("hue", 285)),
+                    glow=int(body.get("glow", 60)),
+                    palette=int(body.get("palette", 0)),
+                    cam=int(body.get("cam", 42)),
+                )
+                is_v2 = True
             else:
                 fields = ("mode", "iters", "blend", "hue", "glow", "palette", "cam")
                 recipe = Recipe(**{
                     f: int(body[f]) for f in fields if f in body
                 })
+                is_v2 = False
         except Exception as exc:
             return JSONResponse(
                 status_code=400, content={"error": "invalid_recipe", "detail": str(exc)}
             )
 
-        # A pure-Python render of a large frame takes tens of seconds; refuse
-        # rather than hang the controller when the native core is missing.
-        if not native_available() and width * height > 160_000:
+        if is_v2 and not native_available():
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "native_core_missing",
+                    "detail": "build services/forge_render/native (make)",
+                },
+            )
+        elif not is_v2 and not native_available() and width * height > 160_000:
             return JSONResponse(
                 status_code=503,
                 content={
@@ -836,9 +867,14 @@ def create_app(
             )
 
         try:
-            surface = await asyncio.to_thread(
-                render_full, recipe, width, height, quality=quality
-            )
+            if is_v2:
+                surface = await asyncio.to_thread(
+                    render_full_v2, recipe, width, height, quality=quality
+                )
+            else:
+                surface = await asyncio.to_thread(
+                    render_full, recipe, width, height, quality=quality
+                )
             png = await asyncio.to_thread(to_png, surface)
         except Exception as exc:
             return JSONResponse(
