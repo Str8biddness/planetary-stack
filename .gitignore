@@ -30,4 +30,5 @@ downloads/
 __pycache__/
 
 # Compiled forge core — built locally, never committed (see native/Makefile)
+.claude/
 services/forge_render/native/*.so
