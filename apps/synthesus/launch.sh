@@ -156,6 +156,25 @@ else
   export SYNTHESUS_AGENTIC_ELEVATION=0
 fi
 
+# Report native acceleration state at startup. The failure mode this prevents:
+# a missing compiled core is swallowed by a try/except somewhere, the app runs
+# on a pure-Python fallback for months, and nobody knows why it is slow.
+FORGE_SO=""
+for c in "$SYNTHESUS_HOME/services/forge_render/native/libforge_core.so" \
+         "$SYNTHESUS_HOME/../../services/forge_render/native/libforge_core.so"; do
+  [ -f "$c" ] && FORGE_SO="$c" && break
+done
+if [ -n "$FORGE_SO" ]; then
+  printf '[native] forge core: enabled\n'
+else
+  printf '[native] forge core: MISSING — rendering will be ~90x slower (build: make -C services/forge_render/native)\n'
+fi
+if [ -n "${SYNTHESUS_KERNEL_BIN:-}" ] && [ -x "${SYNTHESUS_KERNEL_BIN}" ]; then
+  printf '[native] C++ kernel: %s\n' "$SYNTHESUS_KERNEL_BIN"
+else
+  printf '[native] C++ kernel: MISSING — runtime will use its Python fallback\n'
+fi
+
 cd "$SYNTHESUS_HOME/desktop"
 "$PYTHON_BIN" synthesus_native_shell.py &
 APP_PID=$!

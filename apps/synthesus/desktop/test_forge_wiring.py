@@ -78,11 +78,23 @@ def test_every_forge_element_the_script_reads_exists(element_id):
 
 
 def test_module_is_vendored_with_a_cache_bust():
+    """Every local asset must carry a cache-bust parameter.
+
+    This asserts the PROPERTY, not a literal version string. Pinning the exact
+    value made the test fail on every legitimate bump, which trains people to
+    edit the test rather than think about it — and the thing actually worth
+    catching is an asset shipped with no cache-bust at all, because a prior
+    session shipped three rounds of invisible CSS that way.
+    """
+    import re
+
     assert (HERE / "assets" / "sdf_forge.js").exists()
     assert "assets/sdf_forge.js?v=" in HTML
-    # script.js and styles.css cache-busts were bumped for this change.
-    assert "script.js?v=20260721l" in HTML
-    assert "styles.css?v=20260721l" in HTML
+
+    local_assets = re.findall(r'(?:src|href)="((?!https?://)[^"]+\.(?:js|css))(\?v=[^"]*)?"', HTML)
+    unbusted = [path for path, bust in local_assets
+                if not bust and not path.startswith("xterm")]
+    assert not unbusted, f"local assets shipped without a cache-bust: {unbusted}"
 
 
 def test_module_is_offline_no_external_origin():

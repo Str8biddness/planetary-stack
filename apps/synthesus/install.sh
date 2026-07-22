@@ -156,6 +156,22 @@ rsync -a --delete --exclude '.git' --exclude '__pycache__' --exclude '*.pyc' \
 rsync -a --delete --exclude '.git' --exclude '__pycache__' --exclude '*.pyc' \
       --exclude '.venv' --exclude 'venv' --exclude 'node_modules' \
       "$SRC_DIR/runtime/" "$SYNTHESUS_HOME/runtime/"
+
+# The desktop controller imports `services.*` and `contracts.*`, which live at
+# the REPOSITORY ROOT rather than under apps/synthesus. Without these a fresh
+# install has no mesh transport, no storage zones, no entitlements and no
+# forge — synthesusd raises ModuleNotFoundError at startup and the desktop
+# refuses to boot. $SRC_DIR is apps/synthesus, so the root is two levels up.
+REPO_ROOT="$(cd "$SRC_DIR/../.." && pwd)"
+for pkg in services contracts; do
+  if [ -d "$REPO_ROOT/$pkg" ]; then
+    rsync -a --delete --exclude '.git' --exclude '__pycache__' --exclude '*.pyc' \
+          --exclude '*.so' \
+          "$REPO_ROOT/$pkg/" "$SYNTHESUS_HOME/$pkg/"
+  else
+    warn "$pkg/ not found at $REPO_ROOT — mesh features will be unavailable"
+  fi
+done
 mkdir -p "$SYNTHESUS_HOME/tools"
 install -m 0755 "$SRC_DIR/launch.sh" "$SYNTHESUS_HOME/launch.sh"
 install -m 0755 "$SRC_DIR/tools/sudo_askpass.sh" \
@@ -235,13 +251,56 @@ SYNTHESUS_HOST=127.0.0.1
 SYNTHESUS_KNOWLEDGE_SYNC_MODE=off
 # Memory-verification human proof (desktop shell → runtime mint). Local only.
 SYNTHESUS_HUMAN_SESSION_SECRET=$HUMAN_SESSION_SECRET
-# Optional: absolute path to C++ kernel IPC binary (zo_kernel)
-# SYNTHESUS_KERNEL_BIN=$SYNTHESUS_HOME/runtime/packages/kernel/build/zo_kernel
+# C++ kernel IPC binary, built in step 5b. The runtime degrades to its
+# Python fallback if this path is missing.
+SYNTHESUS_KERNEL_BIN=$SYNTHESUS_HOME/runtime/packages/kernel/build/zo_kernel
 ENV
 chmod 600 "$ENV_TMP"
 mv -f "$ENV_TMP" "$SYNTHESUS_HOME/synthesus.env"
 trap - EXIT
 ok "unique secrets written to synthesus.env (API key + JWT + human session; localhost only)"
+
+
+# ---- 5b. native cores (optional, degrade loudly) -------------------------
+# Two compiled pieces make the product dramatically faster. Neither is
+# required: the app runs without them on pure-Python fallbacks. Both are built
+# here so a fresh install is fast by default rather than silently slow.
+#
+#   * forge core  — SDF renderer. Python takes ~13.5s for a 256x256 frame; the
+#                   compiled core takes ~0.14s. Byte-identical output, so a
+#                   mixed mesh of built and unbuilt nodes still composites
+#                   without seams.
+#   * zo_kernel   — the C++ reasoning kernel, spoken to over stdin IPC.
+#
+# BUILD FLAGS FOR THE FORGE ARE LOAD-BEARING: its Makefile omits -march=native
+# and sets -ffp-contract=off, because either would let two machines produce
+# different pixels and seam at tile boundaries. Do not "optimise" them.
+FORGE_NATIVE_DIR="$SYNTHESUS_HOME/services/forge_render/native"
+if [ -f "$FORGE_NATIVE_DIR/Makefile" ] && command -v g++ >/dev/null 2>&1; then
+  if make -C "$FORGE_NATIVE_DIR" >/dev/null 2>&1; then
+    ok "forge native core built (renders ~90x faster; Python fallback still present)"
+  else
+    warn "forge native core failed to build — rendering will use the slow Python path"
+  fi
+else
+  warn "no g++ or forge Makefile — rendering will use the slow Python path"
+fi
+
+KERNEL_SRC_DIR="$SYNTHESUS_HOME/runtime/packages/kernel"
+KERNEL_BIN="$KERNEL_SRC_DIR/build/zo_kernel"
+if [ -x "$KERNEL_BIN" ]; then
+  ok "C++ kernel already built"
+elif [ -f "$KERNEL_SRC_DIR/CMakeLists.txt" ] && command -v cmake >/dev/null 2>&1; then
+  if cmake -S "$KERNEL_SRC_DIR" -B "$KERNEL_SRC_DIR/build" \
+        -DBUILD_PYBIND=OFF -DBUILD_KERNEL=ON -DCMAKE_BUILD_TYPE=Release >/dev/null 2>&1 \
+     && cmake --build "$KERNEL_SRC_DIR/build" -j"$(nproc)" >/dev/null 2>&1; then
+    ok "C++ kernel built ($KERNEL_BIN)"
+  else
+    warn "C++ kernel failed to build — the runtime will use its Python fallback"
+  fi
+else
+  warn "cmake not found — skipping C++ kernel build (Python fallback will be used)"
+fi
 
 # ---- 6. launcher + menu entry -------------------------------------------
 c "6/6  Launcher"

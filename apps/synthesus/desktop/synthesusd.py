@@ -769,6 +769,90 @@ def create_app(
             return JSONResponse(status_code=401, content={"error": "unauthorized"})
         return await asyncio.to_thread(host_metrics.snapshot)
 
+    @app.post("/api/forge/render")
+    async def forge_render(request: Request):
+        """Render a forge recipe server-side and return a PNG.
+
+        The WebGL path is interactive but unavailable on surfaces without
+        WebGL2 (the GTK/WebKit shell is one). This path uses the same pinned
+        CPU engine the distributed renderer uses, so the output is identical
+        to what any mesh node would produce — not a different, prettier
+        fallback. It is also what a chat request calls, so a prompt and a
+        slider produce the same image.
+        """
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+        if not isinstance(body, dict):
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+
+        try:
+            from services.forge_render import Recipe, render_full, to_png
+            from services.forge_render.engine import native_available
+        except Exception as exc:
+            return JSONResponse(
+                status_code=503,
+                content={"error": "forge_unavailable", "detail": str(exc)},
+            )
+
+        # Bounded: this is a synchronous CPU render on the controller.
+        try:
+            width = int(body.get("width", 512))
+            height = int(body.get("height", 512))
+            quality = int(body.get("quality", 48))
+        except (TypeError, ValueError):
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+        if not (32 <= width <= 2048 and 32 <= height <= 2048):
+            return JSONResponse(status_code=400, content={"error": "size_out_of_range"})
+        if not (8 <= quality <= 128):
+            return JSONResponse(status_code=400, content={"error": "quality_out_of_range"})
+
+        code = body.get("code")
+        try:
+            if isinstance(code, str) and code.strip():
+                recipe = Recipe.from_code(code.strip())
+            else:
+                fields = ("mode", "iters", "blend", "hue", "glow", "palette", "cam")
+                recipe = Recipe(**{
+                    f: int(body[f]) for f in fields if f in body
+                })
+        except Exception as exc:
+            return JSONResponse(
+                status_code=400, content={"error": "invalid_recipe", "detail": str(exc)}
+            )
+
+        # A pure-Python render of a large frame takes tens of seconds; refuse
+        # rather than hang the controller when the native core is missing.
+        if not native_available() and width * height > 160_000:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "native_core_missing",
+                    "detail": "build services/forge_render/native (make) or request a smaller frame",
+                },
+            )
+
+        try:
+            surface = await asyncio.to_thread(
+                render_full, recipe, width, height, quality=quality
+            )
+            png = await asyncio.to_thread(to_png, surface)
+        except Exception as exc:
+            return JSONResponse(
+                status_code=500, content={"error": "render_failed", "detail": str(exc)}
+            )
+        return Response(
+            content=png,
+            media_type="image/png",
+            headers={
+                "X-Forge-Recipe": recipe.to_code(),
+                "X-Forge-Native": "1" if native_available() else "0",
+            },
+        )
+
     # ---------------------------------------------------------------- settings
 
     @app.get("/api/settings")

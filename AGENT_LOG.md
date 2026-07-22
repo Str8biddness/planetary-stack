@@ -2675,3 +2675,170 @@ scenes are well above that, so they distribute.
   but not asserted pixel-identical to each other. Not wired into the desktop UI
   yet (needs live nodes to be meaningful). NO FINISH_CHECKLIST box checked.
 
+### forge CPU engine — measured, then optimised with byte-identical output
+- Recovered Emergent's work (PR #52) and then MEASURED it rather than assuming.
+- PROFILE of a 128x128 q48 frame: `_scene` called 307,081 times (~19 per pixel:
+  raymarch steps + normal + soft shadow). `builtins.max` called 2,456,656 times
+  costing 2.39s — 20% of total runtime in call overhead alone.
+- Optimised the hot SDF primitives (`_sd_box`, `_sd_sphere`, `_op_smooth_union`)
+  by inlining max/min as conditionals. Identical results for floats; no
+  numerical change, so ENGINE_VERSION stays `forge-cpu-1` and mixed-version
+  nodes are unaffected.
+- VERIFIED BYTE-IDENTICAL against the pre-optimisation engine, all four scene
+  modes, sha256 over the pixel buffer:
+    mode 0 identical  2.58s -> 2.28s  1.13x
+    mode 1 identical  3.60s -> 2.43s  1.48x
+    mode 2 identical  6.31s -> 4.43s  1.42x
+    mode 3 identical  1.25s -> 1.27s  0.98x   (gyroid does not use _sd_box)
+  Byte-identity is the property that matters here — a changed pixel means tiles
+  rendered on different nodes disagree and seams appear.
+- RAN THEIR BENCHMARK (256x256, q48, 3 nodes):
+    local=13535.3ms  tile=446.3ms  roundtrip=43.00ms  crossover>=193.5ms
+  So distribution DOES pay for this workload, comfortably: overhead is ~10% of a
+  tile, and real renders are ~70x the crossover. 13.5s local -> roughly 5s
+  across three nodes.
+- NON-OBVIOUS CONCLUSION worth keeping: the CPU engine's slowness is exactly
+  what makes distribution worth doing. My earlier caution ("if a scene renders
+  in 300ms, distributing makes it slower") is answered by measurement — the
+  crossover is 193ms and real renders are 13,500ms.
+- PRODUCT SHAPE that follows: WebGL for interactive preview (real-time, local),
+  pinned CPU engine for final/high-res renders distributed across the mesh
+  (seam-safe, deterministic). That is what the engine docstring designed for.
+- STILL UNVERIFIED: no tile has ever crossed the mesh between real nodes. The
+  benchmark's roundtrip figure is a local measurement, not .54<->.55. The forge
+  UI has never been rendered in a browser.
+- NO FINISH_CHECKLIST box checked.
+### CORRECTION + native forge core (20-127x, byte-identical)
+- I SPECULATED THAT THE C++ KERNEL MIGHT NOT COMPILE OR MIGHT BE SCAFFOLDING.
+  That was wrong and unfounded. Owner pushed back; owner was right.
+  What I had actually verified was only: `_synthesus_kernel` is not importable
+  in this venv, and there are no build artifacts in the tree. Neither says
+  anything about whether the code works.
+  My search was also sloppy: I looked for CMakeCache.txt (a build OUTPUT)
+  instead of CMakeLists.txt (the build DEFINITION), and concluded there was no
+  build system.
+- THE KERNEL BUILDS AND RUNS. `cmake -DBUILD_PYBIND=OFF` then make:
+  `[100%] Built target synthesus_kernel`, producing zo_kernel, test_vmm,
+  test_emul. Only unused-parameter warnings across 66 sources.
+  `zo_kernel` starts: "[ZO] Synthesus kernel ready (stdin IPC)" and answers
+  line-delimited JSON:
+    {"query":"what is a gyroid lattice"}
+    -> {"response":"[PPBRS] Pattern match ...","confidence":0.7,
+        "module_used":"ppbrs","found":true}
+- WHY IT WASN'T RUNNING HERE: build-time tools missing, nothing to do with the
+  code. cmake and pybind11 were absent (pip-installed, no sudo). python3-dev
+  headers are still absent, which is the ONLY reason `_synthesus_kernel` cannot
+  be imported. The stdin IPC path needs none of that and works today.
+- WHY IT WAS INVISIBLE: every Python caller wraps the import in try/except and
+  logs a warning nobody reads, then silently uses a Python fallback forever.
+  Those handlers should log loudly or refuse.
+- geometric_engine.cpp is the EMBEDDER (word_to_vector, SSE cosine resonance,
+  predict_next) — not a renderer. No C++ SDF code existed, so the forge port is
+  new code rather than wiring.
+- BUILT services/forge_render/native/forge_core.cpp — a direct transcription of
+  engine.py: same algorithm, same operation order, double precision, and
+  Python's floor-modulo reproduced exactly (C's fmod differs for negatives).
+- BUILD FLAGS ARE LOAD-BEARING, NOT STYLE. The Makefile deliberately OMITS
+  -march=native and sets -ffp-contract=off. Either would let two nodes with
+  different CPUs produce different pixels and seam at tile boundaries.
+- MEASURED, byte-identical to the Python reference in every case:
+    96x96   mode 0  75.6x   mode 1  32.6x   mode 2  27.4x   mode 3  22.6x
+    256x256   13.5s -> 0.143s   (94x)
+    384x384   39.3s -> 0.309s   (127x)
+    1024x1024 q64            2.16s
+  ENGINE_VERSION stays forge-cpu-1 because output is identical — a mixed mesh
+  of native and Python nodes still composites without seams.
+- A BUG OF MINE, CAUGHT BY EMERGENT'S TEST: the Python reference clamps the
+  region to the frame first; my native wrapper passed the unclamped rect
+  through. render_tile routinely asks for a padded rect that hangs off the
+  edge, so padded tiles came back a different size and
+  test_bloom_needs_an_overlap_margin_or_it_seams failed. Their seam test found
+  a real defect in my port. Fixed by clamping before dispatch.
+- CONSEQUENCE WORTH NOTING: this changes when distribution pays. The earlier
+  benchmark put the crossover at ~193ms with 3 nodes; a full 256x256 now takes
+  143ms, i.e. BELOW the crossover. Distributing small frames is now a net loss;
+  the win moves to large/high-quality frames (1024x1024 at 2.16s). The adaptive
+  local-vs-distribute logic matters more, and its threshold must be re-derived.
+- The .so is gitignored and built via native/Makefile. Python fallback is intact
+  and tested, so a checkout with no compiler still renders.
+- Tests: 4 native-parity tests (per mode, tile-vs-full-frame, palette variants,
+  and the Python path standing alone). forge_render + desktop: 134 passed.
+- NOT DONE: pybind11 module (needs python3-dev), wiring the kernel's stdin IPC
+  to anything, ARM/cross-architecture determinism check (the seam risk between
+  a phone and an x86 desktop is UNTESTED).
+- NO FINISH_CHECKLIST box checked.
+### wiring the native work into the launcher and installer
+- SECOND CORRECTION ON THE KERNEL, sharper than the first: TWO zo_kernel
+  PROCESSES WERE ALREADY RUNNING under the live app (PIDs 2770/2771), the
+  binary was built at install time (2026-07-15), and SYNTHESUS_KERNEL_BIN is
+  set in the live env. The C++ kernel is built, configured AND IN USE. What is
+  absent is only the optional PYBIND module `_synthesus_kernel` (needs
+  python3-dev). I conflated "the pybind module will not import" with "the
+  kernel is not used". They are different integrations and the IPC one is live.
+- Built zo_kernel in the REPO tree too, so the app no longer depends on a
+  binary living in the retired install snapshot.
+- FOUND WHILE WIRING, and it is the real gap: INSTALL.SH ONLY COPIES desktop/
+  AND runtime/. Everything under repo-root services/ and contracts/ was never
+  copied. synthesusd imports services.remote_pipeline, services.result_transfer,
+  services.unisync.* — so A FRESH INSTALL WOULD RAISE ModuleNotFoundError AT
+  STARTUP and the desktop would refuse to boot. Confirmed: the retired install
+  tree has no services/ directory at all. Fixed by rsyncing both packages from
+  the repository root (with *.so excluded, since natives are built per-machine).
+- install.sh step 5b now builds both native cores and degrades LOUDLY:
+  * forge core via services/forge_render/native/Makefile (~90x on rendering)
+  * zo_kernel via cmake -DBUILD_PYBIND=OFF
+  Each failure prints a warn line naming the consequence rather than passing
+  silently. SYNTHESUS_KERNEL_BIN is now written to synthesus.env uncommented.
+- launch.sh now REPORTS native state at every start:
+    [native] forge core: enabled
+    [native] C++ kernel: /path/to/zo_kernel
+  or a MISSING line naming the cost and the build command. This is the direct
+  fix for the failure mode that hid the kernel for months — a swallowed import,
+  a pure-Python fallback, and nobody knowing why it was slow.
+- VERIFIED LIVE: restarted from the desktop icon; both native lines print
+  enabled, synthesusd READY, and the served page contains the forge window.
+  forge_render + desktop suites: 134 passed.
+- STILL NOT DONE: pybind module (needs python3-dev, i.e. sudo); a real
+  end-to-end install.sh run into a clean prefix (the copy fix is reasoned and
+  syntax-checked, NOT executed); ARM determinism for the forge core.
+- NO FINISH_CHECKLIST box checked.
+### forge polish — three real bugs found from the owner's screenshot
+- Owner rendered the Image Forge and sent a screenshot. Three defects, all
+  diagnosed from the tree rather than guessed:
+  1. GARBLED OVERLAPPING BANNER: `.forge-stage` sized itself only with
+     `aspect-ratio`. Where that is not honoured the box collapses to zero
+     height, the 100%-height canvas vanishes, and the absolutely-positioned
+     "WebGL2 unavailable" overlay crams on top of itself — exactly what the
+     screenshot showed. Fixed with a min-height fallback.
+  2. BLANK WHITE DROPDOWNS: Preset/Scene/Palette are native <select> with only
+     `.glass-input`, and nothing in either stylesheet targeted `select`. The
+     platform default (white) showed through on a dark panel. Styled
+     explicitly, including `option` background, with the appearance reset and a
+     drawn caret.
+  3. THE FORGE COULD NOT RENDER AT ALL IN THIS SHELL: WebGL2 is unavailable in
+     the GTK/WebKit surface, and the forge was client-side WebGL only. There
+     was NO server-side render path.
+- ADDED POST /api/forge/render — authed, bounded (32..2048px, quality 8..128),
+  accepts a recipe code or explicit fields, returns image/png with
+  X-Forge-Recipe (what actually rendered, so it is reproducible) and
+  X-Forge-Native (which engine served it). It uses the SAME pinned CPU engine
+  the distributed renderer uses, so a browser gets byte-identical output to any
+  mesh node — not a different, prettier fallback.
+- REFUSES a large frame when the native core is missing (>160k px) rather than
+  hanging the controller for a minute on the pure-Python path.
+- VERIFIED LIVE over HTTP against the running app: 512x512 quality 48 in 2.7s,
+  x-forge-native: 1, valid PNG, image inspected and correct.
+- FIXED A BRITTLE TEST OF THEIRS rather than working around it:
+  test_module_is_vendored_with_a_cache_bust pinned the LITERAL string
+  "script.js?v=20260721l", so every legitimate cache-bust bump broke it — which
+  trains people to edit the test instead of thinking. Now asserts the PROPERTY:
+  every local js/css asset carries a ?v= parameter. That still catches the
+  failure worth catching (an asset shipped with no cache-bust, which is how a
+  prior session shipped three rounds of invisible CSS).
+- Tests: 8 new endpoint tests, mostly refusals (unauthenticated, absurd size,
+  absurd quality, malformed recipe, native-missing large frame). Desktop +
+  forge_render: 134 passed.
+- NOT DONE: the chat interface does not call this endpoint yet — that is the
+  prompt -> scene-graph -> render path and it needs Recipe v2 to be worth much,
+  since a prompt can currently only select one of four scenes and turn knobs.
+- NO FINISH_CHECKLIST box checked.
