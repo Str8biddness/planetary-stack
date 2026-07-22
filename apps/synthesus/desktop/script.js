@@ -4426,16 +4426,32 @@ document.addEventListener('keydown', function (event) {
 /* ----------------------------------------------------------- image forge */
 /* CSG + SDF raymarched procedural image generation. Offline, vendored WebGL2,
  * no dependency. Scenes are reproducible from a short shareable recipe code.
- * When WebGL2 is unavailable the forge reports "unknown" and renders nothing —
- * it never shows a fabricated frame (NO MOCK DATA IN THE UI).
+ *
+ * Two render paths, same recipe, same pixels:
+ *   1) WebGL2 interactive canvas when the surface supports it.
+ *   2) POST /api/forge/render (CPU engine via the shell→controller hop) when
+ *      WebGL2 is absent — the GTK/WebKit shell is one such surface.
+ *
+ * NO MOCK DATA: if neither path can produce a real frame the stage shows
+ * "unknown" and nothing fabricated. A loading state is shown while the
+ * server path works (renders take seconds).
  */
 let forgeRenderer = null;
 let forgeAnimating = false;
 let forgePresetsWired = false;
+let forgeServerMode = false;
+let forgeServerBusy = false;
+let forgeServerBlobUrl = null;
+let forgeHasFrame = false;
 
 function forgeSetStatus(text) {
     const el = document.getElementById('forge-status');
     if (el) el.textContent = text;
+}
+
+function forgeSetDetail(text) {
+    const detail = document.getElementById('forge-status-detail');
+    if (detail) detail.textContent = text;
 }
 
 function forgeVal(id, fallback) {
@@ -4443,52 +4459,109 @@ function forgeVal(id, fallback) {
     return el ? el.value : fallback;
 }
 
-function forgeWirePresets() {
-    if (forgePresetsWired || !window.SDFForge) return;
-    const sel = document.getElementById('forge-preset');
-    if (!sel) return;
-    Object.keys(window.SDFForge.PRESETS).forEach(function (name) {
+function forgeFillSelect(sel, items, keepValue) {
+    if (!sel || !items || !items.length) return;
+    const previous = keepValue != null ? String(keepValue) : sel.value;
+    sel.innerHTML = '';
+    items.forEach(function (label, index) {
         const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name;
+        opt.value = String(index);
+        opt.textContent = label;
         sel.appendChild(opt);
     });
+    if (previous !== '' && Array.prototype.some.call(sel.options, function (o) { return o.value === previous; })) {
+        sel.value = previous;
+    }
+}
+
+function forgeWirePresets() {
+    if (forgePresetsWired || !window.SDFForge) return;
+    const F = window.SDFForge;
+
+    // Scenes and palettes come from the same lists the CPU engine uses
+    // (SCENES / palette names), so the dropdowns can never drift from the
+    // renderer. Empty option lists were the "blank white boxes" bug.
+    forgeFillSelect(document.getElementById('forge-mode'), F.SCENES, forgeVal('forge-mode', '0'));
+    forgeFillSelect(document.getElementById('forge-palette'), F.PALETTES, forgeVal('forge-palette', '0'));
+
+    const sel = document.getElementById('forge-preset');
+    if (sel) {
+        // Keep the Custom… sentinel, then append named presets.
+        const custom = sel.querySelector('option[value=""]') || (function () {
+            const o = document.createElement('option');
+            o.value = '';
+            o.textContent = 'Custom…';
+            return o;
+        })();
+        sel.innerHTML = '';
+        sel.appendChild(custom);
+        Object.keys(F.PRESETS || {}).forEach(function (name) {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            sel.appendChild(opt);
+        });
+    }
     forgePresetsWired = true;
 }
 
-function forgeInit() {
-    const canvas = document.getElementById('forge-canvas');
-    if (!canvas) return;
-    if (!window.SDFForge) { forgeSetStatus('forge module unavailable'); return; }
-    forgeWirePresets();
-    if (!forgeRenderer) {
-        forgeRenderer = window.SDFForge.create(canvas);
-    }
+function forgeShowEmpty(show) {
+    const empty = document.getElementById('forge-empty');
+    if (empty) empty.hidden = !show;
+}
+
+function forgeShowUnavailable(show, detail) {
     const unavailable = document.getElementById('forge-unavailable');
-    if (!forgeRenderer.available) {
-        if (unavailable) unavailable.hidden = false;
-        const detail = document.getElementById('forge-status-detail');
-        if (detail) detail.textContent = 'unknown';
-        canvas.style.display = 'none';
-        forgeSetStatus('WebGL2 unavailable');
-        return;
+    if (unavailable) unavailable.hidden = !show;
+    if (detail != null) forgeSetDetail(detail);
+}
+
+function forgeShowLoading(show) {
+    const loading = document.getElementById('forge-loading');
+    const stage = document.getElementById('forge-stage');
+    if (loading) loading.hidden = !show;
+    if (stage) {
+        if (show) stage.classList.add('is-rendering');
+        else stage.classList.remove('is-rendering');
     }
-    if (unavailable) unavailable.hidden = true;
-    canvas.style.display = 'block';
-    forgeApply();
-    forgeRender();
+}
+
+function forgeReadSize() {
+    // Endpoint accepts 32–2048 px and quality 8–128. The selectors only offer
+    // values inside that range; still clamp so a hand-edited option cannot
+    // send an out-of-range request.
+    let size = parseInt(forgeVal('forge-resolution', '512'), 10);
+    let quality = parseInt(forgeVal('forge-quality', '48'), 10);
+    if (!isFinite(size)) size = 512;
+    if (!isFinite(quality)) quality = 48;
+    size = Math.max(32, Math.min(2048, size));
+    quality = Math.max(8, Math.min(128, quality));
+    return { width: size, height: size, quality: quality };
+}
+
+function forgeOnQualityChange() {
+    // Changing size/quality only matters for the next still — do not auto-
+    // re-render (a 1024² frame can take seconds). Nudge the user.
+    if (forgeServerMode) {
+        forgeSetStatus('Resolution/quality updated — press Render still');
+    }
 }
 
 // The live control state, as a recipe object the module understands.
+function forgeReadInt(id, fallback) {
+    const n = parseInt(forgeVal(id, String(fallback)), 10);
+    return Number.isFinite(n) ? n : fallback;
+}
+
 function forgeReadRecipe() {
     return {
-        mode: parseInt(forgeVal('forge-mode', '0'), 10),
-        iters: parseInt(forgeVal('forge-iters', '6'), 10),
-        blend: parseInt(forgeVal('forge-blend', '35'), 10),
-        hue: parseInt(forgeVal('forge-hue', '285'), 10),
-        glow: parseInt(forgeVal('forge-glow', '60'), 10),
-        palette: parseInt(forgeVal('forge-palette', '0'), 10),
-        cam: parseInt(forgeVal('forge-cam', '42'), 10),
+        mode: forgeReadInt('forge-mode', 0),
+        iters: forgeReadInt('forge-iters', 6),
+        blend: forgeReadInt('forge-blend', 35),
+        hue: forgeReadInt('forge-hue', 285),
+        glow: forgeReadInt('forge-glow', 60),
+        palette: forgeReadInt('forge-palette', 0),
+        cam: forgeReadInt('forge-cam', 42),
     };
 }
 
@@ -4505,29 +4578,200 @@ function forgeWriteControls(r) {
 }
 
 function forgeShowRecipeCode(r) {
+    if (!window.SDFForge) return '';
     const code = window.SDFForge.encodeRecipe(r);
     const input = document.getElementById('forge-recipe');
     if (input) input.value = code;
     return code;
 }
 
+function forgeSetServerImage(blob) {
+    const img = document.getElementById('forge-server-img');
+    if (!img) return;
+    if (forgeServerBlobUrl) {
+        try { URL.revokeObjectURL(forgeServerBlobUrl); } catch (e) { /* ignore */ }
+        forgeServerBlobUrl = null;
+    }
+    forgeServerBlobUrl = URL.createObjectURL(blob);
+    img.src = forgeServerBlobUrl;
+    img.hidden = false;
+    forgeHasFrame = true;
+    forgeShowEmpty(false);
+    forgeShowUnavailable(false);
+}
+
+async function forgeServerRender() {
+    if (forgeServerBusy) return;
+    if (!window.SDFForge) {
+        forgeSetStatus('forge module unavailable');
+        forgeShowUnavailable(true, 'unknown');
+        return;
+    }
+
+    const recipe = forgeReadRecipe();
+    const size = forgeReadSize();
+    const code = forgeShowRecipeCode(recipe);
+
+    forgeServerBusy = true;
+    forgeShowLoading(true);
+    forgeShowEmpty(false);
+    forgeShowUnavailable(false);
+    forgeSetStatus('Rendering on this machine…');
+
+    const renderBtn = document.getElementById('forge-render-btn');
+    if (renderBtn) renderBtn.disabled = true;
+
+    try {
+        const resp = await fetch('/api/forge/render', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                code: code,
+                width: size.width,
+                height: size.height,
+                quality: size.quality,
+            }),
+        });
+
+        if (!resp.ok) {
+            let detail = 'render failed (' + resp.status + ')';
+            try {
+                const body = await resp.json();
+                if (body && (body.detail || body.error || body.message)) {
+                    detail = body.detail || body.error || body.message;
+                }
+            } catch (e) { /* keep the status-code message */ }
+            forgeSetStatus(detail);
+            // No fabricated frame: if we never had a real image, show unknown.
+            if (!forgeHasFrame) {
+                forgeShowUnavailable(true, 'unknown');
+                forgeShowEmpty(false);
+            }
+            return;
+        }
+
+        const native = resp.headers.get('X-Forge-Native') === '1';
+        const echoed = resp.headers.get('X-Forge-Recipe');
+        if (echoed) {
+            const input = document.getElementById('forge-recipe');
+            if (input) input.value = echoed;
+        }
+        const blob = await resp.blob();
+        if (!blob || !blob.size) {
+            forgeSetStatus('empty render (unknown)');
+            if (!forgeHasFrame) forgeShowUnavailable(true, 'unknown');
+            return;
+        }
+        forgeSetServerImage(blob);
+        forgeSetStatus(native
+            ? 'Rendered ' + size.width + '×' + size.height + ' on this machine'
+            : 'Rendered ' + size.width + '×' + size.height + ' (Python path — build native core for speed)');
+    } catch (err) {
+        forgeSetStatus('render failed: ' + (err && err.message ? err.message : String(err)));
+        if (!forgeHasFrame) {
+            forgeShowUnavailable(true, 'unknown');
+            forgeShowEmpty(false);
+        }
+    } finally {
+        forgeServerBusy = false;
+        forgeShowLoading(false);
+        if (renderBtn) renderBtn.disabled = false;
+    }
+}
+
+function forgeEnterServerMode() {
+    forgeServerMode = true;
+    const canvas = document.getElementById('forge-canvas');
+    if (canvas) canvas.style.display = 'none';
+    const animBtn = document.getElementById('forge-animate-btn');
+    if (animBtn) {
+        animBtn.disabled = true;
+        animBtn.title = 'Live animation needs WebGL2; still frames render on this machine';
+        animBtn.setAttribute('aria-disabled', 'true');
+    }
+    // Promote Render still to the primary action when animation is gone.
+    const renderBtn = document.getElementById('forge-render-btn');
+    if (renderBtn) renderBtn.classList.add('ds-btn-primary');
+    forgeShowEmpty(!forgeHasFrame);
+    forgeShowUnavailable(false);
+    forgeSetStatus('Still frames render on this machine (no WebGL2)');
+    forgeShowRecipeCode(forgeReadRecipe());
+    // Auto-render so the user sees an image immediately, not an empty stage.
+    forgeServerRender();
+}
+
+function forgeInit() {
+    const canvas = document.getElementById('forge-canvas');
+    if (!canvas) return;
+    if (!window.SDFForge) {
+        forgeSetStatus('forge module unavailable');
+        forgeShowUnavailable(true, 'unknown');
+        forgeShowEmpty(false);
+        return;
+    }
+    forgeWirePresets();
+    if (!forgeRenderer) {
+        forgeRenderer = window.SDFForge.create(canvas);
+    }
+    if (!forgeRenderer.available) {
+        // No WebGL2 (GTK/WebKit shell is one such surface). Fall back to the
+        // server-side CPU engine automatically — same recipe, real pixels.
+        forgeEnterServerMode();
+        return;
+    }
+    forgeServerMode = false;
+    forgeShowUnavailable(false);
+    forgeShowEmpty(false);
+    forgeShowLoading(false);
+    canvas.style.display = 'block';
+    const img = document.getElementById('forge-server-img');
+    if (img) img.hidden = true;
+    const animBtn = document.getElementById('forge-animate-btn');
+    if (animBtn) {
+        animBtn.disabled = false;
+        animBtn.removeAttribute('aria-disabled');
+        animBtn.title = '';
+    }
+    forgeApply();
+    forgeRender();
+}
+
 function forgeApply() {
-    if (!forgeRenderer || !forgeRenderer.available) return;
     const r = forgeReadRecipe();
-    forgeRenderer.applyRecipe(r);
     forgeShowRecipeCode(r);
+    if (forgeServerMode) {
+        // Do not auto-re-render on every slider tick — each still costs seconds.
+        // Recipe code updates live so Copy always reflects the knobs.
+        forgeSetStatus('Recipe updated — press Render still');
+        return;
+    }
+    if (!forgeRenderer || !forgeRenderer.available) return;
+    forgeRenderer.applyRecipe(r);
     if (!forgeAnimating) forgeRender();
 }
 
 function forgeRender() {
-    if (!forgeRenderer || !forgeRenderer.available) { forgeSetStatus('nothing to render (unknown)'); return; }
+    if (forgeServerMode) {
+        forgeServerRender();
+        return;
+    }
+    if (!forgeRenderer || !forgeRenderer.available) {
+        forgeSetStatus('nothing to render (unknown)');
+        forgeShowUnavailable(true, 'unknown');
+        return;
+    }
     forgeRenderer.applyRecipe(forgeReadRecipe());
     forgeRenderer.renderStill(0.0);
+    forgeHasFrame = true;
+    forgeShowEmpty(false);
     forgeSetStatus('Rendered a still frame');
 }
 
 function forgeToggleAnim() {
-    if (!forgeRenderer || !forgeRenderer.available) { forgeSetStatus('nothing to animate (unknown)'); return; }
+    if (forgeServerMode || !forgeRenderer || !forgeRenderer.available) {
+        forgeSetStatus('Live animation needs WebGL2; use Render still');
+        return;
+    }
     const btn = document.getElementById('forge-animate-btn');
     if (forgeAnimating) {
         forgeRenderer.stop();
@@ -4550,36 +4794,70 @@ function forgeRandomize() {
     forgeWriteControls(r);
     const preset = document.getElementById('forge-preset');
     if (preset) preset.value = '';
-    forgeApply();
-    forgeSetStatus('Surprised you with seed "' + seed + '"');
+    forgeShowRecipeCode(r);
+    if (forgeServerMode) {
+        forgeSetStatus('Surprised you with seed "' + seed + '" — rendering…');
+        forgeServerRender();
+    } else {
+        forgeApply();
+        forgeSetStatus('Surprised you with seed "' + seed + '"');
+    }
 }
 
 function forgeApplyRecipe() {
     if (!window.SDFForge) return;
     const input = document.getElementById('forge-recipe');
     const raw = input ? input.value.trim() : '';
+    if (!raw) {
+        forgeSetStatus('Paste a recipe code (e.g. SF1.0.6.35.285.60.0.42) then Load');
+        return;
+    }
     let r = window.SDFForge.decodeRecipe(raw);
+    let message;
     if (!r) {
         // Not a recipe code — treat whatever was typed as a free-text seed.
-        r = window.SDFForge.recipeFromSeed(raw || 'synthesus');
-        forgeSetStatus('Grew a scene from your text');
+        r = window.SDFForge.recipeFromSeed(raw);
+        message = 'Grew a scene from your text';
     } else {
-        forgeSetStatus('Loaded recipe');
+        message = 'Loaded recipe ' + window.SDFForge.encodeRecipe(r);
     }
     forgeWriteControls(r);
     const preset = document.getElementById('forge-preset');
     if (preset) preset.value = '';
-    forgeApply();
+    forgeShowRecipeCode(r);
+    if (forgeServerMode) {
+        forgeSetStatus(message + ' — rendering…');
+        forgeServerRender();
+    } else {
+        forgeApply();
+        forgeSetStatus(message);
+    }
 }
 
 function forgeCopyRecipe() {
     const code = forgeShowRecipeCode(forgeReadRecipe());
+    if (!code) {
+        forgeSetStatus('nothing to copy (unknown)');
+        return;
+    }
+    var copied = false;
     try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(code);
+            copied = true;
         }
-    } catch (e) { /* clipboard may be blocked; the code is still shown in the field */ }
-    forgeSetStatus('Copied recipe ' + code);
+    } catch (e) { /* clipboard may be blocked */ }
+    // Fallback: select the field so the user can Ctrl/Cmd+C.
+    if (!copied) {
+        const input = document.getElementById('forge-recipe');
+        if (input) {
+            input.focus();
+            input.select();
+        }
+        forgeSetStatus('Select and copy: ' + code);
+        return;
+    }
+    forgeSetStatus('Copied ' + code);
 }
 
 function forgeLoadPreset() {
@@ -4589,21 +4867,53 @@ function forgeLoadPreset() {
     if (!name) return;
     const code = window.SDFForge.PRESETS[name];
     const r = window.SDFForge.decodeRecipe(code);
-    if (!r) return;
+    if (!r) {
+        forgeSetStatus('preset unavailable (unknown)');
+        return;
+    }
     forgeWriteControls(r);
-    if (forgeRenderer && forgeRenderer.available) { forgeRenderer.applyRecipe(r); forgeShowRecipeCode(r); forgeRender(); }
-    forgeSetStatus('Preset: ' + name);
+    forgeShowRecipeCode(r);
+    if (forgeServerMode) {
+        forgeSetStatus('Preset: ' + name + ' — rendering…');
+        forgeServerRender();
+    } else if (forgeRenderer && forgeRenderer.available) {
+        forgeRenderer.applyRecipe(r);
+        forgeRender();
+        forgeSetStatus('Preset: ' + name);
+    } else {
+        forgeSetStatus('Preset: ' + name);
+    }
 }
 
 function forgeExport() {
-    if (!forgeRenderer || !forgeRenderer.available) { forgeSetStatus('no frame to export (unknown)'); return; }
+    const code = window.SDFForge ? window.SDFForge.encodeRecipe(forgeReadRecipe()) : 'forge';
+    const link = document.getElementById('forge-download');
+
+    if (forgeServerMode) {
+        const img = document.getElementById('forge-server-img');
+        if (!img || img.hidden || !img.src) {
+            forgeSetStatus('no frame to export — press Render still first');
+            return;
+        }
+        if (link) {
+            link.href = img.src;
+            link.download = 'synthesus-forge-' + code + '.png';
+            link.click();
+        }
+        forgeSetStatus('Exported PNG');
+        return;
+    }
+
+    if (!forgeRenderer || !forgeRenderer.available) {
+        forgeSetStatus('no frame to export (unknown)');
+        return;
+    }
     forgeRenderer.renderStill(forgeAnimating ? (performance.now() / 1000) : 0.0);
     const data = forgeRenderer.toPNG();
     if (!data) { forgeSetStatus('export unavailable (unknown)'); return; }
-    const link = document.getElementById('forge-download');
     if (link) {
         link.href = data;
-        link.download = 'synthesus-forge-' + window.SDFForge.encodeRecipe(forgeReadRecipe()) + '.png';
+        link.download = 'synthesus-forge-' + code + '.png';
         link.click();
     }
     forgeSetStatus('Exported PNG');

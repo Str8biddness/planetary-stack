@@ -8,8 +8,8 @@
     <link rel="icon" type="image/png" sizes="64x64" href="assets/synthesus-mark-64.png">
     <link rel="icon" type="image/png" sizes="32x32" href="assets/synthesus-mark-32.png">
     <link rel="apple-touch-icon" href="assets/synthesus-mark-128.png">
-    <link rel="stylesheet" href="design-system.css?v=20260721n">
-    <link rel="stylesheet" href="styles.css?v=20260721n">
+    <link rel="stylesheet" href="design-system.css?v=20260721p1">
+    <link rel="stylesheet" href="styles.css?v=20260721p1">
     <!-- No external font CDN: the shell assets render locally and remain available offline.
          Uses locally-installed Outfit/Fira Code if present, else a
          native system stack. To pin the exact look later, self-host the woff2 via @font-face. -->
@@ -790,7 +790,7 @@
         </div>
 
         <!-- Image Forge: offline CSG + SDF raymarched procedural image generation -->
-        <div class="window glass-panel forge-window" id="win-forge" style="top: 80px; left: 380px; width: 720px; height: 640px; display: none;">
+        <div class="window glass-panel forge-window" id="win-forge" style="top: 80px; left: 380px; width: 760px; height: 700px; display: none;">
             <div class="window-header" onmousedown="dragWindow(event, 'win-forge')">
                 <span class="window-title">Image forge</span>
                 <div class="window-controls">
@@ -804,25 +804,34 @@
                     Every pixel is computed from geometry — signed distance fields combined by
                     constructive solid geometry (union, intersection, difference), scaled by
                     fractal folding. No bitmap, no network, no model. The image is a real
-                    evaluation of the scene, not a fabrication.
+                    evaluation of the scene, not a fabrication. Four scenes, six knobs, one
+                    shareable recipe code.
                 </p>
-                <div class="forge-stage">
-                    <canvas id="forge-canvas" class="forge-canvas" width="640" height="360" data-testid="forge-canvas"></canvas>
+                <div class="forge-stage" id="forge-stage" data-testid="forge-stage">
+                    <canvas id="forge-canvas" class="forge-canvas" width="640" height="360" data-testid="forge-canvas" aria-label="Interactive forge preview"></canvas>
+                    <img id="forge-server-img" class="forge-server-img" alt="Server-rendered forge still" hidden data-testid="forge-server-img">
+                    <div id="forge-loading" class="forge-loading" data-testid="forge-loading" hidden role="status" aria-live="polite">
+                        <span class="forge-loading-dot" aria-hidden="true"></span>
+                        Rendering on this machine…
+                    </div>
                     <div id="forge-unavailable" class="forge-unavailable" data-testid="forge-unavailable" hidden>
-                        WebGL2 is unavailable on this surface — the forge renders nothing rather
-                        than show a fabricated frame. Status: <span id="forge-status-detail">unknown</span>
+                        Nothing to show yet. Status:
+                        <span id="forge-status-detail">unknown</span>
+                    </div>
+                    <div id="forge-empty" class="forge-empty" data-testid="forge-empty">
+                        Choose a preset or press Render still.
                     </div>
                 </div>
                 <div class="forge-controls">
                     <label class="forge-field">
                         <span>Preset</span>
-                        <select id="forge-preset" class="glass-input" data-testid="forge-preset" onchange="forgeLoadPreset()">
+                        <select id="forge-preset" class="glass-input" data-testid="forge-preset" onchange="forgeLoadPreset()" aria-label="Preset">
                             <option value="">Custom…</option>
                         </select>
                     </label>
                     <label class="forge-field">
                         <span>Scene</span>
-                        <select id="forge-mode" class="glass-input" data-testid="forge-mode" onchange="forgeApply()">
+                        <select id="forge-mode" class="glass-input" data-testid="forge-mode" onchange="forgeApply()" aria-label="Scene">
                             <option value="0">Boolean sculpture</option>
                             <option value="1">Infinite carved field</option>
                             <option value="2">Menger sponge</option>
@@ -831,15 +840,15 @@
                     </label>
                     <label class="forge-field">
                         <span>Fractal depth</span>
-                        <input id="forge-iters" type="range" min="1" max="10" value="6" data-testid="forge-iters" oninput="forgeApply()">
+                        <input id="forge-iters" type="range" min="1" max="10" value="6" data-testid="forge-iters" oninput="forgeApply()" aria-label="Fractal depth">
                     </label>
                     <label class="forge-field">
                         <span>Smooth blend</span>
-                        <input id="forge-blend" type="range" min="0" max="100" value="35" data-testid="forge-blend" oninput="forgeApply()">
+                        <input id="forge-blend" type="range" min="0" max="100" value="35" data-testid="forge-blend" oninput="forgeApply()" aria-label="Smooth blend">
                     </label>
                     <label class="forge-field">
                         <span>Palette</span>
-                        <select id="forge-palette" class="glass-input" data-testid="forge-palette" onchange="forgeApply()">
+                        <select id="forge-palette" class="glass-input" data-testid="forge-palette" onchange="forgeApply()" aria-label="Palette">
                             <option value="0">Amethyst</option>
                             <option value="1">Magenta bloom</option>
                             <option value="2">Ultraviolet</option>
@@ -848,29 +857,54 @@
                     </label>
                     <label class="forge-field">
                         <span>Accent hue</span>
-                        <input id="forge-hue" type="range" min="260" max="320" value="285" data-testid="forge-hue" oninput="forgeApply()">
+                        <input id="forge-hue" type="range" min="260" max="320" value="285" data-testid="forge-hue" oninput="forgeApply()" aria-label="Accent hue">
                     </label>
                     <label class="forge-field">
                         <span>Glow</span>
-                        <input id="forge-glow" type="range" min="0" max="100" value="60" data-testid="forge-glow" oninput="forgeApply()">
+                        <input id="forge-glow" type="range" min="0" max="100" value="60" data-testid="forge-glow" oninput="forgeApply()" aria-label="Glow">
                     </label>
                     <label class="forge-field">
                         <span>Camera pull-back</span>
-                        <input id="forge-cam" type="range" min="30" max="52" value="42" data-testid="forge-cam" oninput="forgeApply()">
+                        <input id="forge-cam" type="range" min="30" max="52" value="42" data-testid="forge-cam" oninput="forgeApply()" aria-label="Camera pull-back">
+                    </label>
+                    <label class="forge-field">
+                        <span>Resolution</span>
+                        <select id="forge-resolution" class="glass-input" data-testid="forge-resolution" onchange="forgeOnQualityChange()" aria-label="Resolution">
+                            <option value="256">256 px</option>
+                            <option value="512" selected>512 px</option>
+                            <option value="768">768 px</option>
+                            <option value="1024">1024 px</option>
+                            <option value="1536">1536 px</option>
+                            <option value="2048">2048 px</option>
+                        </select>
+                    </label>
+                    <label class="forge-field">
+                        <span>Quality</span>
+                        <select id="forge-quality" class="glass-input" data-testid="forge-quality" onchange="forgeOnQualityChange()" aria-label="Quality">
+                            <option value="16">Draft (16)</option>
+                            <option value="32">Fast (32)</option>
+                            <option value="48" selected>Balanced (48)</option>
+                            <option value="64">Fine (64)</option>
+                            <option value="96">High (96)</option>
+                            <option value="128">Max (128)</option>
+                        </select>
                     </label>
                 </div>
                 <div class="forge-recipe-row">
+                    <label class="forge-recipe-label" for="forge-recipe">Recipe code</label>
                     <input id="forge-recipe" class="glass-input forge-recipe-input" data-testid="forge-recipe"
-                        placeholder="recipe code, e.g. SF1.0.6.42.285.60.0.42" aria-label="Recipe code">
-                    <button class="ds-btn" onclick="forgeApplyRecipe()" data-testid="forge-load-recipe-btn">Load</button>
-                    <button class="ds-btn" onclick="forgeCopyRecipe()" data-testid="forge-copy-btn">Copy</button>
-                    <button class="ds-btn" onclick="forgeRandomize()" data-testid="forge-randomize-btn">Surprise me</button>
+                        placeholder="SF1.0.6.35.285.60.0.42" aria-label="Recipe code"
+                        spellcheck="false" autocomplete="off"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();forgeApplyRecipe();}">
+                    <button type="button" class="ds-btn" onclick="forgeApplyRecipe()" data-testid="forge-load-recipe-btn" title="Load recipe code into the controls">Load</button>
+                    <button type="button" class="ds-btn" onclick="forgeCopyRecipe()" data-testid="forge-copy-btn" title="Copy the shareable recipe code">Copy</button>
+                    <button type="button" class="ds-btn" onclick="forgeRandomize()" data-testid="forge-randomize-btn">Surprise me</button>
                 </div>
                 <div class="forge-actions">
-                    <button class="ds-btn ds-btn-primary" onclick="forgeToggleAnim()" data-testid="forge-animate-btn" id="forge-animate-btn">Animate</button>
-                    <button class="ds-btn" onclick="forgeRender()" data-testid="forge-render-btn">Render still</button>
-                    <button class="ds-btn" onclick="forgeExport()" data-testid="forge-export-btn">Export PNG</button>
-                    <span id="forge-status" class="forge-statusline" data-testid="forge-status">Ready</span>
+                    <button type="button" class="ds-btn ds-btn-primary" onclick="forgeToggleAnim()" data-testid="forge-animate-btn" id="forge-animate-btn">Animate</button>
+                    <button type="button" class="ds-btn ds-btn-primary" onclick="forgeRender()" data-testid="forge-render-btn" id="forge-render-btn">Render still</button>
+                    <button type="button" class="ds-btn" onclick="forgeExport()" data-testid="forge-export-btn" id="forge-export-btn">Export PNG</button>
+                    <span id="forge-status" class="forge-statusline" data-testid="forge-status" role="status" aria-live="polite">Ready</span>
                 </div>
                 <a id="forge-download" style="display:none;" data-testid="forge-download"></a>
             </div>
@@ -928,7 +962,7 @@
         </button>
     </nav>
 
-    <script src="script.js?v=20260721n"></script>
+    <script src="script.js?v=20260721p1"></script>
     <script src="assets/sdf_forge.js?v=2"></script>
     <script src="hyperspace.js?v=5"></script>
 
