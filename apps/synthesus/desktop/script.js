@@ -250,7 +250,7 @@ async function fetchOSStatus() {
         const bridgeEl = document.getElementById('sys-bridge');
         if(bridgeEl) {
             bridgeEl.innerText = data['peripheral_bridge_active'] ? 'ACTIVE' : 'INACTIVE';
-            bridgeEl.style.background = data['peripheral_bridge_active'] ? '#38bdf8' : '#333';
+            bridgeEl.style.background = data['peripheral_bridge_active'] ? 'var(--purple-light)' : '#333';
             bridgeEl.style.color = data['peripheral_bridge_active'] ? '#000' : '#fff';
         }
 
@@ -279,7 +279,7 @@ async function fetchOSStatus() {
                 if (entropyEl) {
                     entropyEl.innerText = entropyStr;
                     if (parseFloat(entropyStr) > 0.5) entropyEl.style.color = "#ef4444";
-                    else entropyEl.style.color = "#facc15";
+                    else entropyEl.style.color = "var(--purple-light)";
                 }
                 
                 const convEl = document.querySelector('#win-telemetry .window-content > div:nth-child(2) > div:nth-child(1) > div:nth-child(2)');
@@ -294,7 +294,7 @@ async function fetchOSStatus() {
                 document.getElementById('pool-master').innerHTML = `
                     <div style="display:flex; justify-content:space-between;"><span>CPU Usage:</span> <span style="color:#34d399;">${data.cpu_percent != null ? data.cpu_percent + '%' : '—'}</span></div>
                     <div style="display:flex; justify-content:space-between;"><span>RAM Usage:</span> <span style="color:#818cf8;">${data.ram_percent != null ? data.ram_percent + '%' : '—'}</span></div>
-                    <div style="display:flex; justify-content:space-between;"><span>GPU VRAM:</span> <span style="color:#facc15;">Allocated (QuadBrain)</span></div>
+                    <div style="display:flex; justify-content:space-between;"><span>GPU VRAM:</span> <span style="color:var(--purple-light);">Allocated (QuadBrain)</span></div>
                 `;
 
                 document.getElementById('pool-worker').innerHTML = `
@@ -384,11 +384,13 @@ async function openFile(relPath) {
                 + ' · ' + (data.path || path);
         }
         if (nameEl) nameEl.textContent = data.name || path;
+        if (window.ideFileClick) window.ideFileClick(path, data.content);
     } catch (e) {
         editor.textContent = '// DEGRADED: ' + (e.message || e);
         if (metaEl) metaEl.textContent = 'unreachable';
     }
 }
+window.refreshIDEFiles = fetchIDEFiles;
 
 /** Keep dock buttons lit when their window is open. */
 function syncDockActive() {
@@ -416,7 +418,7 @@ function renderMarkdown(md) {
     h = h.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
     h = h.replace(/^#{1,3} (.*)$/gm, '<div class="md-h">$1</div>');
     h = h.replace(/^\s*[-*] (.*)$/gm, '&bull;&nbsp; $1');
-    h = h.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" style="color:#38bdf8;">$1</a>');
+    h = h.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" style="color:var(--purple-light);">$1</a>');
     h = h.replace(/\n/g, '<br>');
     return h;
 }
@@ -671,7 +673,7 @@ async function sendChatMessage() {
     if(!message) return;
 
     const chatHistory = document.getElementById('chat-history');
-    chatHistory.innerHTML += `<div class="message" style="border-left: 3px solid #facc15;"><strong>User:</strong> ${escapeHtml(message)}</div>`;
+    chatHistory.innerHTML += `<div class="message" style="border-left: 3px solid var(--purple-light);"><strong>User:</strong> ${escapeHtml(message)}</div>`;
     input.value = '';
     chatHistory.scrollTop = chatHistory.scrollHeight;
 
@@ -683,7 +685,7 @@ async function sendChatMessage() {
         return;
     }
     if (intent && intent.mode === 'find') {
-        chatHistory.innerHTML += `<div class="message ai-message"><strong>Synthesus:</strong> <span style="color:#fbbf24;">[find mode]</span> ${escapeHtml(intent.message || '')}
+        chatHistory.innerHTML += `<div class="message ai-message"><strong>Synthesus:</strong> <span style="color:var(--purple-light);">[find mode]</span> ${escapeHtml(intent.message || '')}
             ${intent.alternative ? '<div style="margin-top:6px;font-size:0.85rem;color:#94a3b8;">Alternative: <code>' + escapeHtml(intent.alternative) + '</code></div>' : ''}</div>`;
         chatHistory.scrollTop = chatHistory.scrollHeight;
         return;
@@ -717,7 +719,7 @@ async function sendChatMessage() {
                 if (data.scene_id) setStudioSceneId(data.scene_id);
                 const src = 'data:' + (data.mime_type || 'image/png') + ';base64,' + data.image_base64;
                 if (bubble) {
-                    bubble.innerHTML = '<strong>Synthesus:</strong> <span style="color:#fb923c;">[pass]</span> same world, new knobs'
+                    bubble.innerHTML = '<strong>Synthesus:</strong> <span style="color:var(--purple-light);">[pass]</span> same world, new knobs'
                         + '<div style="margin-top:8px;"><img src="' + src + '" style="max-width:100%;border-radius:8px;"></div>'
                         + '<div style="font-size:0.75rem;color:#64748b;font-family:monospace;">scene stock · not diffusion</div>';
                 }
@@ -732,6 +734,51 @@ async function sendChatMessage() {
         chatHistory.scrollTop = chatHistory.scrollHeight;
         return;
     }
+    if (intent && intent.mode === 'forge') {
+        const thinkId = 'think-' + Date.now();
+        chatHistory.innerHTML += `<div class="message ai-message" id="${thinkId}"><strong>Synthesus:</strong> <span class="thinking-bulb">&#9874;</span> <span style="color:#94a3b8; font-style:italic;">forging graph recipe...</span></div>`;
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+        try {
+            const planRes = await fetch('/api/forge/plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: intent.prompt })
+            });
+            const planData = await planRes.json();
+            if (planRes.ok && planData.code) {
+                const code = planData.code;
+                const renderRes = await fetch('/api/forge/render', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: code, width: 256, height: 256, quality: 32 })
+                });
+                
+                if (renderRes.ok) {
+                    const blob = await renderRes.blob();
+                    const url = URL.createObjectURL(blob);
+                    
+                    const bubble = document.getElementById(thinkId);
+                    if (bubble) {
+                        bubble.innerHTML = '<strong>Synthesus:</strong> <span style="color:var(--purple-light);">[forge]</span> built abstract graph.'
+                            + '<div style="margin-top:8px;"><img src="' + url + '" style="max-width:100%;border-radius:4px;border:1px solid #1e293b;"></div>'
+                            + `<div style="font-size:0.75rem;color:#64748b;font-family:monospace;margin-top:6px;word-break:break-all;">${code}</div>`
+                            + `<button onclick="navigator.clipboard.writeText('${code}')" style="margin-top:4px;background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:0.7rem;">Copy Recipe</button>`;
+                    }
+                    pushImageGallery(url, 'forge');
+                } else {
+                    document.getElementById(thinkId).innerHTML = '<strong>Synthesus:</strong> forge render failed.';
+                }
+            } else {
+                document.getElementById(thinkId).innerHTML = '<strong>Synthesus:</strong> forge compile failed.';
+            }
+        } catch (e) {
+            const bubble = document.getElementById(thinkId);
+            if (bubble) bubble.innerHTML = '<strong>Synthesus:</strong> forge error.';
+        }
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+        return;
+    }
+    
     // SI Image shortcut: "draw a house left of a river…"
     const drawPrompt = (intent && intent.mode === 'draw' && intent.prompt) ? intent.prompt : parseDrawIntent(message);
     if (drawPrompt) {
@@ -775,7 +822,7 @@ async function sendChatMessage() {
             const construction = data.construction || (data.scene_plan && data.scene_plan.construction) || '';
             if (bubble) {
                 bubble.innerHTML =
-                    '<strong>Synthesus:</strong> <span style="color:#38bdf8;">[draw · SI construct]</span> '
+                    '<strong>Synthesus:</strong> <span style="color:var(--purple-light);">[draw · SI construct]</span> '
                     + (voice ? escapeHtml(voice) : ('SI illustration of <em>' + escapeHtml(drawPrompt) + '</em>'))
                     + '<div style="margin-top:8px;"><img src="' + src + '" alt="SI render" style="max-width:100%; border-radius:8px; border:1px solid rgba(56,189,248,.3);"></div>'
                     + '<div style="font-size:0.75rem; color:#64748b; margin-top:6px; font-family:monospace;">'
@@ -831,8 +878,8 @@ async function sendChatMessage() {
         if (data.os_plan) {
             const plan = data.os_plan;
             const planJSON = JSON.stringify(plan).replace(/"/g, '&quot;');
-            let planHtml = `<div style="margin-top: 10px; background: rgba(20, 25, 40, 0.8); border: 1px solid #38bdf8; padding: 10px; border-radius: 8px;">
-                <h4 style="color: #38bdf8; margin-bottom: 5px;">⚠️ OS Action Proposal: ${plan.intent}</h4>
+            let planHtml = `<div style="margin-top: 10px; background: rgba(20, 25, 40, 0.8); border: 1px solid var(--purple-light); padding: 10px; border-radius: 8px;">
+                <h4 style="color: var(--purple-light); margin-bottom: 5px;">⚠️ OS Action Proposal: ${plan.intent}</h4>
                 <div style="font-family: monospace; color: #a78bfa; margin-bottom: 5px;">
                     ${plan.commands.join('<br>')}
                 </div>
@@ -905,7 +952,7 @@ async function approveOSPlan(planStr) {
         });
         const data = await response.json();
         if(data.status === 'success') {
-            chatHistory.innerHTML += `<div class="message ai-message" style="border-left: 3px solid #38bdf8;"><strong>System:</strong> OS Plan successfully executed. Snapshot was taken prior to execution.</div>`;
+            chatHistory.innerHTML += `<div class="message ai-message" style="border-left: 3px solid var(--purple-light);"><strong>System:</strong> OS Plan successfully executed. Snapshot was taken prior to execution.</div>`;
         } else {
             chatHistory.innerHTML += `<div class="message" style="border-left: 3px solid #ef4444;"><strong>System Error:</strong> ${data.message}</div>`;
         }
@@ -973,7 +1020,7 @@ function spawnTerminalWindow() {
         <div class="window-header" onmousedown="dragWindow(event, '${termId}')">
             <span class="window-title" style="color: #4ade80;">_ Terminal [TAB ${termCounter}]</span>
             <div class="window-controls">
-                <button class="win-btn plus" onclick="spawnTerminalWindow()" title="New Tab/Window" style="background: #38bdf8; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; text-decoration: none;">+</button>
+                <button class="win-btn plus" onclick="spawnTerminalWindow()" title="New Tab/Window" style="background: var(--purple-light); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; text-decoration: none;">+</button>
                 <button class="win-btn close" onclick="document.getElementById('${termId}').remove()"></button>
             </div>
         </div>
@@ -2096,7 +2143,7 @@ async function loadLLMSettings() {
 
         onLLMProviderChange();
         if (statusEl && data && data.error) {
-            statusEl.innerHTML = '<span style="color:#fbbf24;">Loaded defaults (runtime: ' +
+            statusEl.innerHTML = '<span style="color:var(--purple-light);">Loaded defaults (runtime: ' +
                 escapeHtml(String(data.error)) + ')</span>';
         }
     } catch (e) {
@@ -2505,7 +2552,7 @@ async function loadImageCapabilities() {
             + '</div><pre style="margin:6px 0 0;white-space:pre-wrap;color:#86efac;">' + escapeHtmlStudio(can)
             + '</pre><pre style="margin:4px 0 0;white-space:pre-wrap;color:#fca5a5;">' + escapeHtmlStudio(cannot) + '</pre>';
         el.style.display = 'block';
-        if (statusEl) statusEl.innerHTML = '<span style="color:#38bdf8;">Capability card loaded (SI ≠ diffusion)</span>';
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--purple-light);">Capability card loaded (SI ≠ diffusion)</span>';
     } catch (e) {
         el.style.display = 'block';
         el.textContent = 'Capabilities unavailable: ' + (e.message || e);
@@ -2520,7 +2567,7 @@ async function runImagePlaylist(name) {
         if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">Generate first for finish job</span>';
         return;
     }
-    if (statusEl) statusEl.innerHTML = '<span style="color:#fbbf24;">Finish playlist "' + escapeHtmlStudio(name) + '"…</span>';
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--purple-light);">Finish playlist "' + escapeHtmlStudio(name) + '"…</span>';
     try {
         const res = await fetch('/api/v1/image', {
             method: 'POST',
@@ -2605,7 +2652,7 @@ async function runImageStudioPass(opts) {
         use_cache: false,
     };
     if (statusEl) {
-        statusEl.innerHTML = '<span style="color:#fb923c;">Re-pass on scene stock · yaw='
+        statusEl.innerHTML = '<span style="color:var(--purple-light);">Re-pass on scene stock · yaw='
             + yaw + '° · grade=' + escapeHtmlStudio(knobs.grade) + '…</span>';
     }
     if (previewEl) {
@@ -2681,7 +2728,7 @@ async function pollImageJob(jobId, statusEl) {
             if (!j) continue;
             if (statusEl) {
                 const pct = j.progress != null ? Math.round(Number(j.progress) * 100) : 0;
-                statusEl.innerHTML = '<span style="color:#38bdf8;">Job '
+                statusEl.innerHTML = '<span style="color:var(--purple-light);">Job '
                     + escapeHtmlStudio(jobId) + ' · ' + escapeHtmlStudio(j.status || '?')
                     + ' · ' + pct + '% · ' + escapeHtmlStudio(j.message || '') + '</span>';
             }
@@ -2763,7 +2810,7 @@ function renderLevelViewer(level) {
 
     // camera marker
     const cam = level.camera || {};
-    ctx.fillStyle = '#38bdf8';
+    ctx.fillStyle = 'var(--purple-light)';
     ctx.font = '9px monospace';
     ctx.fillText(
         'yaw=' + (cam.yaw_deg != null ? Number(cam.yaw_deg).toFixed(0) : '0')
@@ -2826,7 +2873,7 @@ async function reRenderFromLastLevel() {
         if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">No level loaded</span>';
         return;
     }
-    if (statusEl) statusEl.innerHTML = '<span style="color:#38bdf8;">Re-rendering from level stock…</span>';
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--purple-light);">Re-rendering from level stock…</span>';
     try {
         const res = await fetch('/api/v1/image', {
             method: 'POST',
@@ -2858,7 +2905,7 @@ async function exportImageLevel() {
         if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">Prompt or preset required for level export.</span>';
         return;
     }
-    if (statusEl) statusEl.innerHTML = '<span style="color:#38bdf8;">Exporting SI level JSON…</span>';
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--purple-light);">Exporting SI level JSON…</span>';
     try {
         const body = {
             prompt: prompt || 'a house on grass under a sky',
@@ -2953,7 +3000,7 @@ async function runImageStudio(variations, extra) {
         else if (body.frames > 1) msg = 'Rendering ' + body.frames + ' time-of-day frames (same world)…';
         else if (body.views > 1) msg = 'Rendering ' + body.views + ' camera views (orbit)…';
         else if (variations > 1) msg = 'Rendering ' + variations + ' SI seed variations…';
-        statusEl.innerHTML = '<span style="color:#38bdf8;">' + msg + '</span>';
+        statusEl.innerHTML = '<span style="color:var(--purple-light);">' + msg + '</span>';
     }
     if (previewEl) {
         previewEl.style.display = 'flex';
@@ -2980,7 +3027,7 @@ async function runImageStudio(variations, extra) {
         // 202 Accepted — async job
         if (res.status === 202 && data && data.job_id) {
             if (statusEl) {
-                statusEl.innerHTML = '<span style="color:#38bdf8;">Job ' + escapeHtmlStudio(data.job_id)
+                statusEl.innerHTML = '<span style="color:var(--purple-light);">Job ' + escapeHtmlStudio(data.job_id)
                     + ' · ' + escapeHtmlStudio(data.status || 'queued') + '…</span>';
             }
             data = await pollImageJob(data.job_id, statusEl);
@@ -3381,7 +3428,7 @@ async function jobsSubmit() {
 
 function jobsStateBadge(state) {
     const palette = {
-        admitted: ['#facc15', 'ADMITTED'],
+        admitted: ['var(--purple-light)', 'ADMITTED'],
         completed: ['#4ade80', 'COMPLETED'],
         failed: ['#fb7185', 'FAILED'],
         cancelled: ['#94a3b8', 'CANCELLED'],
@@ -3558,7 +3605,7 @@ async function jobsViewResult(jobId, sha256) {
             } else {
                 msg = 'Result unavailable (' + resp.status + ').';
             }
-            body.innerHTML = '<div style="color:#fbbf24; font-size:0.78rem;">' + escapeHtml(msg) + '</div>';
+            body.innerHTML = '<div style="color:var(--purple-light); font-size:0.78rem;">' + escapeHtml(msg) + '</div>';
             return;
         }
         // The endpoint only returns bytes that re-hash to the requested digest,
@@ -3963,7 +4010,7 @@ function psBytes(n) {
 // with a plausible number.
 function dashMetricCard(label, value, sub, percent, options) {
     const opts = options || {};
-    const spark = opts.series ? dashSparkline(opts.series, opts.color || '#38bdf8') : '';
+    const spark = opts.series ? dashSparkline(opts.series, opts.color || 'var(--purple-light)') : '';
     const meter = (percent == null || spark) ? '' :
         '<div class="ps-meter"><span style="width:' + Math.max(0, Math.min(100, percent)) + '%"></span></div>';
     return '<div class="ps-card">' +
@@ -4051,7 +4098,7 @@ async function dashboardRefresh() {
         dashMetricCard('Processor',
             metrics && metrics.cpu_percent != null ? metrics.cpu_percent + '%' : 'unknown',
             'this computer', metrics ? metrics.cpu_percent : null,
-            { icon: '▨', color: '#38bdf8', series: _dashHistory.cpu }) +
+            { icon: '▨', color: 'var(--purple-light)', series: _dashHistory.cpu }) +
         dashMetricCard('Memory',
             mem.percent != null ? mem.percent + '%' : 'unknown',
             mem.used_bytes != null ? psBytes(mem.used_bytes) + ' of ' + psBytes(mem.total_bytes) : 'could not be read',
@@ -4922,4 +4969,366 @@ function forgeExport() {
 function openForge() {
     toggleWindow('win-forge');
     if (document.getElementById('win-forge').style.display !== 'none') forgeInit();
+}
+
+// --- WORKSTREAM C: IDE ADDITIONS ---
+let ideTerminal = null;
+
+function ideInitTerminal() {
+    if (ideTerminal) return;
+    const container = document.getElementById('ide-terminal-container');
+    if (!container) return;
+    ideTerminal = new Terminal({
+        theme: { background: '#0a0a0f', foreground: '#e2e8f0' },
+        fontFamily: "'Fira Code', monospace",
+        fontSize: 13,
+        cursorBlink: true
+    });
+    const fitAddon = new FitAddon.FitAddon();
+    ideTerminal.loadAddon(fitAddon);
+    ideTerminal.open(container);
+    fitAddon.fit();
+    
+    // Connect to backend
+    ensureTerminalCapability().then(config => {
+        const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const sessionId = config.session_id || 'ide-session';
+        const endpoint = `${scheme}://${controllerHost(config)}${config.terminal_ws_path}/${sessionId}`;
+        const ws = new WebSocket(endpoint, ['synthesus-terminal', config.terminal_token]);
+        ws.onopen = () => {
+            ideTerminal.onData(data => ws.send(data));
+            ws.onmessage = e => ideTerminal.write(e.data);
+            window.addEventListener('resize', () => fitAddon.fit());
+        };
+        ws.onerror = (e) => ideTerminal.write(`\\r\\n[IDE Terminal Error]\\r\\n`);
+        ws.onclose = () => ideTerminal.write(`\\r\\n[IDE Terminal Closed]\\r\\n`);
+    }).catch(e => console.error("Could not init IDE terminal", e));
+}
+
+// Resizable Split Panes (C1)
+function setupIdeResizers() {
+    const expMain = document.getElementById('resizer-exp-main');
+    const mainPreview = document.getElementById('resizer-main-preview');
+    const editorTerm = document.getElementById('resizer-editor-term');
+    
+    const expPane = document.getElementById('ide-explorer-pane');
+    const previewPane = document.getElementById('ide-preview-pane');
+    const termPane = document.getElementById('ide-terminal-pane');
+
+    // Load persisted sizes
+    if (localStorage.getItem('ide-exp-width')) expPane.style.flexBasis = localStorage.getItem('ide-exp-width');
+    if (localStorage.getItem('ide-preview-width')) previewPane.style.flexBasis = localStorage.getItem('ide-preview-width');
+    if (localStorage.getItem('ide-term-height')) termPane.style.flexBasis = localStorage.getItem('ide-term-height');
+
+    function createResizer(resizer, target, prop, dimension, invert=false) {
+        if (!resizer || !target) return;
+        let isResizing = false;
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.body.style.cursor = resizer.style.cursor;
+            e.preventDefault();
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            const bounds = target.parentElement.getBoundingClientRect();
+            let newSize = 0;
+            if (dimension === 'x') {
+                newSize = invert ? bounds.right - e.clientX : e.clientX - bounds.left;
+            } else {
+                newSize = invert ? bounds.bottom - e.clientY : e.clientY - bounds.top;
+            }
+            target.style.flexBasis = `${newSize}px`;
+        });
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                document.body.style.cursor = '';
+                localStorage.setItem(`ide-${prop}`, target.style.flexBasis);
+                if (ideTerminal && ideTerminal._core) {
+                    try { ideTerminal._core._fitAddon.fit(); } catch(e){} // best effort
+                }
+            }
+        });
+    }
+
+    createResizer(expMain, expPane, 'exp-width', 'x');
+    createResizer(mainPreview, previewPane, 'preview-width', 'x', true);
+    createResizer(editorTerm, termPane, 'term-height', 'y', true);
+}
+document.addEventListener('DOMContentLoaded', setupIdeResizers);
+window.addEventListener('load', () => { setTimeout(ideInitTerminal, 1000); });
+
+// AI Code Actions (C3)
+function getIdeSelection() {
+    const editor = document.getElementById('ide-code-editor');
+    let text = window.getSelection().toString();
+    if (editor && (!text || text.length === 0)) {
+        text = editor.value.substring(editor.selectionStart, editor.selectionEnd);
+    }
+    if (!text) {
+        alert("Please select some code in the editor first.");
+        return null;
+    }
+    return text;
+}
+function ideExplainCode() {
+    const sel = getIdeSelection();
+    if (!sel) return;
+    if (document.getElementById('win-chat').style.display === 'none') toggleWindow('win-chat');
+    document.getElementById('chat-input').value = `Explain this code:\n\n\`\`\`\n${sel}\n\`\`\``;
+}
+function ideRefactorCode() {
+    const sel = getIdeSelection();
+    if (!sel) return;
+    if (document.getElementById('win-chat').style.display === 'none') toggleWindow('win-chat');
+    document.getElementById('chat-input').value = `Refactor this code to be cleaner and more efficient:\n\n\`\`\`\n${sel}\n\`\`\``;
+}
+function ideNLToCode() {
+    const sel = getIdeSelection();
+    if (!sel) return;
+    if (document.getElementById('win-chat').style.display === 'none') toggleWindow('win-chat');
+    document.getElementById('chat-input').value = `Convert this natural language to code:\n\n${sel}`;
+}
+
+// Preview Pane (C4)
+function ideUpdatePreview(content, filename) {
+    const preview = document.getElementById('ide-html-preview');
+    if (!preview) return;
+    if (filename.endsWith('.html') || filename.endsWith('.htm')) {
+        preview.srcdoc = content;
+    } else {
+        preview.srcdoc = `<html><body style="font-family:sans-serif;padding:20px;color:#666;">Preview is only available for HTML files.</body></html>`;
+    }
+}
+
+// File CRUD (C2)
+let currentIdePath = null;
+async function ideApiFetch(endpoint, opts={}) {
+    const userToken = localStorage.getItem('synthesus_token');
+    if (!userToken) { alert("Sign in first."); return null; }
+    const res = await fetch(endpoint, {
+        ...opts,
+        headers: { 'Authorization': 'Bearer ' + userToken, ...opts.headers }
+    });
+    return res;
+}
+
+async function ideCreateFile() {
+    const path = prompt("New file name (e.g. index.html):");
+    if (!path) return;
+    const res = await ideApiFetch('/api/ide/files/create', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path: path, content: ''})
+    });
+    if (res && res.ok) alert("File created.");
+    else alert("Failed to create file. It may be outside the permitted root or already exist.");
+    if (window.refreshIDEFiles) window.refreshIDEFiles();
+}
+
+async function ideCreateDir() {
+    const path = prompt("New folder name (e.g. src/):");
+    if (!path) return;
+    const res = await ideApiFetch('/api/ide/files/create', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path: path + '/.keep', content: ''})
+    });
+    if (res && res.ok) alert("Folder created.");
+    else alert("Failed to create folder.");
+    if (window.refreshIDEFiles) window.refreshIDEFiles();
+}
+
+async function ideRenameFile() {
+    if (!currentIdePath) { alert("Select a file first."); return; }
+    const newPath = prompt("Rename to:", currentIdePath);
+    if (!newPath || newPath === currentIdePath) return;
+    const res = await ideApiFetch('/api/ide/files/rename', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({old_path: currentIdePath, new_path: newPath})
+    });
+    if (res && res.ok) {
+        alert("File renamed.");
+        currentIdePath = newPath;
+        document.getElementById('ide-current-file').textContent = currentIdePath;
+        if (window.refreshIDEFiles) window.refreshIDEFiles();
+    } else {
+        alert("Failed to rename file. Target may be outside root.");
+    }
+}
+
+async function ideDeleteFile() {
+    if (!currentIdePath) { alert("Select a file first."); return; }
+    if (!confirm(`Are you sure you want to delete ${currentIdePath}?`)) return;
+    const res = await ideApiFetch(`/api/ide/files/${currentIdePath}`, { method: 'DELETE' });
+    if (res && res.ok) {
+        alert("File deleted.");
+        document.getElementById('ide-current-file').textContent = "Select a file";
+        document.getElementById('ide-code-editor').textContent = "";
+        currentIdePath = null;
+        document.getElementById('ide-file-actions').style.display = 'none';
+        if (window.refreshIDEFiles) window.refreshIDEFiles();
+    } else {
+        alert("Failed to delete file.");
+    }
+}
+
+// Override or inject into existing IDE file click handler
+const originalIdeFileClick = window.ideFileClick || function(){};
+window.ideFileClick = function(path, content) {
+    originalIdeFileClick(path, content);
+    currentIdePath = path;
+    document.getElementById('ide-file-actions').style.display = 'flex';
+    ideUpdatePreview(content, path);
+};
+
+// --- WORKSTREAM C ENHANCEMENTS ---
+
+// Unsaved changes & syntax highlighting
+let currentIdeSavedContent = "";
+const syntaxColors = {
+    keyword: '#c678dd',
+    string: '#98c379',
+    comment: '#5c6370',
+    number: '#d19a66',
+    function: '#61afef'
+};
+
+function ideHighlightSyntax(text) {
+    let html = escapeHtml(text);
+    
+    // Comments
+    html = html.replace(/(\/\/.*|\/\*[\s\S]*?\*\/)/g, '<span style="color:' + syntaxColors.comment + '">$&</span>');
+    // Strings
+    html = html.replace(/(["'`])(?:(?=(\\?))\2.)*?\1/g, '<span style="color:' + syntaxColors.string + '">$&</span>');
+    // Keywords
+    const keywords = '\b(const|let|var|function|return|if|else|for|while|class|import|export|from|await|async|try|catch|true|false|null|undefined)\b';
+    html = html.replace(new RegExp(keywords, 'g'), '<span style="color:' + syntaxColors.keyword + '">$&</span>');
+    // Numbers
+    html = html.replace(/\b(\d+)\b/g, '<span style="color:' + syntaxColors.number + '">$&</span>');
+    
+    return html + '<br/>'; // extra br for trailing newlines in textarea
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const editor = document.getElementById('ide-code-editor');
+    const highlight = document.getElementById('ide-code-highlight');
+    if (!editor || !highlight) return;
+
+    // Sync scrolling
+    editor.addEventListener('scroll', () => {
+        highlight.scrollTop = editor.scrollTop;
+        highlight.scrollLeft = editor.scrollLeft;
+    });
+
+    // Real-time input handling
+    editor.addEventListener('input', () => {
+        highlight.innerHTML = ideHighlightSyntax(editor.value);
+        
+        // Unsaved indicator
+        const nameEl = document.getElementById('ide-current-file');
+        if (nameEl) {
+            let name = currentIdePath ? currentIdePath.split('/').pop() : 'Select a file';
+            if (editor.value !== currentIdeSavedContent) {
+                nameEl.textContent = '● ' + name;
+                nameEl.style.fontStyle = 'italic';
+            } else {
+                nameEl.textContent = name;
+                nameEl.style.fontStyle = 'normal';
+            }
+        }
+    });
+
+    // Ctrl+S listener
+    editor.addEventListener('keydown', (e) => {
+        // Indentation support
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            editor.value = editor.value.substring(0, start) + '    ' + editor.value.substring(end);
+            editor.selectionStart = editor.selectionEnd = start + 4;
+            editor.dispatchEvent(new Event('input'));
+        }
+        
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            ideSaveFile();
+        }
+    });
+});
+
+async function ideSaveFile() {
+    if (!currentIdePath) return;
+    const editor = document.getElementById('ide-code-editor');
+    const content = editor.value;
+    
+    const res = await ideApiFetch('/api/ide/files/update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path: currentIdePath, content: content})
+    });
+    
+    if (res && res.ok) {
+        currentIdeSavedContent = content;
+        editor.dispatchEvent(new Event('input')); // trigger indicator reset
+        ideUpdatePreview(content, currentIdePath);
+        if (window.refreshIDEFiles) window.refreshIDEFiles();
+    } else {
+        alert("Failed to save file.");
+    }
+}
+
+// C5: Plugin Hooks
+window.ideEventHooks = {
+    onFileSelect: []
+};
+
+window.ideRegisterHook = function(event, callback) {
+    if (window.ideEventHooks[event]) {
+        window.ideEventHooks[event].push(callback);
+    }
+};
+
+// Patch the original openFileFromEl hook to support our new dual-layer editor
+const oldIdeFileClick = window.ideFileClick;
+window.ideFileClick = function(path, content) {
+    const editor = document.getElementById('ide-code-editor');
+    const highlight = document.getElementById('ide-code-highlight');
+    if (editor && highlight) {
+        const text = content != null ? String(content) : '';
+        editor.value = text;
+        currentIdeSavedContent = text;
+        highlight.innerHTML = ideHighlightSyntax(text);
+        editor.dispatchEvent(new Event('input')); // update indicator
+    }
+    
+    if (oldIdeFileClick) oldIdeFileClick(path, content);
+    
+    // Trigger hooks
+    window.ideEventHooks.onFileSelect.forEach(cb => cb(path, content));
+};
+
+// Pop-out Preview (C4 enhancement)
+function idePopOutPreview() {
+    const preview = document.getElementById('ide-html-preview');
+    if (!preview || !preview.srcdoc) return;
+    const win = window.open('', '_blank');
+    if (win) {
+        win.document.open();
+        win.document.write(preview.srcdoc);
+        win.document.close();
+    } else {
+        alert("Pop-up blocked. Please allow pop-ups for this site.");
+    }
+}
+
+// Logout functionality
+function appLogout() {
+    if (confirm("Are you sure you want to log out?")) {
+        localStorage.removeItem('synthesus_token');
+        localStorage.removeItem('synthesus_user');
+        window.location.reload();
+    }
 }

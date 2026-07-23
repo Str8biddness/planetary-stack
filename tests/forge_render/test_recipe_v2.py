@@ -80,12 +80,25 @@ def test_determinism():
 @pytest.mark.skipif(not native_available(), reason="native core not built")
 def test_tile_whole_frame_agreement():
     nodes = [NodeV2(op=0, p=(1.0, 0, 0, 0, 0, 0))]
-    rc = RecipeV2(nodes=nodes, root=0)
-    full = render_full_v2(rc, 32, 32, quality=16)
-    tile = render_tile_v2(rc, 32, 32, (0, 0, 16, 32), quality=16)
+    rc = RecipeV2(nodes=nodes, root=0, glow=80) # glow helps trigger bright pixels
+    
+    # Render full with bloom
+    full = render_full_v2(rc, 32, 32, quality=16, bloom_radius=4, bloom_strength=1.0)
+    
+    # Render tile WITH overlap
+    tile_good = render_tile_v2(rc, 32, 32, (0, 0, 16, 32), quality=16, overlap=4, bloom_radius=4, bloom_strength=1.0)
     for y in range(32):
         for x in range(16):
-            assert tile.px(x, y) == full.px(x, y)
+            assert tile_good.px(x, y) == full.px(x, y)
+            
+    # Render tile WITHOUT overlap (this should DIFFER from the full frame near the boundary x=15)
+    tile_bad = render_tile_v2(rc, 32, 32, (0, 0, 16, 32), quality=16, overlap=0, bloom_radius=4, bloom_strength=1.0)
+    differs = False
+    for y in range(32):
+        if tile_bad.px(15, y) != full.px(15, y):
+            differs = True
+            break
+    assert differs, "A tile rendered without overlap should differ from the full frame due to bloom clamping."
 
 def test_native_missing_refusal(monkeypatch):
     import services.forge_render.engine as engine

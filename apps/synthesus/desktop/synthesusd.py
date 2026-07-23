@@ -76,6 +76,7 @@ class ControllerSettings:
     allowed_origins: tuple[str, ...]
     parent_pid: int | None = None
     bind_host: str = "127.0.0.1"
+    ide_root: Path = Path("/")
 
     @classmethod
     def from_environment(cls) -> "ControllerSettings":
@@ -121,6 +122,7 @@ class ControllerSettings:
             allowed_origins=origins,
             parent_pid=int(parent) if parent else None,
             bind_host=bind_host,
+            ide_root=Path(os.environ.get("SYNTHESUS_IDE_ROOT", str(_REPO_ROOT))).expanduser().resolve(),
         )
 
 
@@ -769,6 +771,24 @@ def create_app(
             return JSONResponse(status_code=401, content={"error": "unauthorized"})
         return await asyncio.to_thread(host_metrics.snapshot)
 
+    @app.post("/api/forge/plan")
+    async def forge_plan(request: Request):
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse(status_code=400, content={"error": "invalid_json"})
+            
+        prompt = body.get("prompt", "").strip()
+        if not prompt:
+            return JSONResponse(status_code=400, content={"error": "missing_prompt"})
+            
+        try:
+            from forge_compiler import prompt_to_recipe_v2
+            recipe = prompt_to_recipe_v2(prompt)
+            return JSONResponse(status_code=200, content={"code": recipe.to_code()})
+        except Exception as exc:
+            return JSONResponse(status_code=500, content={"error": "plan_failed", "detail": str(exc)})
+
     @app.post("/api/forge/render")
     async def forge_render(request: Request):
         """Render a forge recipe server-side and return a PNG.
@@ -1064,6 +1084,104 @@ def create_app(
         except DevicePolicyError as exc:
             return JSONResponse(status_code=404, content={"error": str(exc)})
         return {"removed": device_id}
+
+    @app.post("/api/ide/files/create")
+    async def ide_file_create(request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+            
+        path = body.get("path")
+        content = body.get("content", "")
+        if not path or not isinstance(path, str):
+            return JSONResponse(status_code=400, content={"error": "invalid_path"})
+            
+        target = (settings.ide_root / path).resolve()
+        if not target.is_relative_to(settings.ide_root):
+            return JSONResponse(status_code=403, content={"error": "outside_root"})
+            
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            return JSONResponse(status_code=409, content={"error": "file_exists"})
+            
+        target.write_text(content)
+        return {"status": "created", "path": path}
+
+    @app.post("/api/ide/files/update")
+    async def ide_file_update(request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+            
+        path = body.get("path")
+        content = body.get("content", "")
+        if not path or not isinstance(path, str):
+            return JSONResponse(status_code=400, content={"error": "invalid_path"})
+            
+        target = (settings.ide_root / path).resolve()
+        if not target.is_relative_to(settings.ide_root):
+            return JSONResponse(status_code=403, content={"error": "outside_root"})
+            
+        if not target.exists():
+            return JSONResponse(status_code=404, content={"error": "file_not_found"})
+            
+        target.write_text(content)
+        return {"status": "updated", "path": path}
+
+    @app.post("/api/ide/files/rename")
+    async def ide_file_rename(request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+            
+        old_path = body.get("old_path")
+        new_path = body.get("new_path")
+        if not old_path or not new_path or not isinstance(old_path, str) or not isinstance(new_path, str):
+            return JSONResponse(status_code=400, content={"error": "invalid_path"})
+            
+        old_target = (settings.ide_root / old_path).resolve()
+        new_target = (settings.ide_root / new_path).resolve()
+        
+        if not old_target.is_relative_to(settings.ide_root) or not new_target.is_relative_to(settings.ide_root):
+            return JSONResponse(status_code=403, content={"error": "outside_root"})
+            
+        if not old_target.exists():
+            return JSONResponse(status_code=404, content={"error": "not_found"})
+            
+        if new_target.exists():
+            return JSONResponse(status_code=409, content={"error": "file_exists"})
+            
+        new_target.parent.mkdir(parents=True, exist_ok=True)
+        old_target.rename(new_target)
+        return {"status": "renamed"}
+
+    @app.delete("/api/ide/files/{path:path}")
+    async def ide_file_delete(path: str, request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+            
+        target = (settings.ide_root / path).resolve()
+        if not target.is_relative_to(settings.ide_root):
+            return JSONResponse(status_code=403, content={"error": "outside_root"})
+            
+        if not target.exists():
+            return JSONResponse(status_code=404, content={"error": "not_found"})
+            
+        if target.is_dir():
+            import shutil
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+        return {"status": "deleted"}
 
     return app
 

@@ -326,6 +326,29 @@ def jobs_result(job_id, output_sha256):
         "GET", f"/api/jobs/{job_id}/results/{output_sha256}"
     )
 
+@app.route('/api/ide/files/create', methods=['POST'])
+@verify_account
+def ide_file_create_proxy(payload):
+    body = request.get_json(silent=True)
+    return _proxy_controller_jobs("POST", "/api/ide/files/create", body)
+
+@app.route('/api/ide/files/update', methods=['POST'])
+@verify_account
+def ide_file_update_proxy(payload):
+    body = request.get_json(silent=True)
+    return _proxy_controller_jobs("POST", "/api/ide/files/update", body)
+
+@app.route('/api/ide/files/rename', methods=['POST'])
+@verify_account
+def ide_file_rename_proxy(payload):
+    body = request.get_json(silent=True)
+    return _proxy_controller_jobs("POST", "/api/ide/files/rename", body)
+
+@app.route('/api/ide/files/<path:filepath>', methods=['DELETE'])
+@verify_account
+def ide_file_delete_proxy(payload, filepath):
+    return _proxy_controller_jobs("DELETE", f"/api/ide/files/{filepath}")
+
 
 @app.route('/api/system/status', methods=['GET'])
 def get_status():

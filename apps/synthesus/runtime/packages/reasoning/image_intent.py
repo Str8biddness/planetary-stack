@@ -40,6 +40,10 @@ FIND_PREFIX = re.compile(
     r"^(?:\/find|find(?:\s+photo)?|search\s+image|show\s+photo|look\s+up\s+image)\s*[:\-]?\s*",
     re.I,
 )
+FORGE_PREFIX = re.compile(
+    r"^\/forge\s*[:\-]?\s*",
+    re.I,
+)
 PASS_PATTERNS = [
     (re.compile(r"\b(warmer|warm\s+it|more\s+warm)\b", re.I), {"grade": "warm"}),
     (re.compile(r"\b(cooler|cool\s+it|more\s+cool)\b", re.I), {"grade": "cool"}),
@@ -114,6 +118,16 @@ def classify_intent(
                         "pass_knobs": knobs,
                         "label": "multi-pass on scene stock",
                     }
+
+    # Forge mode
+    m_forge = FORGE_PREFIX.match(text)
+    if m_forge:
+        q = text[m_forge.end():].strip() or text
+        return {
+            "mode": "forge",
+            "prompt": q,
+            "label": "forge abstract pattern",
+        }
 
     # Find mode
     m_find = FIND_PREFIX.match(text)
@@ -195,6 +209,7 @@ def capability_card() -> dict[str, Any]:
             "find": "retrieve media (labeled; API optional)",
             "talk": "chat only",
             "pass": "re-render scene stock",
+            "forge": "forge abstract pattern",
         },
         "si_vs_ai": (
             "Synthesus SI builds form; optional LLM only plans recipes. "
