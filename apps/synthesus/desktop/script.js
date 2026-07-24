@@ -4613,3 +4613,19 @@ function openForge() {
     toggleWindow('win-forge');
     if (document.getElementById('win-forge').style.display !== 'none') forgeInit();
 }
+
+function showGuideTab(tabId) {
+    document.querySelectorAll('.guide-tab').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.guide-nav-btn').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.color = '#94a3b8';
+    });
+    const target = document.getElementById(tabId);
+    if (target) target.style.display = 'block';
+    
+    const activeBtn = Array.from(document.querySelectorAll('.guide-nav-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+        activeBtn.style.color = '#fff';
+    }
+}

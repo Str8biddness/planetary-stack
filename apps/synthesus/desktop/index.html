@@ -789,6 +789,92 @@
             </div>
         </div>
 
+        <!-- Welcome Guide / Onboarding -->
+        <div class="window glass-panel" id="win-guide" style="top: 100px; left: 150px; width: 680px; height: 500px; display: none;">
+            <div class="window-header" onmousedown="dragWindow(event, 'win-guide')">
+                <span class="window-title">🧭 Welcome Guide</span>
+                <div class="window-controls">
+                    <button class="win-btn minimize" onclick="minimizeWindow(this)" style="background: #facc15;"></button>
+                    <button class="win-btn maximize" onclick="maximizeWindow(this)" style="background: #22c55e;"></button>
+                    <button class="win-btn close" onclick="toggleWindow('win-guide')"></button>
+                </div>
+            </div>
+            <div class="window-content" style="display: flex; padding: 0;">
+                <!-- Sidebar -->
+                <div style="width: 220px; border-right: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); display: flex; flex-direction: column;">
+                    <div style="padding: 15px; font-weight: bold; color: #38bdf8; letter-spacing: 1px; border-bottom: 1px solid rgba(255,255,255,0.05);">MODULES</div>
+                    <button class="guide-nav-btn active" onclick="showGuideTab('guide-intro')" style="text-align: left; padding: 12px 15px; background: transparent; border: none; color: #fff; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05);">Welcome to Synthesus</button>
+                    <button class="guide-nav-btn" onclick="showGuideTab('guide-chat')" style="text-align: left; padding: 12px 15px; background: transparent; border: none; color: #94a3b8; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05);">🧠 Quadbrain Chat</button>
+                    <button class="guide-nav-btn" onclick="showGuideTab('guide-forge')" style="text-align: left; padding: 12px 15px; background: transparent; border: none; color: #94a3b8; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05);">🎨 Image Forge</button>
+                    <button class="guide-nav-btn" onclick="showGuideTab('guide-drive')" style="text-align: left; padding: 12px 15px; background: transparent; border: none; color: #94a3b8; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05);">💽 Expansion Drive</button>
+                    <button class="guide-nav-btn" onclick="showGuideTab('guide-vitals')" style="text-align: left; padding: 12px 15px; background: transparent; border: none; color: #94a3b8; cursor: pointer;">📡 System Vitals</button>
+                </div>
+                <!-- Content Area -->
+                <div style="flex: 1; padding: 25px; overflow-y: auto; position: relative;">
+                    <!-- Intro -->
+                    <div id="guide-intro" class="guide-tab" style="display: block;">
+                        <h2 style="margin-top: 0; color: #fff;">The Local-First AI Substrate</h2>
+                        <p style="color: #cbd5e1; line-height: 1.6; font-size: 0.95rem;">
+                            Synthesus is a private, distributed operating system. It moves artificial intelligence out of the cloud and directly onto your hardware.
+                        </p>
+                        <p style="color: #cbd5e1; line-height: 1.6; font-size: 0.95rem;">
+                            <strong>No subscriptions. No data mining. No cloud reliance.</strong>
+                        </p>
+                        <p style="color: #cbd5e1; line-height: 1.6; font-size: 0.95rem;">
+                            Click through the modules on the left to learn how to master your new cognitive desktop.
+                        </p>
+                    </div>
+                    <!-- Chat -->
+                    <div id="guide-chat" class="guide-tab" style="display: none;">
+                        <h2 style="margin-top: 0; color: #fff;">🧠 Quadbrain Chat (SI)</h2>
+                        <p style="color: #cbd5e1; line-height: 1.6; font-size: 0.95rem;">
+                            The Quadbrain is the core reasoning engine. It doesn't just chat—it routes intents.
+                        </p>
+                        <ul style="color: #94a3b8; font-size: 0.9rem; line-height: 1.6;">
+                            <li><strong>Reasoning:</strong> Ask complex questions. Synthesus uses local LLMs to reason securely.</li>
+                            <li><strong>Intent Routing:</strong> Type <code style="color: #facc15;">draw a cyber city</code> and watch the AI seamlessly route your command to the Image Forge.</li>
+                        </ul>
+                        <button class="glass-btn primary-btn" style="margin-top: 15px;" onclick="toggleWindow('win-chat')">Launch Chat</button>
+                    </div>
+                    <!-- Forge -->
+                    <div id="guide-forge" class="guide-tab" style="display: none;">
+                        <h2 style="margin-top: 0; color: #fff;">🎨 Image Forge</h2>
+                        <p style="color: #cbd5e1; line-height: 1.6; font-size: 0.95rem;">
+                            The Image Forge generates complex visual scenes entirely on-device using WebGL2 and Signed Distance Fields.
+                        </p>
+                        <ul style="color: #94a3b8; font-size: 0.9rem; line-height: 1.6;">
+                            <li><strong>Zero Cloud:</strong> Generates instantly without waiting for an API.</li>
+                            <li><strong>Procedural Power:</strong> Use fractal depth, palettes, and camera settings to sculpt mathematical art.</li>
+                        </ul>
+                        <button class="glass-btn primary-btn" style="margin-top: 15px;" onclick="openForge()">Launch Forge</button>
+                    </div>
+                    <!-- Drive -->
+                    <div id="guide-drive" class="guide-tab" style="display: none;">
+                        <h2 style="margin-top: 0; color: #fff;">💽 Expansion Drive</h2>
+                        <p style="color: #cbd5e1; line-height: 1.6; font-size: 0.95rem;">
+                            Ground your AI in your own reality. The Expansion Drive allows you to ingest personal notes, documents, and data into a local vector knowledge base.
+                        </p>
+                        <p style="color: #cbd5e1; line-height: 1.6; font-size: 0.95rem;">
+                            Once built, the Quadbrain uses this drive to provide hyper-personalized answers based on <strong>your</strong> files.
+                        </p>
+                        <button class="glass-btn primary-btn" style="margin-top: 15px;" onclick="toggleWindow('win-drive')">Launch Drive</button>
+                    </div>
+                    <!-- Vitals -->
+                    <div id="guide-vitals" class="guide-tab" style="display: none;">
+                        <h2 style="margin-top: 0; color: #fff;">📡 System Vitals</h2>
+                        <p style="color: #cbd5e1; line-height: 1.6; font-size: 0.95rem;">
+                            Transparency is security. System Vitals provides a live read-out of your machine's state and active cryptographic proofs.
+                        </p>
+                        <ul style="color: #94a3b8; font-size: 0.9rem; line-height: 1.6;">
+                            <li><strong>Live Readouts:</strong> Watch network connections and active node statuses.</li>
+                            <li><strong>Zero Telemetry:</strong> Verifies that your data is staying exactly where it belongs—on your machine.</li>
+                        </ul>
+                        <button class="glass-btn primary-btn" style="margin-top: 15px;" onclick="toggleVitals()">View Vitals</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Image Forge: offline CSG + SDF raymarched procedural image generation -->
         <div class="window glass-panel forge-window" id="win-forge" style="top: 80px; left: 380px; width: 720px; height: 640px; display: none;">
             <div class="window-header" onmousedown="dragWindow(event, 'win-forge')">
@@ -881,6 +967,9 @@
             <span class="dock-ico"><img src="assets/synthesus-mark-64.png" alt="" width="22" height="22"></span><span class="dock-lbl">Overview</span>
         </button>
         <span class="dock-sep" aria-hidden="true"></span>
+        <button type="button" onclick="toggleWindow('win-guide')" class="dock-btn" data-win="win-guide" title="Welcome Guide">
+            <span class="dock-ico" data-icon="star"></span><span class="dock-lbl">Guide</span>
+        </button>
         <button type="button" onclick="toggleVitals()" class="dock-btn" data-win="win-vitals" title="System Vitals">
             <span class="dock-ico" data-icon="activity"></span><span class="dock-lbl">Vitals</span>
         </button>
