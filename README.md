@@ -53,6 +53,28 @@ identical to the imported `synthesus-os` seed at commit `db72d05`.
 
 ## Start here
 
+### Quick Install (One-Liners)
+
+Copy and paste the command for your operating system into your terminal. This will seamlessly clone the repository, install all dependencies, boot the backend runtime, and launch the frontend UI.
+
+**Ubuntu / Debian / Kali Linux / Mint:**
+```bash
+git clone https://github.com/Str8biddness/planetary-stack.git && cd planetary-stack/apps/synthesus && ./install.sh && ~/.local/bin/synthesus
+```
+
+**Windows 10/11 (WSL2) / Headless Servers:**
+*(Launches the backend and provides a localhost URL you can open in your Windows browser)*
+```bash
+git clone https://github.com/Str8biddness/planetary-stack.git && cd planetary-stack/apps/synthesus && ./install.sh && SYNTHESUS_HEADLESS=1 ~/.local/bin/synthesus
+```
+
+**Arch Linux / Manjaro:**
+```bash
+sudo pacman -Sy --needed git curl && git clone https://github.com/Str8biddness/planetary-stack.git && cd planetary-stack/apps/synthesus && ./install.sh && ~/.local/bin/synthesus
+```
+
+### Manual Testing
+
 ```bash
 make doctor
 make status

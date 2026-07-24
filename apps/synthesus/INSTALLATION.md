@@ -28,16 +28,28 @@ sudo apt update && sudo apt install -y git curl
 
 ---
 
-## 2. Install
+## 2. Quick Install (One-Liners)
 
+Copy and paste the appropriate one-liner for your operating system into your terminal. This will seamlessly clone the repository, run the installer, and launch the application.
+
+**Ubuntu / Debian / Kali Linux / Mint:**
 ```bash
-git clone https://github.com/Str8biddness/synthesus.git
-cd synthesus
-./install.sh
+git clone https://github.com/Str8biddness/planetary-stack.git && cd planetary-stack/apps/synthesus && ./install.sh && ~/.local/bin/synthesus
 ```
 
-It will ask for `sudo` **once** (to install system packages). Total time: ~5–15 min on a
-normal connection (most of it is the ~2 GB model download). On a slow disk/network it's
+**Windows 10/11 (WSL2) / Headless Servers:**
+*(Launches the backend and provides a localhost URL you can open in your Windows browser)*
+```bash
+git clone https://github.com/Str8biddness/planetary-stack.git && cd planetary-stack/apps/synthesus && ./install.sh && SYNTHESUS_HEADLESS=1 ~/.local/bin/synthesus
+```
+
+**Arch Linux / Manjaro:**
+```bash
+sudo pacman -Sy --needed git curl && git clone https://github.com/Str8biddness/planetary-stack.git && cd planetary-stack/apps/synthesus && ./install.sh && ~/.local/bin/synthesus
+```
+
+The installer will ask for `sudo` **once** (to install system packages like python and GTK components). Total time: ~5–15 min on a
+normal connection (most of it is the ~2 GB AI model download). On a slow disk/network it's
 longer — that's normal.
 
 ---
