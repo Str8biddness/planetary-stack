@@ -174,6 +174,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     setInterval(fetchOSStatus, 2000);
     
+    // Welcome Guide logic
+    const showGuide = localStorage.getItem('synthesus_show_guide');
+    if (showGuide !== 'false') {
+        const guideWin = document.getElementById('win-guide');
+        if (guideWin) {
+            guideWin.style.display = 'block';
+            focusWindow(guideWin);
+        }
+    }
+    const guideToggle = document.getElementById('set-show-guide');
+    if (guideToggle) {
+        guideToggle.checked = showGuide !== 'false';
+    }
+    
     // LLM Health Banner Check
     try {
         const hRes = await fetch('/api/v1/health');
@@ -4628,4 +4642,8 @@ function showGuideTab(tabId) {
         activeBtn.classList.add('active');
         activeBtn.style.color = '#fff';
     }
+}
+
+function settingsSaveGuide(checked) {
+    localStorage.setItem('synthesus_show_guide', checked ? 'true' : 'false');
 }
