@@ -76,6 +76,7 @@ class ControllerSettings:
     allowed_origins: tuple[str, ...]
     parent_pid: int | None = None
     bind_host: str = "127.0.0.1"
+    ide_root: Path = Path("/")
 
     @classmethod
     def from_environment(cls) -> "ControllerSettings":
@@ -121,6 +122,7 @@ class ControllerSettings:
             allowed_origins=origins,
             parent_pid=int(parent) if parent else None,
             bind_host=bind_host,
+            ide_root=Path(os.environ.get("SYNTHESUS_IDE_ROOT", str(_REPO_ROOT))).expanduser().resolve(),
         )
 
 
@@ -769,6 +771,24 @@ def create_app(
             return JSONResponse(status_code=401, content={"error": "unauthorized"})
         return await asyncio.to_thread(host_metrics.snapshot)
 
+    @app.post("/api/forge/plan")
+    async def forge_plan(request: Request):
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse(status_code=400, content={"error": "invalid_json"})
+            
+        prompt = body.get("prompt", "").strip()
+        if not prompt:
+            return JSONResponse(status_code=400, content={"error": "missing_prompt"})
+            
+        try:
+            from forge_compiler import prompt_to_recipe_v2
+            recipe = prompt_to_recipe_v2(prompt)
+            return JSONResponse(status_code=200, content={"code": recipe.to_code()})
+        except Exception as exc:
+            return JSONResponse(status_code=500, content={"error": "plan_failed", "detail": str(exc)})
+
     @app.post("/api/forge/render")
     async def forge_render(request: Request):
         """Render a forge recipe server-side and return a PNG.
@@ -791,7 +811,7 @@ def create_app(
 
         try:
             from services.forge_render import Recipe, render_full, to_png
-            from services.forge_render.engine import native_available
+            from services.forge_render.engine import native_available, RecipeV2, NodeV2, render_full_v2
         except Exception as exc:
             return JSONResponse(
                 status_code=503,
@@ -813,20 +833,51 @@ def create_app(
         code = body.get("code")
         try:
             if isinstance(code, str) and code.strip():
-                recipe = Recipe.from_code(code.strip())
+                if code.strip().startswith("SF2."):
+                    recipe = RecipeV2.from_code(code.strip())
+                    is_v2 = True
+                else:
+                    recipe = Recipe.from_code(code.strip())
+                    is_v2 = False
+            elif "nodes" in body:
+                nodes_data = body["nodes"]
+                nodes = []
+                for n in nodes_data:
+                    nodes.append(NodeV2(
+                        op=int(n.get("op", 0)),
+                        a=int(n.get("a", -1)),
+                        b=int(n.get("b", -1)),
+                        p=tuple(float(x) for x in n.get("p", (0.0,)*6))
+                    ))
+                recipe = RecipeV2(
+                    nodes=nodes,
+                    root=int(body.get("root", 0)),
+                    hue=int(body.get("hue", 285)),
+                    glow=int(body.get("glow", 60)),
+                    palette=int(body.get("palette", 0)),
+                    cam=int(body.get("cam", 42)),
+                )
+                is_v2 = True
             else:
                 fields = ("mode", "iters", "blend", "hue", "glow", "palette", "cam")
                 recipe = Recipe(**{
                     f: int(body[f]) for f in fields if f in body
                 })
+                is_v2 = False
         except Exception as exc:
             return JSONResponse(
                 status_code=400, content={"error": "invalid_recipe", "detail": str(exc)}
             )
 
-        # A pure-Python render of a large frame takes tens of seconds; refuse
-        # rather than hang the controller when the native core is missing.
-        if not native_available() and width * height > 160_000:
+        if is_v2 and not native_available():
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "native_core_missing",
+                    "detail": "build services/forge_render/native (make)",
+                },
+            )
+        elif not is_v2 and not native_available() and width * height > 160_000:
             return JSONResponse(
                 status_code=503,
                 content={
@@ -836,9 +887,14 @@ def create_app(
             )
 
         try:
-            surface = await asyncio.to_thread(
-                render_full, recipe, width, height, quality=quality
-            )
+            if is_v2:
+                surface = await asyncio.to_thread(
+                    render_full_v2, recipe, width, height, quality=quality
+                )
+            else:
+                surface = await asyncio.to_thread(
+                    render_full, recipe, width, height, quality=quality
+                )
             png = await asyncio.to_thread(to_png, surface)
         except Exception as exc:
             return JSONResponse(
@@ -852,6 +908,50 @@ def create_app(
                 "X-Forge-Native": "1" if native_available() else "0",
             },
         )
+
+    @app.get("/api/plans")
+    async def list_plans(request: Request):
+        """Plans, the current plan, and current usage against its limits.
+
+        Usage is returned so the UI can show a limit BEFORE it is reached. A
+        limit a user discovers by something breaking is a bug, not a business
+        model. Any figure that cannot be read is omitted rather than guessed,
+        and the UI renders those as "unknown".
+        """
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        try:
+            from services.plans import DEFAULT_PLAN, all_plans_wire
+        except Exception as exc:
+            return JSONResponse(
+                status_code=503, content={"error": "plans_unavailable", "detail": str(exc)}
+            )
+
+        usage: dict[str, Any] = {}
+        try:
+            usage["devices"] = len(await asyncio.to_thread(device_policy.devices))
+        except Exception:
+            pass  # omitted -> UI shows "unknown"
+        try:
+            from services.plans import get_plan  # noqa: F401
+            characters_dir = (
+                _REPO_ROOT / "apps" / "synthesus" / "runtime" / "packages" / "characters"
+            )
+            usage["characters"] = sum(
+                1 for p in characters_dir.iterdir()
+                if p.is_dir() and (p / "bio.json").exists()
+            )
+        except Exception:
+            pass
+
+        # Billing is not wired, so there is no subscription to read. Saying
+        # "free" is accurate for every current install rather than a placeholder.
+        return {
+            "plans": all_plans_wire(),
+            "current_plan_id": DEFAULT_PLAN,
+            "usage": usage,
+            "billing_connected": False,
+        }
 
     # ---------------------------------------------------------------- settings
 
@@ -984,6 +1084,104 @@ def create_app(
         except DevicePolicyError as exc:
             return JSONResponse(status_code=404, content={"error": str(exc)})
         return {"removed": device_id}
+
+    @app.post("/api/ide/files/create")
+    async def ide_file_create(request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+            
+        path = body.get("path")
+        content = body.get("content", "")
+        if not path or not isinstance(path, str):
+            return JSONResponse(status_code=400, content={"error": "invalid_path"})
+            
+        target = (settings.ide_root / path).resolve()
+        if not target.is_relative_to(settings.ide_root):
+            return JSONResponse(status_code=403, content={"error": "outside_root"})
+            
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            return JSONResponse(status_code=409, content={"error": "file_exists"})
+            
+        target.write_text(content)
+        return {"status": "created", "path": path}
+
+    @app.post("/api/ide/files/update")
+    async def ide_file_update(request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+            
+        path = body.get("path")
+        content = body.get("content", "")
+        if not path or not isinstance(path, str):
+            return JSONResponse(status_code=400, content={"error": "invalid_path"})
+            
+        target = (settings.ide_root / path).resolve()
+        if not target.is_relative_to(settings.ide_root):
+            return JSONResponse(status_code=403, content={"error": "outside_root"})
+            
+        if not target.exists():
+            return JSONResponse(status_code=404, content={"error": "file_not_found"})
+            
+        target.write_text(content)
+        return {"status": "updated", "path": path}
+
+    @app.post("/api/ide/files/rename")
+    async def ide_file_rename(request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse(status_code=400, content={"error": "invalid_request"})
+            
+        old_path = body.get("old_path")
+        new_path = body.get("new_path")
+        if not old_path or not new_path or not isinstance(old_path, str) or not isinstance(new_path, str):
+            return JSONResponse(status_code=400, content={"error": "invalid_path"})
+            
+        old_target = (settings.ide_root / old_path).resolve()
+        new_target = (settings.ide_root / new_path).resolve()
+        
+        if not old_target.is_relative_to(settings.ide_root) or not new_target.is_relative_to(settings.ide_root):
+            return JSONResponse(status_code=403, content={"error": "outside_root"})
+            
+        if not old_target.exists():
+            return JSONResponse(status_code=404, content={"error": "not_found"})
+            
+        if new_target.exists():
+            return JSONResponse(status_code=409, content={"error": "file_exists"})
+            
+        new_target.parent.mkdir(parents=True, exist_ok=True)
+        old_target.rename(new_target)
+        return {"status": "renamed"}
+
+    @app.delete("/api/ide/files/{path:path}")
+    async def ide_file_delete(path: str, request: Request):
+        if not _runtime_authorized(request, settings):
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+            
+        target = (settings.ide_root / path).resolve()
+        if not target.is_relative_to(settings.ide_root):
+            return JSONResponse(status_code=403, content={"error": "outside_root"})
+            
+        if not target.exists():
+            return JSONResponse(status_code=404, content={"error": "not_found"})
+            
+        if target.is_dir():
+            import shutil
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+        return {"status": "deleted"}
 
     return app
 

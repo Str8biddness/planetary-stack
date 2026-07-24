@@ -33,6 +33,8 @@ import math
 from pathlib import Path as _Path
 import struct
 import zlib
+import base64
+import ctypes
 from dataclasses import dataclass
 
 ENGINE_VERSION = "forge-cpu-1"
@@ -78,6 +80,94 @@ class Recipe:
             str(v)
             for v in ("SF1", self.mode, self.iters, self.blend, self.hue, self.glow, self.palette, self.cam)
         )
+
+
+@dataclass(frozen=True)
+class NodeV2:
+    op: int
+    a: int = -1
+    b: int = -1
+    p: tuple[float, float, float, float, float, float] = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+@dataclass(frozen=True)
+class RecipeV2:
+    nodes: list[NodeV2]
+    root: int
+    hue: int = 285
+    glow: int = 60
+    palette: int = 0
+    cam: int = 42
+
+    def __post_init__(self):
+        count = len(self.nodes)
+        if count == 0 or count > 64:
+            raise ValueError(f"invalid node count: {count}")
+        if not (0 <= self.root < count):
+            raise ValueError(f"root index out of range: {self.root}")
+        
+        if not (_HUE_MIN <= self.hue <= _HUE_MAX):
+            raise ValueError(f"hue out of range: {self.hue}")
+        if not (0 <= self.glow <= 100):
+            raise ValueError(f"glow out of range: {self.glow}")
+        if not (0 <= self.palette <= 3):
+            raise ValueError(f"palette out of range: {self.palette}")
+        if not (30 <= self.cam <= 52):
+            raise ValueError(f"cam out of range: {self.cam}")
+
+        valid_ops = {
+            0, 1, 2, 3, 4, 5, 6, 7, 8,
+            20, 21, 22, 23, 24, 25,
+            40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+            60, 61, 62, 63
+        }
+        for i, n in enumerate(self.nodes):
+            if n.op not in valid_ops:
+                raise ValueError(f"unknown op code: {n.op}")
+            if n.a != -1 and not (0 <= n.a < i):
+                raise ValueError(f"node {i}: invalid child a index {n.a}")
+            if n.b != -1 and not (0 <= n.b < i):
+                raise ValueError(f"node {i}: invalid child b index {n.b}")
+
+    @classmethod
+    def from_code(cls, code: str) -> "RecipeV2":
+        if not code.startswith("SF2."):
+            raise ValueError("not an SF2 recipe code")
+        
+        b64 = code[4:]
+        b64 += "=" * ((4 - len(b64) % 4) % 4)
+        try:
+            import binascii
+            data = base64.b64decode(b64, altchars=b'-_', validate=True)
+        except (ValueError, binascii.Error):
+            raise ValueError("invalid base64 encoding")
+        
+        if len(data) < 7:
+            raise ValueError("data too short")
+        
+        hue, glow, palette, cam, root, count = struct.unpack(">hbbbbb", data[:7])
+        
+        node_size = 51
+        if len(data) != 7 + count * node_size:
+            raise ValueError("data length does not match node count")
+            
+        nodes = []
+        for i in range(count):
+            offset = 7 + i * node_size
+            node_data = data[offset:offset+node_size]
+            op, a, b, p0, p1, p2, p3, p4, p5 = struct.unpack(">Bbbdddddd", node_data)
+            nodes.append(NodeV2(op, a, b, (p0, p1, p2, p3, p4, p5)))
+            
+        return cls(nodes=nodes, root=root, hue=hue, glow=glow, palette=palette, cam=cam)
+
+    def to_code(self) -> str:
+        count = len(self.nodes)
+        header = struct.pack(">hbbbbb", self.hue, self.glow, self.palette, self.cam, self.root, count)
+        node_bytes = bytearray()
+        for n in self.nodes:
+            node_bytes.extend(struct.pack(">Bbbdddddd", n.op, n.a, n.b, *n.p))
+        
+        data = header + node_bytes
+        return "SF2." + base64.urlsafe_b64encode(data).decode('ascii').rstrip('=')
 
 
 def _clamp_int(v: int, lo: int, hi: int) -> int:
@@ -317,6 +407,22 @@ class _CRecipe(_ctypes.Structure):
     ]
 
 
+class _CNodeV2(_ctypes.Structure):
+    _fields_ = [
+        ("op", _ctypes.c_int),
+        ("a", _ctypes.c_int),
+        ("b", _ctypes.c_int),
+        ("p", _ctypes.c_double * 6),
+    ]
+
+
+class _CRecipeV2(_ctypes.Structure):
+    _fields_ = [
+        ("hue", _ctypes.c_int), ("glow", _ctypes.c_int), ("palette", _ctypes.c_int),
+        ("cam", _ctypes.c_int), ("root", _ctypes.c_int), ("count", _ctypes.c_int),
+    ]
+
+
 def _native():
     """Load the compiled core once, or return None. Never raises."""
     global _NATIVE, _NATIVE_TRIED
@@ -333,6 +439,14 @@ def _native():
             + [_ctypes.POINTER(_ctypes.c_uint8)]
         )
         lib.forge_render_region.restype = None
+        
+        if hasattr(lib, "forge_render_region_v2"):
+            lib.forge_render_region_v2.argtypes = (
+                [_ctypes.POINTER(_CNodeV2), _ctypes.POINTER(_CRecipeV2)] + [_ctypes.c_int] * 7
+                + [_ctypes.POINTER(_ctypes.c_uint8)]
+            )
+            lib.forge_render_region_v2.restype = None
+            
         _NATIVE = lib
     except OSError:
         _NATIVE = None
@@ -469,6 +583,75 @@ def render_tile(
     x0, y0, x1, y1 = rect
     pad = overlap
     padded = render_region(rc, full_w, full_h, x0 - pad, y0 - pad, x1 + pad, y1 + pad, quality=quality)
+    if bloom_radius > 0:
+        padded = _box_blur_bright(padded, bloom_radius, bloom_strength)
+    cx0 = max(0, x0)
+    cy0 = max(0, y0)
+    cx1 = min(full_w, x1)
+    cy1 = min(full_h, y1)
+    out = Surface(cx0, cy0, cx1 - cx0, cy1 - cy0)
+    for ay in range(cy0, cy1):
+        for ax in range(cx0, cx1):
+            out.set(ax, ay, padded.px(ax, ay))
+    return out
+
+
+def render_region_v2(rc: RecipeV2, full_w: int, full_h: int, x0: int, y0: int, x1: int, y1: int, *, quality: int = 64) -> Surface:
+    x0 = max(0, x0)
+    y0 = max(0, y0)
+    x1 = min(full_w, x1)
+    y1 = min(full_h, y1)
+    lib = _native()
+    if lib is None or not hasattr(lib, "forge_render_region_v2"):
+        raise RuntimeError("native core is missing, run make -C services/forge_render/native")
+    
+    w, h = x1 - x0, y1 - y0
+    if w <= 0 or h <= 0:
+        return Surface(x0, y0, max(0, w), max(0, h))
+        
+    buf = (_ctypes.c_uint8 * (w * h * 3))()
+    
+    nodes_array = (_CNodeV2 * len(rc.nodes))()
+    for i, n in enumerate(rc.nodes):
+        nodes_array[i].op = n.op
+        nodes_array[i].a = n.a
+        nodes_array[i].b = n.b
+        nodes_array[i].p = (ctypes.c_double * 6)(*n.p)
+        
+    cr = _CRecipeV2(rc.hue, rc.glow, rc.palette, rc.cam, rc.root, len(rc.nodes))
+    
+    lib.forge_render_region_v2(
+        nodes_array, _ctypes.byref(cr), full_w, full_h, x0, y0, x1, y1, quality, buf
+    )
+    return Surface(x0, y0, w, h, bytearray(buf))
+
+
+def render_full_v2(rc: RecipeV2, w: int, h: int, *, quality: int = 64, bloom_radius: int = 0, bloom_strength: float = 0.0) -> Surface:
+    surf = render_region_v2(rc, w, h, 0, 0, w, h, quality=quality)
+    if bloom_radius > 0:
+        surf = _box_blur_bright(surf, bloom_radius, bloom_strength)
+    return surf
+
+
+def render_tile_v2(
+    rc: RecipeV2,
+    full_w: int,
+    full_h: int,
+    rect: tuple[int, int, int, int],
+    *,
+    quality: int = 64,
+    overlap: int = 0,
+    bloom_radius: int = 0,
+    bloom_strength: float = 0.0,
+    engine_version: str = ENGINE_VERSION,
+) -> Surface:
+    if engine_version != ENGINE_VERSION:
+        raise EngineVersionMismatch(
+            f"job pinned engine {engine_version!r}; this node runs {ENGINE_VERSION!r}"
+        )
+    x0, y0, x1, y1 = rect
+    pad = overlap
+    padded = render_region_v2(rc, full_w, full_h, x0 - pad, y0 - pad, x1 + pad, y1 + pad, quality=quality)
     if bloom_radius > 0:
         padded = _box_blur_bright(padded, bloom_radius, bloom_strength)
     cx0 = max(0, x0)

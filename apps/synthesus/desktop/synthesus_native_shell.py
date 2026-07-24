@@ -261,6 +261,37 @@ def _proxy_controller_jobs(method, path, payload=None):
     return (r.content, r.status_code, {"Content-Type": content_type})
 
 
+@app.route('/api/forge/render', methods=['POST'])
+def forge_render_proxy():
+    """Shell → controller hop for server-side forge rendering.
+
+    The GTK/WebKit shell has no WebGL2, so the interactive canvas cannot run
+    there. The browser POSTs here; this hop attaches the per-install API key
+    and forwards to synthesusd's CPU renderer. The browser never sees the key.
+    Returns the PNG bytes (or the controller's JSON error) unchanged.
+    """
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"error": "invalid_request"}), 400
+    try:
+        r = requests.post(
+            f"{_CONTROLLER_URL}/api/forge/render",
+            headers={"X-API-Key": _runtime_api_key(), "Content-Type": "application/json"},
+            json=body,
+            timeout=120,
+        )
+    except Exception as e:
+        return jsonify({"error": "controller_unavailable", "message": str(e)}), 503
+
+    # Forward the PNG (or error JSON) and the recipe/native headers the UI reads.
+    headers = {"Content-Type": r.headers.get("Content-Type", "application/octet-stream")}
+    for name in ("X-Forge-Recipe", "X-Forge-Native"):
+        value = r.headers.get(name)
+        if value:
+            headers[name] = value
+    return (r.content, r.status_code, headers)
+
+
 @app.route('/api/jobs', methods=['POST'])
 def jobs_submit():
     if not _human_identity_from_request():
@@ -294,6 +325,29 @@ def jobs_result(job_id, output_sha256):
     return _proxy_controller_jobs(
         "GET", f"/api/jobs/{job_id}/results/{output_sha256}"
     )
+
+@app.route('/api/ide/files/create', methods=['POST'])
+@verify_account
+def ide_file_create_proxy(payload):
+    body = request.get_json(silent=True)
+    return _proxy_controller_jobs("POST", "/api/ide/files/create", body)
+
+@app.route('/api/ide/files/update', methods=['POST'])
+@verify_account
+def ide_file_update_proxy(payload):
+    body = request.get_json(silent=True)
+    return _proxy_controller_jobs("POST", "/api/ide/files/update", body)
+
+@app.route('/api/ide/files/rename', methods=['POST'])
+@verify_account
+def ide_file_rename_proxy(payload):
+    body = request.get_json(silent=True)
+    return _proxy_controller_jobs("POST", "/api/ide/files/rename", body)
+
+@app.route('/api/ide/files/<path:filepath>', methods=['DELETE'])
+@verify_account
+def ide_file_delete_proxy(payload, filepath):
+    return _proxy_controller_jobs("DELETE", f"/api/ide/files/{filepath}")
 
 
 @app.route('/api/system/status', methods=['GET'])

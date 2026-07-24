@@ -24,7 +24,8 @@ import heapq
 import threading
 from dataclasses import dataclass
 
-from .engine import ENGINE_VERSION, EngineVersionMismatch, Recipe, Surface, composite, render_tile
+from .engine import ENGINE_VERSION, EngineVersionMismatch, Recipe, RecipeV2, Surface, composite, render_tile, render_tile_v2
+import typing
 
 # Relative per-scene weight — heavier scenes cost more per pixel to march.
 _SCENE_WEIGHT = (1.0, 1.1, 1.6, 1.5)
@@ -32,7 +33,7 @@ _SCENE_WEIGHT = (1.0, 1.1, 1.6, 1.5)
 
 @dataclass(frozen=True)
 class RenderJob:
-    recipe: Recipe
+    recipe: typing.Union[Recipe, RecipeV2]
     full_w: int
     full_h: int
     engine_version: str = ENGINE_VERSION
@@ -95,9 +96,11 @@ def capability_weighted_tiles(w: int, h: int, workers: list[Worker], *, per_work
     return split_tiles(w, h, cols, rows)
 
 
-def estimate_cost(recipe: Recipe, w: int, h: int, *, quality: int = 64) -> float:
+def estimate_cost(recipe: typing.Union[Recipe, RecipeV2], w: int, h: int, *, quality: int = 64) -> float:
     """Abstract cost ~ ray-march evaluations. Used only for the local/distribute
     decision, never presented to the user as a real time."""
+    if isinstance(recipe, RecipeV2):
+        return float(w) * float(h) * float(quality) * 1.5 * len(recipe.nodes)
     return float(w) * float(h) * float(quality) * _SCENE_WEIGHT[recipe.mode % len(_SCENE_WEIGHT)]
 
 
@@ -146,17 +149,30 @@ class WorkStealingScheduler:
         return matching
 
     def _render_tile(self, node_id: str, rect: tuple[int, int, int, int]) -> TileResult:
-        surf = render_tile(
-            self.job.recipe,
-            self.job.full_w,
-            self.job.full_h,
-            rect,
-            quality=self.job.quality,
-            overlap=self.job.overlap,
-            bloom_radius=self.job.bloom_radius,
-            bloom_strength=self.job.bloom_strength,
-            engine_version=self.job.engine_version,  # refuses on mismatch
-        )
+        if isinstance(self.job.recipe, RecipeV2):
+            surf = render_tile_v2(
+                self.job.recipe,
+                self.job.full_w,
+                self.job.full_h,
+                rect,
+                quality=self.job.quality,
+                overlap=self.job.overlap,
+                bloom_radius=self.job.bloom_radius,
+                bloom_strength=self.job.bloom_strength,
+                engine_version=self.job.engine_version,
+            )
+        else:
+            surf = render_tile(
+                self.job.recipe,
+                self.job.full_w,
+                self.job.full_h,
+                rect,
+                quality=self.job.quality,
+                overlap=self.job.overlap,
+                bloom_radius=self.job.bloom_radius,
+                bloom_strength=self.job.bloom_strength,
+                engine_version=self.job.engine_version,
+            )
         return TileResult(node_id=node_id, rect=rect, surface=surf)
 
     def render(
